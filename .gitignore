@@ -1,68 +1,131 @@
-# Prerequisites
-*.d
+# ---------------------------------------------------------------
+# Сборка C++ (CMake, Ninja, Conan)
+# ---------------------------------------------------------------
+/build/
+/build-*/
+/out/
+cmake-build-*/
+CMakeUserPresets.json
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+Testing/
+compile_commands.json
+conan.lock.bak
+.conan2/
 
-# Compiled Object files
-*.slo
-*.lo
+# Объектные файлы и бинарники
 *.o
 *.obj
-
-# Precompiled Headers
-*.gch
-*.pch
-
-# Linker files
-*.ilk
-
-# Debugger Files
-*.pdb
-
-# Compiled Dynamic libraries
+*.lo
+*.slo
+*.a
+*.la
+*.lai
+*.lib
 *.so
+*.so.*
 *.dylib
 *.dll
-*.so.*
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
-*.lai
-*.la
-*.a
-*.lib
-
-# Executables
 *.exe
 *.out
-*.app
-
-# Build directories
-build/
-Build/
-build-*/
-
-# CMake generated files
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-Makefile
-install_manifest.txt
-compile_commands.json
-
-# Temporary files
-*.tmp
-*.log
-*.bak
-*.swp
-
-# vcpkg
-vcpkg_installed/
-
-# debug information files
 *.dwo
+*.gch
+*.pch
+*.pdb
+*.ilk
 
-# test output & cache
-Testing/
+# Покрытие, профилирование, фаззинг
+*.gcda
+*.gcno
+*.gcov
+*.profraw
+*.profdata
+coverage/
+/fuzz/corpus-*/
+crash-*
+leak-*
+timeout-*
+oom-*
+perf.data*
+callgrind.out.*
+
+# ---------------------------------------------------------------
+# Веб (pnpm, Turborepo, Vite, Vitest, Playwright)
+# ---------------------------------------------------------------
+node_modules/
+.pnpm-store/
+.turbo/
+dist/
+dist-ssr/
+*.tsbuildinfo
+.vite/
+.eslintcache
+.stylelintcache
+playwright-report/
+test-results/
+blob-report/
+/web/**/playwright/.cache/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# ---------------------------------------------------------------
+# Python (вспомогательные инструменты)
+# ---------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---------------------------------------------------------------
+# Документация и проверки
+# ---------------------------------------------------------------
+/site/
+.mmd-check/
+.structurizr/
+docs/architecture/c4/workspace.json
+
+# ---------------------------------------------------------------
+# Локальное окружение, данные и секреты
+# ---------------------------------------------------------------
+.env
+.env.*
+!.env.example
+/deploy/local/data/
+/deploy/local/volumes/
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+!**/testdata/**/*.pem
+!**/testdata/**/*.key
+
+# ---------------------------------------------------------------
+# Редакторы, ОС, ИИ-ассистенты
+# ---------------------------------------------------------------
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
 .cache/
+.claude/
+
+# ---------------------------------------------------------------
+# Временное
+# ---------------------------------------------------------------
+*.tmp
+*.bak
+*.log
+tmp/
