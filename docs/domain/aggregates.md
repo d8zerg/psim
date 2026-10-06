@@ -133,7 +133,7 @@
 
 Неизменяемое значение: `event_id`, `connector_id`, `source_id`, `source_epoch`, `source_seq`, `occurred_at`, `received_at`, `raw_code`, `attributes` (строковый словарь), `trace_context`.
 
-**Правила:** RE1. `source_seq` строго возрастает в пределах источника в рамках одной эпохи источника; эпоха увеличивается при сбросе устройства. RE2. Если `occurred_at` позже `received_at` больше чем на допустимое рассогласование часов, событие помечается `clock_skew`, но не отбрасывается.
+**Правила:** RE1. `source_seq` строго возрастает в пределах источника в рамках одной эпохи источника; эпоха увеличивается при сбросе устройства. RE2. Если `occurred_at` позже `received_at` больше чем на допустимое рассогласование часов, шлюз использует `received_at` как время события, сохраняет исходное значение в атрибуте и порождает `system.source.clock_skew` ([ADR-010](../adr/0010-time-semantics.md)).
 
 ---
 
@@ -190,7 +190,7 @@
 
 ### 3.5 Значение `Signal`
 
-`signal_id`, `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`.
+`signal_id`, `origin` (правило или внешний источник, [ADR-025](../adr/0025-ai-extension-points.md)), `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`, `explanation_ref` (необязательно).
 
 **Правила:** SG1. `signal_id` детерминирован (раздел 0.1). SG2. Сигнал публикуется в одной транзакции Kafka с фиксацией смещения входного топика и записью changelog - exactly-once.
 

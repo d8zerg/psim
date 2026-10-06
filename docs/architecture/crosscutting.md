@@ -8,22 +8,21 @@
 
 ## 1. Конверт сообщения
 
-Каждое сообщение Kafka - Protobuf-сообщение `psim.envelope.v1.Envelope` с полезной нагрузкой конкретного типа. Окончательная схема - шаг 0.5, ADR-005.
+Значение каждого сообщения Kafka - запись топика `<Topic>Record { Envelope envelope = 1; oneof payload {...} }` ([ADR-004](../adr/0004-serialization-and-schema-evolution.md)). Тип полезной нагрузки определяется ветвью `oneof`. Конверт `psim.common.v1.Envelope` ([ADR-005](../adr/0005-envelope-and-identifiers.md)):
 
 | Поле | Тип | Назначение |
 |---|---|---|
 | `message_id` | UUID | Идентификатор сообщения: `event_id`, `signal_id`, идентификатор доменного события |
 | `tenant_id` | UUID | Тенант |
-| `type` | строка | Полное имя типа полезной нагрузки, например `psim.incident.v1.IncidentCreated` |
-| `schema_version` | целое | Версия схемы в Schema Registry |
 | `occurred_at` | timestamp (мкс) | Время возникновения в предметной области |
 | `produced_at` | timestamp (мкс) | Время записи в Kafka |
-| `source_seq` | целое | Порядковый номер у источника (для событий) или версия агрегата (для доменных событий) |
+| `received_at` | timestamp (мкс) | Время приёма шлюзом (для событий ввода) |
+| `sequence` | целое | Порядковый номер у источника (для событий) или версия агрегата (для доменных событий) |
 | `causation_id`, `correlation_id` | UUID | Причина сообщения и сквозная цепочка от исходного события |
-| `actor` | структура | Субъект: пользователь, сервис или коннектор |
-| `payload` | bytes | Сериализованная полезная нагрузка |
+| `actor` | структура | Субъект: пользователь, сервис, коннектор или система |
+| `schema_version` | строка | Версия контрактов, выпустившая сообщение |
 
-Заголовки Kafka (не входят в подписываемое тело): `traceparent`, `tracestate` (W3C Trace Context), `psim-ts-<stage>`, заголовки DLQ. Формат проводов - Confluent-совместимый префикс Schema Registry (magic byte + идентификатор схемы) перед Protobuf.
+Заголовки Kafka: `traceparent`, `tracestate` (W3C Trace Context), `psim-ts-<stage>`, заголовки DLQ. Формат на проводе - Confluent wire format: магический байт, идентификатор схемы, индексы сообщения Protobuf, тело.
 
 ## 2. Идентификаторы и время
 

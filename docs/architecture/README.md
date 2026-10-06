@@ -16,7 +16,7 @@
 | 8. Сквозные концепции | [crosscutting.md](crosscutting.md) |
 | - Потоки данных и семантика доставки | [data-flows.md](data-flows.md) |
 | - Масштабирование и партиционирование | [scaling.md](scaling.md) |
-| 9. Архитектурные решения | [реестр ADR](../psim-mvp-development-plan.md#18-реестр-adr), оформляются в шаге 0.4 |
+| 9. Архитектурные решения | [реестр ADR](../adr/README.md) |
 | 10. Требования к качеству и бюджет задержек | [quality.md](quality.md) |
 | 11. Риски и технический долг | этот документ |
 | 12. Глоссарий | [glossary.md](../domain/glossary.md) |
@@ -280,22 +280,22 @@ flowchart LR
 
 ## 9. Архитектурные решения
 
-Реестр - раздел 18 [плана](../psim-mvp-development-plan.md#18-реестр-adr); оформление - шаг 0.4. Решения, принятые на шагах 0.2-0.3, которые ADR должны зафиксировать, включая отличия от плана:
+Реестр - [docs/adr](../adr/README.md). Решения шагов 0.2-0.3, включая отличия от плана, и ADR, в которых они зафиксированы:
 
 | Решение | Где описано | ADR |
 |---|---|---|
-| Normalizer работает с exactly-once (транзакции Kafka), а не at-least-once; трекер источников в `psim.normalizer.state.v1` | [data-flows.md](data-flows.md#32-нормализация-psimingestrawv1--psimeventsnormalizedv1) | ADR-006 |
-| Ключ `psim.signals.v1` - `grouping_key`, а не `correlation_key` | [data-flows.md](data-flows.md#33-корреляция-psimeventsnormalizedv1--psimsignalsv1) | ADR-007 |
-| Перераспределение для правил с ключом шире зоны через `psim.correlation.repartition.v1` | [scaling.md](scaling.md#3-корреляция-и-ключи) | ADR-007, ADR-009 |
-| «Эскалирован» - ортогональный уровень, «ложный» - решение, а не состояния инцидента | [state-models.md](../domain/state-models.md#1-инцидент) | новый ADR-027 |
-| Жизненный цикл команд и уведомлений публикуется в `psim.response.events.v1` | [data-flows.md](data-flows.md#35-реагирование-psimresponseeventsv1) | ADR-006 |
-| Команды читаются всеми экземплярами шлюза широковещательно; быстрый отказ по реестру сессий | [data-flows.md](data-flows.md#36-команды-psimcommandsv1-и-psimcommandsresultsv1) | ADR-018 |
-| Realtime: снимок из проекций со смещениями + дельты напрямую из Kafka | [crosscutting.md](crosscutting.md#9-realtime-снимок-и-дельты) | ADR-019 |
-| Сервис таймеров - библиотека, таймеры у сервиса-владельца | раздел 5.1 | ADR-012 |
-| Управление правилами - модуль Correlation Engine | раздел 5.1 | ADR-001 |
-| PostgreSQL HA: Patroni + etcd, синхронная реплика | [deployment.md](deployment.md#3-топология-кластер-на-vm) | ADR-023 |
-| REST DTO и сериализация JSON в C++ | [crosscutting.md](crosscutting.md#14-синхронное-api-между-веб-клиентом-и-сервисами) | новый ADR-026 |
-| Составной ключ каталога `resource_type:resource_id` | [data-flows.md](data-flows.md#37-каталог-psimcatalogv1) | ADR-007 |
+| Normalizer работает с exactly-once (транзакции Kafka), а не at-least-once; трекер источников в `psim.normalizer.state.v1` | [data-flows.md](data-flows.md#32-нормализация-psimingestrawv1---psimeventsnormalizedv1) | [ADR-006](../adr/0006-delivery-semantics.md) |
+| Ключ `psim.signals.v1` - `grouping_key`, а не `correlation_key` | [data-flows.md](data-flows.md#33-корреляция-psimeventsnormalizedv1---psimsignalsv1) | [ADR-007](../adr/0007-partitioning-strategy.md) |
+| Перераспределение для правил с ключом шире зоны через `psim.correlation.repartition.v1` | [scaling.md](scaling.md#3-корреляция-и-ключи) | [ADR-007](../adr/0007-partitioning-strategy.md), [ADR-009](../adr/0009-correlation-state-store.md) |
+| «Эскалирован» - ортогональный уровень, «ложный» - решение, а не состояния инцидента | [state-models.md](../domain/state-models.md#1-инцидент) | [ADR-027](../adr/0027-incident-states.md) |
+| Жизненный цикл команд и уведомлений публикуется в `psim.response.events.v1` | [data-flows.md](data-flows.md#35-реагирование-psimresponseeventsv1) | [ADR-006](../adr/0006-delivery-semantics.md) |
+| Команды читаются всеми экземплярами шлюза широковещательно; быстрый отказ по реестру сессий | [data-flows.md](data-flows.md#36-команды-psimcommandsv1-и-psimcommandsresultsv1) | [ADR-018](../adr/0018-command-routing.md) |
+| Realtime: снимок из проекций со смещениями + дельты напрямую из Kafka | [crosscutting.md](crosscutting.md#9-realtime-снимок-и-дельты) | [ADR-019](../adr/0019-realtime-channel.md) |
+| Сервис таймеров - библиотека, таймеры у сервиса-владельца | раздел 5.1 | [ADR-012](../adr/0012-response-execution-and-timers.md) |
+| Управление правилами - модуль Correlation Engine | раздел 5.1 | [ADR-001](../adr/0001-monorepo-structure.md) |
+| PostgreSQL HA: Patroni + etcd, синхронная реплика | [deployment.md](deployment.md#3-топология-кластер-на-vm) | [ADR-023](../adr/0023-deployment-topologies.md) |
+| REST DTO и сериализация JSON в C++ | [crosscutting.md](crosscutting.md#14-синхронное-api-между-веб-клиентом-и-сервисами) | [ADR-026](../adr/0026-rest-contract-and-dto.md) |
+| Составной ключ каталога `resource_type:resource_id` | [data-flows.md](data-flows.md#37-каталог-psimcatalogv1) | [ADR-007](../adr/0007-partitioning-strategy.md) |
 
 ---
 

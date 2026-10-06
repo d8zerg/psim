@@ -28,3 +28,7 @@
 - [Масштабирование и партиционирование](architecture/scaling.md)
 - [Требования к качеству и бюджет задержек](architecture/quality.md)
 - [Модель C4 (Structurizr DSL)](architecture/c4/workspace.dsl) - проверка: `docker run --rm -v "$PWD/docs/architecture/c4":/usr/local/structurizr structurizr/structurizr validate -workspace workspace.dsl`
+
+## Архитектурные решения (шаг 0.4)
+
+- [Реестр ADR](adr/README.md) · [шаблон](adr/template.md)
