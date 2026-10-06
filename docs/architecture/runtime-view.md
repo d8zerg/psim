@@ -85,7 +85,7 @@ sequenceDiagram
     CS->>CS: CM1, CM2, критичная -> awaiting_approval
     CS->>R: сессия коннектора есть?
     alt нет сессии
-        CS-->>UI: failed CONNECTOR_OFFLINE
+        CS-->>UI: failed COMMAND_CONNECTOR_OFFLINE
     else есть
         CS->>K: outbox -> psim.commands.v1 (key connector_id), state sent
         K->>GW: команда

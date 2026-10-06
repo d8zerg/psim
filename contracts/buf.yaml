@@ -1,0 +1,20 @@
+version: v2
+modules:
+  - path: proto
+    name: buf.build/psim/contracts
+deps:
+  - buf.build/googleapis/googleapis
+  - buf.build/bufbuild/protovalidate
+lint:
+  use:
+    - STANDARD
+    - COMMENTS
+  except:
+    - COMMENT_ENUM_VALUE
+    - COMMENT_FIELD
+    - COMMENT_ONEOF
+  enum_zero_value_suffix: _UNSPECIFIED
+  service_suffix: Service
+breaking:
+  use:
+    - WIRE_JSON

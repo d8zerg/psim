@@ -1,0 +1,65 @@
+# PSIM Platform: single entry point for build, generation and checks (ADR-030).
+# Install Task: https://taskfile.dev. Run `task` to list tasks.
+version: '3'
+
+vars:
+  CACHE: '{{.ROOT_DIR}}/.cache'
+  UID:
+    sh: id -u
+  GID:
+    sh: id -g
+  PYTHON: python3 -I
+  # Contract tooling image built locally from tools/contracts/image (buf + protoc plugins);
+  # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
+  CONTRACTS_TOOLS_IMAGE:
+    sh: echo "psim/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
+  # Pinned tool images. Change versions here only.
+  REDOCLY_IMAGE: redocly/cli:2.58.2
+  ASYNCAPI_IMAGE: asyncapi/cli:6.1.0
+  MERMAID_IMAGE: minlag/mermaid-cli:12.0.0
+  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19
+
+includes:
+  contracts:
+    taskfile: ./contracts/Taskfile.yml
+    dir: ./contracts
+  docs:
+    taskfile: ./docs/Taskfile.yml
+    dir: ./docs
+
+tasks:
+  default:
+    desc: List tasks
+    silent: true
+    cmds:
+      - "{{.TASK_EXE}} --list"
+
+  check:
+    desc: Run every check (contracts and documentation); the CI gate
+    cmds:
+      - task: contracts:check
+      - task: docs:check
+
+  gen:
+    desc: Regenerate all committed generated artifacts
+    cmds:
+      - task: contracts:gen
+
+  tools:pull:
+    desc: Pull pinned tool images
+    cmds:
+      - for: [REDOCLY_IMAGE, ASYNCAPI_IMAGE, MERMAID_IMAGE, STRUCTURIZR_IMAGE]
+        cmd: docker pull --quiet {{index . .ITEM}}
+      - task: tools:build
+
+  tools:build:
+    desc: Build the contract tooling image (buf + local protoc plugins)
+    status:
+      - docker image inspect {{.CONTRACTS_TOOLS_IMAGE}} >/dev/null 2>&1
+    cmds:
+      - docker build --quiet -t {{.CONTRACTS_TOOLS_IMAGE}} {{.ROOT_DIR}}/tools/contracts/image
+
+  clean:
+    desc: Remove generated caches (.cache/contracts, .cache/mermaid)
+    cmds:
+      - rm -rf {{.CACHE}}/contracts {{.CACHE}}/mermaid

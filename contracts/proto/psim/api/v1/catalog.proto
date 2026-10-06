@@ -1,0 +1,436 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/catalog/v1/catalog.proto";
+
+// CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.
+// Owner: Resource Catalog. Scenarios S1, S2.
+service CatalogService {
+  // ListLocations lists locations, filtered by parent or kind.
+  rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse) {
+    option (google.api.http) = {get: "/v1/locations"};
+  }
+  // GetLocation returns one location.
+  rpc GetLocation(GetLocationRequest) returns (GetLocationResponse) {
+    option (google.api.http) = {get: "/v1/locations/{location_id}"};
+  }
+  // CreateLocation creates a site, building, floor or zone.
+  rpc CreateLocation(CreateLocationRequest) returns (CreateLocationResponse) {
+    option (google.api.http) = {
+      post: "/v1/locations"
+      body: "location"
+    };
+  }
+  // UpdateLocation replaces mutable fields of a location (If-Match required).
+  rpc UpdateLocation(UpdateLocationRequest) returns (UpdateLocationResponse) {
+    option (google.api.http) = {
+      put: "/v1/locations/{location_id}"
+      body: "location"
+    };
+  }
+  // ArchiveLocation archives a location without children and devices (L3).
+  rpc ArchiveLocation(ArchiveLocationRequest) returns (ArchiveLocationResponse) {
+    option (google.api.http) = {
+      post: "/v1/locations/{location_id}:archive"
+      body: "*"
+    };
+  }
+  // UploadFloorPlan uploads the floor plan image of a floor.
+  rpc UploadFloorPlan(UploadFloorPlanRequest) returns (UploadFloorPlanResponse) {
+    option (google.api.http) = {
+      put: "/v1/locations/{location_id}/floor-plan"
+      body: "image"
+    };
+  }
+  // GetFloorPlan downloads the floor plan image.
+  rpc GetFloorPlan(GetFloorPlanRequest) returns (GetFloorPlanResponse) {
+    option (google.api.http) = {
+      get: "/v1/locations/{location_id}/floor-plan"
+      response_body: "image"
+    };
+  }
+  // ListDeviceTypes lists device types.
+  rpc ListDeviceTypes(ListDeviceTypesRequest) returns (ListDeviceTypesResponse) {
+    option (google.api.http) = {get: "/v1/device-types"};
+  }
+  // CreateDeviceType creates a device type.
+  rpc CreateDeviceType(CreateDeviceTypeRequest) returns (CreateDeviceTypeResponse) {
+    option (google.api.http) = {
+      post: "/v1/device-types"
+      body: "device_type"
+    };
+  }
+  // UpdateDeviceType replaces a device type (If-Match required).
+  rpc UpdateDeviceType(UpdateDeviceTypeRequest) returns (UpdateDeviceTypeResponse) {
+    option (google.api.http) = {
+      put: "/v1/device-types/{device_type_id}"
+      body: "device_type"
+    };
+  }
+  // ListDevices lists devices, filtered by location, connector or state.
+  rpc ListDevices(ListDevicesRequest) returns (ListDevicesResponse) {
+    option (google.api.http) = {get: "/v1/devices"};
+  }
+  // GetDevice returns one device.
+  rpc GetDevice(GetDeviceRequest) returns (GetDeviceResponse) {
+    option (google.api.http) = {get: "/v1/devices/{device_id}"};
+  }
+  // CreateDevice registers a device with its sources.
+  rpc CreateDevice(CreateDeviceRequest) returns (CreateDeviceResponse) {
+    option (google.api.http) = {
+      post: "/v1/devices"
+      body: "device"
+    };
+  }
+  // UpdateDevice replaces a device, including zone, position and state (If-Match required).
+  rpc UpdateDevice(UpdateDeviceRequest) returns (UpdateDeviceResponse) {
+    option (google.api.http) = {
+      put: "/v1/devices/{device_id}"
+      body: "device"
+    };
+  }
+  // StartImport starts a bulk import of devices from CSV or JSON.
+  rpc StartImport(StartImportRequest) returns (StartImportResponse) {
+    option (google.api.http) = {
+      post: "/v1/imports"
+      body: "file"
+    };
+  }
+  // GetImport returns import progress and per-row results.
+  rpc GetImport(GetImportRequest) returns (GetImportResponse) {
+    option (google.api.http) = {get: "/v1/imports/{import_id}"};
+  }
+  // ExportDevices exports devices in CSV or JSON.
+  rpc ExportDevices(ExportDevicesRequest) returns (ExportDevicesResponse) {
+    option (google.api.http) = {
+      get: "/v1/devices:export"
+      response_body: "file"
+    };
+  }
+  // ListConnectors lists registered connectors with their status.
+  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse) {
+    option (google.api.http) = {get: "/v1/connectors"};
+  }
+  // RegisterConnector registers a connector and binds its certificate.
+  rpc RegisterConnector(RegisterConnectorRequest) returns (RegisterConnectorResponse) {
+    option (google.api.http) = {
+      post: "/v1/connectors"
+      body: "connector"
+    };
+  }
+  // RotateConnectorCertificate adds a new certificate and sets expiry of the old one (C1).
+  rpc RotateConnectorCertificate(RotateConnectorCertificateRequest) returns (RotateConnectorCertificateResponse) {
+    option (google.api.http) = {
+      post: "/v1/connectors/{connector_id}:rotate-certificate"
+      body: "*"
+    };
+  }
+  // RevokeConnector revokes a connector and closes its sessions (C2).
+  rpc RevokeConnector(RevokeConnectorRequest) returns (RevokeConnectorResponse) {
+    option (google.api.http) = {
+      post: "/v1/connectors/{connector_id}:revoke"
+      body: "*"
+    };
+  }
+}
+
+// ConnectorStatus is the runtime status of a connector, joined from the session registry.
+message ConnectorStatus {
+  psim.catalog.v1.Connector connector = 1;
+  bool online = 2;
+  google.protobuf.Timestamp last_seen_at = 3;
+  double events_per_second = 4;
+  uint64 rejected_events_total = 5;
+  uint64 dlq_events_total = 6;
+}
+
+// ListLocationsRequest is the request of ListLocations.
+message ListLocationsRequest {
+  string parent_id = 1;
+  psim.catalog.v1.LocationKind kind = 2;
+  bool include_archived = 3;
+  int32 page_size = 4 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 1000
+  }];
+  string page_token = 5;
+}
+
+// ListLocationsResponse is the response of ListLocations.
+message ListLocationsResponse {
+  repeated psim.catalog.v1.Location locations = 1;
+  string next_page_token = 2;
+}
+
+// GetLocationRequest is the request of GetLocation.
+message GetLocationRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetLocationResponse is the response of GetLocation.
+message GetLocationResponse {
+  psim.catalog.v1.Location location = 1;
+}
+
+// CreateLocationRequest is the request of CreateLocation.
+message CreateLocationRequest {
+  psim.catalog.v1.Location location = 1 [(buf.validate.field).required = true];
+}
+
+// CreateLocationResponse is the response of CreateLocation.
+message CreateLocationResponse {
+  psim.catalog.v1.Location location = 1;
+}
+
+// UpdateLocationRequest is the request of UpdateLocation.
+message UpdateLocationRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.catalog.v1.Location location = 2 [(buf.validate.field).required = true];
+}
+
+// UpdateLocationResponse is the response of UpdateLocation.
+message UpdateLocationResponse {
+  psim.catalog.v1.Location location = 1;
+}
+
+// ArchiveLocationRequest is the request of ArchiveLocation.
+message ArchiveLocationRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// ArchiveLocationResponse is the response of ArchiveLocation.
+message ArchiveLocationResponse {
+  psim.catalog.v1.Location location = 1;
+}
+
+// UploadFloorPlanRequest is the request of UploadFloorPlan; the body is the image.
+message UploadFloorPlanRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+  // Plan size in plan units; passed as query parameters.
+  double width = 2;
+  double height = 3;
+  google.api.HttpBody image = 4;
+}
+
+// UploadFloorPlanResponse is the response of UploadFloorPlan.
+message UploadFloorPlanResponse {
+  psim.catalog.v1.Location location = 1;
+}
+
+// GetFloorPlanRequest is the request of GetFloorPlan.
+message GetFloorPlanRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetFloorPlanResponse is the response of GetFloorPlan; the body is the image.
+message GetFloorPlanResponse {
+  google.api.HttpBody image = 1;
+}
+
+// ListDeviceTypesRequest is the request of ListDeviceTypes.
+message ListDeviceTypesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// ListDeviceTypesResponse is the response of ListDeviceTypes.
+message ListDeviceTypesResponse {
+  repeated psim.catalog.v1.DeviceType device_types = 1;
+  string next_page_token = 2;
+}
+
+// CreateDeviceTypeRequest is the request of CreateDeviceType.
+message CreateDeviceTypeRequest {
+  psim.catalog.v1.DeviceType device_type = 1 [(buf.validate.field).required = true];
+}
+
+// CreateDeviceTypeResponse is the response of CreateDeviceType.
+message CreateDeviceTypeResponse {
+  psim.catalog.v1.DeviceType device_type = 1;
+}
+
+// UpdateDeviceTypeRequest is the request of UpdateDeviceType.
+message UpdateDeviceTypeRequest {
+  string device_type_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.catalog.v1.DeviceType device_type = 2 [(buf.validate.field).required = true];
+}
+
+// UpdateDeviceTypeResponse is the response of UpdateDeviceType.
+message UpdateDeviceTypeResponse {
+  psim.catalog.v1.DeviceType device_type = 1;
+}
+
+// ListDevicesRequest is the request of ListDevices.
+message ListDevicesRequest {
+  // Any location; devices of all nested zones are returned.
+  string location_id = 1;
+  string connector_id = 2;
+  string device_type_id = 3;
+  psim.catalog.v1.ResourceState state = 4;
+  int32 page_size = 5 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 1000
+  }];
+  string page_token = 6;
+}
+
+// ListDevicesResponse is the response of ListDevices.
+message ListDevicesResponse {
+  repeated psim.catalog.v1.Device devices = 1;
+  string next_page_token = 2;
+}
+
+// GetDeviceRequest is the request of GetDevice.
+message GetDeviceRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetDeviceResponse is the response of GetDevice.
+message GetDeviceResponse {
+  psim.catalog.v1.Device device = 1;
+}
+
+// CreateDeviceRequest is the request of CreateDevice.
+message CreateDeviceRequest {
+  psim.catalog.v1.Device device = 1 [(buf.validate.field).required = true];
+}
+
+// CreateDeviceResponse is the response of CreateDevice.
+message CreateDeviceResponse {
+  psim.catalog.v1.Device device = 1;
+}
+
+// UpdateDeviceRequest is the request of UpdateDevice.
+message UpdateDeviceRequest {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.catalog.v1.Device device = 2 [(buf.validate.field).required = true];
+}
+
+// UpdateDeviceResponse is the response of UpdateDevice.
+message UpdateDeviceResponse {
+  psim.catalog.v1.Device device = 1;
+}
+
+// StartImportRequest is the request of StartImport; the body is the file.
+message StartImportRequest {
+  // "csv" or "json"; passed as a query parameter.
+  string format = 1 [(buf.validate.field).string = {
+    in: [
+      "csv",
+      "json"
+    ]
+  }];
+  // Validate only, do not apply.
+  bool dry_run = 2;
+  google.api.HttpBody file = 3;
+}
+
+// StartImportResponse is the response of StartImport.
+message StartImportResponse {
+  ImportJob import_job = 1;
+}
+
+// GetImportRequest is the request of GetImport.
+message GetImportRequest {
+  string import_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetImportResponse is the response of GetImport.
+message GetImportResponse {
+  ImportJob import_job = 1;
+}
+
+// ImportJob is a bulk import and its results (aggregates.md, 1.5).
+message ImportJob {
+  string import_id = 1;
+  ImportState state = 2;
+  uint32 rows_total = 3;
+  uint32 rows_created = 4;
+  uint32 rows_updated = 5;
+  uint32 rows_failed = 6;
+  repeated ImportRowError errors = 7;
+  google.protobuf.Timestamp started_at = 8;
+  google.protobuf.Timestamp finished_at = 9;
+}
+
+// ImportState is the state of an import job.
+enum ImportState {
+  IMPORT_STATE_UNSPECIFIED = 0;
+  IMPORT_STATE_RUNNING = 1;
+  IMPORT_STATE_COMPLETED = 2;
+  IMPORT_STATE_FAILED = 3;
+}
+
+// ImportRowError is an error of one imported row.
+message ImportRowError {
+  uint32 row = 1;
+  string code = 2;
+  string message = 3;
+}
+
+// ExportDevicesRequest is the request of ExportDevices.
+message ExportDevicesRequest {
+  string location_id = 1;
+  string format = 2 [(buf.validate.field).string = {
+    in: [
+      "csv",
+      "json"
+    ]
+  }];
+}
+
+// ExportDevicesResponse is the response of ExportDevices; the body is the file.
+message ExportDevicesResponse {
+  google.api.HttpBody file = 1;
+}
+
+// ListConnectorsRequest is the request of ListConnectors.
+message ListConnectorsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// ListConnectorsResponse is the response of ListConnectors.
+message ListConnectorsResponse {
+  repeated ConnectorStatus connectors = 1;
+  string next_page_token = 2;
+}
+
+// RegisterConnectorRequest is the request of RegisterConnector.
+message RegisterConnectorRequest {
+  psim.catalog.v1.Connector connector = 1 [(buf.validate.field).required = true];
+}
+
+// RegisterConnectorResponse is the response of RegisterConnector.
+message RegisterConnectorResponse {
+  psim.catalog.v1.Connector connector = 1;
+}
+
+// RotateConnectorCertificateRequest is the request of RotateConnectorCertificate.
+message RotateConnectorCertificateRequest {
+  string connector_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.catalog.v1.CertificateFingerprint new_certificate = 2 [(buf.validate.field).required = true];
+  // Expiry of the previous certificate.
+  google.protobuf.Timestamp previous_not_after = 3;
+}
+
+// RotateConnectorCertificateResponse is the response of RotateConnectorCertificate.
+message RotateConnectorCertificateResponse {
+  psim.catalog.v1.Connector connector = 1;
+}
+
+// RevokeConnectorRequest is the request of RevokeConnector.
+message RevokeConnectorRequest {
+  string connector_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2;
+}
+
+// RevokeConnectorResponse is the response of RevokeConnector.
+message RevokeConnectorResponse {
+  psim.catalog.v1.Connector connector = 1;
+}

@@ -15,6 +15,7 @@ Testing/
 compile_commands.json
 conan.lock.bak
 .conan2/
+.task/
 
 # Объектные файлы и бинарники
 *.o

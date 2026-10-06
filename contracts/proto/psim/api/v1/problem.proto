@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+// REST API v1 conventions (ADR-026):
+// - JSON is the canonical protobuf JSON mapping (lowerCamelCase, enums as strings, int64 as strings).
+// - Lists use cursor pagination: page_size, page_token -> next_page_token.
+// - Mutations of versioned resources require If-Match with the resource version (ETag).
+// - Non-idempotent operations accept the Idempotency-Key header.
+// - Errors are application/problem+json (RFC 9457) with the Problem schema below.
+
+// Problem is the error body of every failed REST request (RFC 9457).
+message Problem {
+  // URI of the error type: https://psim.local/errors/<code>.
+  string type = 1;
+  string title = 2;
+  int32 status = 3;
+  string detail = 4;
+  string instance = 5;
+  // Error code from contracts/errors/errors.yaml.
+  string code = 6;
+  string trace_id = 7;
+  repeated FieldViolation errors = 8;
+}
+
+// FieldViolation describes one invalid field.
+message FieldViolation {
+  // Field path in the request, for example "steps[2].next_step_id".
+  string field = 1;
+  string code = 2;
+  string message = 3;
+}

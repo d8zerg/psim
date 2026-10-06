@@ -1,0 +1,266 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "psim/api/v1/problem.proto";
+import "psim/response/v1/plan.proto";
+import "psim/response/v1/run.proto";
+
+// ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
+service ResponsePlanService {
+  // ListPlans lists the latest version of each plan.
+  rpc ListPlans(ListPlansRequest) returns (ListPlansResponse) {
+    option (google.api.http) = {get: "/v1/plans"};
+  }
+  // GetPlan returns a plan version; latest when version is 0.
+  rpc GetPlan(GetPlanRequest) returns (GetPlanResponse) {
+    option (google.api.http) = {get: "/v1/plans/{plan_id}"};
+  }
+  // SavePlanDraft creates a plan or a new draft version of it.
+  rpc SavePlanDraft(SavePlanDraftRequest) returns (SavePlanDraftResponse) {
+    option (google.api.http) = {
+      post: "/v1/plans"
+      body: "plan"
+    };
+  }
+  // ValidatePlan validates a plan without saving it (P1-P5).
+  rpc ValidatePlan(ValidatePlanRequest) returns (ValidatePlanResponse) {
+    option (google.api.http) = {
+      post: "/v1/plans:validate"
+      body: "plan"
+    };
+  }
+  // PublishPlan publishes a draft version; published versions are immutable.
+  rpc PublishPlan(PublishPlanRequest) returns (PublishPlanResponse) {
+    option (google.api.http) = {
+      post: "/v1/plans/{plan_id}:publish"
+      body: "*"
+    };
+  }
+  // ArchivePlan archives a plan.
+  rpc ArchivePlan(ArchivePlanRequest) returns (ArchivePlanResponse) {
+    option (google.api.http) = {
+      post: "/v1/plans/{plan_id}:archive"
+      body: "*"
+    };
+  }
+}
+
+// ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
+service ResponseRunService {
+  // GetIncidentRun returns the active or last run of an incident.
+  rpc GetIncidentRun(GetIncidentRunRequest) returns (GetIncidentRunResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/run"};
+  }
+  // CompleteStep completes an active step with its result.
+  rpc CompleteStep(CompleteStepRequest) returns (CompleteStepResponse) {
+    option (google.api.http) = {
+      post: "/v1/runs/{run_id}/steps/{step_id}:complete"
+      body: "*"
+    };
+  }
+  // SkipStep skips a non-mandatory step with a reason (RR3).
+  rpc SkipStep(SkipStepRequest) returns (SkipStepResponse) {
+    option (google.api.http) = {
+      post: "/v1/runs/{run_id}/steps/{step_id}:skip"
+      body: "*"
+    };
+  }
+  // RetryStep retries a failed step.
+  rpc RetryStep(RetryStepRequest) returns (RetryStepResponse) {
+    option (google.api.http) = {
+      post: "/v1/runs/{run_id}/steps/{step_id}:retry"
+      body: "*"
+    };
+  }
+  // OverrideStep completes a failed step by a supervisor decision.
+  rpc OverrideStep(OverrideStepRequest) returns (OverrideStepResponse) {
+    option (google.api.http) = {
+      post: "/v1/runs/{run_id}/steps/{step_id}:override"
+      body: "*"
+    };
+  }
+}
+
+// EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.
+service EscalationPolicyService {
+  // ListEscalationPolicies lists policies.
+  rpc ListEscalationPolicies(ListEscalationPoliciesRequest) returns (ListEscalationPoliciesResponse) {
+    option (google.api.http) = {get: "/v1/escalation-policies"};
+  }
+  // CreateEscalationPolicy creates a policy.
+  rpc CreateEscalationPolicy(CreateEscalationPolicyRequest) returns (CreateEscalationPolicyResponse) {
+    option (google.api.http) = {
+      post: "/v1/escalation-policies"
+      body: "policy"
+    };
+  }
+  // UpdateEscalationPolicy replaces a policy (If-Match required).
+  rpc UpdateEscalationPolicy(UpdateEscalationPolicyRequest) returns (UpdateEscalationPolicyResponse) {
+    option (google.api.http) = {
+      put: "/v1/escalation-policies/{policy_id}"
+      body: "policy"
+    };
+  }
+}
+
+// ListPlansRequest is the request of ListPlans.
+message ListPlansRequest {
+  string incident_type_id = 1;
+  bool include_archived = 2;
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+// ListPlansResponse is the response of ListPlans.
+message ListPlansResponse {
+  repeated psim.response.v1.ResponsePlan plans = 1;
+  string next_page_token = 2;
+}
+
+// GetPlanRequest is the request of GetPlan.
+message GetPlanRequest {
+  string plan_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2;
+}
+
+// GetPlanResponse is the response of GetPlan.
+message GetPlanResponse {
+  psim.response.v1.ResponsePlan plan = 1;
+}
+
+// SavePlanDraftRequest is the request of SavePlanDraft.
+message SavePlanDraftRequest {
+  psim.response.v1.ResponsePlan plan = 1 [(buf.validate.field).required = true];
+}
+
+// SavePlanDraftResponse is the response of SavePlanDraft.
+message SavePlanDraftResponse {
+  psim.response.v1.ResponsePlan plan = 1;
+}
+
+// ValidatePlanRequest is the request of ValidatePlan.
+message ValidatePlanRequest {
+  psim.response.v1.ResponsePlan plan = 1 [(buf.validate.field).required = true];
+}
+
+// ValidatePlanResponse is the response of ValidatePlan.
+message ValidatePlanResponse {
+  bool valid = 1;
+  repeated FieldViolation violations = 2;
+}
+
+// PublishPlanRequest is the request of PublishPlan.
+message PublishPlanRequest {
+  string plan_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2 [(buf.validate.field).uint32.gt = 0];
+}
+
+// PublishPlanResponse is the response of PublishPlan.
+message PublishPlanResponse {
+  psim.response.v1.ResponsePlan plan = 1;
+}
+
+// ArchivePlanRequest is the request of ArchivePlan.
+message ArchivePlanRequest {
+  string plan_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// ArchivePlanResponse is the response of ArchivePlan.
+message ArchivePlanResponse {
+  psim.response.v1.ResponsePlan plan = 1;
+}
+
+// GetIncidentRunRequest is the request of GetIncidentRun.
+message GetIncidentRunRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetIncidentRunResponse is the response of GetIncidentRun.
+message GetIncidentRunResponse {
+  psim.response.v1.ResponseRun run = 1;
+  // The plan version used by the run.
+  psim.response.v1.ResponsePlan plan = 2;
+}
+
+// CompleteStepRequest is the request of CompleteStep.
+message CompleteStepRequest {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+  string step_id = 2 [(buf.validate.field).string.min_len = 1];
+  psim.response.v1.StepResult result = 3;
+}
+
+// CompleteStepResponse is the response of CompleteStep.
+message CompleteStepResponse {
+  psim.response.v1.ResponseRun run = 1;
+}
+
+// SkipStepRequest is the request of SkipStep.
+message SkipStepRequest {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+  string step_id = 2 [(buf.validate.field).string.min_len = 1];
+  string reason = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+// SkipStepResponse is the response of SkipStep.
+message SkipStepResponse {
+  psim.response.v1.ResponseRun run = 1;
+}
+
+// RetryStepRequest is the request of RetryStep.
+message RetryStepRequest {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+  string step_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// RetryStepResponse is the response of RetryStep.
+message RetryStepResponse {
+  psim.response.v1.ResponseRun run = 1;
+}
+
+// OverrideStepRequest is the request of OverrideStep.
+message OverrideStepRequest {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+  string step_id = 2 [(buf.validate.field).string.min_len = 1];
+  string reason = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+// OverrideStepResponse is the response of OverrideStep.
+message OverrideStepResponse {
+  psim.response.v1.ResponseRun run = 1;
+}
+
+// ListEscalationPoliciesRequest is the request of ListEscalationPolicies.
+message ListEscalationPoliciesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// ListEscalationPoliciesResponse is the response of ListEscalationPolicies.
+message ListEscalationPoliciesResponse {
+  repeated psim.response.v1.EscalationPolicy policies = 1;
+  string next_page_token = 2;
+}
+
+// CreateEscalationPolicyRequest is the request of CreateEscalationPolicy.
+message CreateEscalationPolicyRequest {
+  psim.response.v1.EscalationPolicy policy = 1 [(buf.validate.field).required = true];
+}
+
+// CreateEscalationPolicyResponse is the response of CreateEscalationPolicy.
+message CreateEscalationPolicyResponse {
+  psim.response.v1.EscalationPolicy policy = 1;
+}
+
+// UpdateEscalationPolicyRequest is the request of UpdateEscalationPolicy.
+message UpdateEscalationPolicyRequest {
+  string policy_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.response.v1.EscalationPolicy policy = 2 [(buf.validate.field).required = true];
+}
+
+// UpdateEscalationPolicyResponse is the response of UpdateEscalationPolicy.
+message UpdateEscalationPolicyResponse {
+  psim.response.v1.EscalationPolicy policy = 1;
+}

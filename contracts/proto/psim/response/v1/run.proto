@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package psim.response.v1;
+
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+
+// ResponseRun is the execution of a plan version for an incident (aggregates.md, 5.2).
+message ResponseRun {
+  string run_id = 1;
+  string incident_id = 2;
+  string plan_id = 3;
+  uint32 plan_version = 4;
+  RunState state = 5;
+  repeated StepExecution steps = 6;
+  repeated string active_step_ids = 7;
+  // Unfinished mandatory steps (RR5).
+  repeated string blocking_step_ids = 8;
+  google.protobuf.Timestamp started_at = 9;
+  google.protobuf.Timestamp finished_at = 10;
+  uint64 version = 11;
+}
+
+// RunState is the lifecycle state of a run (state-models.md, 2.1).
+enum RunState {
+  RUN_STATE_UNSPECIFIED = 0;
+  RUN_STATE_RUNNING = 1;
+  RUN_STATE_COMPLETED = 2;
+  RUN_STATE_CANCELLED = 3;
+}
+
+// StepExecution is the execution state of one step.
+message StepExecution {
+  string step_id = 1;
+  StepState state = 2;
+  uint32 attempt = 3;
+  psim.common.v1.Actor actor = 4;
+  google.protobuf.Timestamp activated_at = 5;
+  google.protobuf.Timestamp finished_at = 6;
+  StepResult result = 7;
+}
+
+// StepState is the state of a step (state-models.md, 2.2).
+enum StepState {
+  STEP_STATE_UNSPECIFIED = 0;
+  STEP_STATE_PENDING = 1;
+  STEP_STATE_ACTIVE = 2;
+  STEP_STATE_COMPLETED = 3;
+  STEP_STATE_SKIPPED = 4;
+  STEP_STATE_FAILED = 5;
+  STEP_STATE_CANCELLED = 6;
+}
+
+// StepResult is what the step produced.
+message StepResult {
+  repeated string checked_item_ids = 1;
+  string decision_option_id = 2;
+  repeated string command_ids = 3;
+  // Reason for skip or override, or a free note.
+  string note = 4;
+  // Set when a supervisor completed a failed step (Override).
+  bool overridden = 5;
+}

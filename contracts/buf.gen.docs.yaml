@@ -1,0 +1,14 @@
+# Generates the Markdown reference of all PSIM contracts (protoc-gen-doc).
+version: v2
+plugins:
+  # Local plugin from the contracts tools image (tools/contracts/image), protoc-gen-doc v1.5.1.
+  - local: protoc-gen-doc
+    # One invocation for all files: the plugin writes a single output file.
+    strategy: all
+    out: ../.cache/contracts/docs
+    opt:
+      - markdown,proto-reference.md
+inputs:
+  - directory: proto
+    paths:
+      - proto/psim

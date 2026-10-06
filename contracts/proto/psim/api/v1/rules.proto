@@ -1,0 +1,247 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/api/v1/problem.proto";
+import "psim/processing/v1/mapping.proto";
+import "psim/processing/v1/rules.proto";
+import "psim/processing/v1/signal.proto";
+
+// CorrelationRuleService manages correlation rules and the active rule set.
+// Owner: Correlation Engine (rule management module). Scenario S4.
+service CorrelationRuleService {
+  // ListRules lists the latest version of each rule.
+  rpc ListRules(ListRulesRequest) returns (ListRulesResponse) {
+    option (google.api.http) = {get: "/v1/rules"};
+  }
+  // GetRule returns a rule version; latest when version is 0.
+  rpc GetRule(GetRuleRequest) returns (GetRuleResponse) {
+    option (google.api.http) = {get: "/v1/rules/{rule_id}"};
+  }
+  // SaveRuleDraft creates a rule or a new draft version of it.
+  rpc SaveRuleDraft(SaveRuleDraftRequest) returns (SaveRuleDraftResponse) {
+    option (google.api.http) = {
+      post: "/v1/rules"
+      body: "rule"
+    };
+  }
+  // ValidateRule validates a draft and moves it to testing on success (R1).
+  rpc ValidateRule(ValidateRuleRequest) returns (ValidateRuleResponse) {
+    option (google.api.http) = {
+      post: "/v1/rules/{rule_id}:validate"
+      body: "*"
+    };
+  }
+  // StartDryRun runs a rule version over historical events without publishing signals.
+  rpc StartDryRun(StartDryRunRequest) returns (StartDryRunResponse) {
+    option (google.api.http) = {
+      post: "/v1/rules/{rule_id}:dry-run"
+      body: "*"
+    };
+  }
+  // GetDryRun returns dry-run progress and produced signals.
+  rpc GetDryRun(GetDryRunRequest) returns (GetDryRunResponse) {
+    option (google.api.http) = {get: "/v1/dry-runs/{dry_run_id}"};
+  }
+  // ArchiveRule archives a rule; it is removed from the next rule set.
+  rpc ArchiveRule(ArchiveRuleRequest) returns (ArchiveRuleResponse) {
+    option (google.api.http) = {
+      post: "/v1/rules/{rule_id}:archive"
+      body: "*"
+    };
+  }
+  // GetActiveRuleSet returns the active rule set.
+  rpc GetActiveRuleSet(GetActiveRuleSetRequest) returns (GetActiveRuleSetResponse) {
+    option (google.api.http) = {get: "/v1/rule-sets/active"};
+  }
+  // ActivateRuleSet atomically activates a new set of rule versions (RS1-RS3).
+  rpc ActivateRuleSet(ActivateRuleSetRequest) returns (ActivateRuleSetResponse) {
+    option (google.api.http) = {
+      post: "/v1/rule-sets:activate"
+      body: "*"
+    };
+  }
+}
+
+// MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.
+service MappingService {
+  // ListMappingRuleSets lists the active mapping rule set of each connector type.
+  rpc ListMappingRuleSets(ListMappingRuleSetsRequest) returns (ListMappingRuleSetsResponse) {
+    option (google.api.http) = {get: "/v1/mappings"};
+  }
+  // GetMappingRuleSet returns the active mapping rule set of a connector type.
+  rpc GetMappingRuleSet(GetMappingRuleSetRequest) returns (GetMappingRuleSetResponse) {
+    option (google.api.http) = {get: "/v1/mappings/{connector_type}"};
+  }
+  // PublishMappingRuleSet validates and publishes a new version (M1-M3).
+  rpc PublishMappingRuleSet(PublishMappingRuleSetRequest) returns (PublishMappingRuleSetResponse) {
+    option (google.api.http) = {
+      put: "/v1/mappings/{connector_type}"
+      body: "mapping_rule_set"
+    };
+  }
+}
+
+// ListRulesRequest is the request of ListRules.
+message ListRulesRequest {
+  repeated psim.processing.v1.RuleState states = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListRulesResponse is the response of ListRules.
+message ListRulesResponse {
+  repeated psim.processing.v1.CorrelationRule rules = 1;
+  string next_page_token = 2;
+}
+
+// GetRuleRequest is the request of GetRule.
+message GetRuleRequest {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2;
+}
+
+// GetRuleResponse is the response of GetRule.
+message GetRuleResponse {
+  psim.processing.v1.CorrelationRule rule = 1;
+}
+
+// SaveRuleDraftRequest is the request of SaveRuleDraft.
+message SaveRuleDraftRequest {
+  psim.processing.v1.CorrelationRule rule = 1 [(buf.validate.field).required = true];
+}
+
+// SaveRuleDraftResponse is the response of SaveRuleDraft.
+message SaveRuleDraftResponse {
+  psim.processing.v1.CorrelationRule rule = 1;
+}
+
+// ValidateRuleRequest is the request of ValidateRule.
+message ValidateRuleRequest {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2 [(buf.validate.field).uint32.gt = 0];
+}
+
+// ValidateRuleResponse is the response of ValidateRule.
+message ValidateRuleResponse {
+  bool valid = 1;
+  repeated FieldViolation violations = 2;
+  psim.processing.v1.CorrelationRule rule = 3;
+}
+
+// StartDryRunRequest is the request of StartDryRun.
+message StartDryRunRequest {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2 [(buf.validate.field).uint32.gt = 0];
+  // Range of event time, limited by the retention of normalized events.
+  google.protobuf.Timestamp from = 3 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp to = 4 [(buf.validate.field).required = true];
+}
+
+// StartDryRunResponse is the response of StartDryRun.
+message StartDryRunResponse {
+  DryRun dry_run = 1;
+}
+
+// GetDryRunRequest is the request of GetDryRun.
+message GetDryRunRequest {
+  string dry_run_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// GetDryRunResponse is the response of GetDryRun.
+message GetDryRunResponse {
+  DryRun dry_run = 1;
+  repeated psim.processing.v1.Signal signals = 2;
+  string next_page_token = 3;
+}
+
+// DryRun is a dry run of a rule over history.
+message DryRun {
+  string dry_run_id = 1;
+  string rule_id = 2;
+  uint32 version = 3;
+  DryRunState state = 4;
+  uint64 events_processed = 5;
+  uint64 signals_produced = 6;
+  google.protobuf.Timestamp started_at = 7;
+  google.protobuf.Timestamp finished_at = 8;
+}
+
+// DryRunState is the state of a dry run.
+enum DryRunState {
+  DRY_RUN_STATE_UNSPECIFIED = 0;
+  DRY_RUN_STATE_RUNNING = 1;
+  DRY_RUN_STATE_COMPLETED = 2;
+  DRY_RUN_STATE_FAILED = 3;
+}
+
+// ArchiveRuleRequest is the request of ArchiveRule.
+message ArchiveRuleRequest {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// ArchiveRuleResponse is the response of ArchiveRule.
+message ArchiveRuleResponse {
+  psim.processing.v1.CorrelationRule rule = 1;
+}
+
+// GetActiveRuleSetRequest is the request of GetActiveRuleSet.
+message GetActiveRuleSetRequest {}
+
+// GetActiveRuleSetResponse is the response of GetActiveRuleSet.
+message GetActiveRuleSetResponse {
+  psim.processing.v1.RuleSet rule_set = 1;
+}
+
+// ActivateRuleSetRequest is the request of ActivateRuleSet.
+message ActivateRuleSetRequest {
+  // Rule versions to make active; every version must be in testing or active state.
+  repeated RuleVersionRef rules = 1;
+  // Version of the currently active set, for optimistic concurrency.
+  uint64 expected_rule_set_version = 2;
+}
+
+// RuleVersionRef references a rule version.
+message RuleVersionRef {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2 [(buf.validate.field).uint32.gt = 0];
+}
+
+// ActivateRuleSetResponse is the response of ActivateRuleSet.
+message ActivateRuleSetResponse {
+  psim.processing.v1.RuleSet rule_set = 1;
+}
+
+// ListMappingRuleSetsRequest is the request of ListMappingRuleSets.
+message ListMappingRuleSetsRequest {}
+
+// ListMappingRuleSetsResponse is the response of ListMappingRuleSets.
+message ListMappingRuleSetsResponse {
+  repeated psim.processing.v1.MappingRuleSet mapping_rule_sets = 1;
+}
+
+// GetMappingRuleSetRequest is the request of GetMappingRuleSet.
+message GetMappingRuleSetRequest {
+  string connector_type = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// GetMappingRuleSetResponse is the response of GetMappingRuleSet.
+message GetMappingRuleSetResponse {
+  psim.processing.v1.MappingRuleSet mapping_rule_set = 1;
+}
+
+// PublishMappingRuleSetRequest is the request of PublishMappingRuleSet.
+message PublishMappingRuleSetRequest {
+  string connector_type = 1 [(buf.validate.field).string.min_len = 1];
+  psim.processing.v1.MappingRuleSet mapping_rule_set = 2 [(buf.validate.field).required = true];
+}
+
+// PublishMappingRuleSetResponse is the response of PublishMappingRuleSet.
+message PublishMappingRuleSetResponse {
+  psim.processing.v1.MappingRuleSet mapping_rule_set = 1;
+}

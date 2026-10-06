@@ -1,0 +1,42 @@
+syntax = "proto3";
+
+package psim.ingest.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+
+// RawEventRecord is the value of topic psim.ingest.raw.v1 (key: source_id).
+message RawEventRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    RawEvent raw_event = 2;
+  }
+}
+
+// RawEvent is an event as delivered by a connector, before normalization.
+// envelope.message_id is the event_id assigned by the Connector SDK,
+// envelope.sequence is the source sequence number, envelope.occurred_at is the event time.
+message RawEvent {
+  string connector_id = 1 [(buf.validate.field).string.uuid = true];
+  // Deterministic id: UUIDv5(connector_id, source_ref), see ADR-029.
+  string source_id = 2 [(buf.validate.field).string.uuid = true];
+  // Source reference as known to the connector (Source.external_ref in the catalog).
+  string source_ref = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  // Incremented when the source resets its sequence counter.
+  uint32 source_epoch = 4;
+  // Vendor event code.
+  string raw_code = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  map<string, string> attributes = 6 [(buf.validate.field).map.max_pairs = 64];
+  // Set when occurred_at was replaced with received_at because of clock skew (ADR-010).
+  bool clock_skew_corrected = 7;
+  // Original source timestamp when clock_skew_corrected is set.
+  google.protobuf.Timestamp source_occurred_at = 8;
+}

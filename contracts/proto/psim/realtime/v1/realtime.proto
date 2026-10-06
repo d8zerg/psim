@@ -1,0 +1,122 @@
+syntax = "proto3";
+
+package psim.realtime.v1;
+
+import "buf/validate/validate.proto";
+import "psim/incident/v1/events.proto";
+import "psim/response/v1/events.proto";
+
+// Realtime protocol v1 over WebSocket (ADR-019). Frames are JSON text messages using the
+// canonical protobuf JSON mapping (ADR-026). Endpoint: wss://<host>/v1/realtime.
+// The access token is passed in the first frame (Authenticate), not in the URL.
+
+// ClientFrame is a frame sent by the browser.
+message ClientFrame {
+  // Client-chosen id echoed in replies.
+  string request_id = 1;
+  oneof frame {
+    option (buf.validate.oneof).required = true;
+    Authenticate authenticate = 2;
+    Subscribe subscribe = 3;
+    Unsubscribe unsubscribe = 4;
+    Ping ping = 5;
+  }
+}
+
+// ServerFrame is a frame sent by the server.
+message ServerFrame {
+  string request_id = 1;
+  oneof frame {
+    option (buf.validate.oneof).required = true;
+    Authenticated authenticated = 2;
+    Subscribed subscribed = 3;
+    Delta delta = 4;
+    ResyncRequired resync_required = 5;
+    ErrorFrame error = 6;
+    Pong pong = 7;
+  }
+}
+
+// Authenticate authenticates the connection; also sent on token refresh.
+message Authenticate {
+  string access_token = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// Authenticated confirms authentication.
+message Authenticated {
+  string user_id = 1;
+  // Seconds until the token expires; the client must re-authenticate before.
+  uint32 expires_in = 2;
+}
+
+// Subscribe opens a subscription from a resume token.
+message Subscribe {
+  string subscription_id = 1 [(buf.validate.field).string.min_len = 1];
+  Stream stream = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  FeedFilter filter = 3;
+  // Token from a snapshot (GET /v1/feed/incidents) or from the last received Delta.
+  string resume_token = 4 [(buf.validate.field).string.min_len = 1];
+}
+
+// Stream selects what to receive.
+enum Stream {
+  STREAM_UNSPECIFIED = 0;
+  // Incident and response changes within the user scope.
+  STREAM_INCIDENTS = 1;
+  // Changes of one incident (filter.incident_id required).
+  STREAM_INCIDENT = 2;
+}
+
+// FeedFilter narrows a subscription; the access scope is always applied by the server.
+message FeedFilter {
+  repeated string site_ids = 1;
+  repeated string zone_ids = 2;
+  string incident_id = 3;
+  bool include_closed = 4;
+}
+
+// Unsubscribe closes a subscription.
+message Unsubscribe {
+  string subscription_id = 1;
+}
+
+// Ping checks the connection.
+message Ping {}
+
+// Pong answers Ping.
+message Pong {}
+
+// Subscribed confirms a subscription.
+message Subscribed {
+  string subscription_id = 1;
+  string resume_token = 2;
+}
+
+// Delta is one change; apply only if the aggregate version is newer than known.
+message Delta {
+  string subscription_id = 1;
+  // Token to resume after this delta.
+  string resume_token = 2;
+  oneof change {
+    option (buf.validate.oneof).required = true;
+    psim.incident.v1.IncidentEventRecord incident_event = 3;
+    psim.response.v1.ResponseEventRecord response_event = 4;
+  }
+}
+
+// ResyncRequired tells the client to take a new snapshot (gap too long or token expired).
+message ResyncRequired {
+  string subscription_id = 1;
+  string reason = 2;
+}
+
+// ErrorFrame reports an error; the connection is closed after fatal errors.
+message ErrorFrame {
+  // Error code from the catalog, for example "REALTIME_SLOW_CONSUMER".
+  string code = 1;
+  string message = 2;
+  bool fatal = 3;
+}

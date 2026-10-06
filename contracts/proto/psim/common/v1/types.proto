@@ -1,0 +1,45 @@
+syntax = "proto3";
+
+package psim.common.v1;
+
+// Severity of a single event (event-taxonomy.md, section 3).
+enum Severity {
+  SEVERITY_UNSPECIFIED = 0;
+  SEVERITY_INFO = 1;
+  SEVERITY_LOW = 2;
+  SEVERITY_MEDIUM = 3;
+  SEVERITY_HIGH = 4;
+  SEVERITY_CRITICAL = 5;
+}
+
+// Priority of a signal or an incident; P1 is the highest.
+enum Priority {
+  PRIORITY_UNSPECIFIED = 0;
+  PRIORITY_P1 = 1;
+  PRIORITY_P2 = 2;
+  PRIORITY_P3 = 3;
+  PRIORITY_P4 = 4;
+}
+
+// EventClass is the behavioural class of a taxonomy type (event-taxonomy.md, section 2).
+enum EventClass {
+  EVENT_CLASS_UNSPECIFIED = 0;
+  EVENT_CLASS_ALARM = 1;
+  EVENT_CLASS_WARNING = 2;
+  EVENT_CLASS_FAULT = 3;
+  EVENT_CLASS_RESTORE = 4;
+  EVENT_CLASS_STATE = 5;
+  EVENT_CLASS_INFO = 6;
+}
+
+// Position is a point on a floor plan in plan units.
+message Position {
+  double x = 1;
+  double y = 2;
+}
+
+// LocationRef places an object in the site hierarchy.
+message LocationRef {
+  string site_id = 1;
+  string zone_id = 2;
+}

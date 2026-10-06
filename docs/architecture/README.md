@@ -66,6 +66,7 @@
 | Сервер на C++23: Boost.Asio и Beast, librdkafka, libpq, OpenSSL 3, gRPC и Protobuf | Решение 0.1 плана |
 | Apache Kafka (KRaft) - центральная шина во всех топологиях | Решение 0.1 плана |
 | PostgreSQL 16+, Redis-совместимое хранилище | Решение 0.1 плана; выбор реализации Redis - ADR-015 |
+| ClickHouse для истории событий и аналитики | Решение владельца продукта 2026-10-06; ADR-028 |
 | Keycloak как Identity Provider (OIDC) | Решение 0.1 плана |
 | Веб-клиент: React 19, TypeScript, Vite | Решение 0.1 плана |
 | Debian 12+, Astra Linux 1.8+; поставка on-premise | Решение 0.1 плана |
@@ -188,19 +189,19 @@ flowchart LR
 | Connector Gateway | C++, gRPC | Сессии коннекторов, mTLS, валидация, кредиты, запись в Kafka, доставка команд | Redis: реестр сессий | Без состояния; N экземпляров за балансировщиком L4 |
 | Resource Catalog | C++, REST | Локации, устройства, источники, коннекторы, импорт, планы | PostgreSQL | 1-2 экземпляра (не на горячем пути) |
 | Normalizer | C++ | Отображение, обогащение, дедупликация, DLQ | Локальная копия каталога в памяти; окно дедупликации в памяти с восстановлением из Kafka | По партициям `psim.ingest.raw.v1` |
-| Event History | C++ | Запись значимых событий, поиск | PostgreSQL, секции по суткам | По партициям `psim.events.normalized.v1` |
+| Event History | C++ | Загрузка всех событий и связей с сигналами в ClickHouse, поиск | ClickHouse | По партициям `psim.events.normalized.v1` |
 | Correlation Engine | C++ | Правила, окна, состояние, сигналы; API управления правилами и пробного прогона | RocksDB + changelog; PostgreSQL для правил | По партициям `psim.events.normalized.v1` |
 | Incident Service | C++, REST | Агрегат инцидента, группировка, назначение, хронология | PostgreSQL + inbox + outbox | По партициям `psim.signals.v1`; запросы пользователей - любой экземпляр |
 | Response Engine | C++, REST | Сценарии, запуски, SLA и таймеры, эскалации | PostgreSQL + outbox | По партициям `psim.incidents.events.v1`; таймеры распределены по тем же партициям |
 | Command Service | C++, REST | Жизненный цикл команд, подтверждения, таймауты | PostgreSQL + outbox | 2+ экземпляра |
 | Notification Service | C++ | Каналы in-app, email, webhook; повторы, агрегация | PostgreSQL | 1-2 экземпляра |
-| Projection Service | C++ | Лента, состояние объектов и устройств, загрузка операторов, отчётные агрегаты | Redis (горячее), PostgreSQL (запросы) | По партициям входных топиков |
+| Projection Service | C++ | Лента, состояние объектов и устройств, загрузка операторов; факты инцидентов и отчёты | Redis (горячее), PostgreSQL (запросы), ClickHouse (факты и отчёты) | По партициям входных топиков |
 | Audit Service | C++, REST | Цепочка хэшей, контрольные точки, проверка, поиск | PostgreSQL, только добавление | 1 активный на тенант (цепочка последовательна) + резерв |
 | API Gateway | C++, Beast | REST v1, WebSocket realtime, JWT, ABAC, лимиты, маршрутизация | Redis: лимиты | Без состояния; N экземпляров |
 | Web Application | React, TypeScript | Консоль оператора, администрирование, аудит, отчёты | - | Статика за API Gateway или веб-сервером |
 | Admin CLI | C++ | Диагностика, DLQ, перестроение проекций, проверка аудита | - | - |
 
-Инфраструктура: Kafka (KRaft), Schema Registry (ADR-003), PostgreSQL, Redis-совместимое хранилище, Keycloak, OpenTelemetry Collector, Prometheus, Grafana, хранилища логов и трассировок.
+Инфраструктура: Kafka (KRaft), Schema Registry (ADR-003), PostgreSQL, Redis-совместимое хранилище, ClickHouse с ClickHouse Keeper (ADR-028), Keycloak, OpenTelemetry Collector, Prometheus, Grafana, хранилища логов и трассировок.
 
 **Управление правилами** размещено в Correlation Engine как отдельный REST-модуль, а не в отдельном сервисе: правила и движок меняются вместе, а это экономит один сервис в MVP. Модуль работает в любом экземпляре и публикует активный набор в `psim.config.v1`.
 
@@ -295,6 +296,8 @@ flowchart LR
 | Управление правилами - модуль Correlation Engine | раздел 5.1 | [ADR-001](../adr/0001-monorepo-structure.md) |
 | PostgreSQL HA: Patroni + etcd, синхронная реплика | [deployment.md](deployment.md#3-топология-кластер-на-vm) | [ADR-023](../adr/0023-deployment-topologies.md) |
 | REST DTO и сериализация JSON в C++ | [crosscutting.md](crosscutting.md#14-синхронное-api-между-веб-клиентом-и-сервисами) | [ADR-026](../adr/0026-rest-contract-and-dto.md) |
+| ClickHouse для истории событий, связей с сигналами, фактов инцидентов и статистики правил | [ADR-028](../adr/0028-clickhouse-analytical-storage.md) | [ADR-028](../adr/0028-clickhouse-analytical-storage.md) |
+| Детерминированный `source_id` = UUIDv5(`connector_id`, `source_ref`) | [ADR-029](../adr/0029-deterministic-source-id.md) | [ADR-029](../adr/0029-deterministic-source-id.md) |
 | Составной ключ каталога `resource_type:resource_id` | [data-flows.md](data-flows.md#37-каталог-psimcatalogv1) | [ADR-007](../adr/0007-partitioning-strategy.md) |
 
 ---

@@ -1,0 +1,164 @@
+# Kafka topic registry - single source of truth for topics (data-flows.md, scaling.md, ADR-006, ADR-007).
+# Generates contracts/asyncapi/psim-topics.yaml; used by the installer to create topics.
+# partitions: per deployment profile; replication: cluster RF 3 / min.insync 2, single node RF 1.
+# retention: ISO 8601 duration or "infinite"; cleanup: delete | compact.
+
+version: 1
+defaults:
+  replication_factor: {cluster: 3, single: 1}
+  min_insync_replicas: {cluster: 2, single: 1}
+  compression: zstd
+
+topics:
+  - name: psim.ingest.raw.v1
+    title: Raw events from connectors
+    record: psim.ingest.v1.RawEventRecord
+    key: source_id
+    partitions: {cluster: 48, single: 12}
+    retention: PT6H
+    cleanup: delete
+    semantics: ALO+ID
+    producers: [connector-gateway]
+    consumers: [normalizer]
+
+  - name: psim.events.normalized.v1
+    title: Normalized events
+    record: psim.processing.v1.EventRecord
+    key: site_id:zone_id
+    partitions: {cluster: 48, single: 12}
+    retention: PT24H
+    cleanup: delete
+    semantics: EOS-K
+    producers: [normalizer]
+    consumers: [correlation-engine, event-history, projection-service]
+
+  - name: psim.normalizer.state.v1
+    title: Normalizer source sequence trackers (internal)
+    record: psim.processing.v1.NormalizerStateRecord
+    key: source_id:epoch
+    partitions: {copartitioned_with: psim.ingest.raw.v1}
+    retention: infinite
+    cleanup: compact
+    semantics: EOS-K
+    internal: true
+    producers: [normalizer]
+    consumers: [normalizer]
+
+  - name: psim.signals.v1
+    title: Signals of correlation rules and external producers
+    record: psim.processing.v1.SignalRecord
+    key: grouping_key
+    partitions: {cluster: 12, single: 4}
+    retention: P7D
+    cleanup: delete
+    semantics: EOS-K
+    producers: [correlation-engine]
+    consumers: [incident-service, event-history, projection-service]
+
+  - name: psim.correlation.changelog.v1
+    title: Correlation state changelog (internal)
+    record: psim.processing.v1.CorrelationChangelogRecord
+    key: rule_id:correlation_key
+    partitions: {copartitioned_with: psim.events.normalized.v1}
+    retention: infinite
+    cleanup: compact
+    semantics: EOS-K
+    internal: true
+    producers: [correlation-engine]
+    consumers: [correlation-engine]
+
+  - name: psim.correlation.repartition.v1
+    title: Events of rules wider than a zone (internal)
+    record: psim.processing.v1.RepartitionRecord
+    key: correlation_key
+    partitions: {cluster: 12, single: 4}
+    retention: PT6H
+    cleanup: delete
+    semantics: EOS-K
+    internal: true
+    producers: [correlation-engine]
+    consumers: [correlation-engine]
+
+  - name: psim.incidents.events.v1
+    title: Incident domain events
+    record: psim.incident.v1.IncidentEventRecord
+    key: incident_id
+    partitions: {cluster: 12, single: 4}
+    retention: P30D
+    cleanup: delete
+    semantics: Outbox
+    producers: [incident-service]
+    consumers: [response-engine, projection-service, api-gateway]
+
+  - name: psim.response.events.v1
+    title: Response runs, commands, notifications, SLA and escalations
+    record: psim.response.v1.ResponseEventRecord
+    key: incident_id
+    partitions: {cluster: 12, single: 4}
+    retention: P30D
+    cleanup: delete
+    semantics: Outbox
+    producers: [response-engine, command-service, notification-service]
+    consumers: [incident-service, projection-service, api-gateway, notification-service]
+
+  - name: psim.commands.v1
+    title: Commands routed to connector sessions
+    record: psim.response.v1.CommandDeliveryRecord
+    key: connector_id
+    partitions: {cluster: 6, single: 2}
+    retention: P1D
+    cleanup: delete
+    semantics: ALO+ID
+    producers: [command-service]
+    consumers: [connector-gateway]
+
+  - name: psim.commands.results.v1
+    title: Command receipts and outcomes from connectors
+    record: psim.response.v1.CommandResultRecord
+    key: command_id
+    partitions: {cluster: 6, single: 2}
+    retention: P1D
+    cleanup: delete
+    semantics: ALO+ID
+    producers: [connector-gateway]
+    consumers: [command-service]
+
+  - name: psim.catalog.v1
+    title: Catalog resources (full state)
+    record: psim.catalog.v1.CatalogRecord
+    key: resource_type:resource_id
+    partitions: {cluster: 6, single: 2}
+    retention: infinite
+    cleanup: compact
+    semantics: Outbox
+    producers: [resource-catalog]
+    consumers: [normalizer, connector-gateway, correlation-engine, response-engine, command-service, projection-service, api-gateway]
+
+  - name: psim.config.v1
+    title: Active configuration objects
+    record: psim.config.v1.ConfigRecord
+    key: config_key
+    partitions: {cluster: 1, single: 1}
+    retention: infinite
+    cleanup: compact
+    semantics: Outbox
+    producers: [correlation-engine, normalizer, resource-catalog]
+    consumers: [normalizer, correlation-engine, event-history]
+
+  - name: psim.audit.v1
+    title: Audit entries and checkpoints
+    record: psim.audit.v1.AuditEventRecord
+    key: tenant_id
+    partitions: {cluster: 6, single: 2}
+    retention: P30D
+    cleanup: delete
+    semantics: ALO+ID
+    producers: [all-services]
+    consumers: [audit-service]
+
+dlq:
+  # psim.dlq.<stage>.v1: original bytes and key, error in headers (data-flows.md, 3.10).
+  stages: [normalizer, correlation, history, incident, response, command, notification, audit, projection]
+  partitions: {cluster: 3, single: 1}
+  retention: P14D
+  headers: [psim-dlq-stage, psim-dlq-error-code, psim-dlq-error, psim-dlq-source-topic, psim-dlq-source-partition, psim-dlq-source-offset, psim-dlq-at]

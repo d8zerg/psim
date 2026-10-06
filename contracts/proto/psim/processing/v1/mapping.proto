@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package psim.processing.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// MappingRuleSet is a published version of mapping rules for one connector type
+// (aggregates.md, 3.1). Published in psim.config.v1 under key "mapping/<tenant_id>/<connector_type>".
+message MappingRuleSet {
+  string mapping_rule_set_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2;
+  string connector_type = 3 [(buf.validate.field).string.min_len = 1];
+  string taxonomy_version = 4;
+  // Ordered; the first matching rule wins.
+  repeated MappingRule rules = 5 [(buf.validate.field).repeated.max_items = 10000];
+  google.protobuf.Timestamp published_at = 6;
+  psim.common.v1.Actor published_by = 7;
+}
+
+// MappingRule maps a raw event to a taxonomy type.
+message MappingRule {
+  // Exact vendor code or prefix ending with "*".
+  string raw_code = 1 [(buf.validate.field).string.min_len = 1];
+  // Optional CEL condition over the variable "raw".
+  string condition = 2;
+  // Target taxonomy type code.
+  string type = 3 [(buf.validate.field).string.min_len = 1];
+  // Overrides the default severity of the type when set.
+  psim.common.v1.Severity severity = 4;
+  // Attribute renames: raw attribute name -> normalized attribute name.
+  map<string, string> attribute_map = 5;
+}

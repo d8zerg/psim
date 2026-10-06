@@ -1,0 +1,144 @@
+# Contracts: buf, OpenAPI, AsyncAPI, proto reference, consistency checks (step 0.5).
+# Included from the root Taskfile as namespace "contracts"; working directory is contracts/.
+version: '3'
+
+vars:
+  OUT: '{{.CACHE}}/contracts'
+  TOOLS: '{{.ROOT_DIR}}/tools/contracts'
+  UPDATE: 'false'
+
+tasks:
+  check:
+    desc: Verify contracts; fails if generated files are stale
+    cmds:
+      - task: format
+      - task: lint
+      - task: breaking
+      - task: build
+      - task: openapi
+      - task: asyncapi
+      - task: reference
+      - task: verify
+
+  gen:
+    desc: Regenerate committed artifacts (OpenAPI, AsyncAPI, proto reference) and verify them
+    cmds:
+      - task: build
+      - task: openapi
+        vars: {UPDATE: 'true'}
+      - task: asyncapi
+        vars: {UPDATE: 'true'}
+      - task: reference
+        vars: {UPDATE: 'true'}
+      - task: verify
+
+  buf:
+    desc: 'Run buf in a container, for example: task contracts:buf -- dep update'
+    cmds:
+      - task: _buf
+        vars: {ARGS: '{{.CLI_ARGS}}'}
+
+  format:
+    desc: Check proto formatting
+    cmds:
+      - task: _buf
+        vars: {ARGS: format --diff --exit-code}
+
+  format:fix:
+    desc: Format proto files in place
+    cmds:
+      - task: _buf
+        vars: {ARGS: format --write}
+
+  lint:
+    desc: Lint proto files (STANDARD + COMMENTS)
+    cmds:
+      - task: _buf
+        vars: {ARGS: lint}
+
+  breaking:
+    desc: Check backward compatibility against master (ADR-004)
+    cmds:
+      - cmd: |
+          if git cat-file -e master:contracts/buf.yaml 2>/dev/null; then
+            {{.TASK_EXE}} contracts:buf -- breaking --against '/repo/.git#branch=master,subdir=contracts'
+          else
+            echo "skipped: no contracts on master yet (first version)"
+          fi
+
+  build:
+    desc: Build the descriptor image used by the consistency checks
+    sources:
+      - buf.yaml
+      - buf.lock
+      - proto/**/*.proto
+    generates:
+      - '{{.OUT}}/image.json'
+    cmds:
+      - mkdir -p {{.OUT}}
+      - task: _buf
+        vars: {ARGS: 'build -o /repo/.cache/contracts/image.json'}
+
+  openapi:
+    desc: Generate OpenAPI from proto, apply the overlay, compare with the committed file, lint
+    cmds:
+      - rm -rf {{.OUT}}/openapi
+      - task: _buf
+        vars: {ARGS: generate --template buf.gen.openapi.yaml}
+      - '{{.PYTHON}} {{.TOOLS}}/openapi_overlay.py {{.OUT}}/openapi/openapi.yaml openapi/overlay.yaml {{.OUT}}/psim-api-v1.yaml'
+      - task: _publish
+        vars: {SRC: '{{.OUT}}/psim-api-v1.yaml', DST: openapi/psim-api-v1.yaml, UPDATE: '{{.UPDATE}}'}
+      - docker run --rm -v "{{.TASKFILE_DIR}}/openapi":/spec {{.REDOCLY_IMAGE}} lint --format=summary /spec/psim-api-v1.yaml
+
+  asyncapi:
+    desc: Generate AsyncAPI from the topic registry, compare with the committed file, validate
+    cmds:
+      - mkdir -p {{.OUT}}
+      - '{{.PYTHON}} {{.TOOLS}}/contracts.py asyncapi topics/topics.yaml {{.OUT}}/psim-topics.yaml'
+      - task: _publish
+        vars: {SRC: '{{.OUT}}/psim-topics.yaml', DST: asyncapi/psim-topics.yaml, UPDATE: '{{.UPDATE}}'}
+      - >-
+        docker run --rm -e ASYNCAPI_METRICS=false -v "{{.TASKFILE_DIR}}/asyncapi":/spec {{.ASYNCAPI_IMAGE}}
+        validate /spec/psim-topics.yaml --fail-severity=warn
+
+  reference:
+    desc: Generate the Markdown proto reference and compare with the committed file
+    cmds:
+      - rm -rf {{.OUT}}/docs
+      - task: _buf
+        vars: {ARGS: generate --template buf.gen.docs.yaml}
+      - task: _publish
+        vars: {SRC: '{{.OUT}}/docs/proto-reference.md', DST: docs/proto-reference.md, UPDATE: '{{.UPDATE}}'}
+
+  verify:
+    desc: Consistency of proto, topic registry, taxonomy, error catalog, overlay and docs
+    deps: [build]
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/contracts.py verify {{.ROOT_DIR}} {{.OUT}}/image.json'
+
+  _buf:
+    internal: true
+    requires:
+      vars: [ARGS]
+    deps: [':tools:build']
+    cmds:
+      - mkdir -p {{.CACHE}}/buf
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -e BUF_CACHE_DIR=/cache
+        -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE}}/buf":/cache -w /repo/contracts
+        {{.CONTRACTS_TOOLS_IMAGE}} {{.ARGS}}
+
+  _publish:
+    internal: true
+    requires:
+      vars: [SRC, DST]
+    cmds:
+      - cmd: |
+          if [ "{{.UPDATE}}" = "true" ]; then
+            cp "{{.SRC}}" "{{.DST}}" && echo "updated: contracts/{{.DST}}"
+          elif ! diff -q "{{.SRC}}" "{{.DST}}" >/dev/null 2>&1; then
+            echo "STALE: contracts/{{.DST}} differs from generated output; run: task contracts:gen" >&2
+            exit 1
+          else
+            echo "ok: contracts/{{.DST}}"
+          fi

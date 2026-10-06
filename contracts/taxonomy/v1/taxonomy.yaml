@@ -1,0 +1,595 @@
+# Event taxonomy v1 - single source of truth (docs/domain/event-taxonomy.md describes it).
+# Rules: codes are only added; removal goes through deprecated: true until the next major version.
+version: '1'
+classes:
+- alarm
+- warning
+- fault
+- restore
+- state
+- info
+severities:
+- info
+- low
+- medium
+- high
+- critical
+priority_by_severity:
+  critical: P1
+  high: P2
+  medium: P3
+  low: P4
+significance_threshold: medium
+standard_attributes:
+- credential_id
+- person_ref
+- direction
+- object_class
+- confidence
+- track_id
+- snapshot_url
+- clip_url
+- loop
+- value
+- unit
+- raw_code
+domains:
+- code: intrusion
+  name:
+    ru: охранная сигнализация
+    en: Intrusion
+  types:
+  - code: intrusion.zone.alarm
+    name:
+      ru: Тревога в охранной зоне
+      en: Zone alarm
+    class: alarm
+    severity: high
+    restore: intrusion.zone.restore
+  - code: intrusion.zone.restore
+    name:
+      ru: Зона в норме
+      en: Zone restore
+    class: restore
+    severity: info
+  - code: intrusion.zone.armed
+    name:
+      ru: Постановка на охрану
+      en: Zone armed
+    class: state
+    severity: info
+  - code: intrusion.zone.disarmed
+    name:
+      ru: Снятие с охраны
+      en: Zone disarmed
+    class: state
+    severity: info
+  - code: intrusion.zone.arm_failed
+    name:
+      ru: Отказ постановки на охрану
+      en: Zone arm failed
+    class: warning
+    severity: medium
+  - code: intrusion.zone.bypassed
+    name:
+      ru: Зона исключена из охраны
+      en: Zone bypassed
+    class: warning
+    severity: low
+    restore: intrusion.zone.unbypassed
+  - code: intrusion.zone.unbypassed
+    name:
+      ru: Зона возвращена в охрану
+      en: Zone unbypassed
+    class: restore
+    severity: info
+  - code: intrusion.panic.alarm
+    name:
+      ru: Тревожная кнопка
+      en: Panic alarm
+    class: alarm
+    severity: critical
+  - code: intrusion.duress.alarm
+    name:
+      ru: Код принуждения
+      en: Duress alarm
+    class: alarm
+    severity: critical
+  - code: intrusion.device.tamper
+    name:
+      ru: Вскрытие корпуса
+      en: Device tamper
+    class: alarm
+    severity: high
+    restore: intrusion.device.tamper_restore
+  - code: intrusion.device.tamper_restore
+    name:
+      ru: Корпус закрыт
+      en: Device tamper restore
+    class: restore
+    severity: info
+- code: fire
+  name:
+    ru: пожарная сигнализация
+    en: Fire
+  types:
+  - code: fire.detector.alarm
+    name:
+      ru: Пожар
+      en: Detector alarm
+    class: alarm
+    severity: critical
+    restore: fire.detector.restore
+  - code: fire.detector.prealarm
+    name:
+      ru: Предварительный сигнал (внимание)
+      en: Detector prealarm
+    class: warning
+    severity: high
+    restore: fire.detector.restore
+  - code: fire.detector.restore
+    name:
+      ru: Извещатель в норме
+      en: Detector restore
+    class: restore
+    severity: info
+  - code: fire.manual_call_point.alarm
+    name:
+      ru: Ручной пожарный извещатель
+      en: Manual call point alarm
+    class: alarm
+    severity: critical
+    restore: fire.manual_call_point.restore
+  - code: fire.manual_call_point.restore
+    name:
+      ru: Ручной извещатель в норме
+      en: Manual call point restore
+    class: restore
+    severity: info
+  - code: fire.loop.fault
+    name:
+      ru: Неисправность шлейфа
+      en: Loop fault
+    class: fault
+    severity: medium
+    restore: fire.loop.restore
+  - code: fire.loop.restore
+    name:
+      ru: Шлейф в норме
+      en: Loop restore
+    class: restore
+    severity: info
+  - code: fire.extinguishing.started
+    name:
+      ru: Пуск автоматического пожаротушения
+      en: Extinguishing started
+    class: alarm
+    severity: critical
+  - code: fire.extinguishing.blocked
+    name:
+      ru: Автоматика пожаротушения отключена
+      en: Extinguishing blocked
+    class: warning
+    severity: high
+    restore: fire.extinguishing.unblocked
+  - code: fire.extinguishing.unblocked
+    name:
+      ru: Автоматика пожаротушения включена
+      en: Extinguishing unblocked
+    class: restore
+    severity: info
+  - code: fire.panel.reset
+    name:
+      ru: Сброс пожарной панели
+      en: Panel reset
+    class: state
+    severity: info
+- code: access
+  name:
+    ru: СКУД
+    en: Access
+  types:
+  - code: access.door.granted
+    name:
+      ru: Проход разрешён
+      en: Door granted
+    class: info
+    severity: info
+  - code: access.door.denied
+    name:
+      ru: Проход запрещён
+      en: Door denied
+    class: info
+    severity: low
+  - code: access.door.denied_repeated
+    name:
+      ru: Повторные отказы в проходе
+      en: Door denied repeated
+    class: warning
+    severity: medium
+  - code: access.door.forced
+    name:
+      ru: Взлом двери (открыта без разрешения)
+      en: Door forced
+    class: alarm
+    severity: high
+    restore: access.door.closed
+  - code: access.door.held_open
+    name:
+      ru: Дверь удерживается открытой
+      en: Door held open
+    class: warning
+    severity: medium
+    restore: access.door.closed
+  - code: access.door.opened
+    name:
+      ru: Дверь открыта
+      en: Door opened
+    class: info
+    severity: info
+  - code: access.door.closed
+    name:
+      ru: Дверь закрыта
+      en: Door closed
+    class: restore
+    severity: info
+  - code: access.door.locked
+    name:
+      ru: Дверь заблокирована
+      en: Door locked
+    class: state
+    severity: info
+  - code: access.door.unlocked
+    name:
+      ru: Дверь разблокирована
+      en: Door unlocked
+    class: state
+    severity: info
+  - code: access.credential.unknown
+    name:
+      ru: Неизвестный идентификатор
+      en: Credential unknown
+    class: warning
+    severity: low
+  - code: access.credential.blocked
+    name:
+      ru: Заблокированный идентификатор
+      en: Credential blocked
+    class: warning
+    severity: medium
+  - code: access.antipassback.violation
+    name:
+      ru: Нарушение antipassback
+      en: Antipassback violation
+    class: warning
+    severity: low
+  - code: access.reader.tamper
+    name:
+      ru: Вскрытие считывателя
+      en: Reader tamper
+    class: alarm
+    severity: high
+    restore: access.reader.tamper_restore
+  - code: access.reader.tamper_restore
+    name:
+      ru: Считыватель в норме
+      en: Reader tamper restore
+    class: restore
+    severity: info
+- code: video
+  name:
+    ru: видео и видеоаналитика
+    en: Video
+  types:
+  - code: video.analytics.motion
+    name:
+      ru: Движение в кадре
+      en: Analytics motion
+    class: info
+    severity: low
+  - code: video.analytics.person_detected
+    name:
+      ru: Обнаружен человек
+      en: Analytics person detected
+    class: warning
+    severity: medium
+  - code: video.analytics.vehicle_detected
+    name:
+      ru: Обнаружено транспортное средство
+      en: Analytics vehicle detected
+    class: warning
+    severity: low
+  - code: video.analytics.line_crossed
+    name:
+      ru: Пересечение линии
+      en: Analytics line crossed
+    class: alarm
+    severity: high
+  - code: video.analytics.zone_intrusion
+    name:
+      ru: Вход в запретную зону кадра
+      en: Analytics zone intrusion
+    class: alarm
+    severity: high
+  - code: video.analytics.loitering
+    name:
+      ru: Длительное нахождение
+      en: Analytics loitering
+    class: warning
+    severity: medium
+  - code: video.analytics.object_left
+    name:
+      ru: Оставленный предмет
+      en: Analytics object left
+    class: alarm
+    severity: high
+  - code: video.analytics.object_removed
+    name:
+      ru: Пропажа предмета
+      en: Analytics object removed
+    class: alarm
+    severity: medium
+  - code: video.analytics.crowd
+    name:
+      ru: Скопление людей
+      en: Analytics crowd
+    class: warning
+    severity: medium
+  - code: video.analytics.smoke_fire
+    name:
+      ru: Видеодетекция дыма или огня
+      en: Analytics smoke fire
+    class: alarm
+    severity: critical
+  - code: video.camera.tamper
+    name:
+      ru: Саботаж камеры (заслонение, расфокус, поворот)
+      en: Camera tamper
+    class: alarm
+    severity: high
+    restore: video.camera.tamper_restore
+  - code: video.camera.tamper_restore
+    name:
+      ru: Изображение камеры в норме
+      en: Camera tamper restore
+    class: restore
+    severity: info
+  - code: video.camera.signal_lost
+    name:
+      ru: Потеря видеосигнала
+      en: Camera signal lost
+    class: fault
+    severity: medium
+    restore: video.camera.signal_restored
+  - code: video.camera.signal_restored
+    name:
+      ru: Видеосигнал восстановлен
+      en: Camera signal restored
+    class: restore
+    severity: info
+- code: perimeter
+  name:
+    ru: периметр
+    en: Perimeter
+  types:
+  - code: perimeter.sensor.alarm
+    name:
+      ru: Срабатывание периметрального средства обнаружения
+      en: Sensor alarm
+    class: alarm
+    severity: high
+    restore: perimeter.sensor.restore
+  - code: perimeter.sensor.restore
+    name:
+      ru: Участок периметра в норме
+      en: Sensor restore
+    class: restore
+    severity: info
+  - code: perimeter.fence.cut
+    name:
+      ru: Перекус или разрушение ограждения
+      en: Fence cut
+    class: alarm
+    severity: high
+    restore: perimeter.sensor.restore
+  - code: perimeter.fence.climb
+    name:
+      ru: Преодоление ограждения
+      en: Fence climb
+    class: alarm
+    severity: high
+    restore: perimeter.sensor.restore
+  - code: perimeter.gate.opened
+    name:
+      ru: Ворота открыты
+      en: Gate opened
+    class: info
+    severity: info
+    restore: perimeter.gate.closed
+  - code: perimeter.gate.closed
+    name:
+      ru: Ворота закрыты
+      en: Gate closed
+    class: restore
+    severity: info
+  - code: perimeter.gate.forced
+    name:
+      ru: Несанкционированное открытие ворот
+      en: Gate forced
+    class: alarm
+    severity: high
+    restore: perimeter.gate.closed
+  - code: perimeter.sensor.tamper
+    name:
+      ru: Вскрытие средства обнаружения
+      en: Sensor tamper
+    class: alarm
+    severity: high
+    restore: perimeter.sensor.restore
+- code: technical
+  name:
+    ru: технические неисправности и инженерные системы
+    en: Technical
+  types:
+  - code: technical.device.offline
+    name:
+      ru: Устройство не на связи
+      en: Device offline
+    class: fault
+    severity: medium
+    restore: technical.device.online
+  - code: technical.device.online
+    name:
+      ru: Связь с устройством восстановлена
+      en: Device online
+    class: restore
+    severity: info
+  - code: technical.device.fault
+    name:
+      ru: Неисправность устройства
+      en: Device fault
+    class: fault
+    severity: medium
+    restore: technical.device.restore
+  - code: technical.device.restore
+    name:
+      ru: Устройство в норме
+      en: Device restore
+    class: restore
+    severity: info
+  - code: technical.power.mains_lost
+    name:
+      ru: Пропадание основного питания
+      en: Power mains lost
+    class: fault
+    severity: medium
+    restore: technical.power.mains_restored
+  - code: technical.power.mains_restored
+    name:
+      ru: Основное питание восстановлено
+      en: Power mains restored
+    class: restore
+    severity: info
+  - code: technical.power.battery_low
+    name:
+      ru: Разряд резервного источника
+      en: Power battery low
+    class: fault
+    severity: medium
+    restore: technical.power.battery_ok
+  - code: technical.power.battery_ok
+    name:
+      ru: Резервный источник в норме
+      en: Power battery ok
+    class: restore
+    severity: info
+  - code: technical.network.link_down
+    name:
+      ru: Потеря канала связи
+      en: Network link down
+    class: fault
+    severity: medium
+    restore: technical.network.link_up
+  - code: technical.network.link_up
+    name:
+      ru: Канал связи восстановлен
+      en: Network link up
+    class: restore
+    severity: info
+  - code: technical.environment.temperature_high
+    name:
+      ru: Превышение температуры
+      en: Environment temperature high
+    class: warning
+    severity: medium
+    restore: technical.environment.normal
+  - code: technical.environment.water_leak
+    name:
+      ru: Протечка
+      en: Environment water leak
+    class: alarm
+    severity: high
+    restore: technical.environment.normal
+  - code: technical.environment.normal
+    name:
+      ru: Параметры среды в норме
+      en: Environment normal
+    class: restore
+    severity: info
+- code: system
+  name:
+    ru: события самой платформы и коннекторов
+    en: System
+  types:
+  - code: system.connector.offline
+    name:
+      ru: Коннектор не на связи
+      en: Connector offline
+    class: fault
+    severity: high
+    restore: system.connector.online
+  - code: system.connector.online
+    name:
+      ru: Коннектор на связи
+      en: Connector online
+    class: restore
+    severity: info
+  - code: system.connector.buffer_overflow
+    name:
+      ru: Переполнение буфера коннектора, возможна потеря событий
+      en: Connector buffer overflow
+    class: fault
+    severity: high
+  - code: system.source.sequence_gap
+    name:
+      ru: Разрыв порядковых номеров источника
+      en: Source sequence gap
+    class: warning
+    severity: medium
+  - code: system.source.clock_skew
+    name:
+      ru: Рассогласование часов источника
+      en: Source clock skew
+    class: warning
+    severity: low
+  - code: system.heartbeat.missed
+    name:
+      ru: Ожидаемое периодическое событие не получено (правило `absence`)
+      en: Heartbeat missed
+    class: fault
+    severity: medium
+- code: generic
+  name:
+    ru: для источников без точного соответствия
+    en: Generic
+  types:
+  - code: generic.alarm
+    name:
+      ru: Тревога (без уточнения)
+      en: Alarm
+    class: alarm
+    severity: high
+  - code: generic.warning
+    name:
+      ru: Предупреждение
+      en: Warning
+    class: warning
+    severity: medium
+  - code: generic.fault
+    name:
+      ru: Неисправность
+      en: Fault
+    class: fault
+    severity: medium
+  - code: generic.restore
+    name:
+      ru: Норма
+      en: Restore
+    class: restore
+    severity: info
+  - code: generic.info
+    name:
+      ru: Информация
+      en: Info
+    class: info
+    severity: info

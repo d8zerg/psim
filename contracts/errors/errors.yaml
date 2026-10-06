@@ -1,0 +1,481 @@
+# Error code catalog - single source of truth for REST (Problem.code), connector protocol
+# (google.rpc.ErrorInfo.reason, EventRejection.code), DLQ headers (psim-dlq-error-code),
+# command results (Command.result_code) and realtime frames (ErrorFrame.code).
+# Format: <DOMAIN>_<ESSENCE>. Codes are never renamed or reused.
+#
+# Fields: http - REST status (null if not used in REST); grpc - gRPC status;
+# retryable - the client may retry the same request; used_in - where the code appears;
+# used_in values: rest, connector, dlq, command_result, notification, realtime.
+# title - English, returned in Problem.title; ru - description for documentation.
+
+version: 1
+domains: [COMMON, AUTH, CATALOG, INGEST, PROCESSING, INCIDENT, RESPONSE, COMMAND, NOTIFICATION, REALTIME]
+codes:
+  # --- COMMON ---------------------------------------------------------------
+  - code: COMMON_INVALID_ARGUMENT
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest, connector]
+    title: Invalid argument
+    ru: Запрос не прошёл валидацию; подробности в errors[]
+  - code: COMMON_NOT_FOUND
+    http: 404
+    grpc: NOT_FOUND
+    retryable: false
+    used_in: [rest]
+    title: Resource not found
+    ru: Ресурс не найден или недоступен в области доступа
+  - code: COMMON_CONCURRENT_MODIFICATION
+    http: 412
+    grpc: ABORTED
+    retryable: false
+    used_in: [rest]
+    title: Resource was modified
+    ru: Версия в If-Match не совпадает с текущей версией ресурса
+  - code: COMMON_PRECONDITION_REQUIRED
+    http: 428
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: If-Match header required
+    ru: Изменение версионированного ресурса без заголовка If-Match
+  - code: COMMON_IDEMPOTENCY_KEY_REUSED
+    http: 422
+    grpc: ALREADY_EXISTS
+    retryable: false
+    used_in: [rest]
+    title: Idempotency key reused with a different request
+    ru: Ключ идемпотентности уже использован для другого запроса
+  - code: COMMON_RATE_LIMITED
+    http: 429
+    grpc: RESOURCE_EXHAUSTED
+    retryable: true
+    used_in: [rest]
+    title: Too many requests
+    ru: Превышен лимит частоты запросов
+  - code: COMMON_INTERNAL
+    http: 500
+    grpc: INTERNAL
+    retryable: true
+    used_in: [rest, connector, dlq, realtime]
+    title: Internal error
+    ru: Непредвиденная ошибка; подробности в журнале по trace_id
+  - code: COMMON_UNAVAILABLE
+    http: 503
+    grpc: UNAVAILABLE
+    retryable: true
+    used_in: [rest, connector, realtime]
+    title: Service unavailable
+    ru: Сервис или его зависимость временно недоступны
+  - code: COMMON_DEADLINE_EXCEEDED
+    http: 504
+    grpc: DEADLINE_EXCEEDED
+    retryable: true
+    used_in: [rest]
+    title: Deadline exceeded
+    ru: Запрос не выполнен за отведённое время
+
+  # --- AUTH -----------------------------------------------------------------
+  - code: AUTH_UNAUTHENTICATED
+    http: 401
+    grpc: UNAUTHENTICATED
+    retryable: false
+    used_in: [rest, connector, realtime]
+    title: Authentication required
+    ru: Нет или недействителен токен доступа либо сертификат
+  - code: AUTH_TOKEN_EXPIRED
+    http: 401
+    grpc: UNAUTHENTICATED
+    retryable: false
+    used_in: [rest, realtime]
+    title: Access token expired
+    ru: Срок действия токена истёк; нужен новый токен
+  - code: AUTH_FORBIDDEN
+    http: 403
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [rest, realtime]
+    title: Action not allowed for the role
+    ru: Роль пользователя не разрешает действие (RBAC)
+  - code: AUTH_SCOPE_DENIED
+    http: 403
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [rest, realtime]
+    title: Object outside the access scope
+    ru: Объект вне области доступа пользователя (ABAC)
+
+  # --- CATALOG --------------------------------------------------------------
+  - code: CATALOG_INVALID_PARENT
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Invalid parent location
+    ru: Недопустимый родитель локации (L1)
+  - code: CATALOG_LOCATION_NOT_EMPTY
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Location has children or devices
+    ru: Нельзя архивировать локацию с дочерними локациями или устройствами (L3)
+  - code: CATALOG_SITE_CHANGE_FORBIDDEN
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Location cannot move to another site
+    ru: Перенос локации в другую площадку запрещён (L4)
+  - code: CATALOG_DUPLICATE_CODE
+    http: 409
+    grpc: ALREADY_EXISTS
+    retryable: false
+    used_in: [rest]
+    title: Duplicate code
+    ru: Код локации или типа устройства уже занят
+  - code: CATALOG_DUPLICATE_EXTERNAL_ID
+    http: 409
+    grpc: ALREADY_EXISTS
+    retryable: false
+    used_in: [rest]
+    title: Duplicate external device id
+    ru: external_id устройства уже используется в пределах коннектора (D1)
+  - code: CATALOG_DUPLICATE_SOURCE_REF
+    http: 409
+    grpc: ALREADY_EXISTS
+    retryable: false
+    used_in: [rest]
+    title: Duplicate source reference
+    ru: external_ref источника уже используется в пределах коннектора (D2)
+  - code: CATALOG_POSITION_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Invalid device position
+    ru: Позиция устройства вне плана этажа или зона не на этаже с планом (D3)
+  - code: CATALOG_DEVICE_TYPE_IN_USE
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Device type is in use
+    ru: Тип устройства нельзя удалить, пока есть устройства этого типа (DT2)
+  - code: CATALOG_CERTIFICATE_LIMIT
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Too many active certificates
+    ru: У коннектора уже два сертификата; дождитесь окончания ротации (C1)
+  - code: CATALOG_IMPORT_ROW_INVALID
+    http: null
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Import row is invalid
+    ru: Ошибка строки импорта, возвращается в отчёте импорта
+
+  # --- INGEST ---------------------------------------------------------------
+  - code: INGEST_UNKNOWN_CONNECTOR
+    http: null
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [connector]
+    title: Connector is not registered
+    ru: Сертификат не привязан ни к одному коннектору
+  - code: INGEST_CONNECTOR_REVOKED
+    http: null
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [connector]
+    title: Connector revoked
+    ru: Коннектор отозван (C2)
+  - code: INGEST_PROTOCOL_VERSION_UNSUPPORTED
+    http: null
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [connector]
+    title: Protocol version not supported
+    ru: Нет общей версии протокола коннекторов
+  - code: INGEST_PROTOCOL_VIOLATION
+    http: null
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [connector]
+    title: Protocol violation
+    ru: Нарушен порядок сообщений протокола (например, EventBatch до Register)
+  - code: INGEST_INVALID_EVENT
+    http: null
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [connector]
+    title: Invalid event
+    ru: Событие не прошло валидацию схемы и отклонено навсегда
+  - code: INGEST_CREDITS_EXCEEDED
+    http: null
+    grpc: RESOURCE_EXHAUSTED
+    retryable: true
+    used_in: [connector]
+    title: Credits exceeded
+    ru: Коннектор отправил больше событий, чем выдано кредитов (CS4)
+  - code: INGEST_RATE_LIMITED
+    http: null
+    grpc: RESOURCE_EXHAUSTED
+    retryable: true
+    used_in: [connector]
+    title: Connector rate limit exceeded
+    ru: Превышен лимит событий в секунду коннектора
+  - code: INGEST_BATCH_TOO_LARGE
+    http: null
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [connector]
+    title: Batch too large
+    ru: Пакет больше max_batch_events или max_batch_bytes
+
+  # --- PROCESSING -----------------------------------------------------------
+  - code: PROCESSING_DEVICE_NOT_FOUND
+    http: null
+    grpc: NOT_FOUND
+    retryable: false
+    used_in: [dlq]
+    title: Device not found for source
+    ru: Источник события не привязан к устройству в каталоге (E2)
+  - code: PROCESSING_DEVICE_DISABLED
+    http: null
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [dlq]
+    title: Device disabled
+    ru: Событие отключённого устройства (D5)
+  - code: PROCESSING_NO_MAPPING
+    http: null
+    grpc: NOT_FOUND
+    retryable: false
+    used_in: [dlq]
+    title: No mapping rule
+    ru: Нет правила отображения для кода события (E2)
+  - code: PROCESSING_UNKNOWN_TAXONOMY_TYPE
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest, dlq]
+    title: Unknown taxonomy type
+    ru: Тип таксономии не существует в действующей версии (M1)
+  - code: PROCESSING_PAYLOAD_INVALID
+    http: null
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [dlq]
+    title: Message payload invalid
+    ru: Сообщение топика не декодируется или нарушает схему
+  - code: PROCESSING_RULE_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Rule is invalid
+    ru: Правило не прошло валидацию (R1, R3, R4)
+  - code: PROCESSING_RULE_STATE_INVALID
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Rule state does not allow the operation
+    ru: Операция недопустима в текущем состоянии версии правила
+  - code: PROCESSING_RULE_EVALUATION_FAILED
+    http: null
+    grpc: INTERNAL
+    retryable: false
+    used_in: [dlq]
+    title: Rule evaluation failed
+    ru: Ошибка вычисления правила для события
+  - code: PROCESSING_RULESET_CONFLICT
+    http: 409
+    grpc: ABORTED
+    retryable: false
+    used_in: [rest]
+    title: Rule set was changed concurrently
+    ru: Активный набор правил изменился после чтения клиентом
+  - code: PROCESSING_DRY_RUN_RANGE_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Dry run range outside retention
+    ru: Интервал пробного прогона вне retention нормализованных событий
+
+  # --- INCIDENT -------------------------------------------------------------
+  - code: INCIDENT_INVALID_STATE_TRANSITION
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Invalid incident state transition
+    ru: Переход не разрешён моделью состояний инцидента (I1)
+  - code: INCIDENT_MANDATORY_STEPS_PENDING
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Mandatory steps are pending
+    ru: Инцидент нельзя решить, пока не выполнены обязательные шаги (I7)
+  - code: INCIDENT_RUN_VERSION_STALE
+    http: 409
+    grpc: ABORTED
+    retryable: true
+    used_in: [rest]
+    title: Response run changed
+    ru: Клиент не видел последних изменений сценария; обновите карточку
+  - code: INCIDENT_ASSIGNEE_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Invalid assignee
+    ru: Ответственный без нужной роли или области доступа (I5)
+  - code: INCIDENT_RESOLUTION_FORBIDDEN
+    http: 403
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [rest]
+    title: Resolution not allowed
+    ru: Решение недопустимо для роли или состояния (например, из new без supervisor)
+
+  # --- RESPONSE -------------------------------------------------------------
+  - code: RESPONSE_PLAN_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Response plan is invalid
+    ru: Сценарий нарушает P1-P5
+  - code: RESPONSE_PLAN_IMMUTABLE
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Published plan version is immutable
+    ru: Опубликованная версия сценария неизменяема (P4)
+  - code: RESPONSE_STEP_NOT_ACTIVE
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Step is not active
+    ru: Шаг не входит в active_steps (RR2)
+  - code: RESPONSE_STEP_MANDATORY
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Mandatory step cannot be skipped
+    ru: Обязательный шаг нельзя пропустить (RR3)
+  - code: RESPONSE_POLICY_INVALID
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Escalation policy is invalid
+    ru: Политика эскалации нарушает EP1-EP2
+  - code: RESPONSE_AUTOMATED_STEP_FAILED
+    http: null
+    grpc: UNAVAILABLE
+    retryable: true
+    used_in: [dlq]
+    title: Automated step handler failed
+    ru: Внешний обработчик автоматического шага вернул ошибку или не ответил
+
+  # --- COMMAND --------------------------------------------------------------
+  - code: COMMAND_CAPABILITY_UNSUPPORTED
+    http: 400
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [rest]
+    title: Capability not supported by device
+    ru: Возможности нет у типа устройства (CM1)
+  - code: COMMAND_APPROVAL_SELF
+    http: 403
+    grpc: PERMISSION_DENIED
+    retryable: false
+    used_in: [rest]
+    title: Requester cannot approve own command
+    ru: Подтверждающий совпадает с инициатором (CM3)
+  - code: COMMAND_INVALID_STATE
+    http: 409
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [rest]
+    title: Command state does not allow the operation
+    ru: Операция недопустима в текущем состоянии команды
+  - code: COMMAND_CONNECTOR_OFFLINE
+    http: null
+    grpc: UNAVAILABLE
+    retryable: false
+    used_in: [command_result]
+    title: Connector offline
+    ru: Коннектор устройства не в сети в момент отправки
+  - code: COMMAND_DEVICE_REJECTED
+    http: null
+    grpc: FAILED_PRECONDITION
+    retryable: false
+    used_in: [command_result, connector]
+    title: Device rejected the command
+    ru: Коннектор или устройство отказали в исполнении
+  - code: COMMAND_TIMED_OUT
+    http: null
+    grpc: DEADLINE_EXCEEDED
+    retryable: false
+    used_in: [command_result]
+    title: Command timed out
+    ru: Нет финального результата до deadline_at
+  - code: COMMAND_APPROVAL_TIMED_OUT
+    http: null
+    grpc: DEADLINE_EXCEEDED
+    retryable: false
+    used_in: [command_result]
+    title: Approval timed out
+    ru: Критичная команда не подтверждена в срок
+  - code: COMMAND_EXPIRED
+    http: null
+    grpc: DEADLINE_EXCEEDED
+    retryable: false
+    used_in: [connector]
+    title: Command expired before delivery
+    ru: Шлюз не доставил команду с истёкшим deadline_at
+
+  # --- NOTIFICATION ---------------------------------------------------------
+  - code: NOTIFICATION_DELIVERY_FAILED
+    http: null
+    grpc: UNAVAILABLE
+    retryable: false
+    used_in: [notification]
+    title: Notification delivery failed
+    ru: Попытки доставки уведомления исчерпаны (N2)
+
+
+  # --- REALTIME -------------------------------------------------------------
+  - code: REALTIME_RESYNC_REQUIRED
+    http: null
+    grpc: OUT_OF_RANGE
+    retryable: false
+    used_in: [realtime]
+    title: Resync required
+    ru: Токен возобновления устарел; клиент должен взять новый снимок
+  - code: REALTIME_SLOW_CONSUMER
+    http: null
+    grpc: RESOURCE_EXHAUSTED
+    retryable: true
+    used_in: [realtime]
+    title: Slow consumer
+    ru: Очередь отправки клиента переполнена; соединение закрывается
+  - code: REALTIME_SUBSCRIPTION_INVALID
+    http: null
+    grpc: INVALID_ARGUMENT
+    retryable: false
+    used_in: [realtime]
+    title: Invalid subscription
+    ru: Неверная подписка или фильтр

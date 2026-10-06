@@ -1,0 +1,129 @@
+syntax = "proto3";
+
+package psim.processing.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// CorrelationRule is one immutable version of a correlation rule (aggregates.md, 3.3; ADR-011).
+message CorrelationRule {
+  string rule_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2;
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  string description = 4 [(buf.validate.field).string.max_len = 4000];
+  RuleState state = 5 [(buf.validate.field).enum.defined_only = true];
+  // Events considered by the rule at all.
+  EventFilter filter = 6 [(buf.validate.field).required = true];
+  CorrelationScope correlation_scope = 7 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  google.protobuf.Duration window = 8;
+  google.protobuf.Duration allowed_lateness = 9;
+  // Suppress repeated signals for the same correlation key for this interval.
+  google.protobuf.Duration suppression = 10;
+  oneof spec {
+    option (buf.validate.oneof).required = true;
+    SingleSpec single = 11;
+    ConjunctionSpec conjunction = 12;
+    SequenceSpec sequence = 13;
+    ThresholdSpec threshold = 14;
+    AbsenceSpec absence = 15;
+  }
+  RuleOutput output = 16 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp created_at = 17;
+  psim.common.v1.Actor created_by = 18;
+}
+
+// RuleState is the lifecycle state of a rule version (state-models.md, 5).
+enum RuleState {
+  RULE_STATE_UNSPECIFIED = 0;
+  RULE_STATE_DRAFT = 1;
+  RULE_STATE_TESTING = 2;
+  RULE_STATE_ACTIVE = 3;
+  RULE_STATE_ARCHIVED = 4;
+}
+
+// CorrelationScope defines the correlation key of a rule (scaling.md, 3).
+enum CorrelationScope {
+  CORRELATION_SCOPE_UNSPECIFIED = 0;
+  CORRELATION_SCOPE_SOURCE = 1;
+  CORRELATION_SCOPE_DEVICE = 2;
+  CORRELATION_SCOPE_ZONE = 3;
+  CORRELATION_SCOPE_FLOOR = 4;
+  CORRELATION_SCOPE_BUILDING = 5;
+  CORRELATION_SCOPE_SITE = 6;
+}
+
+// EventFilter selects events by taxonomy type, severity, location and a CEL condition.
+message EventFilter {
+  // Taxonomy codes or prefixes ending with ".*", for example "intrusion.*".
+  repeated string types = 1 [(buf.validate.field).repeated.max_items = 100];
+  psim.common.v1.Severity min_severity = 2;
+  repeated string site_ids = 3;
+  repeated string zone_ids = 4;
+  // Optional CEL expression over the variable "event".
+  string condition = 5 [(buf.validate.field).string.max_len = 4000];
+}
+
+// SingleSpec fires on every matching event.
+message SingleSpec {}
+
+// ConjunctionSpec fires when every part matched within the window, in any order.
+message ConjunctionSpec {
+  repeated EventFilter parts = 1 [(buf.validate.field).repeated = {
+    min_items: 2
+    max_items: 10
+  }];
+}
+
+// SequenceSpec fires when the steps matched within the window in the given order.
+message SequenceSpec {
+  repeated EventFilter steps = 1 [(buf.validate.field).repeated = {
+    min_items: 2
+    max_items: 10
+  }];
+}
+
+// ThresholdSpec fires when at least count matching events occur within the window.
+message ThresholdSpec {
+  uint32 count = 1 [(buf.validate.field).uint32.gte = 2];
+  // Count distinct values of this field ("device_id", "source_id" or an attribute) instead of events.
+  string distinct_by = 2;
+}
+
+// AbsenceSpec fires when an expected event does not follow a trigger within the window.
+// Without a trigger it fires when no expected event occurs within each window (heartbeat).
+message AbsenceSpec {
+  EventFilter trigger = 1;
+  EventFilter expected = 2 [(buf.validate.field).required = true];
+}
+
+// RuleOutput describes the signal produced by a rule.
+message RuleOutput {
+  string incident_type_id = 1 [(buf.validate.field).string.uuid = true];
+  // Fixed priority, used when priority_expression is empty.
+  psim.common.v1.Priority priority = 2;
+  // Optional CEL expression returning 1..4.
+  string priority_expression = 3;
+  // Scope of the grouping key; defaults to the correlation scope.
+  CorrelationScope grouping_scope = 4;
+  // Summary template, may reference event and rule fields.
+  string summary_template = 5 [(buf.validate.field).string.max_len = 1024];
+}
+
+// RuleSet is the set of rule versions active for a tenant (aggregates.md, 3.4).
+// Published in psim.config.v1 under key "ruleset/<tenant_id>".
+message RuleSet {
+  string rule_set_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 version = 2;
+  repeated CorrelationRule rules = 3;
+  google.protobuf.Timestamp activated_at = 4;
+  psim.common.v1.Actor activated_by = 5;
+}

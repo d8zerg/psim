@@ -1,0 +1,89 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/types.proto";
+import "psim/incident/v1/incident.proto";
+
+// FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.
+service FeedService {
+  // GetIncidentFeed returns active incidents of the caller scope and the resume token
+  // at which the snapshot is consistent (ADR-019).
+  rpc GetIncidentFeed(GetIncidentFeedRequest) returns (GetIncidentFeedResponse) {
+    option (google.api.http) = {get: "/v1/feed/incidents"};
+  }
+  // GetLocationStatus returns the state of devices and zones of a location for the object view.
+  rpc GetLocationStatus(GetLocationStatusRequest) returns (GetLocationStatusResponse) {
+    option (google.api.http) = {get: "/v1/feed/locations/{location_id}/status"};
+  }
+  // GetOperatorLoad returns the current load of operators (supervisor).
+  rpc GetOperatorLoad(GetOperatorLoadRequest) returns (GetOperatorLoadResponse) {
+    option (google.api.http) = {get: "/v1/feed/operators"};
+  }
+}
+
+// GetIncidentFeedRequest is the request of GetIncidentFeed.
+message GetIncidentFeedRequest {
+  repeated string site_ids = 1;
+  repeated string zone_ids = 2;
+}
+
+// GetIncidentFeedResponse is the response of GetIncidentFeed.
+// Not paginated: the console needs the whole feed (up to 10 000 incidents).
+message GetIncidentFeedResponse {
+  repeated psim.incident.v1.Incident incidents = 1;
+  // Token for the realtime Subscribe frame.
+  string resume_token = 2;
+  google.protobuf.Timestamp snapshot_at = 3;
+}
+
+// GetLocationStatusRequest is the request of GetLocationStatus.
+message GetLocationStatusRequest {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetLocationStatusResponse is the response of GetLocationStatus.
+message GetLocationStatusResponse {
+  repeated ZoneStatus zones = 1;
+  repeated DeviceStatus devices = 2;
+}
+
+// ZoneStatus is the aggregated state of a zone.
+message ZoneStatus {
+  string zone_id = 1;
+  // Highest class among active device states.
+  psim.common.v1.EventClass state = 2;
+  bool armed = 3;
+  uint32 open_incidents = 4;
+}
+
+// DeviceStatus is the current state of a device derived from alarm, fault, restore and state events.
+message DeviceStatus {
+  string device_id = 1;
+  psim.common.v1.EventClass state = 2;
+  // Last state-changing taxonomy type.
+  string last_type = 3;
+  google.protobuf.Timestamp last_changed_at = 4;
+  bool online = 5;
+}
+
+// GetOperatorLoadRequest is the request of GetOperatorLoad.
+message GetOperatorLoadRequest {
+  repeated string site_ids = 1;
+}
+
+// GetOperatorLoadResponse is the response of GetOperatorLoad.
+message GetOperatorLoadResponse {
+  repeated OperatorLoad operators = 1;
+}
+
+// OperatorLoad is the current load of one operator.
+message OperatorLoad {
+  string user_id = 1;
+  string display_name = 2;
+  uint32 assigned_open = 3;
+  uint32 escalated = 4;
+}

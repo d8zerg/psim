@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package psim.processing.v1;
+
+import "buf/validate/validate.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/processing/v1/event.proto";
+
+// NormalizerStateRecord is the value of internal compacted topic psim.normalizer.state.v1
+// (key: source_id:epoch). Not a public contract.
+message NormalizerStateRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    SourceSequenceState source_state = 2;
+  }
+}
+
+// SourceSequenceState is the deduplication tracker of one source epoch (data-flows.md, 3.2).
+message SourceSequenceState {
+  string source_id = 1;
+  uint32 source_epoch = 2;
+  uint64 max_sequence = 3;
+  // Bitmap of the last 4096 sequence numbers below max_sequence; bit i set = max_sequence - i seen.
+  bytes window = 4;
+}
+
+// CorrelationChangelogRecord is the value of internal compacted topic
+// psim.correlation.changelog.v1 (key: rule_id:correlation_key). Not a public contract.
+message CorrelationChangelogRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    CorrelationStateEntry state = 2;
+  }
+}
+
+// CorrelationStateEntry is the opaque state of one rule for one correlation key.
+message CorrelationStateEntry {
+  string rule_id = 1;
+  uint32 rule_version = 2;
+  string correlation_key = 3;
+  // Engine-defined encoding, versioned by state_format.
+  bytes state = 4;
+  uint32 state_format = 5;
+}
+
+// RepartitionRecord is the value of internal topic psim.correlation.repartition.v1
+// (key: correlation_key). Not a public contract.
+message RepartitionRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    RepartitionedEvent repartitioned_event = 2;
+  }
+}
+
+// RepartitionedEvent carries an event already filtered by a rule wider than a zone.
+message RepartitionedEvent {
+  string rule_id = 1;
+  uint32 rule_version = 2;
+  string correlation_key = 3;
+  Event event = 4;
+}

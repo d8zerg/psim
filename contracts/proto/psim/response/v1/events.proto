@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+package psim.response.v1;
+
+import "buf/validate/validate.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/response/v1/command.proto";
+import "psim/response/v1/notification.proto";
+import "psim/response/v1/run.proto";
+
+// ResponseEventRecord is the value of topic psim.response.events.v1
+// (key: incident_id; command_id or notification_id when there is no incident).
+// Events carry the aggregate state after the change; envelope.sequence = aggregate version.
+message ResponseEventRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    RunUpdated run_updated = 2;
+    CommandUpdated command_updated = 3;
+    NotificationUpdated notification_updated = 4;
+    SlaBreached sla_breached = 5;
+    EscalationLevelTriggered escalation_level_triggered = 6;
+  }
+}
+
+// RunUpdated reports a change of a response run.
+message RunUpdated {
+  RunChange change = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Step affected by the change, if any.
+  string step_id = 2;
+  ResponseRun run = 3;
+}
+
+// RunChange maps to domain events ResponseRunStarted, StepActivated, StepCompleted, StepSkipped,
+// StepFailed, MandatoryStepsChanged, ResponseRunCompleted, ResponseRunCancelled.
+enum RunChange {
+  RUN_CHANGE_UNSPECIFIED = 0;
+  RUN_CHANGE_RUN_STARTED = 1;
+  RUN_CHANGE_STEP_ACTIVATED = 2;
+  RUN_CHANGE_STEP_COMPLETED = 3;
+  RUN_CHANGE_STEP_SKIPPED = 4;
+  RUN_CHANGE_STEP_FAILED = 5;
+  RUN_CHANGE_MANDATORY_STEPS_CHANGED = 6;
+  RUN_CHANGE_RUN_COMPLETED = 7;
+  RUN_CHANGE_RUN_CANCELLED = 8;
+}
+
+// CommandUpdated reports a change of a command; the change equals the new state.
+message CommandUpdated {
+  Command command = 1;
+}
+
+// NotificationUpdated reports a change of a notification; the change equals the new state.
+message NotificationUpdated {
+  Notification notification = 1;
+}
+
+// SlaBreached reports that an incident missed its SLA.
+message SlaBreached {
+  string incident_id = 1;
+  // "ack" or "resolve".
+  string sla_kind = 2;
+  string policy_id = 3;
+}
+
+// EscalationLevelTriggered reports that an escalation level fired for an incident.
+message EscalationLevelTriggered {
+  string incident_id = 1;
+  uint32 level = 2;
+  string policy_id = 3;
+  repeated string notification_ids = 4;
+}

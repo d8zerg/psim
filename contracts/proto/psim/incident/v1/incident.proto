@@ -1,0 +1,128 @@
+syntax = "proto3";
+
+package psim.incident.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// Incident is the central aggregate (aggregates.md, 4.2; state-models.md, 1; ADR-027).
+message Incident {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  string incident_type_id = 2 [(buf.validate.field).string.uuid = true];
+  string site_id = 3 [(buf.validate.field).string.uuid = true];
+  string zone_id = 4;
+  IncidentState state = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  psim.common.v1.Priority priority = 6;
+  PrioritySource priority_source = 7;
+  string grouping_key = 8;
+  google.protobuf.Timestamp group_until = 9;
+  repeated string signal_ids = 10;
+  string title = 11;
+  // User id of the responsible operator.
+  string assignee_id = 12;
+  // 0 means not escalated.
+  uint32 escalation_level = 13;
+  // Unfinished mandatory steps of the active response run (I7).
+  repeated StepRef blocking_steps = 14;
+  // Version of the response run applied to blocking_steps.
+  uint64 response_run_version = 15;
+  Resolution resolution = 16;
+  string resolution_note = 17;
+  // Previous incident with the same grouping key, if any (I4).
+  string related_incident_id = 18;
+  google.protobuf.Timestamp created_at = 19;
+  google.protobuf.Timestamp acknowledged_at = 20;
+  google.protobuf.Timestamp resolved_at = 21;
+  google.protobuf.Timestamp closed_at = 22;
+  // Aggregate version, used as ETag.
+  uint64 version = 23;
+}
+
+// IncidentState is the lifecycle state of an incident.
+enum IncidentState {
+  INCIDENT_STATE_UNSPECIFIED = 0;
+  INCIDENT_STATE_NEW = 1;
+  INCIDENT_STATE_ACKNOWLEDGED = 2;
+  INCIDENT_STATE_IN_PROGRESS = 3;
+  INCIDENT_STATE_RESOLVED = 4;
+  INCIDENT_STATE_CLOSED = 5;
+}
+
+// PrioritySource tells whether the priority was computed or set manually (I6).
+enum PrioritySource {
+  PRIORITY_SOURCE_UNSPECIFIED = 0;
+  PRIORITY_SOURCE_COMPUTED = 1;
+  PRIORITY_SOURCE_MANUAL = 2;
+}
+
+// Resolution is the outcome of an incident.
+enum Resolution {
+  RESOLUTION_UNSPECIFIED = 0;
+  RESOLUTION_CONFIRMED = 1;
+  RESOLUTION_FALSE_ALARM = 2;
+  RESOLUTION_TEST = 3;
+  RESOLUTION_DUPLICATE = 4;
+}
+
+// StepRef points to a step of a response run.
+message StepRef {
+  string run_id = 1;
+  string step_id = 2;
+  string title = 3;
+}
+
+// IncidentType is a class of situations that defines response plan and SLA (aggregates.md, 4.1).
+message IncidentType {
+  string incident_type_id = 1 [(buf.validate.field).string.uuid = true];
+  string code = 2 [(buf.validate.field).string.min_len = 1];
+  string name = 3 [(buf.validate.field).string.min_len = 1];
+  psim.common.v1.Priority default_priority = 4;
+  google.protobuf.Duration grouping_window = 5;
+  string escalation_policy_id = 6;
+  // When set, an incident without a matching response plan is flagged.
+  bool response_required = 7;
+  // Delay between resolved and automatic close.
+  google.protobuf.Duration auto_close_after = 8;
+  uint64 version = 9;
+}
+
+// TimelineEntry is one record of an incident timeline.
+message TimelineEntry {
+  string entry_id = 1;
+  string incident_id = 2;
+  google.protobuf.Timestamp at = 3;
+  psim.common.v1.Actor actor = 4;
+  TimelineEntryKind kind = 5;
+  string text = 6;
+  // Id of the related object: signal, step, command, notification, link.
+  string ref_id = 7;
+  map<string, string> details = 8;
+}
+
+// TimelineEntryKind classifies timeline entries.
+enum TimelineEntryKind {
+  TIMELINE_ENTRY_KIND_UNSPECIFIED = 0;
+  TIMELINE_ENTRY_KIND_STATE_CHANGED = 1;
+  TIMELINE_ENTRY_KIND_SIGNAL_ATTACHED = 2;
+  TIMELINE_ENTRY_KIND_PRIORITY_CHANGED = 3;
+  TIMELINE_ENTRY_KIND_ASSIGNED = 4;
+  TIMELINE_ENTRY_KIND_ESCALATED = 5;
+  TIMELINE_ENTRY_KIND_COMMENT = 6;
+  TIMELINE_ENTRY_KIND_LINK = 7;
+  TIMELINE_ENTRY_KIND_STEP = 8;
+  TIMELINE_ENTRY_KIND_COMMAND = 9;
+  TIMELINE_ENTRY_KIND_NOTIFICATION = 10;
+}
+
+// Link is an external reference attached to an incident (video clip, document).
+message Link {
+  string link_id = 1;
+  string url = 2 [(buf.validate.field).string.uri = true];
+  string title = 3;
+}

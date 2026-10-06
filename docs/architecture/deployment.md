@@ -30,6 +30,7 @@ flowchart TB
             SR[Schema Registry]
             PG[(PostgreSQL)]
             R[(Redis-совместимое хранилище)]
+            CH[(ClickHouse + Keeper)]
             KC[Keycloak]
         end
         subgraph APP [Сервисы PSIM: по 1 экземпляру]
@@ -71,18 +72,21 @@ flowchart TB
         P1[(PostgreSQL + Patroni)]
         E1[etcd]
         R1[(Redis master/replica)]
+        C1[(ClickHouse реплика + Keeper)]
     end
     subgraph I2 [infra-2]
         K2[Kafka broker+controller]
         P2[(PostgreSQL + Patroni)]
         E2[etcd]
         R2[(Redis master/replica)]
+        C2[(ClickHouse реплика + Keeper)]
     end
     subgraph I3 [infra-3]
         K3[Kafka broker+controller]
         P3[(PostgreSQL + Patroni)]
         E3[etcd]
         R3[(Redis master/replica)]
+        C3[ClickHouse Keeper]
     end
     subgraph A1 [app-1]
         SA[Экземпляры сервисов PSIM, Keycloak]
@@ -107,6 +111,7 @@ flowchart TB
 | Сервисы PSIM | ≥ 2 экземпляра каждого, на разных узлах приложений ([scaling.md](scaling.md#53-экземпляры-сервисов-при-50-000-событийс-кластер)) | Партиции переходят к оставшимся экземплярам |
 | Keycloak | 2 экземпляра, база в PostgreSQL кластера | Уже выданные токены проверяются по кэшу JWKS; новый вход - через оставшийся экземпляр |
 | HAProxy | 2 экземпляра с общим VIP (keepalived) | Переключение VIP за секунды |
+| ClickHouse | 1 шард × 2 реплики (ReplicatedMergeTree) на infra-1 и infra-2; ClickHouse Keeper на трёх узлах инфраструктуры ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) | Чтение и запись переходят на вторую реплику; после восстановления реплика догоняет; загрузчики Kafka догружают накопившееся |
 | Наблюдаемость | Отдельный узел; не влияет на обработку | Потеря телеметрии на время отказа; сервисы не блокируются экспортом |
 
 Минимальная конфигурация - 3 узла, на которых совмещены инфраструктура и сервисы; эталонная для 50 000 событий/с - 3 узла инфраструктуры + 2 узла приложений + узел наблюдаемости.
@@ -132,6 +137,8 @@ flowchart TB
 | 7443 | Connector Gateway: gRPC, mTLS | Коннекторы |
 | 8443 | Keycloak | Пользователи (вход), сервисы |
 | 9092-9094 | Kafka (TLS) | Только сервисы платформы |
+| 9440, 8443 | ClickHouse: нативный протокол TLS, HTTPS | Только сервисы платформы |
+| 9234, 9281 | ClickHouse Keeper: межузловой протокол, клиентский протокол TLS | Только узлы ClickHouse |
 | 5432 | PostgreSQL (через HAProxy: 5000 - лидер, 5001 - реплики) | Только сервисы платформы |
 | 6379 | Redis-совместимое хранилище (TLS) | Только сервисы платформы |
 | 8081 | Schema Registry | Только сервисы платформы |

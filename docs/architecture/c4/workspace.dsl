@@ -83,6 +83,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
             kafka = container "Kafka" "Центральная шина (KRaft)" "Apache Kafka" "Queue"
             schemaRegistry = container "Schema Registry" "Схемы Protobuf" "Confluent-совместимый API"
             postgres = container "PostgreSQL" "Схема на сервис" "PostgreSQL 16+" "Database"
+            clickhouse = container "ClickHouse" "История событий, факты инцидентов, аналитика (ADR-028)" "ClickHouse + Keeper" "Database"
             redis = container "Redis-совместимое хранилище" "Сессии, лимиты, горячие проекции" "Redis API" "Database"
         }
 
@@ -109,7 +110,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
         psim.kafka -> psim.connectorGateway "psim.commands.v1, psim.catalog.v1" "Kafka"
         psim.kafka -> psim.normalizer "psim.ingest.raw.v1, psim.catalog.v1, psim.config.v1" "Kafka"
         psim.normalizer -> psim.kafka "psim.events.normalized.v1 (EOS)" "Kafka"
-        psim.kafka -> psim.eventHistory "psim.events.normalized.v1" "Kafka"
+        psim.kafka -> psim.eventHistory "psim.events.normalized.v1, psim.signals.v1" "Kafka"
         psim.kafka -> psim.correlationEngine "psim.events.normalized.v1, psim.config.v1" "Kafka"
         psim.correlationEngine -> psim.kafka "psim.signals.v1 (EOS), changelog, config" "Kafka"
         psim.kafka -> psim.incidentService "psim.signals.v1, psim.response.events.v1" "Kafka"
@@ -143,13 +144,14 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
         psim.apiGateway -> psim.redis "Лимиты"
         psim.projectionService -> psim.redis "Горячие проекции"
         psim.resourceCatalog -> psim.postgres "catalog"
-        psim.eventHistory -> psim.postgres "event_history"
+        psim.eventHistory -> psim.clickhouse "events, event_signals, signal_facts" "ClickHouse native, TLS"
         psim.correlationEngine -> psim.postgres "правила"
         psim.incidentService -> psim.postgres "incident"
         psim.responseEngine -> psim.postgres "response"
         psim.commandService -> psim.postgres "command"
         psim.notificationService -> psim.postgres "notification"
         psim.projectionService -> psim.postgres "projection"
+        psim.projectionService -> psim.clickhouse "incident_facts, отчёты" "ClickHouse native, TLS"
         psim.auditService -> psim.postgres "audit"
         psim.normalizer -> psim.schemaRegistry "Схемы"
         psim.correlationEngine -> psim.schemaRegistry "Схемы"
@@ -212,6 +214,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
                 containerInstance psim.schemaRegistry
                 containerInstance psim.postgres
                 containerInstance psim.redis
+                containerInstance psim.clickhouse
             }
         }
 
@@ -222,6 +225,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
                 containerInstance psim.postgres
                 containerInstance psim.redis
                 containerInstance psim.schemaRegistry
+                containerInstance psim.clickhouse
             }
             deploymentNode "app" "Debian 12 / Astra Linux 1.8" "VM 16 vCPU, 32 ГБ" 2 {
                 containerInstance psim.connectorGateway

@@ -1,0 +1,86 @@
+syntax = "proto3";
+
+package psim.response.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+
+// Command is a request to act on a device (aggregates.md, 5.3; state-models.md, 3).
+message Command {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string connector_id = 3;
+  string capability = 4 [(buf.validate.field).string.min_len = 1];
+  map<string, string> parameters = 5;
+  string incident_id = 6;
+  string run_id = 7;
+  string step_id = 8;
+  bool critical = 9;
+  CommandState state = 10;
+  psim.common.v1.Actor requested_by = 11;
+  psim.common.v1.Actor approved_by = 12;
+  google.protobuf.Timestamp requested_at = 13;
+  google.protobuf.Timestamp deadline_at = 14;
+  google.protobuf.Timestamp finished_at = 15;
+  // Error code from the catalog for failed, rejected, timed out or cancelled commands.
+  string result_code = 16;
+  string result_message = 17;
+  uint64 version = 18;
+}
+
+// CommandState is the lifecycle state of a command.
+enum CommandState {
+  COMMAND_STATE_UNSPECIFIED = 0;
+  COMMAND_STATE_REQUESTED = 1;
+  COMMAND_STATE_AWAITING_APPROVAL = 2;
+  COMMAND_STATE_SENT = 3;
+  COMMAND_STATE_ACKNOWLEDGED = 4;
+  COMMAND_STATE_EXECUTED = 5;
+  COMMAND_STATE_FAILED = 6;
+  COMMAND_STATE_REJECTED = 7;
+  COMMAND_STATE_TIMED_OUT = 8;
+  COMMAND_STATE_CANCELLED = 9;
+}
+
+// CommandDeliveryRecord is the value of topic psim.commands.v1 (key: connector_id).
+message CommandDeliveryRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    CommandDelivery command_delivery = 2;
+  }
+}
+
+// CommandDelivery is a command routed to the connector session.
+message CommandDelivery {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  string connector_id = 2 [(buf.validate.field).string.uuid = true];
+  string device_external_id = 3 [(buf.validate.field).string.min_len = 1];
+  string capability = 4 [(buf.validate.field).string.min_len = 1];
+  map<string, string> parameters = 5;
+  google.protobuf.Timestamp deadline_at = 6 [(buf.validate.field).required = true];
+}
+
+// CommandResultRecord is the value of topic psim.commands.results.v1 (key: command_id).
+message CommandResultRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    CommandReceipt command_receipt = 2;
+    CommandOutcome command_outcome = 3;
+  }
+}
+
+// CommandReceipt reports that the connector received a command.
+message CommandReceipt {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CommandOutcome reports the final result from the connector or the gateway.
+message CommandOutcome {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  bool success = 2;
+  string code = 3;
+  string message = 4;
+}

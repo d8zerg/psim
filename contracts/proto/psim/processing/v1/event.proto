@@ -1,0 +1,41 @@
+syntax = "proto3";
+
+package psim.processing.v1;
+
+import "buf/validate/validate.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// EventRecord is the value of topic psim.events.normalized.v1 (key: site_id:zone_id).
+message EventRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    Event event = 2;
+  }
+}
+
+// Event is a normalized event. envelope.message_id equals the raw event_id,
+// envelope.sequence equals the source sequence number.
+message Event {
+  // Taxonomy type code, for example "intrusion.zone.alarm".
+  string type = 1 [(buf.validate.field).string.pattern = "^[a-z0-9_]+\\.[a-z0-9_]+(\\.[a-z0-9_]+)?$"];
+  // Taxonomy version used for normalization, for example "1".
+  string taxonomy_version = 2;
+  psim.common.v1.EventClass event_class = 3 [(buf.validate.field).enum.defined_only = true];
+  psim.common.v1.Severity severity = 4 [(buf.validate.field).enum.defined_only = true];
+  string site_id = 5 [(buf.validate.field).string.uuid = true];
+  string zone_id = 6 [(buf.validate.field).string.uuid = true];
+  string device_id = 7 [(buf.validate.field).string.uuid = true];
+  string source_id = 8 [(buf.validate.field).string.uuid = true];
+  string connector_id = 9 [(buf.validate.field).string.uuid = true];
+  uint32 source_epoch = 10;
+  // Vendor event code, always preserved.
+  string raw_code = 11;
+  // Standard attributes (event-taxonomy.md, section 6) and connector attributes prefixed with "x.".
+  map<string, string> attributes = 12;
+  // Significant events are stored long-term in Event History (ADR-028).
+  bool significant = 13;
+  // Event time was corrected because of source clock skew (ADR-010).
+  bool clock_skew_corrected = 14;
+}

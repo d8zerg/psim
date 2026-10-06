@@ -1,0 +1,59 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "psim/config/v1/config.proto";
+
+// SettingsService manages tenant-wide retention and processing settings.
+// Owner: Resource Catalog; changes are published to psim.config.v1.
+service SettingsService {
+  // GetSettings returns the current settings.
+  rpc GetSettings(GetSettingsRequest) returns (GetSettingsResponse) {
+    option (google.api.http) = {get: "/v1/settings"};
+  }
+  // UpdateRetentionSettings replaces retention settings (If-Match required).
+  rpc UpdateRetentionSettings(UpdateRetentionSettingsRequest) returns (UpdateRetentionSettingsResponse) {
+    option (google.api.http) = {
+      put: "/v1/settings/retention"
+      body: "retention"
+    };
+  }
+  // UpdateProcessingSettings replaces processing settings (If-Match required).
+  rpc UpdateProcessingSettings(UpdateProcessingSettingsRequest) returns (UpdateProcessingSettingsResponse) {
+    option (google.api.http) = {
+      put: "/v1/settings/processing"
+      body: "processing"
+    };
+  }
+}
+
+// GetSettingsRequest is the request of GetSettings.
+message GetSettingsRequest {}
+
+// GetSettingsResponse is the response of GetSettings.
+message GetSettingsResponse {
+  psim.config.v1.RetentionSettings retention = 1;
+  psim.config.v1.ProcessingSettings processing = 2;
+}
+
+// UpdateRetentionSettingsRequest is the request of UpdateRetentionSettings.
+message UpdateRetentionSettingsRequest {
+  psim.config.v1.RetentionSettings retention = 1 [(buf.validate.field).required = true];
+}
+
+// UpdateRetentionSettingsResponse is the response of UpdateRetentionSettings.
+message UpdateRetentionSettingsResponse {
+  psim.config.v1.RetentionSettings retention = 1;
+}
+
+// UpdateProcessingSettingsRequest is the request of UpdateProcessingSettings.
+message UpdateProcessingSettingsRequest {
+  psim.config.v1.ProcessingSettings processing = 1 [(buf.validate.field).required = true];
+}
+
+// UpdateProcessingSettingsResponse is the response of UpdateProcessingSettings.
+message UpdateProcessingSettingsResponse {
+  psim.config.v1.ProcessingSettings processing = 1;
+}

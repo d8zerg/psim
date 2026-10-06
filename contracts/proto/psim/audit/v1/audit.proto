@@ -1,0 +1,61 @@
+syntax = "proto3";
+
+package psim.audit.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+
+// AuditEventRecord is the value of topic psim.audit.v1 (key: tenant_id).
+message AuditEventRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    AuditEntry audit_entry = 2;
+    AuditCheckpoint audit_checkpoint = 3;
+  }
+}
+
+// AuditEntry is an action to be recorded in the audit chain.
+// envelope.causation_id is the source domain event id (idempotency key, AU3).
+message AuditEntry {
+  psim.common.v1.Actor actor = 1 [(buf.validate.field).required = true];
+  // Dotted action name, for example "incident.acknowledge", "access.denied".
+  string action = 2 [(buf.validate.field).string.min_len = 1];
+  string object_type = 3;
+  string object_id = 4;
+  string site_id = 5;
+  AuditOutcome outcome = 6 [(buf.validate.field).enum.defined_only = true];
+  map<string, string> details = 7;
+  // Client address and user agent for user actions.
+  string client_address = 8;
+  string user_agent = 9;
+}
+
+// AuditOutcome is the result of the audited action.
+enum AuditOutcome {
+  AUDIT_OUTCOME_UNSPECIFIED = 0;
+  AUDIT_OUTCOME_SUCCESS = 1;
+  AUDIT_OUTCOME_DENIED = 2;
+  AUDIT_OUTCOME_FAILED = 3;
+}
+
+// AuditCheckpoint fixes the head of the chain (ADR-021).
+message AuditCheckpoint {
+  uint64 audit_seq = 1;
+  bytes hash = 2;
+  google.protobuf.Timestamp created_at = 3;
+  bytes signature = 4;
+  string key_id = 5;
+}
+
+// AuditChainEntry is an audit entry as stored in the chain.
+message AuditChainEntry {
+  uint64 audit_seq = 1;
+  string source_event_id = 2;
+  AuditEntry entry = 3;
+  google.protobuf.Timestamp occurred_at = 4;
+  google.protobuf.Timestamp recorded_at = 5;
+  bytes prev_hash = 6;
+  bytes hash = 7;
+}

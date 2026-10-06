@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/types.proto";
+
+// ReportService builds incident reports (ADR-028: analytics in ClickHouse).
+// Owner: Projection Service. Scenario S13.
+service ReportService {
+  // GetIncidentReport returns incident metrics for a period.
+  rpc GetIncidentReport(GetIncidentReportRequest) returns (GetIncidentReportResponse) {
+    option (google.api.http) = {get: "/v1/reports/incidents"};
+  }
+  // ExportIncidentReport exports the same report as CSV.
+  rpc ExportIncidentReport(ExportIncidentReportRequest) returns (ExportIncidentReportResponse) {
+    option (google.api.http) = {
+      get: "/v1/reports/incidents:export"
+      response_body: "file"
+    };
+  }
+}
+
+// ReportFilter selects incidents for a report.
+message ReportFilter {
+  google.protobuf.Timestamp from = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp to = 2 [(buf.validate.field).required = true];
+  repeated string site_ids = 3;
+  repeated string incident_type_ids = 4;
+  repeated psim.common.v1.Priority priorities = 5;
+}
+
+// ReportGrouping is the grouping dimension of report rows.
+enum ReportGrouping {
+  REPORT_GROUPING_UNSPECIFIED = 0;
+  REPORT_GROUPING_NONE = 1;
+  REPORT_GROUPING_SITE = 2;
+  REPORT_GROUPING_INCIDENT_TYPE = 3;
+  REPORT_GROUPING_PRIORITY = 4;
+  REPORT_GROUPING_OPERATOR = 5;
+  REPORT_GROUPING_DAY = 6;
+}
+
+// IncidentMetrics are incident metrics for a group (definitions in acceptance-spec.md, S13).
+message IncidentMetrics {
+  // Group key: site id, incident type id, priority, user id or date; empty for totals.
+  string group = 1;
+  uint64 incidents_created = 2;
+  uint64 incidents_resolved = 3;
+  google.protobuf.Duration mtta = 4;
+  google.protobuf.Duration mttr = 5;
+  // Share of resolution = false_alarm among resolved, 0..1.
+  double false_alarm_rate = 6;
+  // Share of incidents acknowledged within SLA, 0..1.
+  double ack_sla_compliance = 7;
+  // Share of incidents resolved within SLA, 0..1.
+  double resolve_sla_compliance = 8;
+  uint64 escalated = 9;
+}
+
+// GetIncidentReportRequest is the request of GetIncidentReport.
+message GetIncidentReportRequest {
+  ReportFilter filter = 1 [(buf.validate.field).required = true];
+  ReportGrouping grouping = 2;
+}
+
+// GetIncidentReportResponse is the response of GetIncidentReport.
+message GetIncidentReportResponse {
+  IncidentMetrics totals = 1;
+  repeated IncidentMetrics rows = 2;
+  google.protobuf.Timestamp generated_at = 3;
+}
+
+// ExportIncidentReportRequest is the request of ExportIncidentReport.
+message ExportIncidentReportRequest {
+  ReportFilter filter = 1 [(buf.validate.field).required = true];
+  ReportGrouping grouping = 2;
+}
+
+// ExportIncidentReportResponse is the response of ExportIncidentReport; the body is CSV.
+message ExportIncidentReportResponse {
+  google.api.HttpBody file = 1;
+}

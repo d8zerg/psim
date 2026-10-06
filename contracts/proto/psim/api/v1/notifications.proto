@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "psim/response/v1/notification.proto";
+
+// NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.
+service NotificationService {
+  // ListMyNotifications lists in-app notifications of the caller; newest first.
+  rpc ListMyNotifications(ListMyNotificationsRequest) returns (ListMyNotificationsResponse) {
+    option (google.api.http) = {get: "/v1/me/notifications"};
+  }
+  // MarkNotificationRead marks an in-app notification as read.
+  rpc MarkNotificationRead(MarkNotificationReadRequest) returns (MarkNotificationReadResponse) {
+    option (google.api.http) = {
+      post: "/v1/me/notifications/{notification_id}:read"
+      body: "*"
+    };
+  }
+}
+
+// ListMyNotificationsRequest is the request of ListMyNotifications.
+message ListMyNotificationsRequest {
+  bool unread_only = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListMyNotificationsResponse is the response of ListMyNotifications.
+message ListMyNotificationsResponse {
+  repeated psim.response.v1.Notification notifications = 1;
+  string next_page_token = 2;
+  uint32 unread_count = 3;
+}
+
+// MarkNotificationReadRequest is the request of MarkNotificationRead.
+message MarkNotificationReadRequest {
+  string notification_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+
+// MarkNotificationReadResponse is the response of MarkNotificationRead.
+message MarkNotificationReadResponse {
+  psim.response.v1.Notification notification = 1;
+}

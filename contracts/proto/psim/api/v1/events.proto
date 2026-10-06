@@ -1,0 +1,81 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/types.proto";
+import "psim/processing/v1/event.proto";
+
+// EventHistoryService searches stored events (ADR-028). Owner: Event History. Scenario S7.
+service EventHistoryService {
+  // SearchEvents searches events by location, device, type and time; newest first.
+  rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse) {
+    option (google.api.http) = {get: "/v1/events"};
+  }
+  // GetEvent returns one event.
+  rpc GetEvent(GetEventRequest) returns (GetEventResponse) {
+    option (google.api.http) = {get: "/v1/events/{event_id}"};
+  }
+  // ListIncidentEvents returns source events of all signals of an incident.
+  rpc ListIncidentEvents(ListIncidentEventsRequest) returns (ListIncidentEventsResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/events"};
+  }
+}
+
+// StoredEvent is a normalized event with its envelope times.
+message StoredEvent {
+  string event_id = 1;
+  google.protobuf.Timestamp occurred_at = 2;
+  google.protobuf.Timestamp received_at = 3;
+  uint64 source_seq = 4;
+  psim.processing.v1.Event event = 5;
+}
+
+// SearchEventsRequest is the request of SearchEvents.
+message SearchEventsRequest {
+  google.protobuf.Timestamp from = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp to = 2 [(buf.validate.field).required = true];
+  repeated string site_ids = 3;
+  repeated string zone_ids = 4;
+  repeated string device_ids = 5;
+  // Taxonomy codes or prefixes ending with ".*".
+  repeated string types = 6;
+  psim.common.v1.Severity min_severity = 7;
+  bool significant_only = 8;
+  int32 page_size = 9 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 1000
+  }];
+  string page_token = 10;
+}
+
+// SearchEventsResponse is the response of SearchEvents.
+message SearchEventsResponse {
+  repeated StoredEvent events = 1;
+  string next_page_token = 2;
+}
+
+// GetEventRequest is the request of GetEvent.
+message GetEventRequest {
+  string event_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetEventResponse is the response of GetEvent.
+message GetEventResponse {
+  StoredEvent event = 1;
+}
+
+// ListIncidentEventsRequest is the request of ListIncidentEvents.
+message ListIncidentEventsRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListIncidentEventsResponse is the response of ListIncidentEvents.
+message ListIncidentEventsResponse {
+  repeated StoredEvent events = 1;
+  string next_page_token = 2;
+}

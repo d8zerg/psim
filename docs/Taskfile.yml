@@ -1,0 +1,48 @@
+# Documentation checks: links and anchors, typography, Mermaid diagrams, C4 model.
+# Included from the root Taskfile as namespace "docs"; working directory is docs/.
+version: '3'
+
+vars:
+  TOOLS: '{{.ROOT_DIR}}/tools/docs'
+  MERMAID_OUT: '{{.CACHE}}/mermaid'
+  # Markdown with links to check; text sources with typography rules.
+  LINK_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts/README.md {{.ROOT_DIR}}/README.md'
+  TEXT_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts {{.ROOT_DIR}}/tools {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/Taskfile.yml'
+
+tasks:
+  check:
+    desc: Run all documentation checks
+    cmds:
+      - task: links
+      - task: typography
+      - task: mermaid
+      - task: c4
+
+  links:
+    desc: Check relative links and heading anchors in Markdown
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/check_links.py {{.LINK_SOURCES}}'
+
+  typography:
+    desc: 'Check typography: "-" instead of dashes, "->" instead of arrows, no emoji'
+    dir: '{{.ROOT_DIR}}'
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/check_typography.py {{.TEXT_SOURCES}}'
+
+  mermaid:
+    desc: Render every Mermaid diagram in docs to catch syntax errors
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/extract_mermaid.py {{.MERMAID_OUT}} {{.ROOT_DIR}}/docs'
+      - cmd: |
+          cd "{{.MERMAID_OUT}}"
+          ls *.mmd | xargs -P 4 -I{} sh -c '
+            docker run --rm -u {{.UID}}:{{.GID}} -v "$PWD":/data {{.MERMAID_IMAGE}} \
+              -i /data/{} -o /data/{}.svg >"{}.log" 2>&1 \
+              && echo "ok: {}" || { echo "FAIL: {}"; grep -m3 "Error\|Expecting" "{}.log"; exit 255; }'
+
+  c4:
+    desc: Validate the C4 model (Structurizr DSL)
+    cmds:
+      - >-
+        docker run --rm -v "{{.TASKFILE_DIR}}/architecture/c4":/usr/local/structurizr {{.STRUCTURIZR_IMAGE}}
+        validate -workspace workspace.dsl

@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package psim.connector.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+
+// ConnectorGatewayService is the connector protocol v1 (ADR-017).
+// Transport: gRPC over TLS 1.3 with mutual TLS; the client certificate identifies the connector.
+service ConnectorGatewayService {
+  // Session is the single bidirectional stream of a connector session.
+  // The first client message must be Register; the server answers Registered or closes the stream.
+  rpc Session(stream SessionRequest) returns (stream SessionResponse);
+}
+
+// SessionRequest is a message from the connector to the gateway.
+message SessionRequest {
+  oneof message {
+    option (buf.validate.oneof).required = true;
+    Register register = 1;
+    Heartbeat heartbeat = 2;
+    EventBatch event_batch = 3;
+    CommandAck command_ack = 4;
+    CommandResult command_result = 5;
+    Goodbye goodbye = 6;
+  }
+}
+
+// SessionResponse is a message from the gateway to the connector.
+message SessionResponse {
+  oneof message {
+    option (buf.validate.oneof).required = true;
+    Registered registered = 1;
+    Heartbeat heartbeat = 2;
+    BatchAck batch_ack = 3;
+    Credits credits = 4;
+    Command command = 5;
+    ConfigUpdate config_update = 6;
+    Goodbye goodbye = 7;
+  }
+}
+
+// Register opens the session.
+message Register {
+  // Protocol versions supported by the connector, for example ["1.0"].
+  repeated string protocol_versions = 1 [(buf.validate.field).repeated.min_items = 1];
+  string connector_version = 2;
+  // Unique per running connector process, for diagnostics.
+  string instance_id = 3;
+  // Catalog configuration version the connector already has.
+  uint64 config_version = 4;
+}
+
+// Registered confirms the session.
+message Registered {
+  string session_id = 1;
+  string connector_id = 2;
+  string protocol_version = 3;
+  // Number of events the connector may send before the next Credits.
+  uint32 initial_credits = 4;
+  google.protobuf.Duration heartbeat_interval = 5;
+  google.protobuf.Duration session_timeout = 6;
+  uint32 max_batch_events = 7;
+  uint32 max_batch_bytes = 8;
+}
+
+// Heartbeat keeps the session alive; sent by both sides.
+message Heartbeat {
+  google.protobuf.Timestamp sent_at = 1;
+}
+
+// EventBatch is a batch of events; the connector must not exceed granted credits.
+message EventBatch {
+  // Monotonic within the session; echoed in BatchAck.
+  uint64 batch_seq = 1;
+  repeated ConnectorEvent events = 2 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 1000
+  }];
+}
+
+// ConnectorEvent is one event from a source.
+message ConnectorEvent {
+  // UUIDv7 assigned when the event was created; stable across resends.
+  string event_id = 1 [(buf.validate.field).string.uuid = true];
+  // Source reference known to the connector (Source.external_ref).
+  string source_ref = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  uint32 source_epoch = 3;
+  // Strictly increasing within source_ref and source_epoch.
+  uint64 source_seq = 4 [(buf.validate.field).uint64.gt = 0];
+  google.protobuf.Timestamp occurred_at = 5 [(buf.validate.field).required = true];
+  string raw_code = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 128
+  }];
+  map<string, string> attributes = 7 [(buf.validate.field).map.max_pairs = 64];
+  // W3C traceparent of the connector span, optional.
+  string traceparent = 8;
+}
+
+// BatchAck reports that a batch was durably written (acks=all) or rejected.
+message BatchAck {
+  uint64 batch_seq = 1;
+  uint32 accepted = 2;
+  // Events rejected permanently; they must not be resent.
+  repeated EventRejection rejections = 3;
+}
+
+// EventRejection is a permanent rejection of one event.
+message EventRejection {
+  string event_id = 1;
+  // Error code from the catalog, for example "INGEST_INVALID_EVENT".
+  string code = 2;
+  string message = 3;
+}
+
+// Credits grants additional events to send.
+message Credits {
+  uint32 grant = 1 [(buf.validate.field).uint32.gt = 0];
+}
+
+// Command asks the connector to act on a device. Execute at most once per command_id.
+message Command {
+  string command_id = 1;
+  string device_external_id = 2;
+  string capability = 3;
+  map<string, string> parameters = 4;
+  google.protobuf.Timestamp deadline_at = 5;
+}
+
+// CommandAck confirms that the connector received a command.
+message CommandAck {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CommandResult reports the outcome of a command.
+message CommandResult {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  bool success = 2;
+  // Error code when success is false.
+  string code = 3;
+  string message = 4;
+}
+
+// ConfigUpdate sends the catalog configuration of the connector.
+message ConfigUpdate {
+  uint64 config_version = 1;
+  repeated ConnectorDevice devices = 2;
+}
+
+// ConnectorDevice is a device served by the connector.
+message ConnectorDevice {
+  string device_id = 1;
+  string external_id = 2;
+  string name = 3;
+  string device_type_code = 4;
+  repeated string source_refs = 5;
+  repeated string capabilities = 6;
+  bool enabled = 7;
+}
+
+// Goodbye closes the session gracefully.
+message Goodbye {
+  GoodbyeReason reason = 1;
+  string message = 2;
+}
+
+// GoodbyeReason is the reason to close a session.
+enum GoodbyeReason {
+  GOODBYE_REASON_UNSPECIFIED = 0;
+  GOODBYE_REASON_SHUTDOWN = 1;
+  GOODBYE_REASON_DRAINING = 2;
+  GOODBYE_REASON_SUPERSEDED = 3;
+  GOODBYE_REASON_REVOKED = 4;
+  GOODBYE_REASON_PROTOCOL_ERROR = 5;
+}

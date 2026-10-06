@@ -1,0 +1,104 @@
+syntax = "proto3";
+
+package psim.incident.v1;
+
+import "buf/validate/validate.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+import "psim/incident/v1/incident.proto";
+
+// IncidentEventRecord is the value of topic psim.incidents.events.v1 (key: incident_id).
+// Every event carries the incident state after the change; envelope.sequence = incident.version.
+message IncidentEventRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    IncidentCreated incident_created = 2;
+    SignalAttached signal_attached = 3;
+    IncidentPriorityChanged incident_priority_changed = 4;
+    IncidentAcknowledged incident_acknowledged = 5;
+    IncidentWorkStarted incident_work_started = 6;
+    IncidentAssigned incident_assigned = 7;
+    IncidentEscalated incident_escalated = 8;
+    IncidentCommentAdded incident_comment_added = 9;
+    IncidentLinkAdded incident_link_added = 10;
+    IncidentResolved incident_resolved = 11;
+    IncidentReopened incident_reopened = 12;
+    IncidentClosed incident_closed = 13;
+    IncidentBlockingStepsChanged incident_blocking_steps_changed = 14;
+  }
+}
+
+// IncidentCreated is published when a signal opens a new incident.
+message IncidentCreated {
+  Incident incident = 1;
+  string signal_id = 2;
+}
+
+// SignalAttached is published when a signal joins an open incident.
+message SignalAttached {
+  Incident incident = 1;
+  string signal_id = 2;
+}
+
+// IncidentPriorityChanged is published on computed or manual priority change.
+message IncidentPriorityChanged {
+  Incident incident = 1;
+  psim.common.v1.Priority previous_priority = 2;
+}
+
+// IncidentAcknowledged is published when an operator accepts an incident.
+message IncidentAcknowledged {
+  Incident incident = 1;
+}
+
+// IncidentWorkStarted is published on transition to in_progress.
+message IncidentWorkStarted {
+  Incident incident = 1;
+}
+
+// IncidentAssigned is published on assignment or reassignment.
+message IncidentAssigned {
+  Incident incident = 1;
+  string previous_assignee_id = 2;
+}
+
+// IncidentEscalated is published when an escalation level is applied.
+message IncidentEscalated {
+  Incident incident = 1;
+  // "ack" or "resolve".
+  string sla_kind = 2;
+}
+
+// IncidentCommentAdded is published when a comment is added.
+message IncidentCommentAdded {
+  Incident incident = 1;
+  TimelineEntry entry = 2;
+}
+
+// IncidentLinkAdded is published when an external link is attached.
+message IncidentLinkAdded {
+  Incident incident = 1;
+  Link link = 2;
+}
+
+// IncidentResolved is published on transition to resolved.
+message IncidentResolved {
+  Incident incident = 1;
+}
+
+// IncidentReopened is published on transition from resolved back to in_progress.
+message IncidentReopened {
+  Incident incident = 1;
+  string reason = 2;
+}
+
+// IncidentClosed is published on transition to closed.
+message IncidentClosed {
+  Incident incident = 1;
+}
+
+// IncidentBlockingStepsChanged is published when blocking_steps changes from response events.
+message IncidentBlockingStepsChanged {
+  Incident incident = 1;
+}

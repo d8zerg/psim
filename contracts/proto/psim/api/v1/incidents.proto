@@ -1,0 +1,323 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/types.proto";
+import "psim/incident/v1/incident.proto";
+import "psim/processing/v1/signal.proto";
+
+// IncidentService manages incidents and incident types. Owner: Incident Service.
+// Scenarios S5-S7, S9. State transitions follow state-models.md, section 1.
+service IncidentService {
+  // ListIncidents lists incidents within the caller scope.
+  rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse) {
+    option (google.api.http) = {get: "/v1/incidents"};
+  }
+  // GetIncident returns one incident; the ETag is the incident version.
+  rpc GetIncident(GetIncidentRequest) returns (GetIncidentResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}"};
+  }
+  // ListTimeline returns the incident timeline.
+  rpc ListTimeline(ListTimelineRequest) returns (ListTimelineResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/timeline"};
+  }
+  // ListIncidentSignals returns signals attached to the incident.
+  rpc ListIncidentSignals(ListIncidentSignalsRequest) returns (ListIncidentSignalsResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/signals"};
+  }
+  // AcknowledgeIncident accepts an incident; the caller becomes the assignee.
+  rpc AcknowledgeIncident(AcknowledgeIncidentRequest) returns (AcknowledgeIncidentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:acknowledge"
+      body: "*"
+    };
+  }
+  // StartIncidentWork moves an incident to in_progress.
+  rpc StartIncidentWork(StartIncidentWorkRequest) returns (StartIncidentWorkResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:start-work"
+      body: "*"
+    };
+  }
+  // AssignIncident assigns or reassigns an incident.
+  rpc AssignIncident(AssignIncidentRequest) returns (AssignIncidentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:assign"
+      body: "*"
+    };
+  }
+  // SetIncidentPriority sets the priority manually (supervisor).
+  rpc SetIncidentPriority(SetIncidentPriorityRequest) returns (SetIncidentPriorityResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:set-priority"
+      body: "*"
+    };
+  }
+  // AddIncidentComment adds a comment to the timeline.
+  rpc AddIncidentComment(AddIncidentCommentRequest) returns (AddIncidentCommentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}/comments"
+      body: "*"
+    };
+  }
+  // AddIncidentLink attaches an external link.
+  rpc AddIncidentLink(AddIncidentLinkRequest) returns (AddIncidentLinkResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}/links"
+      body: "*"
+    };
+  }
+  // ResolveIncident resolves an incident; fails while mandatory steps are pending (I7).
+  rpc ResolveIncident(ResolveIncidentRequest) returns (ResolveIncidentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:resolve"
+      body: "*"
+    };
+  }
+  // ReopenIncident reopens a resolved incident (I10).
+  rpc ReopenIncident(ReopenIncidentRequest) returns (ReopenIncidentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:reopen"
+      body: "*"
+    };
+  }
+  // CloseIncident closes a resolved incident before the auto-close timer (supervisor).
+  rpc CloseIncident(CloseIncidentRequest) returns (CloseIncidentResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:close"
+      body: "*"
+    };
+  }
+  // ListIncidentTypes lists incident types.
+  rpc ListIncidentTypes(ListIncidentTypesRequest) returns (ListIncidentTypesResponse) {
+    option (google.api.http) = {get: "/v1/incident-types"};
+  }
+  // CreateIncidentType creates an incident type.
+  rpc CreateIncidentType(CreateIncidentTypeRequest) returns (CreateIncidentTypeResponse) {
+    option (google.api.http) = {
+      post: "/v1/incident-types"
+      body: "incident_type"
+    };
+  }
+  // UpdateIncidentType replaces an incident type (If-Match required).
+  rpc UpdateIncidentType(UpdateIncidentTypeRequest) returns (UpdateIncidentTypeResponse) {
+    option (google.api.http) = {
+      put: "/v1/incident-types/{incident_type_id}"
+      body: "incident_type"
+    };
+  }
+}
+
+// ListIncidentsRequest is the request of ListIncidents.
+message ListIncidentsRequest {
+  repeated psim.incident.v1.IncidentState states = 1;
+  repeated psim.common.v1.Priority priorities = 2;
+  repeated string site_ids = 3;
+  repeated string zone_ids = 4;
+  repeated string incident_type_ids = 5;
+  string assignee_id = 6;
+  bool escalated_only = 7;
+  google.protobuf.Timestamp created_from = 8;
+  google.protobuf.Timestamp created_to = 9;
+  int32 page_size = 10 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 1000
+  }];
+  string page_token = 11;
+}
+
+// ListIncidentsResponse is the response of ListIncidents.
+message ListIncidentsResponse {
+  repeated psim.incident.v1.Incident incidents = 1;
+  string next_page_token = 2;
+}
+
+// GetIncidentRequest is the request of GetIncident.
+message GetIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetIncidentResponse is the response of GetIncident.
+message GetIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// ListTimelineRequest is the request of ListTimeline.
+message ListTimelineRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListTimelineResponse is the response of ListTimeline.
+message ListTimelineResponse {
+  repeated psim.incident.v1.TimelineEntry entries = 1;
+  string next_page_token = 2;
+}
+
+// ListIncidentSignalsRequest is the request of ListIncidentSignals.
+message ListIncidentSignalsRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+// ListIncidentSignalsResponse is the response of ListIncidentSignals.
+message ListIncidentSignalsResponse {
+  repeated IncidentSignal signals = 1;
+  string next_page_token = 2;
+}
+
+// IncidentSignal is a signal attached to an incident.
+message IncidentSignal {
+  string signal_id = 1;
+  psim.processing.v1.Signal signal = 2;
+  google.protobuf.Timestamp attached_at = 3;
+}
+
+// AcknowledgeIncidentRequest is the request of AcknowledgeIncident.
+message AcknowledgeIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// AcknowledgeIncidentResponse is the response of AcknowledgeIncident.
+message AcknowledgeIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// StartIncidentWorkRequest is the request of StartIncidentWork.
+message StartIncidentWorkRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// StartIncidentWorkResponse is the response of StartIncidentWork.
+message StartIncidentWorkResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// AssignIncidentRequest is the request of AssignIncident.
+message AssignIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  string assignee_id = 2 [(buf.validate.field).string.min_len = 1];
+  string reason = 3;
+}
+
+// AssignIncidentResponse is the response of AssignIncident.
+message AssignIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// SetIncidentPriorityRequest is the request of SetIncidentPriority.
+message SetIncidentPriorityRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.common.v1.Priority priority = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string reason = 3;
+}
+
+// SetIncidentPriorityResponse is the response of SetIncidentPriority.
+message SetIncidentPriorityResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// AddIncidentCommentRequest is the request of AddIncidentComment.
+message AddIncidentCommentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  string text = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 8000
+  }];
+}
+
+// AddIncidentCommentResponse is the response of AddIncidentComment.
+message AddIncidentCommentResponse {
+  psim.incident.v1.TimelineEntry entry = 1;
+}
+
+// AddIncidentLinkRequest is the request of AddIncidentLink.
+message AddIncidentLinkRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  string url = 2 [(buf.validate.field).string.uri = true];
+  string title = 3;
+}
+
+// AddIncidentLinkResponse is the response of AddIncidentLink.
+message AddIncidentLinkResponse {
+  psim.incident.v1.Link link = 1;
+}
+
+// ResolveIncidentRequest is the request of ResolveIncident.
+message ResolveIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.incident.v1.Resolution resolution = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string note = 3 [(buf.validate.field).string.max_len = 8000];
+  // Response run version known to the client; guards against unseen mandatory steps (runtime-view R2).
+  uint64 known_response_run_version = 4;
+}
+
+// ResolveIncidentResponse is the response of ResolveIncident.
+message ResolveIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// ReopenIncidentRequest is the request of ReopenIncident.
+message ReopenIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// ReopenIncidentResponse is the response of ReopenIncident.
+message ReopenIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// CloseIncidentRequest is the request of CloseIncident.
+message CloseIncidentRequest {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CloseIncidentResponse is the response of CloseIncident.
+message CloseIncidentResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// ListIncidentTypesRequest is the request of ListIncidentTypes.
+message ListIncidentTypesRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+}
+
+// ListIncidentTypesResponse is the response of ListIncidentTypes.
+message ListIncidentTypesResponse {
+  repeated psim.incident.v1.IncidentType incident_types = 1;
+  string next_page_token = 2;
+}
+
+// CreateIncidentTypeRequest is the request of CreateIncidentType.
+message CreateIncidentTypeRequest {
+  psim.incident.v1.IncidentType incident_type = 1 [(buf.validate.field).required = true];
+}
+
+// CreateIncidentTypeResponse is the response of CreateIncidentType.
+message CreateIncidentTypeResponse {
+  psim.incident.v1.IncidentType incident_type = 1;
+}
+
+// UpdateIncidentTypeRequest is the request of UpdateIncidentType.
+message UpdateIncidentTypeRequest {
+  string incident_type_id = 1 [(buf.validate.field).string.uuid = true];
+  psim.incident.v1.IncidentType incident_type = 2 [(buf.validate.field).required = true];
+}
+
+// UpdateIncidentTypeResponse is the response of UpdateIncidentType.
+message UpdateIncidentTypeResponse {
+  psim.incident.v1.IncidentType incident_type = 1;
+}

@@ -27,8 +27,13 @@
 - [Потоки данных и семантика доставки](architecture/data-flows.md)
 - [Масштабирование и партиционирование](architecture/scaling.md)
 - [Требования к качеству и бюджет задержек](architecture/quality.md)
-- [Модель C4 (Structurizr DSL)](architecture/c4/workspace.dsl) - проверка: `docker run --rm -v "$PWD/docs/architecture/c4":/usr/local/structurizr structurizr/structurizr validate -workspace workspace.dsl`
+- [Модель C4 (Structurizr DSL)](architecture/c4/workspace.dsl) - проверка: `task docs:c4`
 
 ## Архитектурные решения (шаг 0.4)
 
 - [Реестр ADR](adr/README.md) · [шаблон](adr/template.md)
+
+## Контракты (шаг 0.5)
+
+- [Контракты v1: состав, соглашения, проверка, покрытие сценариев](../contracts/README.md)
+- [OpenAPI REST v1](../contracts/openapi/psim-api-v1.yaml) · [AsyncAPI топиков](../contracts/asyncapi/psim-topics.yaml) · [справочник proto](../contracts/docs/proto-reference.md)

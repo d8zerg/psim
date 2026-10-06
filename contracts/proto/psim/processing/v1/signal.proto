@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package psim.processing.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// SignalRecord is the value of topic psim.signals.v1 (key: grouping_key).
+message SignalRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    Signal signal = 2;
+  }
+}
+
+// Signal is the result of a correlation rule firing or of an external producer (ADR-025).
+// envelope.message_id is the deterministic signal_id (ADR-005).
+message Signal {
+  SignalOrigin origin = 1 [(buf.validate.field).required = true];
+  string correlation_key = 2 [(buf.validate.field).string.min_len = 1];
+  // Key used by Incident Service to attach the signal to an open incident.
+  string grouping_key = 3 [(buf.validate.field).string.min_len = 1];
+  string incident_type_id = 4 [(buf.validate.field).string.uuid = true];
+  psim.common.v1.Priority priority = 5 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  string site_id = 6 [(buf.validate.field).string.uuid = true];
+  // Empty for signals of rules wider than a zone.
+  string zone_id = 7;
+  repeated string event_ids = 8 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 1000
+  }];
+  google.protobuf.Timestamp first_event_at = 9;
+  google.protobuf.Timestamp last_event_at = 10;
+  string summary = 11 [(buf.validate.field).string.max_len = 1024];
+  // Optional reference to an explanation produced by an external module.
+  string explanation_ref = 12;
+}
+
+// SignalOrigin identifies what produced a signal.
+message SignalOrigin {
+  SignalOriginKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Correlation rule id for SIGNAL_ORIGIN_KIND_RULE.
+  string rule_id = 2;
+  uint32 rule_version = 3;
+  // Registered external producer name for SIGNAL_ORIGIN_KIND_EXTERNAL.
+  string producer = 4;
+}
+
+// SignalOriginKind is the kind of signal producer.
+enum SignalOriginKind {
+  SIGNAL_ORIGIN_KIND_UNSPECIFIED = 0;
+  SIGNAL_ORIGIN_KIND_RULE = 1;
+  SIGNAL_ORIGIN_KIND_EXTERNAL = 2;
+}

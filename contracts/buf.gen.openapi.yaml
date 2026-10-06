@@ -1,0 +1,25 @@
+# Generates the OpenAPI 3 description of REST API v1 from psim/api/v1 (ADR-026).
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: psim.local/contracts/gen/go
+  disable:
+    - module: buf.build/googleapis/googleapis
+    - module: buf.build/bufbuild/protovalidate
+plugins:
+  # Local plugin from the contracts tools image (tools/contracts/image), gnostic v0.7.0.
+  - local: protoc-gen-openapi
+    out: ../.cache/contracts/openapi
+    opt:
+      - naming=json
+      - enum_type=string
+      - fq_schema_naming=true
+      - default_response=false
+      - title=PSIM Platform REST API
+      - version=1.0.0
+inputs:
+  - directory: proto
+    paths:
+      - proto/psim/api/v1

@@ -1,0 +1,88 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "google/api/httpbody.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/audit/v1/audit.proto";
+
+// AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service. Scenario S10.
+service AuditService {
+  // SearchAuditRecords searches audit records; newest first.
+  rpc SearchAuditRecords(SearchAuditRecordsRequest) returns (SearchAuditRecordsResponse) {
+    option (google.api.http) = {get: "/v1/audit/records"};
+  }
+  // VerifyAuditIntegrity recomputes the chain over a range of records.
+  rpc VerifyAuditIntegrity(VerifyAuditIntegrityRequest) returns (VerifyAuditIntegrityResponse) {
+    option (google.api.http) = {
+      post: "/v1/audit:verify"
+      body: "*"
+    };
+  }
+  // ExportAuditRecords exports records with neighbouring hashes and checkpoints (JSON lines).
+  rpc ExportAuditRecords(ExportAuditRecordsRequest) returns (ExportAuditRecordsResponse) {
+    option (google.api.http) = {
+      get: "/v1/audit/records:export"
+      response_body: "file"
+    };
+  }
+}
+
+// AuditQuery selects audit records.
+message AuditQuery {
+  google.protobuf.Timestamp from = 1;
+  google.protobuf.Timestamp to = 2;
+  string actor_id = 3;
+  // Action prefix, for example "incident.".
+  string action = 4;
+  string object_type = 5;
+  string object_id = 6;
+  string site_id = 7;
+  psim.audit.v1.AuditOutcome outcome = 8;
+}
+
+// SearchAuditRecordsRequest is the request of SearchAuditRecords.
+message SearchAuditRecordsRequest {
+  AuditQuery query = 1;
+  int32 page_size = 2 [(buf.validate.field).int32 = {
+    gte: 0
+    lte: 1000
+  }];
+  string page_token = 3;
+}
+
+// SearchAuditRecordsResponse is the response of SearchAuditRecords.
+message SearchAuditRecordsResponse {
+  repeated psim.audit.v1.AuditChainEntry records = 1;
+  string next_page_token = 2;
+}
+
+// VerifyAuditIntegrityRequest is the request of VerifyAuditIntegrity.
+message VerifyAuditIntegrityRequest {
+  // 0 means from the first record.
+  uint64 from_seq = 1;
+  // 0 means up to the last record.
+  uint64 to_seq = 2;
+}
+
+// VerifyAuditIntegrityResponse is the response of VerifyAuditIntegrity.
+message VerifyAuditIntegrityResponse {
+  bool intact = 1;
+  uint64 records_checked = 2;
+  // First record where the chain is broken; 0 when intact.
+  uint64 first_broken_seq = 3;
+  string detail = 4;
+  psim.audit.v1.AuditCheckpoint last_checkpoint = 5;
+}
+
+// ExportAuditRecordsRequest is the request of ExportAuditRecords.
+message ExportAuditRecordsRequest {
+  AuditQuery query = 1;
+}
+
+// ExportAuditRecordsResponse is the response of ExportAuditRecords; the body is JSON lines.
+message ExportAuditRecordsResponse {
+  google.api.HttpBody file = 1;
+}

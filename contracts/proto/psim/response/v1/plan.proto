@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package psim.response.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// ResponsePlan is one immutable version of a response plan (aggregates.md, 5.1).
+message ResponsePlan {
+  string plan_id = 1 [(buf.validate.field).string.uuid = true];
+  uint32 version = 2;
+  string name = 3 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  PlanState state = 4;
+  repeated PlanBinding bindings = 5;
+  string start_step_id = 6 [(buf.validate.field).string.min_len = 1];
+  repeated Step steps = 7 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 200
+  }];
+  google.protobuf.Timestamp published_at = 8;
+  psim.common.v1.Actor published_by = 9;
+}
+
+// PlanState is the lifecycle state of a plan version.
+enum PlanState {
+  PLAN_STATE_UNSPECIFIED = 0;
+  PLAN_STATE_DRAFT = 1;
+  PLAN_STATE_PUBLISHED = 2;
+  PLAN_STATE_ARCHIVED = 3;
+}
+
+// PlanBinding selects incidents a plan applies to; the most specific binding wins (P5).
+message PlanBinding {
+  string incident_type_id = 1 [(buf.validate.field).string.uuid = true];
+  repeated string site_ids = 2;
+  repeated string zone_ids = 3;
+  repeated psim.common.v1.Priority priorities = 4;
+  // Tie-breaker among bindings with equal specificity.
+  int32 binding_priority = 5;
+}
+
+// Step is a node of a plan graph.
+message Step {
+  string step_id = 1 [(buf.validate.field).string.min_len = 1];
+  string title = 2 [(buf.validate.field).string.min_len = 1];
+  bool mandatory = 3;
+  // Next step for all kinds except decision; empty for a final step.
+  string next_step_id = 4;
+  oneof params {
+    option (buf.validate.oneof).required = true;
+    InstructionParams instruction = 10;
+    ChecklistParams checklist = 11;
+    DecisionParams decision = 12;
+    CommandParams command = 13;
+    NotifyParams notify = 14;
+    WaitParams wait = 15;
+    EscalateParams escalate = 16;
+    AutomatedParams automated = 17;
+  }
+}
+
+// InstructionParams shows text the operator must read and confirm.
+message InstructionParams {
+  string text = 1 [(buf.validate.field).string.max_len = 8000];
+}
+
+// ChecklistParams is a list of items to check.
+message ChecklistParams {
+  repeated ChecklistItem items = 1 [(buf.validate.field).repeated.min_items = 1];
+}
+
+// ChecklistItem is one checklist entry.
+message ChecklistItem {
+  string item_id = 1 [(buf.validate.field).string.min_len = 1];
+  string text = 2 [(buf.validate.field).string.min_len = 1];
+  bool required = 3;
+}
+
+// DecisionParams branches the plan by the operator choice (P2).
+message DecisionParams {
+  string question = 1;
+  repeated DecisionOption options = 2 [(buf.validate.field).repeated.min_items = 2];
+}
+
+// DecisionOption is one branch of a decision.
+message DecisionOption {
+  string option_id = 1 [(buf.validate.field).string.min_len = 1];
+  string label = 2 [(buf.validate.field).string.min_len = 1];
+  string next_step_id = 3;
+  // Resolution suggested when this option leads to the end of the plan, for example false alarm.
+  string suggested_resolution = 4;
+}
+
+// CommandParams sends a command to devices (P3).
+message CommandParams {
+  string capability = 1 [(buf.validate.field).string.min_len = 1];
+  oneof target {
+    option (buf.validate.oneof).required = true;
+    string device_id = 2;
+    // Target expression, for example "zone.devices(type == 'access.door')".
+    string target_expression = 3;
+  }
+  map<string, string> parameters = 4;
+  // Execute without operator confirmation.
+  bool automatic = 5;
+}
+
+// NotifyParams sends notifications.
+message NotifyParams {
+  repeated Recipient recipients = 1 [(buf.validate.field).repeated.min_items = 1];
+  repeated NotificationChannel channels = 2;
+  string template = 3;
+}
+
+// WaitParams pauses the plan.
+message WaitParams {
+  google.protobuf.Duration duration = 1 [(buf.validate.field).required = true];
+}
+
+// EscalateParams escalates the incident to the given level.
+message EscalateParams {
+  uint32 level = 1 [(buf.validate.field).uint32.gte = 1];
+}
+
+// AutomatedParams calls an external handler (ADR-025).
+message AutomatedParams {
+  string webhook_url = 1 [(buf.validate.field).string.uri = true];
+  google.protobuf.Duration timeout = 2;
+}
+
+// Recipient is a notification recipient: a user or a role within the incident scope.
+message Recipient {
+  oneof recipient {
+    option (buf.validate.oneof).required = true;
+    string user_id = 1;
+    string role = 2;
+  }
+}
+
+// NotificationChannel is a delivery channel.
+enum NotificationChannel {
+  NOTIFICATION_CHANNEL_UNSPECIFIED = 0;
+  NOTIFICATION_CHANNEL_IN_APP = 1;
+  NOTIFICATION_CHANNEL_EMAIL = 2;
+  NOTIFICATION_CHANNEL_WEBHOOK = 3;
+}
+
+// EscalationPolicy defines SLA and escalation levels (aggregates.md, 5.4).
+message EscalationPolicy {
+  string policy_id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string.min_len = 1];
+  repeated SlaTarget sla = 3;
+  // Strictly increasing delays (EP1).
+  repeated EscalationLevel levels = 4;
+  uint64 version = 5;
+}
+
+// SlaTarget is the SLA for one priority.
+message SlaTarget {
+  psim.common.v1.Priority priority = 1;
+  google.protobuf.Duration acknowledge_within = 2;
+  google.protobuf.Duration resolve_within = 3;
+}
+
+// EscalationLevel is one level of escalation.
+message EscalationLevel {
+  uint32 level = 1 [(buf.validate.field).uint32.gte = 1];
+  // Delay after the SLA breach.
+  google.protobuf.Duration delay = 2;
+  repeated Recipient recipients = 3 [(buf.validate.field).repeated.min_items = 1];
+  repeated NotificationChannel channels = 4;
+}

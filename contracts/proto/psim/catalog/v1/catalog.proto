@@ -1,0 +1,180 @@
+syntax = "proto3";
+
+package psim.catalog.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+
+// CatalogRecord is the value of compacted topic psim.catalog.v1
+// (key: resource_type:resource_id). Each record is the full current state of a resource.
+message CatalogRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    Location location = 2;
+    DeviceType device_type = 3;
+    Device device = 4;
+    Connector connector = 5;
+  }
+}
+
+// ResourceState is the lifecycle state shared by catalog resources.
+enum ResourceState {
+  RESOURCE_STATE_UNSPECIFIED = 0;
+  RESOURCE_STATE_ACTIVE = 1;
+  RESOURCE_STATE_DISABLED = 2;
+  RESOURCE_STATE_ARCHIVED = 3;
+}
+
+// Location is a site, building, floor or zone (aggregates.md, 1.1).
+message Location {
+  string location_id = 1 [(buf.validate.field).string.uuid = true];
+  LocationKind kind = 2 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // Empty only for sites.
+  string parent_id = 3;
+  string site_id = 4 [(buf.validate.field).string.uuid = true];
+  string name = 5 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 200
+  }];
+  // Unique among siblings.
+  string code = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 64
+  }];
+  // IANA time zone, sites only.
+  string timezone = 7;
+  // Floors only.
+  FloorPlan floor_plan = 8;
+  ResourceState state = 9;
+  uint64 version = 10;
+  google.protobuf.Timestamp updated_at = 11;
+}
+
+// LocationKind is the level of a location in the hierarchy.
+enum LocationKind {
+  LOCATION_KIND_UNSPECIFIED = 0;
+  LOCATION_KIND_SITE = 1;
+  LOCATION_KIND_BUILDING = 2;
+  LOCATION_KIND_FLOOR = 3;
+  LOCATION_KIND_ZONE = 4;
+}
+
+// FloorPlan is an image of a floor with a coordinate system for device positions.
+message FloorPlan {
+  // Reference to the stored image, served by GET /v1/locations/{id}/floor-plan.
+  string image_ref = 1;
+  string content_type = 2;
+  double width = 3 [(buf.validate.field).double.gt = 0];
+  double height = 4 [(buf.validate.field).double.gt = 0];
+}
+
+// DeviceType describes a class of devices, its sources and capabilities (aggregates.md, 1.2).
+message DeviceType {
+  string device_type_id = 1 [(buf.validate.field).string.uuid = true];
+  string code = 2 [(buf.validate.field).string.min_len = 1];
+  string name = 3;
+  // Taxonomy domain, for example "access".
+  string taxonomy_domain = 4;
+  repeated SourceTemplate source_templates = 5;
+  repeated Capability capabilities = 6;
+  ResourceState state = 7;
+  uint64 version = 8;
+}
+
+// SourceTemplate describes a source every device of the type has.
+message SourceTemplate {
+  string kind = 1;
+  string name = 2;
+}
+
+// Capability is a command or mode a device supports.
+message Capability {
+  // For example "lock", "unlock", "arm", "ptz.preset".
+  string code = 1 [(buf.validate.field).string.pattern = "^[a-z][a-z0-9_.]*$"];
+  string name = 2;
+  // Critical commands require approval by a second user (CM3).
+  bool critical = 3;
+  repeated ParameterSpec parameters = 4;
+}
+
+// ParameterSpec describes one command parameter.
+message ParameterSpec {
+  string name = 1 [(buf.validate.field).string.min_len = 1];
+  ParameterType type = 2 [(buf.validate.field).enum.defined_only = true];
+  bool required = 3;
+  repeated string allowed_values = 4;
+}
+
+// ParameterType is the type of a command parameter.
+enum ParameterType {
+  PARAMETER_TYPE_UNSPECIFIED = 0;
+  PARAMETER_TYPE_STRING = 1;
+  PARAMETER_TYPE_INTEGER = 2;
+  PARAMETER_TYPE_NUMBER = 3;
+  PARAMETER_TYPE_BOOLEAN = 4;
+  PARAMETER_TYPE_DURATION = 5;
+}
+
+// Device is a physical or logical device with its sources (aggregates.md, 1.3).
+message Device {
+  string device_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_type_id = 2 [(buf.validate.field).string.uuid = true];
+  string zone_id = 3 [(buf.validate.field).string.uuid = true];
+  string site_id = 4 [(buf.validate.field).string.uuid = true];
+  string connector_id = 5 [(buf.validate.field).string.uuid = true];
+  // Device id in the external system, unique per connector (D1).
+  string external_id = 6 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string name = 7;
+  repeated Source sources = 8;
+  psim.common.v1.Position position = 9;
+  ResourceState state = 10;
+  uint64 version = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// Source is an event channel of a device.
+message Source {
+  // Deterministic: UUIDv5(connector_id, external_ref), see ADR-029.
+  string source_id = 1 [(buf.validate.field).string.uuid = true];
+  // Reference used by the connector, unique per connector (D2).
+  string external_ref = 2 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  string kind = 3;
+  string name = 4;
+}
+
+// Connector is a registered connector with its credentials and limits (aggregates.md, 1.4).
+message Connector {
+  string connector_id = 1 [(buf.validate.field).string.uuid = true];
+  string name = 2 [(buf.validate.field).string.min_len = 1];
+  // Selects the mapping rule set, for example "simulator" or "mqtt".
+  string connector_type = 3 [(buf.validate.field).string.min_len = 1];
+  repeated CertificateFingerprint certificates = 4 [(buf.validate.field).repeated.max_items = 2];
+  ConnectorLimits limits = 5;
+  ResourceState state = 6;
+  uint64 version = 7;
+}
+
+// CertificateFingerprint binds an mTLS client certificate to a connector.
+message CertificateFingerprint {
+  // Hex-encoded SHA-256 of the DER certificate.
+  string sha256 = 1 [(buf.validate.field).string.pattern = "^[0-9a-f]{64}$"];
+  google.protobuf.Timestamp not_after = 2;
+}
+
+// ConnectorLimits are per-connector ingestion limits enforced by the gateway.
+message ConnectorLimits {
+  uint32 max_events_per_second = 1;
+  uint32 max_batch_events = 2;
+}

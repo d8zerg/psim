@@ -1,0 +1,5876 @@
+# Generated: contracts/openapi/generated/openapi.yaml + contracts/openapi/overlay.yaml.
+# Do not edit; change the proto files or the overlay and run: task contracts:gen.
+openapi: 3.0.3
+info:
+  title: PSIM Platform REST API
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  description: 'PSIM Platform REST API v1. Generated from contracts/proto/psim/api/v1 and this overlay.
+
+    JSON is the canonical protobuf JSON mapping. Lists use cursor pagination
+
+    (pageSize, pageToken -> nextPageToken). Errors are application/problem+json (RFC 9457).
+
+    '
+paths:
+  /v1/audit/records:
+    get:
+      tags:
+      - AuditService
+      description: SearchAuditRecords searches audit records; newest first.
+      operationId: AuditService_SearchAuditRecords
+      parameters:
+      - name: query.from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: query.to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: query.actorId
+        in: query
+        schema:
+          type: string
+      - name: query.action
+        in: query
+        description: Action prefix, for example "incident.".
+        schema:
+          type: string
+      - name: query.objectType
+        in: query
+        schema:
+          type: string
+      - name: query.objectId
+        in: query
+        schema:
+          type: string
+      - name: query.siteId
+        in: query
+        schema:
+          type: string
+      - name: query.outcome
+        in: query
+        schema:
+          enum:
+          - AUDIT_OUTCOME_UNSPECIFIED
+          - AUDIT_OUTCOME_SUCCESS
+          - AUDIT_OUTCOME_DENIED
+          - AUDIT_OUTCOME_FAILED
+          type: string
+          format: enum
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SearchAuditRecordsResponse'
+        '400': &id001
+          $ref: '#/components/responses/Problem'
+        '401': &id002
+          $ref: '#/components/responses/Problem'
+        '403': &id003
+          $ref: '#/components/responses/Problem'
+        '404': &id004
+          $ref: '#/components/responses/Problem'
+        '429': &id005
+          $ref: '#/components/responses/Problem'
+        '500': &id006
+          $ref: '#/components/responses/Problem'
+        '503': &id007
+          $ref: '#/components/responses/Problem'
+      summary: SearchAuditRecords searches audit records; newest first
+  /v1/audit/records:export:
+    get:
+      tags:
+      - AuditService
+      description: ExportAuditRecords exports records with neighbouring hashes and checkpoints (JSON lines).
+      operationId: AuditService_ExportAuditRecords
+      parameters:
+      - name: query.from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: query.to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: query.actorId
+        in: query
+        schema:
+          type: string
+      - name: query.action
+        in: query
+        description: Action prefix, for example "incident.".
+        schema:
+          type: string
+      - name: query.objectType
+        in: query
+        schema:
+          type: string
+      - name: query.objectId
+        in: query
+        schema:
+          type: string
+      - name: query.siteId
+        in: query
+        schema:
+          type: string
+      - name: query.outcome
+        in: query
+        schema:
+          enum:
+          - AUDIT_OUTCOME_UNSPECIFIED
+          - AUDIT_OUTCOME_SUCCESS
+          - AUDIT_OUTCOME_DENIED
+          - AUDIT_OUTCOME_FAILED
+          type: string
+          format: enum
+      responses:
+        '200':
+          description: OK
+          content:
+            application/x-ndjson:
+              schema:
+                type: string
+                format: binary
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ExportAuditRecords exports records with neighbouring hashes and checkpoints (JSON lines)
+  /v1/audit:verify:
+    post:
+      tags:
+      - AuditService
+      description: VerifyAuditIntegrity recomputes the chain over a range of records.
+      operationId: AuditService_VerifyAuditIntegrity
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.VerifyAuditIntegrityRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.VerifyAuditIntegrityResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': &id008
+          $ref: '#/components/responses/Problem'
+        '412': &id009
+          $ref: '#/components/responses/Problem'
+      parameters: &id010
+      - &id011
+        $ref: '#/components/parameters/IfMatch'
+      - &id012
+        $ref: '#/components/parameters/IdempotencyKey'
+      summary: VerifyAuditIntegrity recomputes the chain over a range of records
+  /v1/commands:
+    get:
+      tags:
+      - CommandService
+      description: ListCommands lists commands by incident, device or state.
+      operationId: CommandService_ListCommands
+      parameters:
+      - name: incidentId
+        in: query
+        schema:
+          type: string
+      - name: deviceId
+        in: query
+        schema:
+          type: string
+      - name: states
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - COMMAND_STATE_UNSPECIFIED
+            - COMMAND_STATE_REQUESTED
+            - COMMAND_STATE_AWAITING_APPROVAL
+            - COMMAND_STATE_SENT
+            - COMMAND_STATE_ACKNOWLEDGED
+            - COMMAND_STATE_EXECUTED
+            - COMMAND_STATE_FAILED
+            - COMMAND_STATE_REJECTED
+            - COMMAND_STATE_TIMED_OUT
+            - COMMAND_STATE_CANCELLED
+            type: string
+            format: enum
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListCommandsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListCommands lists commands by incident, device or state
+    post:
+      tags:
+      - CommandService
+      description: RequestCommand requests a command; Idempotency-Key header equals command_id.
+      operationId: CommandService_RequestCommand
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.RequestCommandRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RequestCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: RequestCommand requests a command; Idempotency-Key header equals command_id
+  /v1/commands/{commandId}:
+    get:
+      tags:
+      - CommandService
+      description: GetCommand returns one command.
+      operationId: CommandService_GetCommand
+      parameters:
+      - name: commandId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetCommand returns one command
+  /v1/commands/{commandId}:approve:
+    post:
+      tags:
+      - CommandService
+      description: ApproveCommand approves a critical command; approver must differ from requester (CM3).
+      operationId: CommandService_ApproveCommand
+      parameters:
+      - name: commandId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ApproveCommandRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ApproveCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ApproveCommand approves a critical command; approver must differ from requester (CM3)
+  /v1/commands/{commandId}:cancel:
+    post:
+      tags:
+      - CommandService
+      description: CancelCommand cancels a command before it is sent.
+      operationId: CommandService_CancelCommand
+      parameters:
+      - name: commandId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.CancelCommandRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CancelCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: CancelCommand cancels a command before it is sent
+  /v1/commands/{commandId}:reject:
+    post:
+      tags:
+      - CommandService
+      description: RejectCommand rejects a critical command.
+      operationId: CommandService_RejectCommand
+      parameters:
+      - name: commandId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.RejectCommandRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RejectCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: RejectCommand rejects a critical command
+  /v1/connectors:
+    get:
+      tags:
+      - CatalogService
+      description: ListConnectors lists registered connectors with their status.
+      operationId: CatalogService_ListConnectors
+      parameters:
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListConnectorsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListConnectors lists registered connectors with their status
+    post:
+      tags:
+      - CatalogService
+      description: RegisterConnector registers a connector and binds its certificate.
+      operationId: CatalogService_RegisterConnector
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.Connector'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RegisterConnectorResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: RegisterConnector registers a connector and binds its certificate
+  /v1/connectors/{connectorId}:revoke:
+    post:
+      tags:
+      - CatalogService
+      description: RevokeConnector revokes a connector and closes its sessions (C2).
+      operationId: CatalogService_RevokeConnector
+      parameters:
+      - name: connectorId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.RevokeConnectorRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RevokeConnectorResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: RevokeConnector revokes a connector and closes its sessions (C2)
+  /v1/connectors/{connectorId}:rotate-certificate:
+    post:
+      tags:
+      - CatalogService
+      description: RotateConnectorCertificate adds a new certificate and sets expiry of the old one (C1).
+      operationId: CatalogService_RotateConnectorCertificate
+      parameters:
+      - name: connectorId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.RotateConnectorCertificateRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RotateConnectorCertificateResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: RotateConnectorCertificate adds a new certificate and sets expiry of the old one (C1)
+  /v1/device-types:
+    get:
+      tags:
+      - CatalogService
+      description: ListDeviceTypes lists device types.
+      operationId: CatalogService_ListDeviceTypes
+      parameters:
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListDeviceTypesResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListDeviceTypes lists device types
+    post:
+      tags:
+      - CatalogService
+      description: CreateDeviceType creates a device type.
+      operationId: CatalogService_CreateDeviceType
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateDeviceTypeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateDeviceType creates a device type
+  /v1/device-types/{deviceTypeId}:
+    put:
+      tags:
+      - CatalogService
+      description: UpdateDeviceType replaces a device type (If-Match required).
+      operationId: CatalogService_UpdateDeviceType
+      parameters:
+      - name: deviceTypeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - &id013
+        $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateDeviceTypeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': &id014
+          $ref: '#/components/responses/Problem'
+        '412': &id015
+          $ref: '#/components/responses/Problem'
+      summary: UpdateDeviceType replaces a device type (If-Match required)
+  /v1/devices:
+    get:
+      tags:
+      - CatalogService
+      description: ListDevices lists devices, filtered by location, connector or state.
+      operationId: CatalogService_ListDevices
+      parameters:
+      - name: locationId
+        in: query
+        description: Any location; devices of all nested zones are returned.
+        schema:
+          type: string
+      - name: connectorId
+        in: query
+        schema:
+          type: string
+      - name: deviceTypeId
+        in: query
+        schema:
+          type: string
+      - name: state
+        in: query
+        schema:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListDevicesResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListDevices lists devices, filtered by location, connector or state
+    post:
+      tags:
+      - CatalogService
+      description: CreateDevice registers a device with its sources.
+      operationId: CatalogService_CreateDevice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.Device'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateDeviceResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateDevice registers a device with its sources
+  /v1/devices/{deviceId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetDevice returns one device.
+      operationId: CatalogService_GetDevice
+      parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetDeviceResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetDevice returns one device
+    put:
+      tags:
+      - CatalogService
+      description: UpdateDevice replaces a device, including zone, position and state (If-Match required).
+      operationId: CatalogService_UpdateDevice
+      parameters:
+      - name: deviceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.Device'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateDeviceResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UpdateDevice replaces a device, including zone, position and state (If-Match required)
+  /v1/devices:export:
+    get:
+      tags:
+      - CatalogService
+      description: ExportDevices exports devices in CSV or JSON.
+      operationId: CatalogService_ExportDevices
+      parameters:
+      - name: locationId
+        in: query
+        schema:
+          type: string
+      - name: format
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                type: string
+                format: binary
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ExportDevices exports devices in CSV or JSON
+  /v1/dry-runs/{dryRunId}:
+    get:
+      tags:
+      - CorrelationRuleService
+      description: GetDryRun returns dry-run progress and produced signals.
+      operationId: CorrelationRuleService_GetDryRun
+      parameters:
+      - name: dryRunId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetDryRunResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetDryRun returns dry-run progress and produced signals
+  /v1/escalation-policies:
+    get:
+      tags:
+      - EscalationPolicyService
+      description: ListEscalationPolicies lists policies.
+      operationId: EscalationPolicyService_ListEscalationPolicies
+      parameters:
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListEscalationPoliciesResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListEscalationPolicies lists policies
+    post:
+      tags:
+      - EscalationPolicyService
+      description: CreateEscalationPolicy creates a policy.
+      operationId: EscalationPolicyService_CreateEscalationPolicy
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateEscalationPolicyResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateEscalationPolicy creates a policy
+  /v1/escalation-policies/{policyId}:
+    put:
+      tags:
+      - EscalationPolicyService
+      description: UpdateEscalationPolicy replaces a policy (If-Match required).
+      operationId: EscalationPolicyService_UpdateEscalationPolicy
+      parameters:
+      - name: policyId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateEscalationPolicyResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UpdateEscalationPolicy replaces a policy (If-Match required)
+  /v1/events:
+    get:
+      tags:
+      - EventHistoryService
+      description: SearchEvents searches events by location, device, type and time; newest first.
+      operationId: EventHistoryService_SearchEvents
+      parameters:
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: zoneIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: deviceIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: types
+        in: query
+        description: Taxonomy codes or prefixes ending with ".*".
+        schema:
+          type: array
+          items:
+            type: string
+      - name: minSeverity
+        in: query
+        schema:
+          enum:
+          - SEVERITY_UNSPECIFIED
+          - SEVERITY_INFO
+          - SEVERITY_LOW
+          - SEVERITY_MEDIUM
+          - SEVERITY_HIGH
+          - SEVERITY_CRITICAL
+          type: string
+          format: enum
+      - name: significantOnly
+        in: query
+        schema:
+          type: boolean
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SearchEventsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: SearchEvents searches events by location, device, type and time; newest first
+  /v1/events/{eventId}:
+    get:
+      tags:
+      - EventHistoryService
+      description: GetEvent returns one event.
+      operationId: EventHistoryService_GetEvent
+      parameters:
+      - name: eventId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetEventResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetEvent returns one event
+  /v1/feed/incidents:
+    get:
+      tags:
+      - FeedService
+      description: "GetIncidentFeed returns active incidents of the caller scope and the resume token\n at which the snapshot\
+        \ is consistent (ADR-019)."
+      operationId: FeedService_GetIncidentFeed
+      parameters:
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: zoneIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentFeedResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: "GetIncidentFeed returns active incidents of the caller scope and the resume token\n at which the snapshot\
+        \ is consistent (ADR-019)"
+  /v1/feed/locations/{locationId}/status:
+    get:
+      tags:
+      - FeedService
+      description: GetLocationStatus returns the state of devices and zones of a location for the object view.
+      operationId: FeedService_GetLocationStatus
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetLocationStatusResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetLocationStatus returns the state of devices and zones of a location for the object view
+  /v1/feed/operators:
+    get:
+      tags:
+      - FeedService
+      description: GetOperatorLoad returns the current load of operators (supervisor).
+      operationId: FeedService_GetOperatorLoad
+      parameters:
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetOperatorLoadResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetOperatorLoad returns the current load of operators (supervisor)
+  /v1/imports:
+    post:
+      tags:
+      - CatalogService
+      description: StartImport starts a bulk import of devices from CSV or JSON.
+      operationId: CatalogService_StartImport
+      parameters:
+      - name: format
+        in: query
+        description: '"csv" or "json"; passed as a query parameter.'
+        schema:
+          type: string
+      - name: dryRun
+        in: query
+        description: Validate only, do not apply.
+        schema:
+          type: boolean
+      - *id011
+      - *id012
+      requestBody:
+        required: true
+        content:
+          text/csv:
+            schema:
+              type: string
+              format: binary
+          application/json:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.StartImportResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: StartImport starts a bulk import of devices from CSV or JSON
+  /v1/imports/{importId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetImport returns import progress and per-row results.
+      operationId: CatalogService_GetImport
+      parameters:
+      - name: importId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetImportResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetImport returns import progress and per-row results
+  /v1/incident-types:
+    get:
+      tags:
+      - IncidentService
+      description: ListIncidentTypes lists incident types.
+      operationId: IncidentService_ListIncidentTypes
+      parameters:
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListIncidentTypesResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListIncidentTypes lists incident types
+    post:
+      tags:
+      - IncidentService
+      description: CreateIncidentType creates an incident type.
+      operationId: IncidentService_CreateIncidentType
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.incident.v1.IncidentType'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateIncidentTypeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateIncidentType creates an incident type
+  /v1/incident-types/{incidentTypeId}:
+    put:
+      tags:
+      - IncidentService
+      description: UpdateIncidentType replaces an incident type (If-Match required).
+      operationId: IncidentService_UpdateIncidentType
+      parameters:
+      - name: incidentTypeId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.incident.v1.IncidentType'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateIncidentTypeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UpdateIncidentType replaces an incident type (If-Match required)
+  /v1/incidents:
+    get:
+      tags:
+      - IncidentService
+      description: ListIncidents lists incidents within the caller scope.
+      operationId: IncidentService_ListIncidents
+      parameters:
+      - name: states
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - INCIDENT_STATE_UNSPECIFIED
+            - INCIDENT_STATE_NEW
+            - INCIDENT_STATE_ACKNOWLEDGED
+            - INCIDENT_STATE_IN_PROGRESS
+            - INCIDENT_STATE_RESOLVED
+            - INCIDENT_STATE_CLOSED
+            type: string
+            format: enum
+      - name: priorities
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - PRIORITY_UNSPECIFIED
+            - PRIORITY_P1
+            - PRIORITY_P2
+            - PRIORITY_P3
+            - PRIORITY_P4
+            type: string
+            format: enum
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: zoneIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: incidentTypeIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: assigneeId
+        in: query
+        schema:
+          type: string
+      - name: escalatedOnly
+        in: query
+        schema:
+          type: boolean
+      - name: createdFrom
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: createdTo
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListIncidentsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListIncidents lists incidents within the caller scope
+  /v1/incidents/{incidentId}:
+    get:
+      tags:
+      - IncidentService
+      description: GetIncident returns one incident; the ETag is the incident version.
+      operationId: IncidentService_GetIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetIncident returns one incident; the ETag is the incident version
+  /v1/incidents/{incidentId}/comments:
+    post:
+      tags:
+      - IncidentService
+      description: AddIncidentComment adds a comment to the timeline.
+      operationId: IncidentService_AddIncidentComment
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.AddIncidentCommentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.AddIncidentCommentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: AddIncidentComment adds a comment to the timeline
+  /v1/incidents/{incidentId}/events:
+    get:
+      tags:
+      - EventHistoryService
+      description: ListIncidentEvents returns source events of all signals of an incident.
+      operationId: EventHistoryService_ListIncidentEvents
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListIncidentEventsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListIncidentEvents returns source events of all signals of an incident
+  /v1/incidents/{incidentId}/links:
+    post:
+      tags:
+      - IncidentService
+      description: AddIncidentLink attaches an external link.
+      operationId: IncidentService_AddIncidentLink
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.AddIncidentLinkRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.AddIncidentLinkResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: AddIncidentLink attaches an external link
+  /v1/incidents/{incidentId}/run:
+    get:
+      tags:
+      - ResponseRunService
+      description: GetIncidentRun returns the active or last run of an incident.
+      operationId: ResponseRunService_GetIncidentRun
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentRunResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetIncidentRun returns the active or last run of an incident
+  /v1/incidents/{incidentId}/signals:
+    get:
+      tags:
+      - IncidentService
+      description: ListIncidentSignals returns signals attached to the incident.
+      operationId: IncidentService_ListIncidentSignals
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListIncidentSignalsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListIncidentSignals returns signals attached to the incident
+  /v1/incidents/{incidentId}/timeline:
+    get:
+      tags:
+      - IncidentService
+      description: ListTimeline returns the incident timeline.
+      operationId: IncidentService_ListTimeline
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListTimelineResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListTimeline returns the incident timeline
+  /v1/incidents/{incidentId}:acknowledge:
+    post:
+      tags:
+      - IncidentService
+      description: AcknowledgeIncident accepts an incident; the caller becomes the assignee.
+      operationId: IncidentService_AcknowledgeIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.AcknowledgeIncidentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.AcknowledgeIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: AcknowledgeIncident accepts an incident; the caller becomes the assignee
+  /v1/incidents/{incidentId}:assign:
+    post:
+      tags:
+      - IncidentService
+      description: AssignIncident assigns or reassigns an incident.
+      operationId: IncidentService_AssignIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.AssignIncidentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.AssignIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: AssignIncident assigns or reassigns an incident
+  /v1/incidents/{incidentId}:close:
+    post:
+      tags:
+      - IncidentService
+      description: CloseIncident closes a resolved incident before the auto-close timer (supervisor).
+      operationId: IncidentService_CloseIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.CloseIncidentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CloseIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: CloseIncident closes a resolved incident before the auto-close timer (supervisor)
+  /v1/incidents/{incidentId}:reopen:
+    post:
+      tags:
+      - IncidentService
+      description: ReopenIncident reopens a resolved incident (I10).
+      operationId: IncidentService_ReopenIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ReopenIncidentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ReopenIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ReopenIncident reopens a resolved incident (I10)
+  /v1/incidents/{incidentId}:resolve:
+    post:
+      tags:
+      - IncidentService
+      description: ResolveIncident resolves an incident; fails while mandatory steps are pending (I7).
+      operationId: IncidentService_ResolveIncident
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ResolveIncidentRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ResolveIncidentResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ResolveIncident resolves an incident; fails while mandatory steps are pending (I7)
+  /v1/incidents/{incidentId}:set-priority:
+    post:
+      tags:
+      - IncidentService
+      description: SetIncidentPriority sets the priority manually (supervisor).
+      operationId: IncidentService_SetIncidentPriority
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.SetIncidentPriorityRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SetIncidentPriorityResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: SetIncidentPriority sets the priority manually (supervisor)
+  /v1/incidents/{incidentId}:start-work:
+    post:
+      tags:
+      - IncidentService
+      description: StartIncidentWork moves an incident to in_progress.
+      operationId: IncidentService_StartIncidentWork
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.StartIncidentWorkRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.StartIncidentWorkResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: StartIncidentWork moves an incident to in_progress
+  /v1/locations:
+    get:
+      tags:
+      - CatalogService
+      description: ListLocations lists locations, filtered by parent or kind.
+      operationId: CatalogService_ListLocations
+      parameters:
+      - name: parentId
+        in: query
+        schema:
+          type: string
+      - name: kind
+        in: query
+        schema:
+          enum:
+          - LOCATION_KIND_UNSPECIFIED
+          - LOCATION_KIND_SITE
+          - LOCATION_KIND_BUILDING
+          - LOCATION_KIND_FLOOR
+          - LOCATION_KIND_ZONE
+          type: string
+          format: enum
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListLocationsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListLocations lists locations, filtered by parent or kind
+    post:
+      tags:
+      - CatalogService
+      description: CreateLocation creates a site, building, floor or zone.
+      operationId: CatalogService_CreateLocation
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.Location'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateLocationResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateLocation creates a site, building, floor or zone
+  /v1/locations/{locationId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetLocation returns one location.
+      operationId: CatalogService_GetLocation
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetLocationResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetLocation returns one location
+    put:
+      tags:
+      - CatalogService
+      description: UpdateLocation replaces mutable fields of a location (If-Match required).
+      operationId: CatalogService_UpdateLocation
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.Location'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateLocationResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UpdateLocation replaces mutable fields of a location (If-Match required)
+  /v1/locations/{locationId}/floor-plan:
+    get:
+      tags:
+      - CatalogService
+      description: GetFloorPlan downloads the floor plan image.
+      operationId: CatalogService_GetFloorPlan
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            image/*:
+              schema:
+                type: string
+                format: binary
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetFloorPlan downloads the floor plan image
+    put:
+      tags:
+      - CatalogService
+      description: UploadFloorPlan uploads the floor plan image of a floor.
+      operationId: CatalogService_UploadFloorPlan
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: width
+        in: query
+        description: Plan size in plan units; passed as query parameters.
+        schema:
+          type: number
+          format: double
+      - name: height
+        in: query
+        schema:
+          type: number
+          format: double
+      - *id013
+      requestBody:
+        required: true
+        content:
+          image/png:
+            schema:
+              type: string
+              format: binary
+          image/jpeg:
+            schema:
+              type: string
+              format: binary
+          image/svg+xml:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UploadFloorPlanResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UploadFloorPlan uploads the floor plan image of a floor
+  /v1/locations/{locationId}:archive:
+    post:
+      tags:
+      - CatalogService
+      description: ArchiveLocation archives a location without children and devices (L3).
+      operationId: CatalogService_ArchiveLocation
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ArchiveLocationRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ArchiveLocationResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ArchiveLocation archives a location without children and devices (L3)
+  /v1/mappings:
+    get:
+      tags:
+      - MappingService
+      description: ListMappingRuleSets lists the active mapping rule set of each connector type.
+      operationId: MappingService_ListMappingRuleSets
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListMappingRuleSetsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListMappingRuleSets lists the active mapping rule set of each connector type
+  /v1/mappings/{connectorType}:
+    get:
+      tags:
+      - MappingService
+      description: GetMappingRuleSet returns the active mapping rule set of a connector type.
+      operationId: MappingService_GetMappingRuleSet
+      parameters:
+      - name: connectorType
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetMappingRuleSetResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetMappingRuleSet returns the active mapping rule set of a connector type
+    put:
+      tags:
+      - MappingService
+      description: PublishMappingRuleSet validates and publishes a new version (M1-M3).
+      operationId: MappingService_PublishMappingRuleSet
+      parameters:
+      - name: connectorType
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.processing.v1.MappingRuleSet'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.PublishMappingRuleSetResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: PublishMappingRuleSet validates and publishes a new version (M1-M3)
+  /v1/me:
+    get:
+      tags:
+      - MeService
+      description: GetMe returns the caller identity, roles, scopes and allowed actions.
+      operationId: MeService_GetMe
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetMeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetMe returns the caller identity, roles, scopes and allowed actions
+  /v1/me/notifications:
+    get:
+      tags:
+      - NotificationService
+      description: ListMyNotifications lists in-app notifications of the caller; newest first.
+      operationId: NotificationService_ListMyNotifications
+      parameters:
+      - name: unreadOnly
+        in: query
+        schema:
+          type: boolean
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListMyNotificationsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListMyNotifications lists in-app notifications of the caller; newest first
+  /v1/me/notifications/{notificationId}:read:
+    post:
+      tags:
+      - NotificationService
+      description: MarkNotificationRead marks an in-app notification as read.
+      operationId: NotificationService_MarkNotificationRead
+      parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.MarkNotificationReadRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.MarkNotificationReadResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: MarkNotificationRead marks an in-app notification as read
+  /v1/plans:
+    get:
+      tags:
+      - ResponsePlanService
+      description: ListPlans lists the latest version of each plan.
+      operationId: ResponsePlanService_ListPlans
+      parameters:
+      - name: incidentTypeId
+        in: query
+        schema:
+          type: string
+      - name: includeArchived
+        in: query
+        schema:
+          type: boolean
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListPlansResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListPlans lists the latest version of each plan
+    post:
+      tags:
+      - ResponsePlanService
+      description: SavePlanDraft creates a plan or a new draft version of it.
+      operationId: ResponsePlanService_SavePlanDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SavePlanDraftResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: SavePlanDraft creates a plan or a new draft version of it
+  /v1/plans/{planId}:
+    get:
+      tags:
+      - ResponsePlanService
+      description: GetPlan returns a plan version; latest when version is 0.
+      operationId: ResponsePlanService_GetPlan
+      parameters:
+      - name: planId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: query
+        schema:
+          type: integer
+          format: uint32
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetPlanResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetPlan returns a plan version; latest when version is 0
+  /v1/plans/{planId}:archive:
+    post:
+      tags:
+      - ResponsePlanService
+      description: ArchivePlan archives a plan.
+      operationId: ResponsePlanService_ArchivePlan
+      parameters:
+      - name: planId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ArchivePlanRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ArchivePlanResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ArchivePlan archives a plan
+  /v1/plans/{planId}:publish:
+    post:
+      tags:
+      - ResponsePlanService
+      description: PublishPlan publishes a draft version; published versions are immutable.
+      operationId: ResponsePlanService_PublishPlan
+      parameters:
+      - name: planId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.PublishPlanRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.PublishPlanResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: PublishPlan publishes a draft version; published versions are immutable
+  /v1/plans:validate:
+    post:
+      tags:
+      - ResponsePlanService
+      description: ValidatePlan validates a plan without saving it (P1-P5).
+      operationId: ResponsePlanService_ValidatePlan
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ValidatePlanResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: ValidatePlan validates a plan without saving it (P1-P5)
+  /v1/reports/incidents:
+    get:
+      tags:
+      - ReportService
+      description: GetIncidentReport returns incident metrics for a period.
+      operationId: ReportService_GetIncidentReport
+      parameters:
+      - name: filter.from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: filter.to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: filter.siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: filter.incidentTypeIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: filter.priorities
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - PRIORITY_UNSPECIFIED
+            - PRIORITY_P1
+            - PRIORITY_P2
+            - PRIORITY_P3
+            - PRIORITY_P4
+            type: string
+            format: enum
+      - name: grouping
+        in: query
+        schema:
+          enum:
+          - REPORT_GROUPING_UNSPECIFIED
+          - REPORT_GROUPING_NONE
+          - REPORT_GROUPING_SITE
+          - REPORT_GROUPING_INCIDENT_TYPE
+          - REPORT_GROUPING_PRIORITY
+          - REPORT_GROUPING_OPERATOR
+          - REPORT_GROUPING_DAY
+          type: string
+          format: enum
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentReportResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetIncidentReport returns incident metrics for a period
+  /v1/reports/incidents:export:
+    get:
+      tags:
+      - ReportService
+      description: ExportIncidentReport exports the same report as CSV.
+      operationId: ReportService_ExportIncidentReport
+      parameters:
+      - name: filter.from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: filter.to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: filter.siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: filter.incidentTypeIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: filter.priorities
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - PRIORITY_UNSPECIFIED
+            - PRIORITY_P1
+            - PRIORITY_P2
+            - PRIORITY_P3
+            - PRIORITY_P4
+            type: string
+            format: enum
+      - name: grouping
+        in: query
+        schema:
+          enum:
+          - REPORT_GROUPING_UNSPECIFIED
+          - REPORT_GROUPING_NONE
+          - REPORT_GROUPING_SITE
+          - REPORT_GROUPING_INCIDENT_TYPE
+          - REPORT_GROUPING_PRIORITY
+          - REPORT_GROUPING_OPERATOR
+          - REPORT_GROUPING_DAY
+          type: string
+          format: enum
+      responses:
+        '200':
+          description: OK
+          content:
+            text/csv:
+              schema:
+                type: string
+                format: binary
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ExportIncidentReport exports the same report as CSV
+  /v1/rule-sets/active:
+    get:
+      tags:
+      - CorrelationRuleService
+      description: GetActiveRuleSet returns the active rule set.
+      operationId: CorrelationRuleService_GetActiveRuleSet
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetActiveRuleSetResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetActiveRuleSet returns the active rule set
+  /v1/rule-sets:activate:
+    post:
+      tags:
+      - CorrelationRuleService
+      description: ActivateRuleSet atomically activates a new set of rule versions (RS1-RS3).
+      operationId: CorrelationRuleService_ActivateRuleSet
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ActivateRuleSetRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ActivateRuleSetResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: ActivateRuleSet atomically activates a new set of rule versions (RS1-RS3)
+  /v1/rules:
+    get:
+      tags:
+      - CorrelationRuleService
+      description: ListRules lists the latest version of each rule.
+      operationId: CorrelationRuleService_ListRules
+      parameters:
+      - name: states
+        in: query
+        schema:
+          type: array
+          items:
+            enum:
+            - RULE_STATE_UNSPECIFIED
+            - RULE_STATE_DRAFT
+            - RULE_STATE_TESTING
+            - RULE_STATE_ACTIVE
+            - RULE_STATE_ARCHIVED
+            type: string
+            format: enum
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListRulesResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListRules lists the latest version of each rule
+    post:
+      tags:
+      - CorrelationRuleService
+      description: SaveRuleDraft creates a rule or a new draft version of it.
+      operationId: CorrelationRuleService_SaveRuleDraft
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SaveRuleDraftResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: SaveRuleDraft creates a rule or a new draft version of it
+  /v1/rules/{ruleId}:
+    get:
+      tags:
+      - CorrelationRuleService
+      description: GetRule returns a rule version; latest when version is 0.
+      operationId: CorrelationRuleService_GetRule
+      parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: version
+        in: query
+        schema:
+          type: integer
+          format: uint32
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetRuleResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetRule returns a rule version; latest when version is 0
+  /v1/rules/{ruleId}:archive:
+    post:
+      tags:
+      - CorrelationRuleService
+      description: ArchiveRule archives a rule; it is removed from the next rule set.
+      operationId: CorrelationRuleService_ArchiveRule
+      parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ArchiveRuleRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ArchiveRuleResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ArchiveRule archives a rule; it is removed from the next rule set
+  /v1/rules/{ruleId}:dry-run:
+    post:
+      tags:
+      - CorrelationRuleService
+      description: StartDryRun runs a rule version over historical events without publishing signals.
+      operationId: CorrelationRuleService_StartDryRun
+      parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.StartDryRunRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.StartDryRunResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: StartDryRun runs a rule version over historical events without publishing signals
+  /v1/rules/{ruleId}:validate:
+    post:
+      tags:
+      - CorrelationRuleService
+      description: ValidateRule validates a draft and moves it to testing on success (R1).
+      operationId: CorrelationRuleService_ValidateRule
+      parameters:
+      - name: ruleId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ValidateRuleRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ValidateRuleResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ValidateRule validates a draft and moves it to testing on success (R1)
+  /v1/runs/{runId}/steps/{stepId}:complete:
+    post:
+      tags:
+      - ResponseRunService
+      description: CompleteStep completes an active step with its result.
+      operationId: ResponseRunService_CompleteStep
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.CompleteStepRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CompleteStepResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: CompleteStep completes an active step with its result
+  /v1/runs/{runId}/steps/{stepId}:override:
+    post:
+      tags:
+      - ResponseRunService
+      description: OverrideStep completes a failed step by a supervisor decision.
+      operationId: ResponseRunService_OverrideStep
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.OverrideStepRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.OverrideStepResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: OverrideStep completes a failed step by a supervisor decision
+  /v1/runs/{runId}/steps/{stepId}:retry:
+    post:
+      tags:
+      - ResponseRunService
+      description: RetryStep retries a failed step.
+      operationId: ResponseRunService_RetryStep
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.RetryStepRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RetryStepResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: RetryStep retries a failed step
+  /v1/runs/{runId}/steps/{stepId}:skip:
+    post:
+      tags:
+      - ResponseRunService
+      description: SkipStep skips a non-mandatory step with a reason (RR3).
+      operationId: ResponseRunService_SkipStep
+      parameters:
+      - name: runId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: stepId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.SkipStepRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SkipStepResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: SkipStep skips a non-mandatory step with a reason (RR3)
+  /v1/settings:
+    get:
+      tags:
+      - SettingsService
+      description: GetSettings returns the current settings.
+      operationId: SettingsService_GetSettings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetSettingsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetSettings returns the current settings
+  /v1/settings/processing:
+    put:
+      tags:
+      - SettingsService
+      description: UpdateProcessingSettings replaces processing settings (If-Match required).
+      operationId: SettingsService_UpdateProcessingSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.config.v1.ProcessingSettings'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateProcessingSettingsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      parameters: &id016
+      - *id013
+      summary: UpdateProcessingSettings replaces processing settings (If-Match required)
+  /v1/settings/retention:
+    put:
+      tags:
+      - SettingsService
+      description: UpdateRetentionSettings replaces retention settings (If-Match required).
+      operationId: SettingsService_UpdateRetentionSettings
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.config.v1.RetentionSettings'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateRetentionSettingsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      parameters: *id016
+      summary: UpdateRetentionSettings replaces retention settings (If-Match required)
+components:
+  schemas:
+    psim.api.v1.AcknowledgeIncidentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+      description: AcknowledgeIncidentRequest is the request of AcknowledgeIncident.
+    psim.api.v1.AcknowledgeIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: AcknowledgeIncidentResponse is the response of AcknowledgeIncident.
+    psim.api.v1.ActivateRuleSetRequest:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.RuleVersionRef'
+          description: Rule versions to make active; every version must be in testing or active state.
+        expectedRuleSetVersion:
+          type: string
+          description: Version of the currently active set, for optimistic concurrency.
+      description: ActivateRuleSetRequest is the request of ActivateRuleSet.
+    psim.api.v1.ActivateRuleSetResponse:
+      type: object
+      properties:
+        ruleSet:
+          $ref: '#/components/schemas/psim.processing.v1.RuleSet'
+      description: ActivateRuleSetResponse is the response of ActivateRuleSet.
+    psim.api.v1.AddIncidentCommentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        text:
+          type: string
+      description: AddIncidentCommentRequest is the request of AddIncidentComment.
+    psim.api.v1.AddIncidentCommentResponse:
+      type: object
+      properties:
+        entry:
+          $ref: '#/components/schemas/psim.incident.v1.TimelineEntry'
+      description: AddIncidentCommentResponse is the response of AddIncidentComment.
+    psim.api.v1.AddIncidentLinkRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+      description: AddIncidentLinkRequest is the request of AddIncidentLink.
+    psim.api.v1.AddIncidentLinkResponse:
+      type: object
+      properties:
+        link:
+          $ref: '#/components/schemas/psim.incident.v1.Link'
+      description: AddIncidentLinkResponse is the response of AddIncidentLink.
+    psim.api.v1.ApproveCommandRequest:
+      type: object
+      properties:
+        commandId:
+          type: string
+      description: ApproveCommandRequest is the request of ApproveCommand.
+    psim.api.v1.ApproveCommandResponse:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.response.v1.Command'
+      description: ApproveCommandResponse is the response of ApproveCommand.
+    psim.api.v1.ArchiveLocationRequest:
+      type: object
+      properties:
+        locationId:
+          type: string
+      description: ArchiveLocationRequest is the request of ArchiveLocation.
+    psim.api.v1.ArchiveLocationResponse:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/psim.catalog.v1.Location'
+      description: ArchiveLocationResponse is the response of ArchiveLocation.
+    psim.api.v1.ArchivePlanRequest:
+      type: object
+      properties:
+        planId:
+          type: string
+      description: ArchivePlanRequest is the request of ArchivePlan.
+    psim.api.v1.ArchivePlanResponse:
+      type: object
+      properties:
+        plan:
+          $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+      description: ArchivePlanResponse is the response of ArchivePlan.
+    psim.api.v1.ArchiveRuleRequest:
+      type: object
+      properties:
+        ruleId:
+          type: string
+      description: ArchiveRuleRequest is the request of ArchiveRule.
+    psim.api.v1.ArchiveRuleResponse:
+      type: object
+      properties:
+        rule:
+          $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+      description: ArchiveRuleResponse is the response of ArchiveRule.
+    psim.api.v1.AssignIncidentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        assigneeId:
+          type: string
+        reason:
+          type: string
+      description: AssignIncidentRequest is the request of AssignIncident.
+    psim.api.v1.AssignIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: AssignIncidentResponse is the response of AssignIncident.
+    psim.api.v1.CancelCommandRequest:
+      type: object
+      properties:
+        commandId:
+          type: string
+      description: CancelCommandRequest is the request of CancelCommand.
+    psim.api.v1.CancelCommandResponse:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.response.v1.Command'
+      description: CancelCommandResponse is the response of CancelCommand.
+    psim.api.v1.CloseIncidentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+      description: CloseIncidentRequest is the request of CloseIncident.
+    psim.api.v1.CloseIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: CloseIncidentResponse is the response of CloseIncident.
+    psim.api.v1.CompleteStepRequest:
+      type: object
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+        result:
+          $ref: '#/components/schemas/psim.response.v1.StepResult'
+      description: CompleteStepRequest is the request of CompleteStep.
+    psim.api.v1.CompleteStepResponse:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/psim.response.v1.ResponseRun'
+      description: CompleteStepResponse is the response of CompleteStep.
+    psim.api.v1.ConnectorStatus:
+      type: object
+      properties:
+        connector:
+          $ref: '#/components/schemas/psim.catalog.v1.Connector'
+        online:
+          type: boolean
+        lastSeenAt:
+          type: string
+          format: date-time
+        eventsPerSecond:
+          type: number
+          format: double
+        rejectedEventsTotal:
+          type: string
+        dlqEventsTotal:
+          type: string
+      description: ConnectorStatus is the runtime status of a connector, joined from the session registry.
+    psim.api.v1.CreateDeviceResponse:
+      type: object
+      properties:
+        device:
+          $ref: '#/components/schemas/psim.catalog.v1.Device'
+      description: CreateDeviceResponse is the response of CreateDevice.
+    psim.api.v1.CreateDeviceTypeResponse:
+      type: object
+      properties:
+        deviceType:
+          $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+      description: CreateDeviceTypeResponse is the response of CreateDeviceType.
+    psim.api.v1.CreateEscalationPolicyResponse:
+      type: object
+      properties:
+        policy:
+          $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
+      description: CreateEscalationPolicyResponse is the response of CreateEscalationPolicy.
+    psim.api.v1.CreateIncidentTypeResponse:
+      type: object
+      properties:
+        incidentType:
+          $ref: '#/components/schemas/psim.incident.v1.IncidentType'
+      description: CreateIncidentTypeResponse is the response of CreateIncidentType.
+    psim.api.v1.CreateLocationResponse:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/psim.catalog.v1.Location'
+      description: CreateLocationResponse is the response of CreateLocation.
+    psim.api.v1.DeviceStatus:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        state:
+          enum:
+          - EVENT_CLASS_UNSPECIFIED
+          - EVENT_CLASS_ALARM
+          - EVENT_CLASS_WARNING
+          - EVENT_CLASS_FAULT
+          - EVENT_CLASS_RESTORE
+          - EVENT_CLASS_STATE
+          - EVENT_CLASS_INFO
+          type: string
+          format: enum
+        lastType:
+          type: string
+          description: Last state-changing taxonomy type.
+        lastChangedAt:
+          type: string
+          format: date-time
+        online:
+          type: boolean
+      description: DeviceStatus is the current state of a device derived from alarm, fault, restore and state events.
+    psim.api.v1.DryRun:
+      type: object
+      properties:
+        dryRunId:
+          type: string
+        ruleId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+        state:
+          enum:
+          - DRY_RUN_STATE_UNSPECIFIED
+          - DRY_RUN_STATE_RUNNING
+          - DRY_RUN_STATE_COMPLETED
+          - DRY_RUN_STATE_FAILED
+          type: string
+          format: enum
+        eventsProcessed:
+          type: string
+        signalsProduced:
+          type: string
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      description: DryRun is a dry run of a rule over history.
+    psim.api.v1.FieldViolation:
+      type: object
+      properties:
+        field:
+          type: string
+          description: Field path in the request, for example "steps[2].next_step_id".
+        code:
+          type: string
+        message:
+          type: string
+      description: FieldViolation describes one invalid field.
+    psim.api.v1.GetActiveRuleSetResponse:
+      type: object
+      properties:
+        ruleSet:
+          $ref: '#/components/schemas/psim.processing.v1.RuleSet'
+      description: GetActiveRuleSetResponse is the response of GetActiveRuleSet.
+    psim.api.v1.GetCommandResponse:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.response.v1.Command'
+      description: GetCommandResponse is the response of GetCommand.
+    psim.api.v1.GetDeviceResponse:
+      type: object
+      properties:
+        device:
+          $ref: '#/components/schemas/psim.catalog.v1.Device'
+      description: GetDeviceResponse is the response of GetDevice.
+    psim.api.v1.GetDryRunResponse:
+      type: object
+      properties:
+        dryRun:
+          $ref: '#/components/schemas/psim.api.v1.DryRun'
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.Signal'
+        nextPageToken:
+          type: string
+      description: GetDryRunResponse is the response of GetDryRun.
+    psim.api.v1.GetEventResponse:
+      type: object
+      properties:
+        event:
+          $ref: '#/components/schemas/psim.api.v1.StoredEvent'
+      description: GetEventResponse is the response of GetEvent.
+    psim.api.v1.GetImportResponse:
+      type: object
+      properties:
+        importJob:
+          $ref: '#/components/schemas/psim.api.v1.ImportJob'
+      description: GetImportResponse is the response of GetImport.
+    psim.api.v1.GetIncidentFeedResponse:
+      type: object
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.Incident'
+        resumeToken:
+          type: string
+          description: Token for the realtime Subscribe frame.
+        snapshotAt:
+          type: string
+          format: date-time
+      description: "GetIncidentFeedResponse is the response of GetIncidentFeed.\n Not paginated: the console needs the whole\
+        \ feed (up to 10 000 incidents)."
+    psim.api.v1.GetIncidentReportResponse:
+      type: object
+      properties:
+        totals:
+          $ref: '#/components/schemas/psim.api.v1.IncidentMetrics'
+        rows:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.IncidentMetrics'
+        generatedAt:
+          type: string
+          format: date-time
+      description: GetIncidentReportResponse is the response of GetIncidentReport.
+    psim.api.v1.GetIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: GetIncidentResponse is the response of GetIncident.
+    psim.api.v1.GetIncidentRunResponse:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/psim.response.v1.ResponseRun'
+        plan:
+          allOf:
+          - $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+          description: The plan version used by the run.
+      description: GetIncidentRunResponse is the response of GetIncidentRun.
+    psim.api.v1.GetLocationResponse:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/psim.catalog.v1.Location'
+      description: GetLocationResponse is the response of GetLocation.
+    psim.api.v1.GetLocationStatusResponse:
+      type: object
+      properties:
+        zones:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.ZoneStatus'
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.DeviceStatus'
+      description: GetLocationStatusResponse is the response of GetLocationStatus.
+    psim.api.v1.GetMappingRuleSetResponse:
+      type: object
+      properties:
+        mappingRuleSet:
+          $ref: '#/components/schemas/psim.processing.v1.MappingRuleSet'
+      description: GetMappingRuleSetResponse is the response of GetMappingRuleSet.
+    psim.api.v1.GetMeResponse:
+      type: object
+      properties:
+        userId:
+          type: string
+        tenantId:
+          type: string
+        displayName:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            type: string
+          description: 'Roles: operator, supervisor, admin, integrator, auditor, manager.'
+        siteIds:
+          type: array
+          items:
+            type: string
+        zoneIds:
+          type: array
+          items:
+            type: string
+        actions:
+          type: array
+          items:
+            type: string
+          description: Actions allowed by the role table, for hiding unavailable UI actions (ADR-020).
+        locale:
+          type: string
+      description: GetMeResponse is the response of GetMe.
+    psim.api.v1.GetOperatorLoadResponse:
+      type: object
+      properties:
+        operators:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.OperatorLoad'
+      description: GetOperatorLoadResponse is the response of GetOperatorLoad.
+    psim.api.v1.GetPlanResponse:
+      type: object
+      properties:
+        plan:
+          $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+      description: GetPlanResponse is the response of GetPlan.
+    psim.api.v1.GetRuleResponse:
+      type: object
+      properties:
+        rule:
+          $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+      description: GetRuleResponse is the response of GetRule.
+    psim.api.v1.GetSettingsResponse:
+      type: object
+      properties:
+        retention:
+          $ref: '#/components/schemas/psim.config.v1.RetentionSettings'
+        processing:
+          $ref: '#/components/schemas/psim.config.v1.ProcessingSettings'
+      description: GetSettingsResponse is the response of GetSettings.
+    psim.api.v1.ImportJob:
+      type: object
+      properties:
+        importId:
+          type: string
+        state:
+          enum:
+          - IMPORT_STATE_UNSPECIFIED
+          - IMPORT_STATE_RUNNING
+          - IMPORT_STATE_COMPLETED
+          - IMPORT_STATE_FAILED
+          type: string
+          format: enum
+        rowsTotal:
+          type: integer
+          format: uint32
+        rowsCreated:
+          type: integer
+          format: uint32
+        rowsUpdated:
+          type: integer
+          format: uint32
+        rowsFailed:
+          type: integer
+          format: uint32
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.ImportRowError'
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+      description: ImportJob is a bulk import and its results (aggregates.md, 1.5).
+    psim.api.v1.ImportRowError:
+      type: object
+      properties:
+        row:
+          type: integer
+          format: uint32
+        code:
+          type: string
+        message:
+          type: string
+      description: ImportRowError is an error of one imported row.
+    psim.api.v1.IncidentMetrics:
+      type: object
+      properties:
+        group:
+          type: string
+          description: 'Group key: site id, incident type id, priority, user id or date; empty for totals.'
+        incidentsCreated:
+          type: string
+        incidentsResolved:
+          type: string
+        mtta:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        mttr:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        falseAlarmRate:
+          type: number
+          description: Share of resolution = false_alarm among resolved, 0..1.
+          format: double
+        ackSlaCompliance:
+          type: number
+          description: Share of incidents acknowledged within SLA, 0..1.
+          format: double
+        resolveSlaCompliance:
+          type: number
+          description: Share of incidents resolved within SLA, 0..1.
+          format: double
+        escalated:
+          type: string
+      description: IncidentMetrics are incident metrics for a group (definitions in acceptance-spec.md, S13).
+    psim.api.v1.IncidentSignal:
+      type: object
+      properties:
+        signalId:
+          type: string
+        signal:
+          $ref: '#/components/schemas/psim.processing.v1.Signal'
+        attachedAt:
+          type: string
+          format: date-time
+      description: IncidentSignal is a signal attached to an incident.
+    psim.api.v1.ListCommandsResponse:
+      type: object
+      properties:
+        commands:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.Command'
+        nextPageToken:
+          type: string
+      description: ListCommandsResponse is the response of ListCommands.
+    psim.api.v1.ListConnectorsResponse:
+      type: object
+      properties:
+        connectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.ConnectorStatus'
+        nextPageToken:
+          type: string
+      description: ListConnectorsResponse is the response of ListConnectors.
+    psim.api.v1.ListDeviceTypesResponse:
+      type: object
+      properties:
+        deviceTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+        nextPageToken:
+          type: string
+      description: ListDeviceTypesResponse is the response of ListDeviceTypes.
+    psim.api.v1.ListDevicesResponse:
+      type: object
+      properties:
+        devices:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Device'
+        nextPageToken:
+          type: string
+      description: ListDevicesResponse is the response of ListDevices.
+    psim.api.v1.ListEscalationPoliciesResponse:
+      type: object
+      properties:
+        policies:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
+        nextPageToken:
+          type: string
+      description: ListEscalationPoliciesResponse is the response of ListEscalationPolicies.
+    psim.api.v1.ListIncidentEventsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.StoredEvent'
+        nextPageToken:
+          type: string
+      description: ListIncidentEventsResponse is the response of ListIncidentEvents.
+    psim.api.v1.ListIncidentSignalsResponse:
+      type: object
+      properties:
+        signals:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.IncidentSignal'
+        nextPageToken:
+          type: string
+      description: ListIncidentSignalsResponse is the response of ListIncidentSignals.
+    psim.api.v1.ListIncidentTypesResponse:
+      type: object
+      properties:
+        incidentTypes:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.IncidentType'
+        nextPageToken:
+          type: string
+      description: ListIncidentTypesResponse is the response of ListIncidentTypes.
+    psim.api.v1.ListIncidentsResponse:
+      type: object
+      properties:
+        incidents:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.Incident'
+        nextPageToken:
+          type: string
+      description: ListIncidentsResponse is the response of ListIncidents.
+    psim.api.v1.ListLocationsResponse:
+      type: object
+      properties:
+        locations:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Location'
+        nextPageToken:
+          type: string
+      description: ListLocationsResponse is the response of ListLocations.
+    psim.api.v1.ListMappingRuleSetsResponse:
+      type: object
+      properties:
+        mappingRuleSets:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.MappingRuleSet'
+      description: ListMappingRuleSetsResponse is the response of ListMappingRuleSets.
+    psim.api.v1.ListMyNotificationsResponse:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.Notification'
+        nextPageToken:
+          type: string
+        unreadCount:
+          type: integer
+          format: uint32
+      description: ListMyNotificationsResponse is the response of ListMyNotifications.
+    psim.api.v1.ListPlansResponse:
+      type: object
+      properties:
+        plans:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+        nextPageToken:
+          type: string
+      description: ListPlansResponse is the response of ListPlans.
+    psim.api.v1.ListRulesResponse:
+      type: object
+      properties:
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+        nextPageToken:
+          type: string
+      description: ListRulesResponse is the response of ListRules.
+    psim.api.v1.ListTimelineResponse:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.TimelineEntry'
+        nextPageToken:
+          type: string
+      description: ListTimelineResponse is the response of ListTimeline.
+    psim.api.v1.MarkNotificationReadRequest:
+      type: object
+      properties:
+        notificationId:
+          type: string
+      description: MarkNotificationReadRequest is the request of MarkNotificationRead.
+    psim.api.v1.MarkNotificationReadResponse:
+      type: object
+      properties:
+        notification:
+          $ref: '#/components/schemas/psim.response.v1.Notification'
+      description: MarkNotificationReadResponse is the response of MarkNotificationRead.
+    psim.api.v1.OperatorLoad:
+      type: object
+      properties:
+        userId:
+          type: string
+        displayName:
+          type: string
+        assignedOpen:
+          type: integer
+          format: uint32
+        escalated:
+          type: integer
+          format: uint32
+      description: OperatorLoad is the current load of one operator.
+    psim.api.v1.OverrideStepRequest:
+      type: object
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+        reason:
+          type: string
+      description: OverrideStepRequest is the request of OverrideStep.
+    psim.api.v1.OverrideStepResponse:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/psim.response.v1.ResponseRun'
+      description: OverrideStepResponse is the response of OverrideStep.
+    psim.api.v1.PublishMappingRuleSetResponse:
+      type: object
+      properties:
+        mappingRuleSet:
+          $ref: '#/components/schemas/psim.processing.v1.MappingRuleSet'
+      description: PublishMappingRuleSetResponse is the response of PublishMappingRuleSet.
+    psim.api.v1.PublishPlanRequest:
+      type: object
+      properties:
+        planId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+      description: PublishPlanRequest is the request of PublishPlan.
+    psim.api.v1.PublishPlanResponse:
+      type: object
+      properties:
+        plan:
+          $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+      description: PublishPlanResponse is the response of PublishPlan.
+    psim.api.v1.RegisterConnectorResponse:
+      type: object
+      properties:
+        connector:
+          $ref: '#/components/schemas/psim.catalog.v1.Connector'
+      description: RegisterConnectorResponse is the response of RegisterConnector.
+    psim.api.v1.RejectCommandRequest:
+      type: object
+      properties:
+        commandId:
+          type: string
+        reason:
+          type: string
+      description: RejectCommandRequest is the request of RejectCommand.
+    psim.api.v1.RejectCommandResponse:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.response.v1.Command'
+      description: RejectCommandResponse is the response of RejectCommand.
+    psim.api.v1.ReopenIncidentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        reason:
+          type: string
+      description: ReopenIncidentRequest is the request of ReopenIncident.
+    psim.api.v1.ReopenIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: ReopenIncidentResponse is the response of ReopenIncident.
+    psim.api.v1.RequestCommandRequest:
+      type: object
+      properties:
+        commandId:
+          type: string
+        deviceId:
+          type: string
+        capability:
+          type: string
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+        incidentId:
+          type: string
+        runId:
+          type: string
+        stepId:
+          type: string
+      description: RequestCommandRequest is the request of RequestCommand.
+    psim.api.v1.RequestCommandResponse:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.response.v1.Command'
+      description: RequestCommandResponse is the response of RequestCommand.
+    psim.api.v1.ResolveIncidentRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        resolution:
+          enum:
+          - RESOLUTION_UNSPECIFIED
+          - RESOLUTION_CONFIRMED
+          - RESOLUTION_FALSE_ALARM
+          - RESOLUTION_TEST
+          - RESOLUTION_DUPLICATE
+          type: string
+          format: enum
+        note:
+          type: string
+        knownResponseRunVersion:
+          type: string
+          description: Response run version known to the client; guards against unseen mandatory steps (runtime-view R2).
+      description: ResolveIncidentRequest is the request of ResolveIncident.
+    psim.api.v1.ResolveIncidentResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: ResolveIncidentResponse is the response of ResolveIncident.
+    psim.api.v1.RetryStepRequest:
+      type: object
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+      description: RetryStepRequest is the request of RetryStep.
+    psim.api.v1.RetryStepResponse:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/psim.response.v1.ResponseRun'
+      description: RetryStepResponse is the response of RetryStep.
+    psim.api.v1.RevokeConnectorRequest:
+      type: object
+      properties:
+        connectorId:
+          type: string
+        reason:
+          type: string
+      description: RevokeConnectorRequest is the request of RevokeConnector.
+    psim.api.v1.RevokeConnectorResponse:
+      type: object
+      properties:
+        connector:
+          $ref: '#/components/schemas/psim.catalog.v1.Connector'
+      description: RevokeConnectorResponse is the response of RevokeConnector.
+    psim.api.v1.RotateConnectorCertificateRequest:
+      type: object
+      properties:
+        connectorId:
+          type: string
+        newCertificate:
+          $ref: '#/components/schemas/psim.catalog.v1.CertificateFingerprint'
+        previousNotAfter:
+          type: string
+          description: Expiry of the previous certificate.
+          format: date-time
+      description: RotateConnectorCertificateRequest is the request of RotateConnectorCertificate.
+    psim.api.v1.RotateConnectorCertificateResponse:
+      type: object
+      properties:
+        connector:
+          $ref: '#/components/schemas/psim.catalog.v1.Connector'
+      description: RotateConnectorCertificateResponse is the response of RotateConnectorCertificate.
+    psim.api.v1.RuleVersionRef:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+      description: RuleVersionRef references a rule version.
+    psim.api.v1.SavePlanDraftResponse:
+      type: object
+      properties:
+        plan:
+          $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
+      description: SavePlanDraftResponse is the response of SavePlanDraft.
+    psim.api.v1.SaveRuleDraftResponse:
+      type: object
+      properties:
+        rule:
+          $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+      description: SaveRuleDraftResponse is the response of SaveRuleDraft.
+    psim.api.v1.SearchAuditRecordsResponse:
+      type: object
+      properties:
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.audit.v1.AuditChainEntry'
+        nextPageToken:
+          type: string
+      description: SearchAuditRecordsResponse is the response of SearchAuditRecords.
+    psim.api.v1.SearchEventsResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.StoredEvent'
+        nextPageToken:
+          type: string
+      description: SearchEventsResponse is the response of SearchEvents.
+    psim.api.v1.SetIncidentPriorityRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        priority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          format: enum
+        reason:
+          type: string
+      description: SetIncidentPriorityRequest is the request of SetIncidentPriority.
+    psim.api.v1.SetIncidentPriorityResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: SetIncidentPriorityResponse is the response of SetIncidentPriority.
+    psim.api.v1.SkipStepRequest:
+      type: object
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+        reason:
+          type: string
+      description: SkipStepRequest is the request of SkipStep.
+    psim.api.v1.SkipStepResponse:
+      type: object
+      properties:
+        run:
+          $ref: '#/components/schemas/psim.response.v1.ResponseRun'
+      description: SkipStepResponse is the response of SkipStep.
+    psim.api.v1.StartDryRunRequest:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+        from:
+          type: string
+          description: Range of event time, limited by the retention of normalized events.
+          format: date-time
+        to:
+          type: string
+          format: date-time
+      description: StartDryRunRequest is the request of StartDryRun.
+    psim.api.v1.StartDryRunResponse:
+      type: object
+      properties:
+        dryRun:
+          $ref: '#/components/schemas/psim.api.v1.DryRun'
+      description: StartDryRunResponse is the response of StartDryRun.
+    psim.api.v1.StartImportResponse:
+      type: object
+      properties:
+        importJob:
+          $ref: '#/components/schemas/psim.api.v1.ImportJob'
+      description: StartImportResponse is the response of StartImport.
+    psim.api.v1.StartIncidentWorkRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+      description: StartIncidentWorkRequest is the request of StartIncidentWork.
+    psim.api.v1.StartIncidentWorkResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: StartIncidentWorkResponse is the response of StartIncidentWork.
+    psim.api.v1.StoredEvent:
+      type: object
+      properties:
+        eventId:
+          type: string
+        occurredAt:
+          type: string
+          format: date-time
+        receivedAt:
+          type: string
+          format: date-time
+        sourceSeq:
+          type: string
+        event:
+          $ref: '#/components/schemas/psim.processing.v1.Event'
+      description: StoredEvent is a normalized event with its envelope times.
+    psim.api.v1.UpdateDeviceResponse:
+      type: object
+      properties:
+        device:
+          $ref: '#/components/schemas/psim.catalog.v1.Device'
+      description: UpdateDeviceResponse is the response of UpdateDevice.
+    psim.api.v1.UpdateDeviceTypeResponse:
+      type: object
+      properties:
+        deviceType:
+          $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+      description: UpdateDeviceTypeResponse is the response of UpdateDeviceType.
+    psim.api.v1.UpdateEscalationPolicyResponse:
+      type: object
+      properties:
+        policy:
+          $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
+      description: UpdateEscalationPolicyResponse is the response of UpdateEscalationPolicy.
+    psim.api.v1.UpdateIncidentTypeResponse:
+      type: object
+      properties:
+        incidentType:
+          $ref: '#/components/schemas/psim.incident.v1.IncidentType'
+      description: UpdateIncidentTypeResponse is the response of UpdateIncidentType.
+    psim.api.v1.UpdateLocationResponse:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/psim.catalog.v1.Location'
+      description: UpdateLocationResponse is the response of UpdateLocation.
+    psim.api.v1.UpdateProcessingSettingsResponse:
+      type: object
+      properties:
+        processing:
+          $ref: '#/components/schemas/psim.config.v1.ProcessingSettings'
+      description: UpdateProcessingSettingsResponse is the response of UpdateProcessingSettings.
+    psim.api.v1.UpdateRetentionSettingsResponse:
+      type: object
+      properties:
+        retention:
+          $ref: '#/components/schemas/psim.config.v1.RetentionSettings'
+      description: UpdateRetentionSettingsResponse is the response of UpdateRetentionSettings.
+    psim.api.v1.UploadFloorPlanResponse:
+      type: object
+      properties:
+        location:
+          $ref: '#/components/schemas/psim.catalog.v1.Location'
+      description: UploadFloorPlanResponse is the response of UploadFloorPlan.
+    psim.api.v1.ValidatePlanResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.FieldViolation'
+      description: ValidatePlanResponse is the response of ValidatePlan.
+    psim.api.v1.ValidateRuleRequest:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+      description: ValidateRuleRequest is the request of ValidateRule.
+    psim.api.v1.ValidateRuleResponse:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        violations:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.FieldViolation'
+        rule:
+          $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+      description: ValidateRuleResponse is the response of ValidateRule.
+    psim.api.v1.VerifyAuditIntegrityRequest:
+      type: object
+      properties:
+        fromSeq:
+          type: string
+          description: 0 means from the first record.
+        toSeq:
+          type: string
+          description: 0 means up to the last record.
+      description: VerifyAuditIntegrityRequest is the request of VerifyAuditIntegrity.
+    psim.api.v1.VerifyAuditIntegrityResponse:
+      type: object
+      properties:
+        intact:
+          type: boolean
+        recordsChecked:
+          type: string
+        firstBrokenSeq:
+          type: string
+          description: First record where the chain is broken; 0 when intact.
+        detail:
+          type: string
+        lastCheckpoint:
+          $ref: '#/components/schemas/psim.audit.v1.AuditCheckpoint'
+      description: VerifyAuditIntegrityResponse is the response of VerifyAuditIntegrity.
+    psim.api.v1.ZoneStatus:
+      type: object
+      properties:
+        zoneId:
+          type: string
+        state:
+          enum:
+          - EVENT_CLASS_UNSPECIFIED
+          - EVENT_CLASS_ALARM
+          - EVENT_CLASS_WARNING
+          - EVENT_CLASS_FAULT
+          - EVENT_CLASS_RESTORE
+          - EVENT_CLASS_STATE
+          - EVENT_CLASS_INFO
+          type: string
+          description: Highest class among active device states.
+          format: enum
+        armed:
+          type: boolean
+        openIncidents:
+          type: integer
+          format: uint32
+      description: ZoneStatus is the aggregated state of a zone.
+    psim.audit.v1.AuditChainEntry:
+      type: object
+      properties:
+        auditSeq:
+          type: string
+        sourceEventId:
+          type: string
+        entry:
+          $ref: '#/components/schemas/psim.audit.v1.AuditEntry'
+        occurredAt:
+          type: string
+          format: date-time
+        recordedAt:
+          type: string
+          format: date-time
+        prevHash:
+          type: string
+          format: bytes
+        hash:
+          type: string
+          format: bytes
+      description: AuditChainEntry is an audit entry as stored in the chain.
+    psim.audit.v1.AuditCheckpoint:
+      type: object
+      properties:
+        auditSeq:
+          type: string
+        hash:
+          type: string
+          format: bytes
+        createdAt:
+          type: string
+          format: date-time
+        signature:
+          type: string
+          format: bytes
+        keyId:
+          type: string
+      description: AuditCheckpoint fixes the head of the chain (ADR-021).
+    psim.audit.v1.AuditEntry:
+      type: object
+      properties:
+        actor:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+        action:
+          type: string
+          description: Dotted action name, for example "incident.acknowledge", "access.denied".
+        objectType:
+          type: string
+        objectId:
+          type: string
+        siteId:
+          type: string
+        outcome:
+          enum:
+          - AUDIT_OUTCOME_UNSPECIFIED
+          - AUDIT_OUTCOME_SUCCESS
+          - AUDIT_OUTCOME_DENIED
+          - AUDIT_OUTCOME_FAILED
+          type: string
+          format: enum
+        details:
+          type: object
+          additionalProperties:
+            type: string
+        clientAddress:
+          type: string
+          description: Client address and user agent for user actions.
+        userAgent:
+          type: string
+      description: "AuditEntry is an action to be recorded in the audit chain.\n envelope.causation_id is the source domain\
+        \ event id (idempotency key, AU3)."
+    psim.catalog.v1.Capability:
+      type: object
+      properties:
+        code:
+          type: string
+          description: For example "lock", "unlock", "arm", "ptz.preset".
+        name:
+          type: string
+        critical:
+          type: boolean
+          description: Critical commands require approval by a second user (CM3).
+        parameters:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.ParameterSpec'
+      description: Capability is a command or mode a device supports.
+    psim.catalog.v1.CertificateFingerprint:
+      type: object
+      properties:
+        sha256:
+          type: string
+          description: Hex-encoded SHA-256 of the DER certificate.
+        notAfter:
+          type: string
+          format: date-time
+      description: CertificateFingerprint binds an mTLS client certificate to a connector.
+    psim.catalog.v1.Connector:
+      type: object
+      properties:
+        connectorId:
+          type: string
+        name:
+          type: string
+        connectorType:
+          type: string
+          description: Selects the mapping rule set, for example "simulator" or "mqtt".
+        certificates:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.CertificateFingerprint'
+        limits:
+          $ref: '#/components/schemas/psim.catalog.v1.ConnectorLimits'
+        state:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+        version:
+          type: string
+      description: Connector is a registered connector with its credentials and limits (aggregates.md, 1.4).
+    psim.catalog.v1.ConnectorLimits:
+      type: object
+      properties:
+        maxEventsPerSecond:
+          type: integer
+          format: uint32
+        maxBatchEvents:
+          type: integer
+          format: uint32
+      description: ConnectorLimits are per-connector ingestion limits enforced by the gateway.
+    psim.catalog.v1.Device:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        deviceTypeId:
+          type: string
+        zoneId:
+          type: string
+        siteId:
+          type: string
+        connectorId:
+          type: string
+        externalId:
+          type: string
+          description: Device id in the external system, unique per connector (D1).
+        name:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Source'
+        position:
+          $ref: '#/components/schemas/psim.common.v1.Position'
+        state:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+        version:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      description: Device is a physical or logical device with its sources (aggregates.md, 1.3).
+    psim.catalog.v1.DeviceType:
+      type: object
+      properties:
+        deviceTypeId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        taxonomyDomain:
+          type: string
+          description: Taxonomy domain, for example "access".
+        sourceTemplates:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.SourceTemplate'
+        capabilities:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Capability'
+        state:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+        version:
+          type: string
+      description: DeviceType describes a class of devices, its sources and capabilities (aggregates.md, 1.2).
+    psim.catalog.v1.FloorPlan:
+      type: object
+      properties:
+        imageRef:
+          type: string
+          description: Reference to the stored image, served by GET /v1/locations/{id}/floor-plan.
+        contentType:
+          type: string
+        width:
+          type: number
+          format: double
+        height:
+          type: number
+          format: double
+      description: FloorPlan is an image of a floor with a coordinate system for device positions.
+    psim.catalog.v1.Location:
+      type: object
+      properties:
+        locationId:
+          type: string
+        kind:
+          enum:
+          - LOCATION_KIND_UNSPECIFIED
+          - LOCATION_KIND_SITE
+          - LOCATION_KIND_BUILDING
+          - LOCATION_KIND_FLOOR
+          - LOCATION_KIND_ZONE
+          type: string
+          format: enum
+        parentId:
+          type: string
+          description: Empty only for sites.
+        siteId:
+          type: string
+        name:
+          type: string
+        code:
+          type: string
+          description: Unique among siblings.
+        timezone:
+          type: string
+          description: IANA time zone, sites only.
+        floorPlan:
+          allOf:
+          - $ref: '#/components/schemas/psim.catalog.v1.FloorPlan'
+          description: Floors only.
+        state:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+        version:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      description: Location is a site, building, floor or zone (aggregates.md, 1.1).
+    psim.catalog.v1.ParameterSpec:
+      type: object
+      properties:
+        name:
+          type: string
+        type:
+          enum:
+          - PARAMETER_TYPE_UNSPECIFIED
+          - PARAMETER_TYPE_STRING
+          - PARAMETER_TYPE_INTEGER
+          - PARAMETER_TYPE_NUMBER
+          - PARAMETER_TYPE_BOOLEAN
+          - PARAMETER_TYPE_DURATION
+          type: string
+          format: enum
+        required:
+          type: boolean
+        allowedValues:
+          type: array
+          items:
+            type: string
+      description: ParameterSpec describes one command parameter.
+    psim.catalog.v1.Source:
+      type: object
+      properties:
+        sourceId:
+          type: string
+          description: 'Deterministic: UUIDv5(connector_id, external_ref), see ADR-029.'
+        externalRef:
+          type: string
+          description: Reference used by the connector, unique per connector (D2).
+        kind:
+          type: string
+        name:
+          type: string
+      description: Source is an event channel of a device.
+    psim.catalog.v1.SourceTemplate:
+      type: object
+      properties:
+        kind:
+          type: string
+        name:
+          type: string
+      description: SourceTemplate describes a source every device of the type has.
+    psim.common.v1.Actor:
+      type: object
+      properties:
+        kind:
+          enum:
+          - ACTOR_KIND_UNSPECIFIED
+          - ACTOR_KIND_USER
+          - ACTOR_KIND_SERVICE
+          - ACTOR_KIND_CONNECTOR
+          - ACTOR_KIND_SYSTEM
+          type: string
+          format: enum
+        id:
+          type: string
+          description: User id, service name, connector id or "system".
+        displayName:
+          type: string
+      description: Actor identifies the subject that performed an action.
+    psim.common.v1.Position:
+      type: object
+      properties:
+        x:
+          type: number
+          format: double
+        y:
+          type: number
+          format: double
+      description: Position is a point on a floor plan in plan units.
+    psim.config.v1.ProcessingSettings:
+      type: object
+      properties:
+        significanceThreshold:
+          enum:
+          - SEVERITY_UNSPECIFIED
+          - SEVERITY_INFO
+          - SEVERITY_LOW
+          - SEVERITY_MEDIUM
+          - SEVERITY_HIGH
+          - SEVERITY_CRITICAL
+          type: string
+          description: Events at or above this severity are significant (E3).
+          format: enum
+        maxClockSkew:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        maxBufferReplayAge:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        sourceIdleTimeout:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        version:
+          type: string
+      description: ProcessingSettings are tenant-wide processing parameters.
+    psim.config.v1.RetentionSettings:
+      type: object
+      properties:
+        eventHistoryAll:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        eventHistorySignificant:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        incidents:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        audit:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        version:
+          type: string
+      description: RetentionSettings are data retention periods of a tenant.
+    psim.incident.v1.Incident:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        incidentTypeId:
+          type: string
+        siteId:
+          type: string
+        zoneId:
+          type: string
+        state:
+          enum:
+          - INCIDENT_STATE_UNSPECIFIED
+          - INCIDENT_STATE_NEW
+          - INCIDENT_STATE_ACKNOWLEDGED
+          - INCIDENT_STATE_IN_PROGRESS
+          - INCIDENT_STATE_RESOLVED
+          - INCIDENT_STATE_CLOSED
+          type: string
+          format: enum
+        priority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          format: enum
+        prioritySource:
+          enum:
+          - PRIORITY_SOURCE_UNSPECIFIED
+          - PRIORITY_SOURCE_COMPUTED
+          - PRIORITY_SOURCE_MANUAL
+          type: string
+          format: enum
+        groupingKey:
+          type: string
+        groupUntil:
+          type: string
+          format: date-time
+        signalIds:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        assigneeId:
+          type: string
+          description: User id of the responsible operator.
+        escalationLevel:
+          type: integer
+          description: 0 means not escalated.
+          format: uint32
+        blockingSteps:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.StepRef'
+          description: Unfinished mandatory steps of the active response run (I7).
+        responseRunVersion:
+          type: string
+          description: Version of the response run applied to blocking_steps.
+        resolution:
+          enum:
+          - RESOLUTION_UNSPECIFIED
+          - RESOLUTION_CONFIRMED
+          - RESOLUTION_FALSE_ALARM
+          - RESOLUTION_TEST
+          - RESOLUTION_DUPLICATE
+          type: string
+          format: enum
+        resolutionNote:
+          type: string
+        relatedIncidentId:
+          type: string
+          description: Previous incident with the same grouping key, if any (I4).
+        createdAt:
+          type: string
+          format: date-time
+        acknowledgedAt:
+          type: string
+          format: date-time
+        resolvedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+          description: Aggregate version, used as ETag.
+      description: Incident is the central aggregate (aggregates.md, 4.2; state-models.md, 1; ADR-027).
+    psim.incident.v1.IncidentType:
+      type: object
+      properties:
+        incidentTypeId:
+          type: string
+        code:
+          type: string
+        name:
+          type: string
+        defaultPriority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          format: enum
+        groupingWindow:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        escalationPolicyId:
+          type: string
+        responseRequired:
+          type: boolean
+          description: When set, an incident without a matching response plan is flagged.
+        autoCloseAfter:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+          description: Delay between resolved and automatic close.
+        version:
+          type: string
+      description: IncidentType is a class of situations that defines response plan and SLA (aggregates.md, 4.1).
+    psim.incident.v1.Link:
+      type: object
+      properties:
+        linkId:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+      description: Link is an external reference attached to an incident (video clip, document).
+    psim.incident.v1.StepRef:
+      type: object
+      properties:
+        runId:
+          type: string
+        stepId:
+          type: string
+        title:
+          type: string
+      description: StepRef points to a step of a response run.
+    psim.incident.v1.TimelineEntry:
+      type: object
+      properties:
+        entryId:
+          type: string
+        incidentId:
+          type: string
+        at:
+          type: string
+          format: date-time
+        actor:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+        kind:
+          enum:
+          - TIMELINE_ENTRY_KIND_UNSPECIFIED
+          - TIMELINE_ENTRY_KIND_STATE_CHANGED
+          - TIMELINE_ENTRY_KIND_SIGNAL_ATTACHED
+          - TIMELINE_ENTRY_KIND_PRIORITY_CHANGED
+          - TIMELINE_ENTRY_KIND_ASSIGNED
+          - TIMELINE_ENTRY_KIND_ESCALATED
+          - TIMELINE_ENTRY_KIND_COMMENT
+          - TIMELINE_ENTRY_KIND_LINK
+          - TIMELINE_ENTRY_KIND_STEP
+          - TIMELINE_ENTRY_KIND_COMMAND
+          - TIMELINE_ENTRY_KIND_NOTIFICATION
+          type: string
+          format: enum
+        text:
+          type: string
+        refId:
+          type: string
+          description: 'Id of the related object: signal, step, command, notification, link.'
+        details:
+          type: object
+          additionalProperties:
+            type: string
+      description: TimelineEntry is one record of an incident timeline.
+    psim.processing.v1.AbsenceSpec:
+      type: object
+      properties:
+        trigger:
+          $ref: '#/components/schemas/psim.processing.v1.EventFilter'
+        expected:
+          $ref: '#/components/schemas/psim.processing.v1.EventFilter'
+      description: "AbsenceSpec fires when an expected event does not follow a trigger within the window.\n Without a trigger\
+        \ it fires when no expected event occurs within each window (heartbeat)."
+    psim.processing.v1.ConjunctionSpec:
+      type: object
+      properties:
+        parts:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.EventFilter'
+      description: ConjunctionSpec fires when every part matched within the window, in any order.
+    psim.processing.v1.CorrelationRule:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+        name:
+          type: string
+        description:
+          type: string
+        state:
+          enum:
+          - RULE_STATE_UNSPECIFIED
+          - RULE_STATE_DRAFT
+          - RULE_STATE_TESTING
+          - RULE_STATE_ACTIVE
+          - RULE_STATE_ARCHIVED
+          type: string
+          format: enum
+        filter:
+          allOf:
+          - $ref: '#/components/schemas/psim.processing.v1.EventFilter'
+          description: Events considered by the rule at all.
+        correlationScope:
+          enum:
+          - CORRELATION_SCOPE_UNSPECIFIED
+          - CORRELATION_SCOPE_SOURCE
+          - CORRELATION_SCOPE_DEVICE
+          - CORRELATION_SCOPE_ZONE
+          - CORRELATION_SCOPE_FLOOR
+          - CORRELATION_SCOPE_BUILDING
+          - CORRELATION_SCOPE_SITE
+          type: string
+          format: enum
+        window:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        allowedLateness:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        suppression:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+          description: Suppress repeated signals for the same correlation key for this interval.
+        single:
+          $ref: '#/components/schemas/psim.processing.v1.SingleSpec'
+        conjunction:
+          $ref: '#/components/schemas/psim.processing.v1.ConjunctionSpec'
+        sequence:
+          $ref: '#/components/schemas/psim.processing.v1.SequenceSpec'
+        threshold:
+          $ref: '#/components/schemas/psim.processing.v1.ThresholdSpec'
+        absence:
+          $ref: '#/components/schemas/psim.processing.v1.AbsenceSpec'
+        output:
+          $ref: '#/components/schemas/psim.processing.v1.RuleOutput'
+        createdAt:
+          type: string
+          format: date-time
+        createdBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+      description: CorrelationRule is one immutable version of a correlation rule (aggregates.md, 3.3; ADR-011).
+    psim.processing.v1.Event:
+      type: object
+      properties:
+        type:
+          type: string
+          description: Taxonomy type code, for example "intrusion.zone.alarm".
+        taxonomyVersion:
+          type: string
+          description: Taxonomy version used for normalization, for example "1".
+        eventClass:
+          enum:
+          - EVENT_CLASS_UNSPECIFIED
+          - EVENT_CLASS_ALARM
+          - EVENT_CLASS_WARNING
+          - EVENT_CLASS_FAULT
+          - EVENT_CLASS_RESTORE
+          - EVENT_CLASS_STATE
+          - EVENT_CLASS_INFO
+          type: string
+          format: enum
+        severity:
+          enum:
+          - SEVERITY_UNSPECIFIED
+          - SEVERITY_INFO
+          - SEVERITY_LOW
+          - SEVERITY_MEDIUM
+          - SEVERITY_HIGH
+          - SEVERITY_CRITICAL
+          type: string
+          format: enum
+        siteId:
+          type: string
+        zoneId:
+          type: string
+        deviceId:
+          type: string
+        sourceId:
+          type: string
+        connectorId:
+          type: string
+        sourceEpoch:
+          type: integer
+          format: uint32
+        rawCode:
+          type: string
+          description: Vendor event code, always preserved.
+        attributes:
+          type: object
+          additionalProperties:
+            type: string
+          description: Standard attributes (event-taxonomy.md, section 6) and connector attributes prefixed with "x.".
+        significant:
+          type: boolean
+          description: Significant events are stored long-term in Event History (ADR-028).
+        clockSkewCorrected:
+          type: boolean
+          description: Event time was corrected because of source clock skew (ADR-010).
+      description: "Event is a normalized event. envelope.message_id equals the raw event_id,\n envelope.sequence equals the\
+        \ source sequence number."
+    psim.processing.v1.EventFilter:
+      type: object
+      properties:
+        types:
+          type: array
+          items:
+            type: string
+          description: Taxonomy codes or prefixes ending with ".*", for example "intrusion.*".
+        minSeverity:
+          enum:
+          - SEVERITY_UNSPECIFIED
+          - SEVERITY_INFO
+          - SEVERITY_LOW
+          - SEVERITY_MEDIUM
+          - SEVERITY_HIGH
+          - SEVERITY_CRITICAL
+          type: string
+          format: enum
+        siteIds:
+          type: array
+          items:
+            type: string
+        zoneIds:
+          type: array
+          items:
+            type: string
+        condition:
+          type: string
+          description: Optional CEL expression over the variable "event".
+      description: EventFilter selects events by taxonomy type, severity, location and a CEL condition.
+    psim.processing.v1.MappingRule:
+      type: object
+      properties:
+        rawCode:
+          type: string
+          description: Exact vendor code or prefix ending with "*".
+        condition:
+          type: string
+          description: Optional CEL condition over the variable "raw".
+        type:
+          type: string
+          description: Target taxonomy type code.
+        severity:
+          enum:
+          - SEVERITY_UNSPECIFIED
+          - SEVERITY_INFO
+          - SEVERITY_LOW
+          - SEVERITY_MEDIUM
+          - SEVERITY_HIGH
+          - SEVERITY_CRITICAL
+          type: string
+          description: Overrides the default severity of the type when set.
+          format: enum
+        attributeMap:
+          type: object
+          additionalProperties:
+            type: string
+          description: 'Attribute renames: raw attribute name -> normalized attribute name.'
+      description: MappingRule maps a raw event to a taxonomy type.
+    psim.processing.v1.MappingRuleSet:
+      type: object
+      properties:
+        mappingRuleSetId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+        connectorType:
+          type: string
+        taxonomyVersion:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.MappingRule'
+          description: Ordered; the first matching rule wins.
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+      description: "MappingRuleSet is a published version of mapping rules for one connector type\n (aggregates.md, 3.1).\
+        \ Published in psim.config.v1 under key \"mapping/<tenant_id>/<connector_type>\"."
+    psim.processing.v1.RuleOutput:
+      type: object
+      properties:
+        incidentTypeId:
+          type: string
+        priority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          description: Fixed priority, used when priority_expression is empty.
+          format: enum
+        priorityExpression:
+          type: string
+          description: Optional CEL expression returning 1..4.
+        groupingScope:
+          enum:
+          - CORRELATION_SCOPE_UNSPECIFIED
+          - CORRELATION_SCOPE_SOURCE
+          - CORRELATION_SCOPE_DEVICE
+          - CORRELATION_SCOPE_ZONE
+          - CORRELATION_SCOPE_FLOOR
+          - CORRELATION_SCOPE_BUILDING
+          - CORRELATION_SCOPE_SITE
+          type: string
+          description: Scope of the grouping key; defaults to the correlation scope.
+          format: enum
+        summaryTemplate:
+          type: string
+          description: Summary template, may reference event and rule fields.
+      description: RuleOutput describes the signal produced by a rule.
+    psim.processing.v1.RuleSet:
+      type: object
+      properties:
+        ruleSetId:
+          type: string
+        version:
+          type: string
+        rules:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
+        activatedAt:
+          type: string
+          format: date-time
+        activatedBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+      description: "RuleSet is the set of rule versions active for a tenant (aggregates.md, 3.4).\n Published in psim.config.v1\
+        \ under key \"ruleset/<tenant_id>\"."
+    psim.processing.v1.SequenceSpec:
+      type: object
+      properties:
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.processing.v1.EventFilter'
+      description: SequenceSpec fires when the steps matched within the window in the given order.
+    psim.processing.v1.Signal:
+      type: object
+      properties:
+        origin:
+          $ref: '#/components/schemas/psim.processing.v1.SignalOrigin'
+        correlationKey:
+          type: string
+        groupingKey:
+          type: string
+          description: Key used by Incident Service to attach the signal to an open incident.
+        incidentTypeId:
+          type: string
+        priority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          format: enum
+        siteId:
+          type: string
+        zoneId:
+          type: string
+          description: Empty for signals of rules wider than a zone.
+        eventIds:
+          type: array
+          items:
+            type: string
+        firstEventAt:
+          type: string
+          format: date-time
+        lastEventAt:
+          type: string
+          format: date-time
+        summary:
+          type: string
+        explanationRef:
+          type: string
+          description: Optional reference to an explanation produced by an external module.
+      description: "Signal is the result of a correlation rule firing or of an external producer (ADR-025).\n envelope.message_id\
+        \ is the deterministic signal_id (ADR-005)."
+    psim.processing.v1.SignalOrigin:
+      type: object
+      properties:
+        kind:
+          enum:
+          - SIGNAL_ORIGIN_KIND_UNSPECIFIED
+          - SIGNAL_ORIGIN_KIND_RULE
+          - SIGNAL_ORIGIN_KIND_EXTERNAL
+          type: string
+          format: enum
+        ruleId:
+          type: string
+          description: Correlation rule id for SIGNAL_ORIGIN_KIND_RULE.
+        ruleVersion:
+          type: integer
+          format: uint32
+        producer:
+          type: string
+          description: Registered external producer name for SIGNAL_ORIGIN_KIND_EXTERNAL.
+      description: SignalOrigin identifies what produced a signal.
+    psim.processing.v1.SingleSpec:
+      type: object
+      properties: {}
+      description: SingleSpec fires on every matching event.
+    psim.processing.v1.ThresholdSpec:
+      type: object
+      properties:
+        count:
+          type: integer
+          format: uint32
+        distinctBy:
+          type: string
+          description: Count distinct values of this field ("device_id", "source_id" or an attribute) instead of events.
+      description: ThresholdSpec fires when at least count matching events occur within the window.
+    psim.response.v1.AutomatedParams:
+      type: object
+      properties:
+        webhookUrl:
+          type: string
+        timeout:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+      description: AutomatedParams calls an external handler (ADR-025).
+    psim.response.v1.ChecklistItem:
+      type: object
+      properties:
+        itemId:
+          type: string
+        text:
+          type: string
+        required:
+          type: boolean
+      description: ChecklistItem is one checklist entry.
+    psim.response.v1.ChecklistParams:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.ChecklistItem'
+      description: ChecklistParams is a list of items to check.
+    psim.response.v1.Command:
+      type: object
+      properties:
+        commandId:
+          type: string
+        deviceId:
+          type: string
+        connectorId:
+          type: string
+        capability:
+          type: string
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+        incidentId:
+          type: string
+        runId:
+          type: string
+        stepId:
+          type: string
+        critical:
+          type: boolean
+        state:
+          enum:
+          - COMMAND_STATE_UNSPECIFIED
+          - COMMAND_STATE_REQUESTED
+          - COMMAND_STATE_AWAITING_APPROVAL
+          - COMMAND_STATE_SENT
+          - COMMAND_STATE_ACKNOWLEDGED
+          - COMMAND_STATE_EXECUTED
+          - COMMAND_STATE_FAILED
+          - COMMAND_STATE_REJECTED
+          - COMMAND_STATE_TIMED_OUT
+          - COMMAND_STATE_CANCELLED
+          type: string
+          format: enum
+        requestedBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+        approvedBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+        requestedAt:
+          type: string
+          format: date-time
+        deadlineAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        resultCode:
+          type: string
+          description: Error code from the catalog for failed, rejected, timed out or cancelled commands.
+        resultMessage:
+          type: string
+        version:
+          type: string
+      description: Command is a request to act on a device (aggregates.md, 5.3; state-models.md, 3).
+    psim.response.v1.CommandParams:
+      type: object
+      properties:
+        capability:
+          type: string
+        deviceId:
+          type: string
+        targetExpression:
+          type: string
+          description: Target expression, for example "zone.devices(type == 'access.door')".
+        parameters:
+          type: object
+          additionalProperties:
+            type: string
+        automatic:
+          type: boolean
+          description: Execute without operator confirmation.
+      description: CommandParams sends a command to devices (P3).
+    psim.response.v1.DecisionOption:
+      type: object
+      properties:
+        optionId:
+          type: string
+        label:
+          type: string
+        nextStepId:
+          type: string
+        suggestedResolution:
+          type: string
+          description: Resolution suggested when this option leads to the end of the plan, for example false alarm.
+      description: DecisionOption is one branch of a decision.
+    psim.response.v1.DecisionParams:
+      type: object
+      properties:
+        question:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.DecisionOption'
+      description: DecisionParams branches the plan by the operator choice (P2).
+    psim.response.v1.EscalateParams:
+      type: object
+      properties:
+        level:
+          type: integer
+          format: uint32
+      description: EscalateParams escalates the incident to the given level.
+    psim.response.v1.EscalationLevel:
+      type: object
+      properties:
+        level:
+          type: integer
+          format: uint32
+        delay:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+          description: Delay after the SLA breach.
+        recipients:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.Recipient'
+        channels:
+          type: array
+          items:
+            enum:
+            - NOTIFICATION_CHANNEL_UNSPECIFIED
+            - NOTIFICATION_CHANNEL_IN_APP
+            - NOTIFICATION_CHANNEL_EMAIL
+            - NOTIFICATION_CHANNEL_WEBHOOK
+            type: string
+            format: enum
+      description: EscalationLevel is one level of escalation.
+    psim.response.v1.EscalationPolicy:
+      type: object
+      properties:
+        policyId:
+          type: string
+        name:
+          type: string
+        sla:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.SlaTarget'
+        levels:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.EscalationLevel'
+          description: Strictly increasing delays (EP1).
+        version:
+          type: string
+      description: EscalationPolicy defines SLA and escalation levels (aggregates.md, 5.4).
+    psim.response.v1.InstructionParams:
+      type: object
+      properties:
+        text:
+          type: string
+      description: InstructionParams shows text the operator must read and confirm.
+    psim.response.v1.Notification:
+      type: object
+      properties:
+        notificationId:
+          type: string
+        recipientUserId:
+          type: string
+        channel:
+          enum:
+          - NOTIFICATION_CHANNEL_UNSPECIFIED
+          - NOTIFICATION_CHANNEL_IN_APP
+          - NOTIFICATION_CHANNEL_EMAIL
+          - NOTIFICATION_CHANNEL_WEBHOOK
+          type: string
+          format: enum
+        state:
+          enum:
+          - NOTIFICATION_STATE_UNSPECIFIED
+          - NOTIFICATION_STATE_PENDING
+          - NOTIFICATION_STATE_SENT
+          - NOTIFICATION_STATE_DELIVERED
+          - NOTIFICATION_STATE_FAILED
+          - NOTIFICATION_STATE_AGGREGATED
+          type: string
+          format: enum
+        template:
+          type: string
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        attempts:
+          type: integer
+          format: uint32
+        incidentId:
+          type: string
+        aggregatedNotificationIds:
+          type: array
+          items:
+            type: string
+          description: Set for aggregated notifications (N3).
+        createdAt:
+          type: string
+          format: date-time
+        deliveredAt:
+          type: string
+          format: date-time
+        read:
+          type: boolean
+          description: In-app notifications only.
+        version:
+          type: string
+      description: Notification is a message to a recipient over a channel (aggregates.md, 5.6).
+    psim.response.v1.NotifyParams:
+      type: object
+      properties:
+        recipients:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.Recipient'
+        channels:
+          type: array
+          items:
+            enum:
+            - NOTIFICATION_CHANNEL_UNSPECIFIED
+            - NOTIFICATION_CHANNEL_IN_APP
+            - NOTIFICATION_CHANNEL_EMAIL
+            - NOTIFICATION_CHANNEL_WEBHOOK
+            type: string
+            format: enum
+        template:
+          type: string
+      description: NotifyParams sends notifications.
+    psim.response.v1.PlanBinding:
+      type: object
+      properties:
+        incidentTypeId:
+          type: string
+        siteIds:
+          type: array
+          items:
+            type: string
+        zoneIds:
+          type: array
+          items:
+            type: string
+        priorities:
+          type: array
+          items:
+            enum:
+            - PRIORITY_UNSPECIFIED
+            - PRIORITY_P1
+            - PRIORITY_P2
+            - PRIORITY_P3
+            - PRIORITY_P4
+            type: string
+            format: enum
+        bindingPriority:
+          type: integer
+          description: Tie-breaker among bindings with equal specificity.
+          format: int32
+      description: PlanBinding selects incidents a plan applies to; the most specific binding wins (P5).
+    psim.response.v1.Recipient:
+      type: object
+      properties:
+        userId:
+          type: string
+        role:
+          type: string
+      description: 'Recipient is a notification recipient: a user or a role within the incident scope.'
+    psim.response.v1.ResponsePlan:
+      type: object
+      properties:
+        planId:
+          type: string
+        version:
+          type: integer
+          format: uint32
+        name:
+          type: string
+        state:
+          enum:
+          - PLAN_STATE_UNSPECIFIED
+          - PLAN_STATE_DRAFT
+          - PLAN_STATE_PUBLISHED
+          - PLAN_STATE_ARCHIVED
+          type: string
+          format: enum
+        bindings:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.PlanBinding'
+        startStepId:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.Step'
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+      description: ResponsePlan is one immutable version of a response plan (aggregates.md, 5.1).
+    psim.response.v1.ResponseRun:
+      type: object
+      properties:
+        runId:
+          type: string
+        incidentId:
+          type: string
+        planId:
+          type: string
+        planVersion:
+          type: integer
+          format: uint32
+        state:
+          enum:
+          - RUN_STATE_UNSPECIFIED
+          - RUN_STATE_RUNNING
+          - RUN_STATE_COMPLETED
+          - RUN_STATE_CANCELLED
+          type: string
+          format: enum
+        steps:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.response.v1.StepExecution'
+        activeStepIds:
+          type: array
+          items:
+            type: string
+        blockingStepIds:
+          type: array
+          items:
+            type: string
+          description: Unfinished mandatory steps (RR5).
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        version:
+          type: string
+      description: ResponseRun is the execution of a plan version for an incident (aggregates.md, 5.2).
+    psim.response.v1.SlaTarget:
+      type: object
+      properties:
+        priority:
+          enum:
+          - PRIORITY_UNSPECIFIED
+          - PRIORITY_P1
+          - PRIORITY_P2
+          - PRIORITY_P3
+          - PRIORITY_P4
+          type: string
+          format: enum
+        acknowledgeWithin:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+        resolveWithin:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+      description: SlaTarget is the SLA for one priority.
+    psim.response.v1.Step:
+      type: object
+      properties:
+        stepId:
+          type: string
+        title:
+          type: string
+        mandatory:
+          type: boolean
+        nextStepId:
+          type: string
+          description: Next step for all kinds except decision; empty for a final step.
+        instruction:
+          $ref: '#/components/schemas/psim.response.v1.InstructionParams'
+        checklist:
+          $ref: '#/components/schemas/psim.response.v1.ChecklistParams'
+        decision:
+          $ref: '#/components/schemas/psim.response.v1.DecisionParams'
+        command:
+          $ref: '#/components/schemas/psim.response.v1.CommandParams'
+        notify:
+          $ref: '#/components/schemas/psim.response.v1.NotifyParams'
+        wait:
+          $ref: '#/components/schemas/psim.response.v1.WaitParams'
+        escalate:
+          $ref: '#/components/schemas/psim.response.v1.EscalateParams'
+        automated:
+          $ref: '#/components/schemas/psim.response.v1.AutomatedParams'
+      description: Step is a node of a plan graph.
+    psim.response.v1.StepExecution:
+      type: object
+      properties:
+        stepId:
+          type: string
+        state:
+          enum:
+          - STEP_STATE_UNSPECIFIED
+          - STEP_STATE_PENDING
+          - STEP_STATE_ACTIVE
+          - STEP_STATE_COMPLETED
+          - STEP_STATE_SKIPPED
+          - STEP_STATE_FAILED
+          - STEP_STATE_CANCELLED
+          type: string
+          format: enum
+        attempt:
+          type: integer
+          format: uint32
+        actor:
+          $ref: '#/components/schemas/psim.common.v1.Actor'
+        activatedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        result:
+          $ref: '#/components/schemas/psim.response.v1.StepResult'
+      description: StepExecution is the execution state of one step.
+    psim.response.v1.StepResult:
+      type: object
+      properties:
+        checkedItemIds:
+          type: array
+          items:
+            type: string
+        decisionOptionId:
+          type: string
+        commandIds:
+          type: array
+          items:
+            type: string
+        note:
+          type: string
+          description: Reason for skip or override, or a free note.
+        overridden:
+          type: boolean
+          description: Set when a supervisor completed a failed step (Override).
+      description: StepResult is what the step produced.
+    psim.response.v1.WaitParams:
+      type: object
+      properties:
+        duration:
+          pattern: ^-?(?:0|[1-9][0-9]{0,11})(?:\.[0-9]{1,9})?s$
+          type: string
+      description: WaitParams pauses the plan.
+    Problem:
+      type: object
+      description: Error body (RFC 9457), see psim.api.v1.Problem.
+      properties:
+        type:
+          type: string
+        title:
+          type: string
+        status:
+          type: integer
+          format: int32
+        detail:
+          type: string
+        instance:
+          type: string
+        code:
+          type: string
+        traceId:
+          type: string
+        errors:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldViolation'
+      required:
+      - type
+      - title
+      - status
+      - code
+    FieldViolation:
+      type: object
+      properties:
+        field:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+  securitySchemes:
+    oidc:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token issued by Keycloak (OIDC Authorization Code + PKCE).
+  parameters:
+    IfMatch:
+      name: If-Match
+      in: header
+      required: false
+      description: Expected resource version (ETag). Required for updates of versioned resources.
+      schema:
+        type: string
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: UUID; repeated requests with the same key return the first result.
+      schema:
+        type: string
+        format: uuid
+  responses:
+    Problem:
+      description: Error (RFC 9457).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+tags:
+- name: AuditService
+  description: 'AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service. Scenario S10.'
+- name: CatalogService
+  description: "CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.\n Owner: Resource\
+    \ Catalog. Scenarios S1, S2."
+- name: CommandService
+  description: 'CommandService manages commands to devices. Owner: Command Service. Scenario S8.'
+- name: CorrelationRuleService
+  description: "CorrelationRuleService manages correlation rules and the active rule set.\n Owner: Correlation Engine (rule\
+    \ management module). Scenario S4."
+- name: EscalationPolicyService
+  description: 'EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.'
+- name: EventHistoryService
+  description: 'EventHistoryService searches stored events (ADR-028). Owner: Event History. Scenario S7.'
+- name: FeedService
+  description: 'FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.'
+- name: IncidentService
+  description: "IncidentService manages incidents and incident types. Owner: Incident Service.\n Scenarios S5-S7, S9. State\
+    \ transitions follow state-models.md, section 1."
+- name: MappingService
+  description: 'MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.'
+- name: MeService
+  description: 'MeService describes the caller. Owner: API Gateway (from the access token and the policy table).'
+- name: NotificationService
+  description: 'NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.'
+- name: ReportService
+  description: "ReportService builds incident reports (ADR-028: analytics in ClickHouse).\n Owner: Projection Service. Scenario\
+    \ S13."
+- name: ResponsePlanService
+  description: 'ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.'
+- name: ResponseRunService
+  description: 'ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.'
+- name: SettingsService
+  description: "SettingsService manages tenant-wide retention and processing settings.\n Owner: Resource Catalog; changes\
+    \ are published to psim.config.v1."
+servers:
+- url: https://{host}
+  variables:
+    host:
+      default: psim.local
+security:
+- oidc: []

@@ -1,0 +1,119 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "buf/validate/validate.proto";
+import "google/api/annotations.proto";
+import "psim/response/v1/command.proto";
+
+// CommandService manages commands to devices. Owner: Command Service. Scenario S8.
+service CommandService {
+  // RequestCommand requests a command; Idempotency-Key header equals command_id.
+  rpc RequestCommand(RequestCommandRequest) returns (RequestCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/commands"
+      body: "*"
+    };
+  }
+  // GetCommand returns one command.
+  rpc GetCommand(GetCommandRequest) returns (GetCommandResponse) {
+    option (google.api.http) = {get: "/v1/commands/{command_id}"};
+  }
+  // ListCommands lists commands by incident, device or state.
+  rpc ListCommands(ListCommandsRequest) returns (ListCommandsResponse) {
+    option (google.api.http) = {get: "/v1/commands"};
+  }
+  // ApproveCommand approves a critical command; approver must differ from requester (CM3).
+  rpc ApproveCommand(ApproveCommandRequest) returns (ApproveCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/commands/{command_id}:approve"
+      body: "*"
+    };
+  }
+  // RejectCommand rejects a critical command.
+  rpc RejectCommand(RejectCommandRequest) returns (RejectCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/commands/{command_id}:reject"
+      body: "*"
+    };
+  }
+  // CancelCommand cancels a command before it is sent.
+  rpc CancelCommand(CancelCommandRequest) returns (CancelCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/commands/{command_id}:cancel"
+      body: "*"
+    };
+  }
+}
+
+// RequestCommandRequest is the request of RequestCommand.
+message RequestCommandRequest {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  string device_id = 2 [(buf.validate.field).string.uuid = true];
+  string capability = 3 [(buf.validate.field).string.min_len = 1];
+  map<string, string> parameters = 4;
+  string incident_id = 5;
+  string run_id = 6;
+  string step_id = 7;
+}
+
+// RequestCommandResponse is the response of RequestCommand.
+message RequestCommandResponse {
+  psim.response.v1.Command command = 1;
+}
+
+// GetCommandRequest is the request of GetCommand.
+message GetCommandRequest {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetCommandResponse is the response of GetCommand.
+message GetCommandResponse {
+  psim.response.v1.Command command = 1;
+}
+
+// ListCommandsRequest is the request of ListCommands.
+message ListCommandsRequest {
+  string incident_id = 1;
+  string device_id = 2;
+  repeated psim.response.v1.CommandState states = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+// ListCommandsResponse is the response of ListCommands.
+message ListCommandsResponse {
+  repeated psim.response.v1.Command commands = 1;
+  string next_page_token = 2;
+}
+
+// ApproveCommandRequest is the request of ApproveCommand.
+message ApproveCommandRequest {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// ApproveCommandResponse is the response of ApproveCommand.
+message ApproveCommandResponse {
+  psim.response.v1.Command command = 1;
+}
+
+// RejectCommandRequest is the request of RejectCommand.
+message RejectCommandRequest {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+  string reason = 2 [(buf.validate.field).string.min_len = 1];
+}
+
+// RejectCommandResponse is the response of RejectCommand.
+message RejectCommandResponse {
+  psim.response.v1.Command command = 1;
+}
+
+// CancelCommandRequest is the request of CancelCommand.
+message CancelCommandRequest {
+  string command_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// CancelCommandResponse is the response of CancelCommand.
+message CancelCommandResponse {
+  psim.response.v1.Command command = 1;
+}

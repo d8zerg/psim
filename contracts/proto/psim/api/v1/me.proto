@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "google/api/annotations.proto";
+
+// MeService describes the caller. Owner: API Gateway (from the access token and the policy table).
+service MeService {
+  // GetMe returns the caller identity, roles, scopes and allowed actions.
+  rpc GetMe(GetMeRequest) returns (GetMeResponse) {
+    option (google.api.http) = {get: "/v1/me"};
+  }
+}
+
+// GetMeRequest is the request of GetMe.
+message GetMeRequest {}
+
+// GetMeResponse is the response of GetMe.
+message GetMeResponse {
+  string user_id = 1;
+  string tenant_id = 2;
+  string display_name = 3;
+  string email = 4;
+  // Roles: operator, supervisor, admin, integrator, auditor, manager.
+  repeated string roles = 5;
+  repeated string site_ids = 6;
+  repeated string zone_ids = 7;
+  // Actions allowed by the role table, for hiding unavailable UI actions (ADR-020).
+  repeated string actions = 8;
+  string locale = 9;
+}

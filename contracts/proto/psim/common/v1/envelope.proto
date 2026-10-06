@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package psim.common.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// Envelope carries the metadata shared by every message on every PSIM topic.
+// See ADR-005. The payload type is defined by the oneof of the topic record (ADR-004).
+message Envelope {
+  // Message identifier: event_id, signal_id or domain event id (UUIDv7 or UUIDv5).
+  string message_id = 1 [(buf.validate.field).string.uuid = true];
+  string tenant_id = 2 [(buf.validate.field).string.uuid = true];
+  // Time the fact happened in the domain (event time).
+  google.protobuf.Timestamp occurred_at = 3 [(buf.validate.field).required = true];
+  // Time the message was written to Kafka.
+  google.protobuf.Timestamp produced_at = 4 [(buf.validate.field).required = true];
+  // Time the platform received the event (ingest events only).
+  google.protobuf.Timestamp received_at = 5;
+  // Source sequence number for events, aggregate version for domain events.
+  uint64 sequence = 6;
+  // Message that caused this one.
+  string causation_id = 7 [
+    (buf.validate.field).string.uuid = true,
+    (buf.validate.field).ignore = IGNORE_IF_ZERO_VALUE
+  ];
+  // Identifier of the originating event of the whole causal chain.
+  string correlation_id = 8 [(buf.validate.field).string.uuid = true];
+  Actor actor = 9 [(buf.validate.field).required = true];
+  // Version of the contracts release that produced the message, for diagnostics.
+  string schema_version = 10;
+}
+
+// Actor identifies the subject that performed an action.
+message Actor {
+  ActorKind kind = 1 [(buf.validate.field).enum = {
+    defined_only: true
+    not_in: [0]
+  }];
+  // User id, service name, connector id or "system".
+  string id = 2 [(buf.validate.field).string.min_len = 1];
+  string display_name = 3;
+}
+
+// ActorKind is the kind of subject.
+enum ActorKind {
+  ACTOR_KIND_UNSPECIFIED = 0;
+  ACTOR_KIND_USER = 1;
+  ACTOR_KIND_SERVICE = 2;
+  ACTOR_KIND_CONNECTOR = 3;
+  ACTOR_KIND_SYSTEM = 4;
+}

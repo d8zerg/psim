@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package psim.response.v1;
+
+import "google/protobuf/timestamp.proto";
+import "psim/response/v1/plan.proto";
+
+// Notification is a message to a recipient over a channel (aggregates.md, 5.6).
+message Notification {
+  string notification_id = 1;
+  string recipient_user_id = 2;
+  NotificationChannel channel = 3;
+  NotificationState state = 4;
+  string template = 5;
+  map<string, string> data = 6;
+  uint32 attempts = 7;
+  string incident_id = 8;
+  // Set for aggregated notifications (N3).
+  repeated string aggregated_notification_ids = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp delivered_at = 11;
+  // In-app notifications only.
+  bool read = 12;
+  uint64 version = 13;
+}
+
+// NotificationState is the delivery state (state-models.md, 6).
+enum NotificationState {
+  NOTIFICATION_STATE_UNSPECIFIED = 0;
+  NOTIFICATION_STATE_PENDING = 1;
+  NOTIFICATION_STATE_SENT = 2;
+  NOTIFICATION_STATE_DELIVERED = 3;
+  NOTIFICATION_STATE_FAILED = 4;
+  NOTIFICATION_STATE_AGGREGATED = 5;
+}

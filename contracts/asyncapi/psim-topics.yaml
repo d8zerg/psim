@@ -1,0 +1,1045 @@
+# Generated from contracts/topics/topics.yaml. Do not edit.
+asyncapi: 3.1.0
+info:
+  title: PSIM Platform Kafka topics
+  version: 1.0.0
+  description: Generated from contracts/topics/topics.yaml by tools/contracts/contracts.py. Every message value is a topic
+    record with an Envelope and a oneof payload (ADR-004, ADR-005).
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+defaultContentType: application/x-protobuf
+servers:
+  kafka:
+    host: kafka:9093
+    protocol: kafka-secure
+    description: 'Kafka (KRaft), TLS. Schema Registry: Apicurio, Confluent-compatible API (ADR-003).'
+    bindings:
+      kafka:
+        schemaRegistryUrl: https://schema-registry:8081/apis/ccompat/v7
+        schemaRegistryVendor: apicurio
+        bindingVersion: 0.5.0
+channels:
+  ingestRawV1:
+    address: psim.ingest.raw.v1
+    title: Raw events from connectors
+    description: 'Key: source_id. Semantics: ALO+ID.'
+    messages:
+      RawEventRecord:
+        $ref: '#/components/messages/RawEventRecord'
+    bindings:
+      kafka:
+        topic: psim.ingest.raw.v1
+        partitions: 48
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 21600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 48
+      single: 12
+    x-psim-semantics: ALO+ID
+  eventsNormalizedV1:
+    address: psim.events.normalized.v1
+    title: Normalized events
+    description: 'Key: site_id:zone_id. Semantics: EOS-K.'
+    messages:
+      EventRecord:
+        $ref: '#/components/messages/EventRecord'
+    bindings:
+      kafka:
+        topic: psim.events.normalized.v1
+        partitions: 48
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 86400000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 48
+      single: 12
+    x-psim-semantics: EOS-K
+  normalizerStateV1:
+    address: psim.normalizer.state.v1
+    title: Normalizer source sequence trackers (internal)
+    description: 'Key: source_id:epoch. Semantics: EOS-K. Internal topic.'
+    messages:
+      NormalizerStateRecord:
+        $ref: '#/components/messages/NormalizerStateRecord'
+    bindings:
+      kafka:
+        topic: psim.normalizer.state.v1
+        partitions: 48
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - compact
+          retention.ms: -1
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 48
+      single: 12
+    x-psim-semantics: EOS-K
+  signalsV1:
+    address: psim.signals.v1
+    title: Signals of correlation rules and external producers
+    description: 'Key: grouping_key. Semantics: EOS-K.'
+    messages:
+      SignalRecord:
+        $ref: '#/components/messages/SignalRecord'
+    bindings:
+      kafka:
+        topic: psim.signals.v1
+        partitions: 12
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 604800000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 12
+      single: 4
+    x-psim-semantics: EOS-K
+  correlationChangelogV1:
+    address: psim.correlation.changelog.v1
+    title: Correlation state changelog (internal)
+    description: 'Key: rule_id:correlation_key. Semantics: EOS-K. Internal topic.'
+    messages:
+      CorrelationChangelogRecord:
+        $ref: '#/components/messages/CorrelationChangelogRecord'
+    bindings:
+      kafka:
+        topic: psim.correlation.changelog.v1
+        partitions: 48
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - compact
+          retention.ms: -1
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 48
+      single: 12
+    x-psim-semantics: EOS-K
+  correlationRepartitionV1:
+    address: psim.correlation.repartition.v1
+    title: Events of rules wider than a zone (internal)
+    description: 'Key: correlation_key. Semantics: EOS-K. Internal topic.'
+    messages:
+      RepartitionRecord:
+        $ref: '#/components/messages/RepartitionRecord'
+    bindings:
+      kafka:
+        topic: psim.correlation.repartition.v1
+        partitions: 12
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 21600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 12
+      single: 4
+    x-psim-semantics: EOS-K
+  incidentsEventsV1:
+    address: psim.incidents.events.v1
+    title: Incident domain events
+    description: 'Key: incident_id. Semantics: Outbox.'
+    messages:
+      IncidentEventRecord:
+        $ref: '#/components/messages/IncidentEventRecord'
+    bindings:
+      kafka:
+        topic: psim.incidents.events.v1
+        partitions: 12
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 2592000000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 12
+      single: 4
+    x-psim-semantics: Outbox
+  responseEventsV1:
+    address: psim.response.events.v1
+    title: Response runs, commands, notifications, SLA and escalations
+    description: 'Key: incident_id. Semantics: Outbox.'
+    messages:
+      ResponseEventRecord:
+        $ref: '#/components/messages/ResponseEventRecord'
+    bindings:
+      kafka:
+        topic: psim.response.events.v1
+        partitions: 12
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 2592000000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 12
+      single: 4
+    x-psim-semantics: Outbox
+  commandsV1:
+    address: psim.commands.v1
+    title: Commands routed to connector sessions
+    description: 'Key: connector_id. Semantics: ALO+ID.'
+    messages:
+      CommandDeliveryRecord:
+        $ref: '#/components/messages/CommandDeliveryRecord'
+    bindings:
+      kafka:
+        topic: psim.commands.v1
+        partitions: 6
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 86400000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 6
+      single: 2
+    x-psim-semantics: ALO+ID
+  commandsResultsV1:
+    address: psim.commands.results.v1
+    title: Command receipts and outcomes from connectors
+    description: 'Key: command_id. Semantics: ALO+ID.'
+    messages:
+      CommandResultRecord:
+        $ref: '#/components/messages/CommandResultRecord'
+    bindings:
+      kafka:
+        topic: psim.commands.results.v1
+        partitions: 6
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 86400000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 6
+      single: 2
+    x-psim-semantics: ALO+ID
+  catalogV1:
+    address: psim.catalog.v1
+    title: Catalog resources (full state)
+    description: 'Key: resource_type:resource_id. Semantics: Outbox.'
+    messages:
+      CatalogRecord:
+        $ref: '#/components/messages/CatalogRecord'
+    bindings:
+      kafka:
+        topic: psim.catalog.v1
+        partitions: 6
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - compact
+          retention.ms: -1
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 6
+      single: 2
+    x-psim-semantics: Outbox
+  configV1:
+    address: psim.config.v1
+    title: Active configuration objects
+    description: 'Key: config_key. Semantics: Outbox.'
+    messages:
+      ConfigRecord:
+        $ref: '#/components/messages/ConfigRecord'
+    bindings:
+      kafka:
+        topic: psim.config.v1
+        partitions: 1
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - compact
+          retention.ms: -1
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 1
+      single: 1
+    x-psim-semantics: Outbox
+  auditV1:
+    address: psim.audit.v1
+    title: Audit entries and checkpoints
+    description: 'Key: tenant_id. Semantics: ALO+ID.'
+    messages:
+      AuditEventRecord:
+        $ref: '#/components/messages/AuditEventRecord'
+    bindings:
+      kafka:
+        topic: psim.audit.v1
+        partitions: 6
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 2592000000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 6
+      single: 2
+    x-psim-semantics: ALO+ID
+  dlqNormalizerV1:
+    address: psim.dlq.normalizer.v1
+    title: Dead letters of stage normalizer
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.normalizer.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqCorrelationV1:
+    address: psim.dlq.correlation.v1
+    title: Dead letters of stage correlation
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.correlation.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqHistoryV1:
+    address: psim.dlq.history.v1
+    title: Dead letters of stage history
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.history.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqIncidentV1:
+    address: psim.dlq.incident.v1
+    title: Dead letters of stage incident
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.incident.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqResponseV1:
+    address: psim.dlq.response.v1
+    title: Dead letters of stage response
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.response.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqCommandV1:
+    address: psim.dlq.command.v1
+    title: Dead letters of stage command
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.command.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqNotificationV1:
+    address: psim.dlq.notification.v1
+    title: Dead letters of stage notification
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.notification.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqAuditV1:
+    address: psim.dlq.audit.v1
+    title: Dead letters of stage audit
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.audit.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqProjectionV1:
+    address: psim.dlq.projection.v1
+    title: Dead letters of stage projection
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.projection.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+operations:
+  connectorGatewaySendIngestRawV1:
+    action: send
+    channel:
+      $ref: '#/channels/ingestRawV1'
+    messages:
+    - $ref: '#/channels/ingestRawV1/messages/RawEventRecord'
+    x-psim-service: connector-gateway
+  normalizerReceiveIngestRawV1:
+    action: receive
+    channel:
+      $ref: '#/channels/ingestRawV1'
+    messages:
+    - $ref: '#/channels/ingestRawV1/messages/RawEventRecord'
+    x-psim-service: normalizer
+  normalizerSendEventsNormalizedV1:
+    action: send
+    channel:
+      $ref: '#/channels/eventsNormalizedV1'
+    messages:
+    - $ref: '#/channels/eventsNormalizedV1/messages/EventRecord'
+    x-psim-service: normalizer
+  correlationEngineReceiveEventsNormalizedV1:
+    action: receive
+    channel:
+      $ref: '#/channels/eventsNormalizedV1'
+    messages:
+    - $ref: '#/channels/eventsNormalizedV1/messages/EventRecord'
+    x-psim-service: correlation-engine
+  eventHistoryReceiveEventsNormalizedV1:
+    action: receive
+    channel:
+      $ref: '#/channels/eventsNormalizedV1'
+    messages:
+    - $ref: '#/channels/eventsNormalizedV1/messages/EventRecord'
+    x-psim-service: event-history
+  projectionServiceReceiveEventsNormalizedV1:
+    action: receive
+    channel:
+      $ref: '#/channels/eventsNormalizedV1'
+    messages:
+    - $ref: '#/channels/eventsNormalizedV1/messages/EventRecord'
+    x-psim-service: projection-service
+  normalizerSendNormalizerStateV1:
+    action: send
+    channel:
+      $ref: '#/channels/normalizerStateV1'
+    messages:
+    - $ref: '#/channels/normalizerStateV1/messages/NormalizerStateRecord'
+    x-psim-service: normalizer
+  normalizerReceiveNormalizerStateV1:
+    action: receive
+    channel:
+      $ref: '#/channels/normalizerStateV1'
+    messages:
+    - $ref: '#/channels/normalizerStateV1/messages/NormalizerStateRecord'
+    x-psim-service: normalizer
+  correlationEngineSendSignalsV1:
+    action: send
+    channel:
+      $ref: '#/channels/signalsV1'
+    messages:
+    - $ref: '#/channels/signalsV1/messages/SignalRecord'
+    x-psim-service: correlation-engine
+  incidentServiceReceiveSignalsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/signalsV1'
+    messages:
+    - $ref: '#/channels/signalsV1/messages/SignalRecord'
+    x-psim-service: incident-service
+  eventHistoryReceiveSignalsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/signalsV1'
+    messages:
+    - $ref: '#/channels/signalsV1/messages/SignalRecord'
+    x-psim-service: event-history
+  projectionServiceReceiveSignalsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/signalsV1'
+    messages:
+    - $ref: '#/channels/signalsV1/messages/SignalRecord'
+    x-psim-service: projection-service
+  correlationEngineSendCorrelationChangelogV1:
+    action: send
+    channel:
+      $ref: '#/channels/correlationChangelogV1'
+    messages:
+    - $ref: '#/channels/correlationChangelogV1/messages/CorrelationChangelogRecord'
+    x-psim-service: correlation-engine
+  correlationEngineReceiveCorrelationChangelogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/correlationChangelogV1'
+    messages:
+    - $ref: '#/channels/correlationChangelogV1/messages/CorrelationChangelogRecord'
+    x-psim-service: correlation-engine
+  correlationEngineSendCorrelationRepartitionV1:
+    action: send
+    channel:
+      $ref: '#/channels/correlationRepartitionV1'
+    messages:
+    - $ref: '#/channels/correlationRepartitionV1/messages/RepartitionRecord'
+    x-psim-service: correlation-engine
+  correlationEngineReceiveCorrelationRepartitionV1:
+    action: receive
+    channel:
+      $ref: '#/channels/correlationRepartitionV1'
+    messages:
+    - $ref: '#/channels/correlationRepartitionV1/messages/RepartitionRecord'
+    x-psim-service: correlation-engine
+  incidentServiceSendIncidentsEventsV1:
+    action: send
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: incident-service
+  responseEngineReceiveIncidentsEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: response-engine
+  projectionServiceReceiveIncidentsEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: projection-service
+  apiGatewayReceiveIncidentsEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: api-gateway
+  responseEngineSendResponseEventsV1:
+    action: send
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: response-engine
+  commandServiceSendResponseEventsV1:
+    action: send
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: command-service
+  notificationServiceSendResponseEventsV1:
+    action: send
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: notification-service
+  incidentServiceReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: incident-service
+  projectionServiceReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: projection-service
+  apiGatewayReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: api-gateway
+  notificationServiceReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: notification-service
+  commandServiceSendCommandsV1:
+    action: send
+    channel:
+      $ref: '#/channels/commandsV1'
+    messages:
+    - $ref: '#/channels/commandsV1/messages/CommandDeliveryRecord'
+    x-psim-service: command-service
+  connectorGatewayReceiveCommandsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/commandsV1'
+    messages:
+    - $ref: '#/channels/commandsV1/messages/CommandDeliveryRecord'
+    x-psim-service: connector-gateway
+  connectorGatewaySendCommandsResultsV1:
+    action: send
+    channel:
+      $ref: '#/channels/commandsResultsV1'
+    messages:
+    - $ref: '#/channels/commandsResultsV1/messages/CommandResultRecord'
+    x-psim-service: connector-gateway
+  commandServiceReceiveCommandsResultsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/commandsResultsV1'
+    messages:
+    - $ref: '#/channels/commandsResultsV1/messages/CommandResultRecord'
+    x-psim-service: command-service
+  resourceCatalogSendCatalogV1:
+    action: send
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: resource-catalog
+  normalizerReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: normalizer
+  connectorGatewayReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: connector-gateway
+  correlationEngineReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: correlation-engine
+  responseEngineReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: response-engine
+  commandServiceReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: command-service
+  projectionServiceReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: projection-service
+  apiGatewayReceiveCatalogV1:
+    action: receive
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: api-gateway
+  correlationEngineSendConfigV1:
+    action: send
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: correlation-engine
+  normalizerSendConfigV1:
+    action: send
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: normalizer
+  resourceCatalogSendConfigV1:
+    action: send
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: resource-catalog
+  normalizerReceiveConfigV1:
+    action: receive
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: normalizer
+  correlationEngineReceiveConfigV1:
+    action: receive
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: correlation-engine
+  eventHistoryReceiveConfigV1:
+    action: receive
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: event-history
+  allServicesSendAuditV1:
+    action: send
+    channel:
+      $ref: '#/channels/auditV1'
+    messages:
+    - $ref: '#/channels/auditV1/messages/AuditEventRecord'
+    x-psim-service: all-services
+  auditServiceReceiveAuditV1:
+    action: receive
+    channel:
+      $ref: '#/channels/auditV1'
+    messages:
+    - $ref: '#/channels/auditV1/messages/AuditEventRecord'
+    x-psim-service: audit-service
+components:
+  messages:
+    RawEventRecord:
+      name: RawEventRecord
+      title: psim.ingest.v1.RawEventRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.ingest.v1.RawEventRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.ingest.v1.RawEventRecord.'
+        x-psim-proto: psim.ingest.v1.RawEventRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: source_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    EventRecord:
+      name: EventRecord
+      title: psim.processing.v1.EventRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.processing.v1.EventRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.processing.v1.EventRecord.'
+        x-psim-proto: psim.processing.v1.EventRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: site_id:zone_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    NormalizerStateRecord:
+      name: NormalizerStateRecord
+      title: psim.processing.v1.NormalizerStateRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.processing.v1.NormalizerStateRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.processing.v1.NormalizerStateRecord.'
+        x-psim-proto: psim.processing.v1.NormalizerStateRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: source_id:epoch
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    SignalRecord:
+      name: SignalRecord
+      title: psim.processing.v1.SignalRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.processing.v1.SignalRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.processing.v1.SignalRecord.'
+        x-psim-proto: psim.processing.v1.SignalRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: grouping_key
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    CorrelationChangelogRecord:
+      name: CorrelationChangelogRecord
+      title: psim.processing.v1.CorrelationChangelogRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.processing.v1.CorrelationChangelogRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.processing.v1.CorrelationChangelogRecord.'
+        x-psim-proto: psim.processing.v1.CorrelationChangelogRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: rule_id:correlation_key
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    RepartitionRecord:
+      name: RepartitionRecord
+      title: psim.processing.v1.RepartitionRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.processing.v1.RepartitionRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.processing.v1.RepartitionRecord.'
+        x-psim-proto: psim.processing.v1.RepartitionRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: correlation_key
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    IncidentEventRecord:
+      name: IncidentEventRecord
+      title: psim.incident.v1.IncidentEventRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.incident.v1.IncidentEventRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.incident.v1.IncidentEventRecord.'
+        x-psim-proto: psim.incident.v1.IncidentEventRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: incident_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    ResponseEventRecord:
+      name: ResponseEventRecord
+      title: psim.response.v1.ResponseEventRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.response.v1.ResponseEventRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.response.v1.ResponseEventRecord.'
+        x-psim-proto: psim.response.v1.ResponseEventRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: incident_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    CommandDeliveryRecord:
+      name: CommandDeliveryRecord
+      title: psim.response.v1.CommandDeliveryRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.response.v1.CommandDeliveryRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.response.v1.CommandDeliveryRecord.'
+        x-psim-proto: psim.response.v1.CommandDeliveryRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: connector_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    CommandResultRecord:
+      name: CommandResultRecord
+      title: psim.response.v1.CommandResultRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.response.v1.CommandResultRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.response.v1.CommandResultRecord.'
+        x-psim-proto: psim.response.v1.CommandResultRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: command_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    CatalogRecord:
+      name: CatalogRecord
+      title: psim.catalog.v1.CatalogRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.catalog.v1.CatalogRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.catalog.v1.CatalogRecord.'
+        x-psim-proto: psim.catalog.v1.CatalogRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: resource_type:resource_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    ConfigRecord:
+      name: ConfigRecord
+      title: psim.config.v1.ConfigRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.config.v1.ConfigRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.config.v1.ConfigRecord.'
+        x-psim-proto: psim.config.v1.ConfigRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: config_key
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    AuditEventRecord:
+      name: AuditEventRecord
+      title: psim.audit.v1.AuditEventRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.audit.v1.AuditEventRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.audit.v1.AuditEventRecord.'
+        x-psim-proto: psim.audit.v1.AuditEventRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: tenant_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    DeadLetter:
+      name: DeadLetter
+      contentType: application/octet-stream
+      summary: Original message bytes; error in headers psim-dlq-stage, psim-dlq-error-code, psim-dlq-error, psim-dlq-source-topic,
+        psim-dlq-source-partition, psim-dlq-source-offset, psim-dlq-at.
+      payload:
+        type: string
+        format: binary

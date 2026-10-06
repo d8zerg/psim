@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+package psim.config.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "psim/common/v1/envelope.proto";
+import "psim/common/v1/types.proto";
+import "psim/processing/v1/mapping.proto";
+import "psim/processing/v1/rules.proto";
+
+// ConfigRecord is the value of compacted single-partition topic psim.config.v1 (key: config_key).
+// Each record is the full active object; consumers apply it atomically between input batches.
+message ConfigRecord {
+  psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
+  oneof payload {
+    option (buf.validate.oneof).required = true;
+    // Key "ruleset/<tenant_id>".
+    psim.processing.v1.RuleSet rule_set = 2;
+    // Key "mapping/<tenant_id>/<connector_type>".
+    psim.processing.v1.MappingRuleSet mapping_rule_set = 3;
+    // Key "retention/<tenant_id>".
+    RetentionSettings retention = 4;
+    // Key "processing/<tenant_id>".
+    ProcessingSettings processing = 5;
+  }
+}
+
+// RetentionSettings are data retention periods of a tenant.
+message RetentionSettings {
+  google.protobuf.Duration event_history_all = 1;
+  google.protobuf.Duration event_history_significant = 2;
+  google.protobuf.Duration incidents = 3;
+  google.protobuf.Duration audit = 4;
+  uint64 version = 5;
+}
+
+// ProcessingSettings are tenant-wide processing parameters.
+message ProcessingSettings {
+  // Events at or above this severity are significant (E3).
+  psim.common.v1.Severity significance_threshold = 1;
+  google.protobuf.Duration max_clock_skew = 2;
+  google.protobuf.Duration max_buffer_replay_age = 3;
+  google.protobuf.Duration source_idle_timeout = 4;
+  uint64 version = 5;
+}
