@@ -1,0 +1,19 @@
+# Conan profile of the PSIM toolchain (ADR-032): clang 21, libc++, C++23, static libraries.
+# Used for host and build contexts: conan install -pr:a tools/conan/profiles/clang21-libcxx
+[settings]
+os=Linux
+arch=x86_64
+compiler=clang
+compiler.version=21
+compiler.libcxx=libc++
+compiler.cppstd=23
+build_type=Release
+
+[options]
+*:shared=False
+
+[conf]
+tools.build:compiler_executables={"c": "clang", "cpp": "clang++"}
+tools.cmake.cmaketoolchain:generator=Ninja
+tools.build:exelinkflags=["-fuse-ld=lld"]
+tools.build:sharedlinkflags=["-fuse-ld=lld"]

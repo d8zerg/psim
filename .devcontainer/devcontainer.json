@@ -1,0 +1,38 @@
+{
+  "name": "PSIM toolchain (Debian 12)",
+  "build": {
+    "dockerfile": "../tools/toolchain/Dockerfile",
+    "args": {
+      "BASE": "debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+    }
+  },
+  "workspaceMount": "source=${localWorkspaceFolder},target=/repo,type=bind",
+  "workspaceFolder": "/repo",
+  "remoteUser": "dev",
+  "updateRemoteUserUID": true,
+  "containerEnv": {
+    "PSIM_PLATFORM": "debian12",
+    "HOME": "/cache/home"
+  },
+  "mounts": [
+    "source=${localWorkspaceFolder}/.cache/debian12/conan,target=/cache/conan,type=bind",
+    "source=${localWorkspaceFolder}/.cache/debian12/ccache,target=/cache/ccache,type=bind",
+    "source=${localWorkspaceFolder}/.cache/debian12/home,target=/cache/home,type=bind"
+  ],
+  "initializeCommand": "mkdir -p .cache/debian12/conan .cache/debian12/ccache .cache/debian12/home",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "llvm-vs-code-extensions.vscode-clangd",
+        "ms-vscode.cmake-tools",
+        "bufbuild.vscode-buf",
+        "task.vscode-task"
+      ],
+      "settings": {
+        "cmake.useCMakePresets": "always",
+        "cmake.configureOnOpen": false,
+        "clangd.arguments": ["--compile-commands-dir=build/debian12/debug", "--header-insertion=never"]
+      }
+    }
+  }
+}

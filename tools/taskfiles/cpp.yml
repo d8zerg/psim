@@ -1,0 +1,114 @@
+# C++ build: Conan dependencies, CMake presets, tests, reproducibility (step 1.1, ADR-032).
+# Namespace "cpp"; working directory is the repository root.
+# Build commands run in the toolchain container (Debian 12 base); inside the container
+# (PSIM_IN_TOOLCHAIN=1) they run directly. Artifacts are verified on the target platforms by
+# runtime-test (Debian 12, Astra Linux 1.8).
+#   PRESET    debug (default) | release | relwithdebinfo | asan | tsan | coverage
+#   JOBS      parallel jobs (default: half of the CPUs)
+version: '3'
+
+vars:
+  PROFILE: tools/conan/profiles/clang21-libcxx
+  # Build platform of the toolchain; build directories are build/<PLATFORM>/<preset>.
+  PLATFORM: debian12
+
+tasks:
+  build:
+    desc: Install dependencies, configure and build PRESET
+    vars:
+      PRESET: '{{.PRESET | default "debug"}}'
+    cmds:
+      - task: deps
+      - task: _run
+        vars:
+          CMD: cmake --preset {{.PRESET}} && cmake --build --preset {{.PRESET}} -j {{.JOBS}}
+
+  test:
+    desc: Build and run tests of PRESET in the toolchain
+    vars:
+      PRESET: '{{.PRESET | default "debug"}}'
+    cmds:
+      - task: build
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: _run
+        vars:
+          CMD: ctest --preset {{.PRESET}} -j {{.JOBS}}
+
+  deps:
+    desc: Build or fetch Conan dependencies (Release, pinned by conan.lock)
+    sources:
+      - conanfile.py
+      - conan.lock
+      - '{{.PROFILE}}'
+    generates:
+      - build/{{.PLATFORM}}/conan/conan_toolchain.cmake
+    cmds:
+      - task: _run
+        vars:
+          CMD: >-
+            conan install . -pr:a {{.PROFILE}} --lockfile=conan.lock --build=missing
+            -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan
+
+  lock:
+    desc: Re-resolve dependency versions into conan.lock (after changing conanfile.py)
+    cmds:
+      - task: _run
+        vars:
+          CMD: conan lock create . -pr:a {{.PROFILE}} --lockfile-out=conan.lock
+
+  reproducible:
+    desc: Build release twice in different directories without ccache and compare artifacts (FF-13)
+    cmds:
+      - task: deps
+      - task: _run
+        vars:
+          CMD: >-
+            rm -rf build/{{.PLATFORM}}/repro-a build/{{.PLATFORM}}/repro-b &&
+            for d in repro-a repro-b; do
+            CCACHE_DISABLE=1 cmake --preset release -B build/{{.PLATFORM}}/$d >/dev/null &&
+            CCACHE_DISABLE=1 cmake --build build/{{.PLATFORM}}/$d -j {{.JOBS}} >/dev/null || exit 1; done &&
+            python3 -I tools/cpp/compare_builds.py build/{{.PLATFORM}}/repro-a build/{{.PLATFORM}}/repro-b
+
+  runtime-test:
+    desc: 'Run built tests and psimctl of PRESET on target platforms (RUNTIMES="debian12 astra18")'
+    vars:
+      PRESET: '{{.PRESET | default "debug"}}'
+      RUNTIMES: '{{.RUNTIMES | default "debian12 astra18"}}'
+    deps:
+      - task: build
+        vars: {PRESET: '{{.PRESET}}'}
+    cmds:
+      - for: {var: RUNTIMES}
+        cmd: >-
+          docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo:ro -w /repo
+          {{index .RUNTIME_IMAGES .ITEM}}
+          sh /repo/tools/cpp/runtime_test.sh {{.ITEM}} build/{{.PLATFORM}}/{{.PRESET}}
+
+  clean:
+    desc: Remove build directories (keeps the Conan and ccache caches)
+    cmds:
+      - rm -rf build/{{.PLATFORM}}
+
+  _run:
+    internal: true
+    requires:
+      vars: [CMD]
+    vars:
+      CACHE_DIR: '{{.CACHE}}/{{.PLATFORM}}'
+    deps:
+      - task: :toolchain:build
+    env:
+      PSIM_CMD: '{{.CMD}}'
+      PSIM_PLATFORM: '{{.PLATFORM}}'
+    cmds:
+      - cmd: |
+          if [ "${PSIM_IN_TOOLCHAIN:-0}" = "1" ]; then
+            eval "$PSIM_CMD"
+          else
+            mkdir -p "{{.CACHE_DIR}}/conan" "{{.CACHE_DIR}}/ccache" "{{.CACHE_DIR}}/home"
+            docker run --rm {{.TTY}} -u {{.UID}}:{{.GID}} \
+              -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
+              -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/conan":/cache/conan \
+              -v "{{.CACHE_DIR}}/ccache":/cache/ccache -v "{{.CACHE_DIR}}/home":/cache/home \
+              -w /repo {{.TOOLCHAIN_IMAGE}} bash -c 'eval "$PSIM_CMD"'
+          fi

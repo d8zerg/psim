@@ -1,0 +1,50 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {"major": 3, "minor": 28, "patch": 0},
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/$env{PSIM_PLATFORM}/${presetName}",
+      "toolchainFile": "${sourceDir}/build/$env{PSIM_PLATFORM}/conan/conan_toolchain.cmake",
+      "cacheVariables": {
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_C_COMPILER_LAUNCHER": "ccache",
+        "CMAKE_CXX_COMPILER_LAUNCHER": "ccache",
+        "PSIM_WERROR": "ON"
+      },
+      "environment": {"SOURCE_DATE_EPOCH": "0"}
+    },
+    {"name": "debug", "displayName": "Debug", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug"}},
+    {"name": "release", "displayName": "Release", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "Release"}},
+    {"name": "relwithdebinfo", "displayName": "RelWithDebInfo", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo"}},
+    {"name": "asan", "displayName": "Debug + AddressSanitizer + UBSan", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "PSIM_SANITIZE": "address;undefined"}},
+    {"name": "tsan", "displayName": "RelWithDebInfo + ThreadSanitizer", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo", "PSIM_SANITIZE": "thread"}},
+    {"name": "coverage", "displayName": "Debug + llvm-cov coverage", "inherits": "base",
+     "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "PSIM_COVERAGE": "ON"}}
+  ],
+  "buildPresets": [
+    {"name": "debug", "configurePreset": "debug"},
+    {"name": "release", "configurePreset": "release"},
+    {"name": "relwithdebinfo", "configurePreset": "relwithdebinfo"},
+    {"name": "asan", "configurePreset": "asan"},
+    {"name": "tsan", "configurePreset": "tsan"},
+    {"name": "coverage", "configurePreset": "coverage"}
+  ],
+  "testPresets": [
+    {"name": "base", "hidden": true, "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "debug", "inherits": "base", "configurePreset": "debug"},
+    {"name": "release", "inherits": "base", "configurePreset": "release"},
+    {"name": "relwithdebinfo", "inherits": "base", "configurePreset": "relwithdebinfo"},
+    {"name": "asan", "inherits": "base", "configurePreset": "asan"},
+    {"name": "tsan", "inherits": "base", "configurePreset": "tsan"},
+    {"name": "coverage", "inherits": "base", "configurePreset": "coverage",
+     "environment": {"LLVM_PROFILE_FILE": "${sourceDir}/build/$env{PSIM_PLATFORM}/coverage/profiles/%p-%m.profraw"}}
+  ]
+}

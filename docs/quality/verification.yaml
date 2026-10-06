@@ -19,7 +19,7 @@ methods:
     env: E-CI
     gate: pr
     barrier: automated
-    task: task cpp:test:unit
+    task: task cpp:test
     steps: ['1.2', '5.3', '6.1', '6.2']
   - id: TS-02
     kind: test
@@ -557,7 +557,7 @@ methods:
     env: E-CI
     gate: nightly
     barrier: automated
-    task: task build:reproducible
+    task: task cpp:reproducible
     steps: ['1.1', '1.3']
   - id: FF-14
     kind: fitness
@@ -568,6 +568,16 @@ methods:
     barrier: automated
     task: task release:verify
     steps: ['1.3']
+
+  - id: FF-15
+    kind: fitness
+    name: Запуск артефактов на целевых платформах
+    criteria: Тестовые исполняемые файлы и psimctl проходят на Debian 12 и Astra Linux 1.8 без toolchain; нет зависимости от разделяемого libc++ (ADR-032)
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task cpp:runtime-test
+    steps: ['1.1']
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01
@@ -708,7 +718,7 @@ goals:
   - {id: G-15, source: '1.4', attribute: 'Фаззинг', methods: [SEC-04, SEC-05]}
   - {id: G-16, source: '1.4', attribute: 'Совместимость контрактов', methods: [TS-04, FF-04, TS-05]}
   - {id: G-17, source: '1.4', attribute: 'Регрессия производительности', methods: [B-05, B-02, FF-05, L-01]}
-  - {id: G-18, source: '1.4', attribute: 'Сборки', methods: [FF-13, FF-14, SEC-02]}
+  - {id: G-18, source: '1.4', attribute: 'Сборки', methods: [FF-13, FF-14, FF-15, SEC-02]}
   - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09]}
 
 scenarios:

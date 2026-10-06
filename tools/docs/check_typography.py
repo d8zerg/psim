@@ -2,7 +2,7 @@
 """Check project typography rules in text sources.
 
 Rules: plain "-" instead of em dash, en dash and minus sign; "->" instead of the arrow; no emoji.
-Generated files listed in GENERATED are skipped.
+Generated files listed in GENERATED and vendored third_party directories are skipped.
 
 Usage: check_typography.py <file-or-dir>...
 """
@@ -41,7 +41,7 @@ def main(argv):
     checked = 0
     for path in files(argv[1:]):
         rel = os.path.relpath(path)
-        if rel in GENERATED:
+        if rel in GENERATED or "third_party" in rel.split(os.sep):
             continue
         checked += 1
         for no, line in enumerate(open(path, encoding="utf-8"), 1):

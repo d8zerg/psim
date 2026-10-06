@@ -9,6 +9,18 @@ vars:
   GID:
     sh: id -g
   PYTHON: python3 -I
+  # Parallel build jobs; override: task cpp:build JOBS=4.
+  JOBS:
+    sh: echo $(( $(nproc) / 2 ))
+  # C++ toolchain (ADR-032): built on the oldest target glibc (Debian 12, 2.36); the tag follows
+  # the Dockerfile content. Target platforms run the artifacts as plain OS images.
+  TOOLCHAIN_IMAGE:
+    sh: echo "psim/toolchain:debian12-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
+  TOOLCHAIN_BASE: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+  RUNTIME_IMAGES:
+    map:
+      debian12: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+      astra18: registry.astralinux.ru/library/astra/ubi18@sha256:b62fb94cf64384778d8c0c0da04a06a30f4ad0abbe18de969caf102e34faf065
   # Contract tooling image built locally from tools/contracts/image (buf + protoc plugins);
   # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
   CONTRACTS_TOOLS_IMAGE:
@@ -20,6 +32,12 @@ vars:
   STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19
 
 includes:
+  toolchain:
+    taskfile: ./tools/taskfiles/toolchain.yml
+    dir: .
+  cpp:
+    taskfile: ./tools/taskfiles/cpp.yml
+    dir: .
   contracts:
     taskfile: ./contracts/Taskfile.yml
     dir: ./contracts
@@ -35,9 +53,11 @@ tasks:
       - "{{.TASK_EXE}} --list"
 
   check:
-    desc: Run every check (contracts and documentation); the CI gate
+    desc: Run every check (contracts, C++ build and tests, documentation); the CI gate
     cmds:
       - task: contracts:check
+      - task: cpp:test
+      - task: cpp:runtime-test
       - task: docs:check
 
   gen:
@@ -68,7 +88,7 @@ tasks:
       vars: [SRC, DST]
     cmds:
       - cmd: |
-          rel="$(realpath --relative-to="{{.ROOT_DIR}}" "{{.DST}}")"
+          rel="$(realpath -m --relative-to="{{.ROOT_DIR}}" "{{.DST}}")"
           if [ "{{.UPDATE}}" = "true" ]; then
             cp "{{.SRC}}" "{{.DST}}" && echo "updated: $rel"
           elif ! diff -q "{{.SRC}}" "{{.DST}}" >/dev/null 2>&1; then
@@ -76,6 +96,23 @@ tasks:
             exit 1
           else
             echo "ok: $rel"
+          fi
+
+  _publish_dir:
+    internal: true
+    desc: Compare a generated directory with the committed one, or replace it when UPDATE=true
+    requires:
+      vars: [SRC, DST]
+    cmds:
+      - cmd: |
+          rel="$(realpath -m --relative-to="{{.ROOT_DIR}}" "{{.DST}}")"
+          if [ "{{.UPDATE}}" = "true" ]; then
+            rm -rf "{{.DST}}" && mkdir -p "$(dirname "{{.DST}}")" && cp -r "{{.SRC}}" "{{.DST}}" && echo "updated: $rel/"
+          elif ! diff -r -q "{{.SRC}}" "{{.DST}}" >/dev/null 2>&1; then
+            echo "STALE: $rel/ differs from generated output; run: task gen" >&2
+            exit 1
+          else
+            echo "ok: $rel/"
           fi
 
   clean:

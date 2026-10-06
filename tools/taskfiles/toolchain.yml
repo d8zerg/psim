@@ -1,0 +1,17 @@
+# C++ toolchain image (ADR-032). Namespace "toolchain"; working directory is the repository root.
+version: '3'
+
+tasks:
+  build:
+    desc: Build the C++ toolchain image (Debian 12 base, clang 21, libc++ 21)
+    status:
+      - '[ "${PSIM_IN_TOOLCHAIN:-0}" = "1" ] || docker image inspect {{.TOOLCHAIN_IMAGE}} >/dev/null 2>&1'
+    cmds:
+      - docker build --build-arg BASE={{.TOOLCHAIN_BASE}} -t {{.TOOLCHAIN_IMAGE}} {{.ROOT_DIR}}/tools/toolchain
+
+  shell:
+    desc: Interactive shell in the toolchain container
+    interactive: true
+    cmds:
+      - task: :cpp:_run
+        vars: {CMD: bash, TTY: '-it'}

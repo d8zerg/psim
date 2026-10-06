@@ -15,6 +15,7 @@ tasks:
       - task: lint
       - task: breaking
       - task: build
+      - task: vendor
       - task: openapi
       - task: asyncapi
       - task: reference
@@ -24,6 +25,8 @@ tasks:
     desc: Regenerate committed artifacts (OpenAPI, AsyncAPI, proto reference) and verify them
     cmds:
       - task: build
+      - task: vendor
+        vars: {UPDATE: 'true'}
       - task: openapi
         vars: {UPDATE: 'true'}
       - task: asyncapi
@@ -82,6 +85,17 @@ tasks:
       - mkdir -p {{.OUT}}
       - task: _buf
         vars: {ARGS: 'build -o /repo/.cache/contracts/image.json'}
+
+  vendor:
+    desc: Vendor third-party proto imports (google/api, buf/validate) into third_party/proto for C++ codegen
+    cmds:
+      - rm -rf {{.OUT}}/export {{.OUT}}/third_party
+      - task: _buf
+        vars: {ARGS: export . --output /repo/.cache/contracts/export}
+      - mkdir -p {{.OUT}}/third_party/proto
+      - cd {{.OUT}}/export && find . -name '*.proto' ! -path './psim/*' -exec cp --parents {} {{.OUT}}/third_party/proto/ \;
+      - task: :_publish_dir
+        vars: {SRC: '{{.OUT}}/third_party/proto', DST: '{{.TASKFILE_DIR}}/third_party/proto', UPDATE: '{{.UPDATE}}'}
 
   openapi:
     desc: Generate OpenAPI from proto, apply the overlay, compare with the committed file, lint

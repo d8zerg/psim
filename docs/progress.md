@@ -14,13 +14,24 @@
 | 0.4 | Пакет ADR | утверждён | [реестр ADR](adr/README.md): 17 приняты, 10 предложены (принимаются в начале своих шагов) |
 | 0.5 | Контракты v1 | утверждён | [contracts/](../contracts/README.md): proto, OpenAPI, AsyncAPI, реестр топиков, таксономия, каталог ошибок; проверка `task contracts:check`; ADR-028 (ClickHouse), ADR-029 |
 | 0.6 | Модель угроз и требования безопасности | утверждён | [threat-model](security/threat-model.md), [реестр угроз и требований](security/threat-register.md) (источник - [threat-model.yaml](security/threat-model.yaml)); проверка `task docs:threats` |
-| 0.7 | Стратегия качества и верификации | готов | [strategy](quality/strategy.md), [матрица верификации](quality/verification-matrix.md) (источник - [verification.yaml](quality/verification.yaml)), [сверка](quality/reconciliation.md), [замер задержек](quality/latency-measurement.md), ADR-031; проверка `task docs:verification` |
+| 0.7 | Стратегия качества и верификации | утверждён | [strategy](quality/strategy.md), [матрица верификации](quality/verification-matrix.md) (источник - [verification.yaml](quality/verification.yaml)), [сверка](quality/reconciliation.md), [замер задержек](quality/latency-measurement.md), ADR-031; проверка `task docs:verification` |
 
-**Веха M0** (документы Ф0 утверждены, контракты v1 опубликованы, ADR приняты): все шаги Ф0 выполнены, ожидается утверждение шага 0.7. Решения со статусом «Предложено» принимаются в начале своих шагов (реестр ADR).
+**Веха M0** (документы Ф0 утверждены, контракты v1 опубликованы, ADR приняты): пройдена. Решения со статусом «Предложено» принимаются в начале своих шагов (реестр ADR).
 
-## Ф1-Ф11
+## Ф1. Инженерная платформа
 
-Не начаты. Статусы шагов добавляются по мере начала фазы.
+| Шаг | Название | Статус | Артефакты |
+|---|---|---|---|
+| 1.1 | Монорепозиторий и toolchain | готов | [ADR-032](adr/0032-cpp-toolchain.md), `tools/toolchain`, `CMakePresets.json`, `conanfile.py`, `task cpp:*` |
+| 1.2 | Контроль качества кода | не начат | |
+| 1.3 | CI/CD и цепочка поставки | не начат | |
+| 1.4 | Локальное окружение | не начат | |
+| 1.5 | Веб-монорепозиторий | не начат | |
+| 1.6 | Документация как код | не начат | |
+
+## Ф2-Ф11
+
+Не начаты.
 
 ## Открытые решения владельца
 
