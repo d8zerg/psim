@@ -1,0 +1,71 @@
+# clang-tidy profile of PSIM (step 1.2, ADR-033): 0 findings is the gate (FF-10, SEC-01).
+# Run: task cpp:lint. Suppressions in code need NOLINT(<check>) with a reason after it.
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  concurrency-*,
+  cppcoreguidelines-*,
+  misc-*,
+  modernize-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -cppcoreguidelines-avoid-magic-numbers,
+  -cppcoreguidelines-pro-bounds-constant-array-index,
+  -cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+  -misc-non-private-member-variables-in-classes,
+  -misc-no-recursion,
+  -modernize-use-trailing-return-type,
+  -modernize-use-nodiscard,
+  -readability-identifier-length,
+  -readability-magic-numbers,
+  -readability-function-cognitive-complexity,
+  -portability-avoid-pragma-once
+WarningsAsErrors: '*'
+# Project headers only; generated code (build/) and vendored code (third_party/) are skipped.
+HeaderFilterRegex: '/(libs|services|connectors|tools|contracts/tests)/'
+ExcludeHeaderFilterRegex: '/(build|third_party)/'
+SystemHeaders: false
+FormatStyle: file
+CheckOptions:
+  # Naming (coding standard, section "Naming"): snake_case, CamelCase types, trailing _ for private members.
+  readability-identifier-naming.NamespaceCase: lower_case
+  readability-identifier-naming.ClassCase: CamelCase
+  readability-identifier-naming.StructCase: CamelCase
+  readability-identifier-naming.EnumCase: CamelCase
+  readability-identifier-naming.EnumConstantCase: CamelCase
+  readability-identifier-naming.EnumConstantPrefix: k
+  readability-identifier-naming.TypeAliasCase: CamelCase
+  readability-identifier-naming.TypedefCase: CamelCase
+  readability-identifier-naming.ConceptCase: CamelCase
+  readability-identifier-naming.TemplateParameterCase: CamelCase
+  readability-identifier-naming.FunctionCase: lower_case
+  readability-identifier-naming.MethodCase: lower_case
+  readability-identifier-naming.VariableCase: lower_case
+  readability-identifier-naming.ParameterCase: lower_case
+  readability-identifier-naming.MemberCase: lower_case
+  readability-identifier-naming.PrivateMemberCase: lower_case
+  readability-identifier-naming.PrivateMemberSuffix: _
+  readability-identifier-naming.ProtectedMemberCase: lower_case
+  readability-identifier-naming.ProtectedMemberSuffix: _
+  readability-identifier-naming.ConstexprVariableCase: CamelCase
+  readability-identifier-naming.ConstexprVariablePrefix: k
+  readability-identifier-naming.GlobalConstantCase: CamelCase
+  readability-identifier-naming.GlobalConstantPrefix: k
+  readability-identifier-naming.StaticConstantCase: CamelCase
+  readability-identifier-naming.StaticConstantPrefix: k
+  readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
+  readability-identifier-naming.MacroDefinitionPrefix: PSIM_
+  # Include control replaces include-what-you-use (ADR-033). gtest and gmock are used through
+  # their umbrella headers.
+  misc-include-cleaner.IgnoreHeaders: 'gtest/.*;gmock/.*'
+  misc-include-cleaner.DeduplicateFindings: true
+  readability-implicit-bool-conversion.AllowPointerConditions: true
+  readability-braces-around-statements.ShortStatementLines: 0
+  cppcoreguidelines-special-member-functions.AllowSoleDefaultDtor: true
+  cppcoreguidelines-rvalue-reference-param-not-moved.AllowPartialMove: true
+  performance-unnecessary-value-param.AllowedTypes: 'std::shared_ptr;std::span;std::string_view'
+  bugprone-unused-return-value.AllowCastToVoid: true

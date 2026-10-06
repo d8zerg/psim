@@ -8,6 +8,7 @@
 #include "psim/common/v1/envelope.pb.h"
 #include "psim/connector/v1/connector.grpc.pb.h"
 #include "psim/incident/v1/events.pb.h"
+#include "psim/incident/v1/incident.pb.h"
 
 namespace {
 

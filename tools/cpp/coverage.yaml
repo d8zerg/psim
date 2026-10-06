@@ -1,0 +1,14 @@
+# Coverage thresholds of C++ code (FF-12, strategy.md section 6, ADR-033). Checked by `task cpp:coverage`.
+# Each module (a directory matching a pattern) is checked separately, so a well-tested module
+# cannot hide an untested one. Patterns are globs relative to the repository root; the first
+# matching group wins. Files outside every group are reported but not gated.
+# Tests, generated code (build/), vendored code (third_party/) and dependencies are excluded.
+
+groups:
+  - name: domain
+    modules: ['libs/domain/*']
+    lines: 90
+    branches: 80
+  - name: infrastructure
+    modules: ['libs/platform/*', 'services/*/adapters']
+    lines: 75

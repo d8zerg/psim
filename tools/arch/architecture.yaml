@@ -1,0 +1,53 @@
+# Module boundaries of the monorepo (ADR-001), checked by `task arch:deps` (FF-01).
+# Both the CMake target graph (File API code model) and #include directives are checked.
+
+# Source directories -> module kinds; the first matching pattern wins. A module is the directory
+# matched by the pattern (for example libs/domain/incident); a target belongs to the module of its
+# CMakeLists.txt directory. Targets and sources outside every pattern are reported as errors.
+modules:
+  - {pattern: 'libs/domain/common', kind: domain-common}
+  - {pattern: 'libs/domain/*', kind: domain}
+  - {pattern: 'libs/platform/*', kind: platform}
+  - {pattern: 'libs/sim', kind: sim}
+  - {pattern: 'contracts', kind: contracts}
+  - {pattern: 'services/*', kind: service}
+  - {pattern: 'connectors/*', kind: connector}
+  - {pattern: 'tools/*', kind: tool}
+
+# Module kinds each kind may depend on; a module may always depend on itself. Test targets
+# (all sources under tests/) may additionally use the simulation bench.
+allowed:
+  domain-common: []
+  domain: [domain-common]                                  # rules 1 and 3: no infrastructure, no other context
+  platform: [platform, contracts]
+  sim: [domain-common, domain, platform, contracts]
+  contracts: []
+  service: [domain-common, domain, platform, contracts]    # rule 2: no other service; domain - see services
+  connector: [connector, platform, contracts]
+  tool: [platform, contracts]
+test_extra: [sim]
+
+# Include prefixes -> module kinds and, for domain, the context. Contract headers are generated
+# under psim/<package>/v<N>/.
+includes:
+  - {prefix: 'psim/domain/common/', kind: domain-common}
+  - {prefix: 'psim/domain/', kind: domain}
+  - {prefix: 'psim/platform/', kind: platform}
+  - {prefix: 'psim/sim/', kind: sim}
+  - {regex: '^psim/[a-z_]+/v[0-9]+/', kind: contracts}
+
+# Domain contexts each service may use (rule 2: a service depends on its own domain core).
+# A new service must be listed here.
+services:
+  connector-gateway: [ingest]
+  resource-catalog: [catalog]
+  normalizer: [processing]
+  event-history: [processing]
+  correlation-engine: [processing]
+  incident-service: [incident]
+  response-engine: [response]
+  command-service: [response]
+  notification-service: [response]
+  projection-service: [access]
+  audit-service: [audit]
+  api-gateway: [access]

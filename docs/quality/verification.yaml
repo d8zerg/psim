@@ -38,7 +38,7 @@ methods:
     gate: pr
     barrier: automated
     task: task cpp:test:component
-    steps: ['1.4', '2.3', '2.4', '2.5']
+    steps: ['1.4', '2.3', '2.4', '2.5', '2.8']
   - id: TS-04
     kind: test
     name: Проверка контрактов
@@ -465,7 +465,7 @@ methods:
     gate: pr
     barrier: automated
     task: task arch:tenant
-    steps: ['2.4']
+    steps: ['2.4', '2.8']
     purpose: Мультитенантность (ADR-022)
   - id: FF-04
     kind: fitness
@@ -578,6 +578,26 @@ methods:
     barrier: automated
     task: task cpp:runtime-test
     steps: ['1.1']
+  - id: FF-16
+    kind: fitness
+    name: Формат кода C++
+    criteria: clang-format по .clang-format не меняет ни одного файла проекта
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task cpp:format
+    steps: ['1.2']
+    purpose: Стандарт кодирования (шаг 1.2, ADR-033)
+  - id: FF-17
+    kind: fitness
+    name: Самопроверка fitness functions
+    criteria: Для каждого правила arch:deps, arch:domain-purity, arch:sql тест с нарушением даёт отказ
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task arch:selftest
+    steps: ['1.2']
+    purpose: Достоверность архитектурных проверок при пустом доменном ядре (ADR-033)
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01

@@ -49,3 +49,9 @@
 - [Матрица верификации](quality/verification-matrix.md) (генерируется из [verification.yaml](quality/verification.yaml))
 - [Методика сквозной сверки потерь и дубликатов](quality/reconciliation.md)
 - [Методика замера задержек](quality/latency-measurement.md)
+
+## Инженерная платформа (шаги 1.1-1.2)
+
+- [Стандарт кодирования C++23](engineering/cpp-coding-standard.md)
+- [Стандарт кодирования TypeScript](engineering/typescript-coding-standard.md)
+- Барьеры качества и fitness functions - [ADR-033](adr/0033-code-quality-gates.md); toolchain - [ADR-032](adr/0032-cpp-toolchain.md)

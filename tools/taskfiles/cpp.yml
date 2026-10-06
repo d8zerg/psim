@@ -1,4 +1,5 @@
-# C++ build: Conan dependencies, CMake presets, tests, reproducibility (step 1.1, ADR-032).
+# C++ build: Conan dependencies, CMake presets, tests, reproducibility (step 1.1, ADR-032);
+# quality gates: formatting, clang-tidy, sanitizers, coverage (step 1.2, ADR-033).
 # Namespace "cpp"; working directory is the repository root.
 # Build commands run in the toolchain container (Debian 12 base); inside the container
 # (PSIM_IN_TOOLCHAIN=1) they run directly. Artifacts are verified on the target platforms by
@@ -9,8 +10,12 @@ version: '3'
 
 vars:
   PROFILE: tools/conan/profiles/clang21-libcxx
-  # Build platform of the toolchain; build directories are build/<PLATFORM>/<preset>.
-  PLATFORM: debian12
+  # Dependencies instrumented with ThreadSanitizer for the tsan preset (ADR-033).
+  PROFILE_TSAN: tools/conan/profiles/clang21-libcxx-tsan
+  # Project C++ sources: formatting and clang-tidy scope (generated and vendored code excluded).
+  CXX_FILES: git ls-files -co --exclude-standard -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**'
+  # Translation units checked by clang-tidy (regex over compile_commands.json entries).
+  TIDY_SCOPE: '^/repo/(libs|services|connectors|tools|contracts/tests)/'
 
 tasks:
   build:
@@ -18,10 +23,22 @@ tasks:
     vars:
       PRESET: '{{.PRESET | default "debug"}}'
     cmds:
-      - task: deps
+      - task: configure
+        vars: {PRESET: '{{.PRESET}}'}
       - task: _run
         vars:
-          CMD: cmake --preset {{.PRESET}} && cmake --build --preset {{.PRESET}} -j {{.JOBS}}
+          CMD: cmake --build --preset {{.PRESET}} -j {{.JOBS}}
+
+  configure:
+    desc: Install dependencies and configure PRESET (also writes the CMake File API code model)
+    vars:
+      PRESET: '{{.PRESET | default "debug"}}'
+      QUERY: build/{{.PLATFORM}}/{{.PRESET}}/.cmake/api/v1/query
+    cmds:
+      - task: '{{if eq .PRESET "tsan"}}deps:tsan{{else}}deps{{end}}'
+      - task: _run
+        vars:
+          CMD: mkdir -p {{.QUERY}} && touch {{.QUERY}}/codemodel-v2 && cmake --preset {{.PRESET}} >/dev/null
 
   test:
     desc: Build and run tests of PRESET in the toolchain
@@ -33,6 +50,49 @@ tasks:
       - task: _run
         vars:
           CMD: ctest --preset {{.PRESET}} -j {{.JOBS}}
+
+  test:sanitizers:
+    desc: Run tests under ASan+UBSan and under TSan (FF-11)
+    cmds:
+      - task: test
+        vars: {PRESET: asan}
+      - task: test
+        vars: {PRESET: tsan}
+
+  coverage:
+    desc: Measure llvm-cov coverage of the tests and enforce thresholds (FF-12)
+    cmds:
+      - task: build
+        vars: {PRESET: coverage}
+      - task: _run
+        vars:
+          CMD: >-
+            rm -rf build/{{.PLATFORM}}/coverage/profiles &&
+            ctest --preset coverage -j {{.JOBS}} &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+
+  format:
+    desc: Check formatting of C++ sources with clang-format (FILES limits the check)
+    cmds:
+      - task: _run
+        vars:
+          CMD: '{{if .FILES}}printf "%s\n" {{.FILES}}{{else}}{{.CXX_FILES}}{{end}} | xargs -r clang-format --dry-run -Werror'
+
+  format:fix:
+    desc: Format C++ sources in place
+    cmds:
+      - task: _run
+        vars:
+          CMD: '{{.CXX_FILES}} | xargs -r clang-format -i'
+
+  lint:
+    desc: Run clang-tidy with the project profile; any finding fails (FF-10, SEC-01)
+    cmds:
+      - task: build
+        vars: {PRESET: debug}
+      - task: _run
+        vars:
+          CMD: run-clang-tidy -p build/{{.PLATFORM}}/debug -quiet -j {{.JOBS}} '{{.TIDY_SCOPE}}'
 
   deps:
     desc: Build or fetch Conan dependencies (Release, pinned by conan.lock)
@@ -48,6 +108,22 @@ tasks:
           CMD: >-
             conan install . -pr:a {{.PROFILE}} --lockfile=conan.lock --build=missing
             -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan
+
+  deps:tsan:
+    desc: Build or fetch Conan dependencies instrumented with ThreadSanitizer (tsan preset)
+    sources:
+      - conanfile.py
+      - conan.lock
+      - '{{.PROFILE}}'
+      - '{{.PROFILE_TSAN}}'
+    generates:
+      - build/{{.PLATFORM}}/conan-tsan/conan_toolchain.cmake
+    cmds:
+      - task: _run
+        vars:
+          CMD: >-
+            conan install . -pr:h {{.PROFILE_TSAN}} -pr:b {{.PROFILE}} --lockfile=conan.lock --build=missing
+            -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan-tsan
 
   lock:
     desc: Re-resolve dependency versions into conan.lock (after changing conanfile.py)

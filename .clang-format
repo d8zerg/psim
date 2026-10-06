@@ -1,0 +1,30 @@
+# C++ formatting of PSIM (step 1.2, coding standard: docs/engineering/cpp-coding-standard.md).
+# clang-format 21 from the toolchain image; check: task cpp:format, fix: task cpp:format:fix.
+BasedOnStyle: Google
+Language: Cpp
+Standard: Latest
+ColumnLimit: 120
+IndentWidth: 2
+AccessModifierOffset: -1
+DerivePointerAlignment: false
+PointerAlignment: Left
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortLambdasOnASingleLine: Inline
+BreakBeforeBinaryOperators: NonAssignment
+InsertBraces: true
+InsertNewlineAtEOF: true
+RemoveSemicolon: true
+SeparateDefinitionBlocks: Always
+# Includes: own header, third-party <x/y.h>, standard library <x>, project "psim/...".
+SortIncludes: CaseSensitive
+IncludeBlocks: Regroup
+IncludeIsMainRegex: '(_test)?$'
+IncludeCategories:
+  - Regex: '^<[^>]*\.(h|hpp)>$'
+    Priority: 2
+  - Regex: '^<[^>]*>$'
+    Priority: 3
+  - Regex: '^"'
+    Priority: 4

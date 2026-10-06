@@ -17,6 +17,8 @@ vars:
   TOOLCHAIN_IMAGE:
     sh: echo "psim/toolchain:debian12-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
   TOOLCHAIN_BASE: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+  # Build platform of the toolchain; build directories are build/<PLATFORM>/<preset>.
+  PLATFORM: debian12
   RUNTIME_IMAGES:
     map:
       debian12: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
@@ -38,6 +40,9 @@ includes:
   cpp:
     taskfile: ./tools/taskfiles/cpp.yml
     dir: .
+  arch:
+    taskfile: ./tools/taskfiles/arch.yml
+    dir: .
   contracts:
     taskfile: ./contracts/Taskfile.yml
     dir: ./contracts
@@ -53,12 +58,56 @@ tasks:
       - "{{.TASK_EXE}} --list"
 
   check:
-    desc: Run every check (contracts, C++ build and tests, documentation); the CI gate
+    desc: Run every check (contracts, architecture, C++ quality gates and tests, documentation); the CI gate
     cmds:
       - task: contracts:check
+      - task: arch:check
+      - task: cpp:format
+      - task: cpp:lint
       - task: cpp:test
+      - task: cpp:test:sanitizers
+      - task: cpp:coverage
       - task: cpp:runtime-test
       - task: docs:check
+
+  hooks:install:
+    desc: Use the repository git hooks (tools/git-hooks) in this clone
+    cmds:
+      - git config core.hooksPath tools/git-hooks
+      - 'echo "git hooks path: tools/git-hooks (pre-commit)"'
+
+  hooks:pre-commit:
+    desc: 'Fast checks of staged files: whitespace, C++ format, proto format, domain purity, SQL, docs'
+    vars:
+      STAGED_CXX:
+        sh: git diff --cached --name-only --diff-filter=ACMR -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**' | tr '\n' ' '
+      STAGED_PROTO:
+        sh: git diff --cached --name-only --diff-filter=ACMR -- 'contracts/proto/*.proto' | tr '\n' ' '
+    cmds:
+      - git diff --cached --check
+      - task: _hook_cxx
+        vars: {FILES: '{{.STAGED_CXX}}'}
+      - task: _hook_proto
+        vars: {FILES: '{{.STAGED_PROTO}}'}
+      - task: arch:domain-purity
+      - task: arch:sql
+      - task: docs:typography
+      - task: docs:links
+
+  _hook_cxx:
+    internal: true
+    status:
+      - test -z "{{.FILES}}"
+    cmds:
+      - task: cpp:format
+        vars: {FILES: '{{.FILES}}'}
+
+  _hook_proto:
+    internal: true
+    status:
+      - test -z "{{.FILES}}"
+    cmds:
+      - task: contracts:format
 
   gen:
     desc: Regenerate all committed generated artifacts

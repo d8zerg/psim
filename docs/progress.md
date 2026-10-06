@@ -22,8 +22,8 @@
 
 | Шаг | Название | Статус | Артефакты |
 |---|---|---|---|
-| 1.1 | Монорепозиторий и toolchain | готов | [ADR-032](adr/0032-cpp-toolchain.md), `tools/toolchain`, `CMakePresets.json`, `conanfile.py`, `task cpp:*` |
-| 1.2 | Контроль качества кода | не начат | |
+| 1.1 | Монорепозиторий и toolchain | утверждён | [ADR-032](adr/0032-cpp-toolchain.md), `tools/toolchain`, `CMakePresets.json`, `conanfile.py`, `task cpp:*` |
+| 1.2 | Контроль качества кода | готов | [ADR-033](adr/0033-code-quality-gates.md), [стандарт C++](engineering/cpp-coding-standard.md), [стандарт TypeScript](engineering/typescript-coding-standard.md), `.clang-format`, `.clang-tidy`, `tools/arch`, `tools/git-hooks`; проверки `task cpp:format`, `cpp:lint`, `cpp:test:sanitizers`, `cpp:coverage`, `arch:check`; барьер - `task check` |
 | 1.3 | CI/CD и цепочка поставки | не начат | |
 | 1.4 | Локальное окружение | не начат | |
 | 1.5 | Веб-монорепозиторий | не начат | |

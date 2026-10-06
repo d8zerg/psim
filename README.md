@@ -1,6 +1,6 @@
 # PSIM Platform
 
-Вендор-нейтральная платформа управления ситуациями в физической безопасности (PSIM). Статус: разработка MVP, фаза Ф0 - архитектура и контракты.
+Вендор-нейтральная платформа управления ситуациями в физической безопасности (PSIM). Статус: разработка MVP, фаза Ф1 - инженерная платформа.
 
 - [Документация](docs/README.md) · [план MVP](docs/psim-mvp-development-plan.md) · [прогресс](docs/progress.md)
 - [Архитектура](docs/architecture/README.md) · [ADR](docs/adr/README.md) · [контракты](contracts/README.md)
@@ -13,10 +13,16 @@
 
 ```
 task                          # список задач
-task check                    # все проверки: контракты, сборка и тесты C++, документация
+task check                    # все проверки - барьер слияния (контракты, архитектура, качество C++, тесты, документация)
+task hooks:install            # подключить git-хук pre-commit (быстрые проверки перед коммитом)
 task gen                      # перегенерировать сгенерированные файлы
 task cpp:build                # собрать (PRESET=debug|release|relwithdebinfo|asan|tsan|coverage)
 task cpp:test                 # собрать и запустить тесты
+task cpp:format               # проверить формат C++ (task cpp:format:fix - исправить)
+task cpp:lint                 # clang-tidy по профилю проекта
+task cpp:test:sanitizers      # тесты под ASan+UBSan и TSan
+task cpp:coverage             # покрытие и пороги по модулям
+task arch:check               # fitness functions: зависимости модулей, чистота домена, SQL
 task cpp:runtime-test         # запустить собранные тесты на Debian 12 и Astra Linux 1.8
 task cpp:reproducible         # проверить воспроизводимость сборки
 task toolchain:shell          # оболочка в контейнере toolchain

@@ -3,6 +3,7 @@
 #include <google/protobuf/util/json_util.h>
 
 #include <cstdio>
+#include <exception>
 #include <print>
 #include <span>
 #include <string>
@@ -43,10 +44,7 @@ int usage() {
   return 2;
 }
 
-}  // namespace
-
-int main(int argc, char** argv) {
-  const std::span<char*> args(argv, static_cast<std::size_t>(argc));
+int run(std::span<char*> args) {
   if (args.size() == 2 && std::string_view{args[1]} == "version") {
     return print_version();
   }
@@ -54,4 +52,19 @@ int main(int argc, char** argv) {
     return print_envelope_sample();
   }
   return usage();
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+  // Exceptions of the standard library and protobuf stop here, with a message instead of std::terminate.
+  try {
+    return run(std::span<char*>(argv, static_cast<std::size_t>(argc)));
+  } catch (const std::exception& e) {
+    // Non-throwing output; nothing is left to do if stderr itself fails.
+    (void)std::fputs("psimctl: ", stderr);
+    (void)std::fputs(e.what(), stderr);
+    (void)std::fputs("\n", stderr);
+    return 1;
+  }
 }

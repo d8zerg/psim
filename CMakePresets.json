@@ -25,6 +25,7 @@
     {"name": "asan", "displayName": "Debug + AddressSanitizer + UBSan", "inherits": "base",
      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "PSIM_SANITIZE": "address;undefined"}},
     {"name": "tsan", "displayName": "RelWithDebInfo + ThreadSanitizer", "inherits": "base",
+     "toolchainFile": "${sourceDir}/build/$env{PSIM_PLATFORM}/conan-tsan/conan_toolchain.cmake",
      "cacheVariables": {"CMAKE_BUILD_TYPE": "RelWithDebInfo", "PSIM_SANITIZE": "thread"}},
     {"name": "coverage", "displayName": "Debug + llvm-cov coverage", "inherits": "base",
      "cacheVariables": {"CMAKE_BUILD_TYPE": "Debug", "PSIM_COVERAGE": "ON"}}

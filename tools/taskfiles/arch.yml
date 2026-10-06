@@ -1,0 +1,37 @@
+# Architecture fitness functions (step 1.2, ADR-001, ADR-033). Namespace "arch"; working directory
+# is the repository root. Rules: tools/arch/architecture.yaml.
+version: '3'
+
+vars:
+  ARCH: '{{.PYTHON}} tools/arch/arch_check.py'
+
+tasks:
+  check:
+    desc: Run all architecture fitness functions and their self-tests
+    cmds:
+      - task: selftest
+      - task: deps
+      - task: domain-purity
+      - task: sql
+
+  selftest:
+    desc: Prove that every fitness function catches its violation (unit tests of the checks)
+    cmds:
+      - '{{.PYTHON}} -m unittest discover -s tools/arch -t tools/arch'
+
+  deps:
+    desc: 'Module dependency directions: CMake target graph and #include (FF-01)'
+    cmds:
+      - task: :cpp:configure
+        vars: {PRESET: debug}
+      - '{{.ARCH}} deps . build/{{.PLATFORM}}/debug'
+
+  domain-purity:
+    desc: No system clocks, randomness, I/O, threads or exceptions in libs/domain (FF-02)
+    cmds:
+      - '{{.ARCH}} purity .'
+
+  sql:
+    desc: SQL text is never composed at run time (FF-07, SR-13)
+    cmds:
+      - '{{.ARCH}} sql .'

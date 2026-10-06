@@ -57,6 +57,7 @@ tasks:
     desc: Regenerate the threat register from the registry
     cmds:
       - task: threats
+        vars: {UPDATE: 'true'}
       - task: verification
         vars: {UPDATE: 'true'}
 

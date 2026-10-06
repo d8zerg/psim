@@ -9,10 +9,13 @@ endif()
 
 # --- Common flags for all code -------------------------------------------------------------
 # Reproducible builds: no absolute paths in debug info and macros, stable build id, no dates.
-add_compile_options(
-  "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=."
-  "-ffile-prefix-map=${CMAKE_BINARY_DIR}=."
-  -fno-record-gcc-switches)
+# Coverage builds keep absolute paths: llvm-cov resolves sources through them (ADR-033).
+if(NOT PSIM_COVERAGE)
+  add_compile_options(
+    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=."
+    "-ffile-prefix-map=${CMAKE_BINARY_DIR}=.")
+endif()
+add_compile_options(-fno-record-gcc-switches)
 add_link_options(-fuse-ld=lld LINKER:--build-id=sha1)
 
 # Hardening (all configurations): stack protection, control-flow protection, full RELRO, PIE.
