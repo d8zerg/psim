@@ -40,6 +40,8 @@ vars:
   VERSION:
     sh: sed -n 's/^  VERSION \([0-9.]*\)$/\1/p' {{.ROOT_DIR}}/CMakeLists.txt
   IMAGES: psimctl
+  # Scope of the last `task ci` run (tools/ci/scope.py).
+  CI_SCOPE: build/{{.PLATFORM}}/ci-scope.json
 
 includes:
   toolchain:
@@ -88,22 +90,68 @@ tasks:
       - task: docs:check
 
   ci:
-    desc: 'Local CI pipeline, the gate of every push (ADR-034): checks, dependencies, benchmarks, packages, images'
+    desc: 'Local CI pipeline, the gate of every push (ADR-034); checks what changed against origin/master (FULL=true: all)'
+    vars:
+      FULL: '{{.FULL | default "false"}}'
     cmds:
-      - task: check                  # build, static analysis, unit tests, sanitizers, coverage, contracts, docs
-      # Integration tests against the local environment join here with step 1.4 (TS-03).
-      - task: security:deps          # SEC-02
-      - task: bench:compare          # B-05
-      - task: release:package:test   # FF-18
-      - task: release:images:test    # SR-24
+      - task: cpp:configure
+        vars: {PRESET: debug}
+      - '{{.PYTHON}} tools/ci/scope.py compute . build/{{.PLATFORM}}/debug {{.CI_SCOPE}} {{.FULL}}'
+      - task: _ci_stages
       - task: _ci_record
 
+  _ci_stages:
+    internal: true
+    vars:
+      CPP: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} cpp'}
+      CONTRACTS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} contracts'}
+      DOCS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} docs'}
+      DEPS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} deps'}
+      RELEASE: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} release'}
+      BENCH: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} bench'}
+      LABELS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} labels'}
+      TIDY: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} tidy'}
+      MODULES: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} modules'}
+      BENCHES: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} benches'}
+    cmds:
+      - task: contracts:check                 # TS-04
+        if: '[ "{{.CONTRACTS}}" = true ]'
+      - task: arch:check                      # FF-01, FF-02, FF-07, FF-17
+      - task: cpp:format                      # FF-16
+      - task: cpp:lint                        # FF-10, SEC-01 (affected translation units)
+        vars: {FILES: '{{.TIDY}}'}
+        if: '[ "{{.CPP}}" = true ]'
+      - task: cpp:test                        # TS-01 (affected targets)
+        vars: {LABELS: '{{.LABELS}}'}
+        if: '[ "{{.CPP}}" = true ]'
+      - task: cpp:test:sanitizers             # FF-11
+        vars: {LABELS: '{{.LABELS}}'}
+        if: '[ "{{.CPP}}" = true ]'
+      - task: cpp:coverage                    # FF-12 (affected modules)
+        vars: {LABELS: '{{.LABELS}}', MODULES: '{{.MODULES}}'}
+        if: '[ "{{.CPP}}" = true ]'
+      - task: cpp:runtime-test                # FF-15
+        if: '[ "{{.CPP}}" = true ]'
+      # Integration tests against the local environment join here with step 1.4 (TS-03).
+      - task: docs:check                      # FF-08
+        if: '[ "{{.DOCS}}" = true ]'
+      - task: security:deps                   # SEC-02
+        if: '[ "{{.DEPS}}" = true ]'
+      - task: bench:compare                   # B-05
+        vars: {BENCHES: '{{.BENCHES}}'}
+        if: '[ "{{.BENCH}}" = true ]'
+      - task: release:package:test            # FF-18
+        if: '[ "{{.RELEASE}}" = true ]'
+      - task: release:images:test             # FF-19
+        if: '[ "{{.RELEASE}}" = true ]'
+
   ci:nightly:
-    desc: Nightly pipeline on master - ci plus reproducibility and image scanning
+    desc: Nightly pipeline - ci over the full scope plus reproducibility and image scanning
     cmds:
       - task: ci
-      - task: cpp:reproducible       # FF-13
-      - task: security:images        # SEC-03
+        vars: {FULL: 'true'}
+      - task: cpp:reproducible                # FF-13
+      - task: security:images                 # SEC-03
 
   release:
     desc: Release pipeline - nightly checks, signed release directory, verification (FF-14)
@@ -129,19 +177,39 @@ tasks:
             echo "ci: passed for $sha"
           fi
 
+  ci:run:
+    desc: 'Run the pipeline for a commit in the dedicated clone: task ci:run SHA=<commit> (default HEAD)'
+    cmds:
+      - sh tools/ci/runner.sh {{.SHA | default "HEAD"}}
+
   ci:status:
-    desc: 'Exit 0 when the pipeline passed for a commit: task ci:status SHA=<commit> (default HEAD)'
+    desc: 'Pipeline state of a commit - passed, FAILED, running or none; exit 0 only when passed (SHA, default HEAD)'
+    silent: true
     vars:
       SHA:
         sh: git rev-parse {{.SHA | default "HEAD"}}
     cmds:
-      - test -f {{.CACHE}}/ci/{{.SHA}}.ok
+      - cmd: |
+          ci={{.CACHE}}/ci; sha={{.SHA}}
+          if [ -f "$ci/$sha.running" ] && kill -0 "$(cat "$ci/$sha.running")" 2>/dev/null; then echo "$sha: running"; exit 1
+          elif [ -f "$ci/$sha.ok" ]; then echo "$sha: $(cat "$ci/$sha.ok")"
+          elif [ -f "$ci/$sha.failed" ]; then echo "$sha: $(cat "$ci/$sha.failed")"; exit 1
+          else echo "$sha: no pipeline record"; exit 1; fi
+
+  ci:log:
+    desc: 'Follow the pipeline log of a commit (SHA, default HEAD)'
+    interactive: true
+    vars:
+      SHA:
+        sh: git rev-parse {{.SHA | default "HEAD"}}
+    cmds:
+      - tail -n 50 -F {{.CACHE}}/ci/{{.SHA}}.log
 
   hooks:install:
     desc: Use the repository git hooks (tools/git-hooks) in this clone
     cmds:
       - git config core.hooksPath tools/git-hooks
-      - 'echo "git hooks path: tools/git-hooks (pre-commit, pre-push)"'
+      - 'echo "git hooks path: tools/git-hooks (pre-commit, post-commit, pre-push)"'
 
   hooks:pre-commit:
     desc: 'Fast checks of staged files: whitespace, C++ format, proto format, domain purity, SQL, docs'

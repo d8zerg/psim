@@ -6,6 +6,9 @@
 # runtime-test (Debian 12, Astra Linux 1.8).
 #   PRESET    debug (default) | release | relwithdebinfo | asan | tsan | coverage
 #   JOBS      parallel jobs (default: half of the CPUs)
+#   LABELS    ctest label regex limiting the tests (task ci passes affected targets; empty: all)
+#   FILES     translation units for clang-tidy (task ci passes affected ones; empty: all)
+#   MODULES   coverage modules to gate (task ci passes affected ones; empty: all)
 version: '3'
 
 vars:
@@ -49,15 +52,15 @@ tasks:
         vars: {PRESET: '{{.PRESET}}'}
       - task: _run
         vars:
-          CMD: ctest --preset {{.PRESET}} -j {{.JOBS}}
+          CMD: ctest --preset {{.PRESET}} -j {{.JOBS}}{{if .LABELS}} -L '{{.LABELS}}' --no-tests=ignore{{end}}
 
   test:sanitizers:
     desc: Run tests under ASan+UBSan and under TSan (FF-11)
     cmds:
       - task: test
-        vars: {PRESET: asan}
+        vars: {PRESET: asan, LABELS: '{{.LABELS}}'}
       - task: test
-        vars: {PRESET: tsan}
+        vars: {PRESET: tsan, LABELS: '{{.LABELS}}'}
 
   coverage:
     desc: Measure llvm-cov coverage of the tests and enforce thresholds (FF-12)
@@ -68,8 +71,8 @@ tasks:
         vars:
           CMD: >-
             rm -rf build/{{.PLATFORM}}/coverage/profiles &&
-            ctest --preset coverage -j {{.JOBS}} &&
-            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+            ctest --preset coverage -j {{.JOBS}}{{if .LABELS}} -L '{{.LABELS}}' --no-tests=ignore{{end}} &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml '{{.MODULES}}'
 
   format:
     desc: Check formatting of C++ sources with clang-format (FILES limits the check)
@@ -92,7 +95,9 @@ tasks:
         vars: {PRESET: debug}
       - task: _run
         vars:
-          CMD: run-clang-tidy -p build/{{.PLATFORM}}/debug -quiet -j {{.JOBS}} '{{.TIDY_SCOPE}}'
+          CMD: >-
+            run-clang-tidy -p build/{{.PLATFORM}}/debug -quiet -j {{.JOBS}}
+            {{if .FILES}}{{range splitList " " .FILES}}'^/repo/{{.}}$' {{end}}{{else}}'{{.TIDY_SCOPE}}'{{end}}
 
   deps:
     desc: Build or fetch Conan dependencies (Release, pinned by conan.lock)

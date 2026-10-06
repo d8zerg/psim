@@ -63,7 +63,8 @@ function(psim_add_test name)
   psim_target_defaults(${name})
   target_link_libraries(${name} PRIVATE ${ARG_LIBS} GTest::gtest_main)
   include(GoogleTest)
-  gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST PROPERTIES LABELS unit)
+  # The target name is a label too: `task ci` selects tests of affected targets by label.
+  gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST PROPERTIES LABELS "unit;${name}")
 endfunction()
 
 # psim_add_benchmark(<name> SOURCES ... LIBS ...): Google Benchmark executable <name> (suffix
@@ -76,5 +77,5 @@ function(psim_add_benchmark name)
   psim_target_defaults(${name})
   target_link_libraries(${name} PRIVATE ${ARG_LIBS} benchmark::benchmark_main)
   add_test(NAME ${name} COMMAND ${name} --benchmark_min_time=1x)
-  set_tests_properties(${name} PROPERTIES LABELS benchmark)
+  set_tests_properties(${name} PROPERTIES LABELS "benchmark;${name}")
 endfunction()

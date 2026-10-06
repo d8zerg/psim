@@ -4,7 +4,8 @@
 Runs in the toolchain container after `ctest --preset coverage`. Thresholds and module groups are
 read from coverage.yaml. Reports: <build-dir>/coverage-report.txt and <build-dir>/coverage-html/.
 
-Usage: coverage.py <coverage-build-dir> <coverage.yaml>
+Usage: coverage.py <coverage-build-dir> <coverage.yaml> [modules]
+  modules  space-separated module directories to gate (task ci passes the affected ones); empty: all
 """
 
 import fnmatch
@@ -59,14 +60,18 @@ def gated_modules(groups, root):
     return found
 
 
-def evaluate(files, groups, root):
-    """Aggregate per-file summaries by module; return (rows, failures)."""
+def evaluate(files, groups, root, only=None):
+    """Aggregate per-file summaries by module; return (rows, failures). only: modules to gate."""
     modules = {}
     for name, group in gated_modules(groups, root).items():
+        if only and name not in only:
+            continue
         modules[name] = {"group": group, "lines": [0, 0], "branches": [0, 0]}
     for f in files:
         rel = os.path.relpath(f["filename"], root)
         group, module = module_of(rel, groups)
+        if only and module not in only:
+            group, module = None, None
         key = module or "(ungated)"
         m = modules.setdefault(key, {"group": group, "lines": [0, 0], "branches": [0, 0]})
         for kind in ("lines", "branches"):
@@ -92,10 +97,11 @@ def evaluate(files, groups, root):
 
 
 def main(argv):
-    if len(argv) != 3:
+    if len(argv) not in (3, 4):
         print(__doc__, file=sys.stderr)
         return 2
     build_dir, config_path = argv[1], argv[2]
+    only = set(argv[3].split()) if len(argv) == 4 else set()
     root = os.getcwd()
     groups = yaml.safe_load(open(config_path, encoding="utf-8"))["groups"]
 
@@ -117,7 +123,7 @@ def main(argv):
     run(["llvm-cov", "show", "-format=html", "-show-branches=count",
          f"-output-dir={os.path.join(build_dir, 'coverage-html')}", *common], stdout=subprocess.DEVNULL)
 
-    rows, failures = evaluate(files, groups, root)
+    rows, failures = evaluate(files, groups, root, only)
     print(f"{'module':40} {'group':15} {'lines':32} branches")
     for row in rows:
         print(f"{row[0]:40} {row[1]:15} {row[2]:32} {row[3]}")

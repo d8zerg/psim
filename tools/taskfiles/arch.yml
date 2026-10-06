@@ -15,9 +15,10 @@ tasks:
       - task: sql
 
   selftest:
-    desc: Prove that every fitness function catches its violation (unit tests of the checks)
+    desc: Prove that every fitness function catches its violation; tests of the ci scope
     cmds:
       - '{{.PYTHON}} -m unittest discover -s tools/arch -t tools/arch'
+      - '{{.PYTHON}} -m unittest discover -s tools/ci -t tools/ci'
 
   deps:
     desc: 'Module dependency directions: CMake target graph and #include (FF-01)'

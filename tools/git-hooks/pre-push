@@ -1,24 +1,34 @@
 #!/bin/sh
 # PSIM pre-push hook (step 1.3, ADR-034): the local CI pipeline is the gate of every push.
-# A commit may be pushed when `task ci` passed for it on a clean working tree (.cache/ci/<sha>.ok).
-# When the pushed commit is HEAD of a clean tree without a record, the hook runs `task ci` itself.
-# Installed by `task hooks:install`. `git push --no-verify` bypasses the gate and is reserved for
-# emergencies; the bypass is visible because the commit has no pipeline record.
+# A commit may be pushed when `task ci` passed for it (.cache/ci/<sha>.ok). The post-commit hook has
+# usually run it already in the background; a run in progress is awaited, a missing one is started
+# (tools/ci/runner.sh checks the committed content in a dedicated clone, so the working tree may
+# have uncommitted changes). Installed by `task hooks:install`. `git push --no-verify` bypasses the
+# gate and is reserved for emergencies; such commits have no pipeline record (task ci:status).
 set -eu
+root=$(git rev-parse --show-toplevel)
+ci="$root/.cache/ci"
 zero=0000000000000000000000000000000000000000
+running() { [ -f "$ci/$1.running" ] && kill -0 "$(cat "$ci/$1.running")" 2>/dev/null; }
 status=0
 while read -r local_ref local_sha remote_ref remote_sha; do
   [ "$local_sha" = "$zero" ] && continue   # branch deletion
-  if task ci:status SHA="$local_sha" >/dev/null 2>&1; then
-    echo "pre-push: pipeline passed for $local_sha ($local_ref)"
-    continue
+  short=$(git rev-parse --short "$local_sha")
+  if running "$local_sha"; then
+    echo "pre-push: waiting for the background pipeline of $short (task ci:log SHA=$short)"
+    while running "$local_sha"; do sleep 5; done
   fi
-  if [ "$local_sha" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
-    echo "pre-push: no pipeline record for $local_sha, running task ci"
-    task ci </dev/null && task ci:status SHA="$local_sha" >/dev/null 2>&1 && continue
+  if [ ! -f "$ci/$local_sha.ok" ] && [ ! -f "$ci/$local_sha.failed" ]; then
+    echo "pre-push: no pipeline record for $short, running task ci"
+    sh "$root/tools/ci/runner.sh" "$local_sha" </dev/null || true
+  fi
+  if [ -f "$ci/$local_sha.ok" ]; then
+    echo "pre-push: pipeline passed for $short ($local_ref)"
   else
-    echo "pre-push: no pipeline record for $local_sha ($local_ref); check it out on a clean tree and run task ci" >&2
+    echo "pre-push: pipeline FAILED for $short; last lines of .cache/ci/$local_sha.log:" >&2
+    tail -n 15 "$ci/$local_sha.log" >&2 || true
+    echo "pre-push: fix and commit, or rerun with: task ci:run SHA=$short" >&2
+    status=1
   fi
-  status=1
 done
 exit $status

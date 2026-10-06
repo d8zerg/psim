@@ -10,7 +10,7 @@ psim_package(psimctl SUMMARY "PSIM administration CLI")
 function(psimctl_smoke_test name expected)
   add_test(NAME psimctl.${name} COMMAND psimctl ${ARGN})
   set_tests_properties(psimctl.${name} PROPERTIES
-    LABELS smoke
+    LABELS "smoke;psimctl"
     PASS_REGULAR_EXPRESSION "${expected}"
     FAIL_REGULAR_EXPRESSION "Sanitizer|runtime error:")
 endfunction()

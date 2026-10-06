@@ -1,0 +1,29 @@
+# Scope of the push pipeline (`task ci`, ADR-034): what changed relative to origin/master decides
+# which expensive stages run and on which targets. `task ci:nightly` and `task release` always run
+# the full scope. Patterns are fnmatch globs over repository-relative paths ("*" spans directories).
+
+# Changes that can affect any build or check: the whole scope runs.
+full:
+  - CMakeLists.txt
+  - CMakePresets.json
+  - Taskfile.yml
+  - conanfile.py
+  - conan.lock
+  - .clang-tidy
+  - .clang-format
+  - cmake/*
+  - tools/toolchain/*
+  - tools/conan/*
+  - tools/cpp/*
+  - tools/ci/*
+  - tools/taskfiles/cpp.yml
+  - tools/taskfiles/arch.yml
+
+# Optional stages and the paths that enable them; C++ stages run for changed modules and every
+# target that depends on them (CMake code model).
+stages:
+  contracts: ['contracts/*', 'tools/contracts/*']
+  docs: ['docs/*', '*.md', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
+  deps: ['conanfile.py', 'conan.lock', 'tools/release/licenses.yaml', 'tools/taskfiles/security.yml']
+  release: ['deploy/*', 'tools/release/*', 'tools/taskfiles/release.yml']
+  bench: ['tools/bench/*', 'tools/taskfiles/bench.yml']

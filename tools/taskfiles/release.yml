@@ -84,6 +84,7 @@ tasks:
       - task: :cpp:_run
         vars:
           CMD: >-
+            mkdir -p {{.RELEASE_BUILD}} &&
             conan graph info . -pr:a tools/conan/profiles/clang21-libcxx --lockfile=conan.lock --format=json
             > {{.RELEASE_BUILD}}/conan-graph.json 2>/dev/null &&
             SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 -I tools/release/sbom.py app

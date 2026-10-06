@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Benchmark runs and the performance regression gate (B-05, ADR-034).
 
-  run <build-dir> <out.json> [commit]   run every *_bench executable of a build with repetitions;
+  run <build-dir> <out.json> [commit] [names]
+                                        run every *_bench executable (or only the space-separated
+                                        names) of a build with repetitions;
                                         an existing result of the same commit is merged (minimum)
   compare <base.json> <current.json>    fail when a benchmark is slower than the baseline by more
                                         than the threshold (default 5%)
@@ -33,7 +35,7 @@ def executables(build_dir):
     return found
 
 
-def run(build_dir, out_path, commit):
+def run(build_dir, out_path, commit, only=None):
     results = {}
     if os.path.exists(out_path):
         with open(out_path, encoding="utf-8") as f:
@@ -41,6 +43,8 @@ def run(build_dir, out_path, commit):
         if previous.get("commit") == commit:
             results = previous["cpu_ns_min"]
     for exe in executables(build_dir):
+        if only and os.path.basename(exe) not in only:
+            continue
         report = subprocess.run(
             [exe, "--benchmark_format=json", f"--benchmark_repetitions={REPETITIONS}",
              f"--benchmark_min_time={MIN_TIME}"],
@@ -70,7 +74,7 @@ def compare(base_path, current_path, threshold=THRESHOLD):
           f"threshold +{threshold:.0%}")
     for name in sorted(set(old) | set(new)):
         if name not in new:
-            print(f"  removed   {name}")
+            print(f"  not run   {name}")
         elif name not in old:
             print(f"  new       {name}: {new[name]:.1f} ns")
         else:
@@ -85,7 +89,8 @@ def compare(base_path, current_path, threshold=THRESHOLD):
 
 def main(argv):
     if len(argv) >= 4 and argv[1] == "run":
-        return run(argv[2], argv[3], argv[4] if len(argv) > 4 else "unknown")
+        only = set(argv[5].split()) if len(argv) > 5 else None
+        return run(argv[2], argv[3], argv[4] if len(argv) > 4 else "unknown", only)
     if len(argv) == 4 and argv[1] == "compare":
         return compare(argv[2], argv[3])
     print(__doc__, file=sys.stderr)

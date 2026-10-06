@@ -13,11 +13,12 @@
 
 ```
 task                          # список задач
-task ci                       # локальный конвейер - барьер каждого push: check, зависимости, бенчмарки, пакеты, образы
+task ci                       # локальный конвейер - барьер push, по области изменения (FULL=true - всё)
+task ci:status                # состояние конвейера для HEAD (после коммита он идёт в фоне); ci:log, ci:run
 task ci:nightly               # ci + воспроизводимость сборки + сканирование образов
 task release                  # ci:nightly + подписанный каталог выпуска dist/ + его проверка
 task check                    # все проверки кода (контракты, архитектура, качество C++, тесты, документация)
-task hooks:install            # подключить git-хуки: pre-commit (быстрые проверки), pre-push (требует task ci)
+task hooks:install            # git-хуки: pre-commit (быстрые проверки), post-commit (ci в фоне), pre-push (требует ci)
 task gen                      # перегенерировать сгенерированные файлы
 task cpp:build                # собрать (PRESET=debug|release|relwithdebinfo|asan|tsan|coverage)
 task cpp:test                 # собрать и запустить тесты
