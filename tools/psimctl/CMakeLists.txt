@@ -2,7 +2,8 @@
 add_executable(psimctl src/main.cpp)
 psim_target_defaults(psimctl)
 target_link_libraries(psimctl PRIVATE psim::platform_core psim::contracts)
-install(TARGETS psimctl RUNTIME DESTINATION bin)
+install(TARGETS psimctl RUNTIME DESTINATION bin COMPONENT psimctl)
+psim_package(psimctl SUMMARY "PSIM administration CLI")
 
 # Smoke tests: every command also runs under the sanitizer and coverage presets. A pass regex
 # ignores the exit code, so sanitizer reports are matched explicitly.

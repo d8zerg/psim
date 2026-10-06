@@ -1,0 +1,24 @@
+#!/bin/sh
+# PSIM pre-push hook (step 1.3, ADR-034): the local CI pipeline is the gate of every push.
+# A commit may be pushed when `task ci` passed for it on a clean working tree (.cache/ci/<sha>.ok).
+# When the pushed commit is HEAD of a clean tree without a record, the hook runs `task ci` itself.
+# Installed by `task hooks:install`. `git push --no-verify` bypasses the gate and is reserved for
+# emergencies; the bypass is visible because the commit has no pipeline record.
+set -eu
+zero=0000000000000000000000000000000000000000
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ "$local_sha" = "$zero" ] && continue   # branch deletion
+  if task ci:status SHA="$local_sha" >/dev/null 2>&1; then
+    echo "pre-push: pipeline passed for $local_sha ($local_ref)"
+    continue
+  fi
+  if [ "$local_sha" = "$(git rev-parse HEAD)" ] && [ -z "$(git status --porcelain)" ]; then
+    echo "pre-push: no pipeline record for $local_sha, running task ci"
+    task ci </dev/null && task ci:status SHA="$local_sha" >/dev/null 2>&1 && continue
+  else
+    echo "pre-push: no pipeline record for $local_sha ($local_ref); check it out on a clean tree and run task ci" >&2
+  fi
+  status=1
+done
+exit $status

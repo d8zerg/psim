@@ -1,0 +1,15 @@
+# License policy of code linked into PSIM binaries (SEC-02, SR-23, ADR-034). Checked by
+# `task security:deps` over the application components of the SBOM (Conan host dependencies and
+# the statically linked libc++). Operating system packages of the base image are linked
+# dynamically from the distribution and are scanned for vulnerabilities only.
+# A component without a license or with a license outside this list blocks the pipeline.
+# Copyleft licenses (GPL, LGPL, AGPL, MPL, EPL, SSPL) are not allowed for statically linked code.
+allowed:
+  - Apache-2.0
+  - Apache-2.0 WITH LLVM-exception
+  - BSD-2-Clause
+  - BSD-3-Clause
+  - BSL-1.0
+  - ISC
+  - MIT
+  - Zlib

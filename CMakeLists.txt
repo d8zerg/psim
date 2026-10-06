@@ -23,10 +23,14 @@ endforeach()
 include(PsimOptions)
 include(PsimCompiler)
 include(PsimProto)
+include(PsimPackaging)
 
 enable_testing()
 find_package(GTest REQUIRED CONFIG)
+find_package(benchmark REQUIRED CONFIG)
 
 add_subdirectory(contracts)
 add_subdirectory(libs)
 add_subdirectory(tools/psimctl)
+
+psim_finalize_packaging()

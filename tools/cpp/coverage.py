@@ -16,8 +16,8 @@ import sys
 
 import yaml
 
-# Tests, generated and vendored code, dependency and system headers are not measured.
-IGNORE_REGEX = r"(^|/)(tests|build|third_party)/|^/cache/|^/usr/"
+# Tests, benchmarks, generated and vendored code, dependency and system headers are not measured.
+IGNORE_REGEX = r"(^|/)(tests|benchmarks|build|third_party)/|^/cache/|^/usr/"
 
 
 def run(cmd, **kwargs):
@@ -52,7 +52,7 @@ def gated_modules(groups, root):
         for pattern in group["modules"]:
             for module in glob.glob(os.path.join(root, pattern)):
                 for dirpath, dirnames, filenames in os.walk(module):
-                    dirnames[:] = [d for d in dirnames if d != "tests"]
+                    dirnames[:] = [d for d in dirnames if d not in ("tests", "benchmarks")]
                     if any(n.endswith((".cpp", ".cc")) for n in filenames):
                         found.setdefault(os.path.relpath(module, root), group)
                         break

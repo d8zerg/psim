@@ -19,5 +19,5 @@ target_include_directories(psim_platform_core
 psim_target_defaults(psim_platform_core)
 
 psim_add_test(psim_platform_core_test
-  SOURCES tests/build_info_test.cpp
+  SOURCES tests/build_info_test.cpp tests/static_runtime_test.cpp
   LIBS psim::platform_core)

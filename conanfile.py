@@ -21,9 +21,11 @@ class PsimConan(ConanFile):
         self.requires(self.PROTOBUF)
         self.requires(self.GRPC)
         self.requires("openssl/3.5.9")
-        self.requires("gtest/1.18.0")
 
     def build_requirements(self):
+        # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.
+        self.test_requires("gtest/1.18.0")
+        self.test_requires("benchmark/1.9.5")
         # protoc and grpc_cpp_plugin run at build time.
         self.tool_requires(self.PROTOBUF)
         self.tool_requires(self.GRPC)

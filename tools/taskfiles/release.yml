@@ -1,0 +1,188 @@
+# Release artifacts: Debian packages, container images, SBOMs, signatures (step 1.3, ADR-034).
+# Namespace "release"; working directory is the repository root. Artifacts are built from the
+# release preset; a signed release directory is dist/psim-<version>-<commit>/.
+#   PSIM_SIGNING_KEY   Ed25519 private key (PEM) for release:dist; default: a development key in .cache/keys
+#   PSIM_TRUSTED_KEY   public key trusted by release:verify; default: deploy/keys/psim-release.pub.pem when
+#                      present, otherwise the development key
+version: '3'
+
+vars:
+  RELEASE_BUILD: build/{{.PLATFORM}}/release
+  PACKAGES: '{{.RELEASE_BUILD}}/packages'
+  COMMIT:
+    sh: git rev-parse --short=12 HEAD
+  DIST: dist/psim-{{.VERSION}}-{{.COMMIT}}
+  # Keys may live outside the repository: they are mounted read-only into the toolchain container.
+  DEV_KEY: '{{.ROOT_DIR}}/.cache/keys/psim-dev.pem'
+  SIGNING_KEY: '{{.PSIM_SIGNING_KEY | default .DEV_KEY}}'
+  TRUSTED_KEY:
+    sh: |
+      if [ -n "${PSIM_TRUSTED_KEY:-}" ]; then realpath "$PSIM_TRUSTED_KEY"
+      elif [ -f deploy/keys/psim-release.pub.pem ]; then realpath deploy/keys/psim-release.pub.pem
+      else echo "{{.ROOT_DIR}}/.cache/keys/psim-dev.pub.pem"; fi
+
+tasks:
+  package:
+    desc: Build Debian packages from the release preset (build/<platform>/release/packages)
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run
+        vars:
+          CMD: rm -rf {{.PACKAGES}} && cd {{.RELEASE_BUILD}} && SOURCE_DATE_EPOCH=0 cpack -B packages >/dev/null && ls packages/*.deb
+
+  package:test:
+    desc: Install the packages on Debian 12 and Astra Linux 1.8 and run them (FF-18)
+    vars:
+      RUNTIMES: '{{.RUNTIMES | default "debian12 astra18"}}'
+    deps: [package]
+    cmds:
+      - for: {var: RUNTIMES}
+        cmd: >-
+          docker run --rm -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
+          sh -c 'dpkg -i /packages/*.deb >/dev/null && psimctl version && dpkg -r psim-psimctl >/dev/null
+          && echo "ok: packages install, run and remove on {{.ITEM}}"'
+
+  images:
+    desc: Build container images (distroless, non-root) from the release preset
+    deps:
+      - task: :cpp:build
+        vars: {PRESET: release}
+    cmds:
+      - for: {var: IMAGES}
+        cmd: |
+          stage={{.RELEASE_BUILD}}/images/{{.ITEM}}
+          rm -rf "$stage" && mkdir -p "$stage"
+          cp deploy/images/{{.ITEM}}/Dockerfile "$stage"/
+          # Exactly one built executable of that name (CPack staging and image stages excluded).
+          bins=$(find {{.RELEASE_BUILD}} \( -name CMakeFiles -o -name packages -o -name images \) -prune \
+            -o -type f -perm -u+x -name {{.ITEM}} -print)
+          [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
+          cp "$bins" "$stage"/
+          docker build --quiet --build-arg BASE={{.DISTROLESS_IMAGE}} \
+            --label org.opencontainers.image.title=psim-{{.ITEM}} \
+            --label org.opencontainers.image.version={{.VERSION}} \
+            --label org.opencontainers.image.revision={{.COMMIT}} \
+            --label org.opencontainers.image.vendor="PSIM Platform" \
+            -t psim/{{.ITEM}}:{{.VERSION}} "$stage" >/dev/null
+          echo "image: psim/{{.ITEM}}:{{.VERSION}}"
+
+  images:test:
+    desc: Run every image read-only, without capabilities, as non-root (SR-24)
+    deps: [images]
+    cmds:
+      - for: {var: IMAGES}
+        cmd: |
+          user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' psim/{{.ITEM}}:{{.VERSION}})
+          case "$user" in ""|0|0:*|root|root:*) echo "FAIL: psim/{{.ITEM}} runs as root" >&2; exit 1 ;; esac
+          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges psim/{{.ITEM}}:{{.VERSION}} >/dev/null
+          echo "ok: psim/{{.ITEM}}:{{.VERSION}} runs read-only, no capabilities, user $user"
+
+  sbom:app:
+    desc: SBOM of the components linked into PSIM binaries (Conan host dependencies and libc++)
+    cmds:
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            conan graph info . -pr:a tools/conan/profiles/clang21-libcxx --lockfile=conan.lock --format=json
+            > {{.RELEASE_BUILD}}/conan-graph.json 2>/dev/null &&
+            SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 -I tools/release/sbom.py app
+            {{.RELEASE_BUILD}}/conan-graph.json "$(clang -dumpversion)" {{.VERSION}} "$(git rev-parse HEAD)"
+            {{.RELEASE_BUILD}}/app.cdx.json
+
+  dist:
+    desc: Build a signed release directory dist/psim-<version>-<commit> (packages, images, SBOMs)
+    preconditions:
+      - sh: '[ "{{.ALLOW_DIRTY}}" = "true" ] || [ -z "$(git status --porcelain)" ]'
+        msg: 'release from a clean working tree only (ALLOW_DIRTY=true for a trial run)'
+    cmds:
+      - task: package
+      - task: images
+      - task: sbom:app
+      - rm -rf {{.DIST}} && mkdir -p {{.DIST}}
+      - cp {{.PACKAGES}}/*.deb {{.DIST}}/
+      - for: {var: IMAGES}
+        cmd: >-
+          docker save -o {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar psim/{{.ITEM}}:{{.VERSION}} &&
+          chmod 644 {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar
+      - for: {var: IMAGES}
+        cmd: >-
+          docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE}}/trivy":/cache -w /repo
+          {{.TRIVY_IMAGE}} image --cache-dir /cache --quiet --format cyclonedx
+          --input {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar
+          --output {{.RELEASE_BUILD}}/images/{{.ITEM}}/os.cdx.json
+      - task: :cpp:_run
+        vars:
+          CMD: |
+            export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct)
+            for deb in {{.DIST}}/*.deb; do
+              name=$(dpkg-deb -f "$deb" Package)
+              python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$deb" deb "$name" {{.VERSION}} "$deb.cdx.json"
+            done
+            for image in {{.IMAGES}}; do
+              tar={{.DIST}}/psim-${image}_{{.VERSION}}_image.tar
+              python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$tar" image "psim/$image" {{.VERSION}} \
+                "$tar.cdx.json" {{.RELEASE_BUILD}}/images/$image/os.cdx.json
+            done
+      - task: sign
+
+  sign:
+    desc: Sign the release directory with PSIM_SIGNING_KEY (development key when unset)
+    cmds:
+      - task: _dev_key
+      - task: _with_key
+        vars: {KEY: '{{.SIGNING_KEY}}', SCRIPT: sign.sh}
+
+  verify:
+    desc: Verify signature, checksums and SBOMs of the release directory against the trusted key (FF-14)
+    cmds:
+      - cmd: '[ "{{.TRUSTED_KEY}}" != "{{.ROOT_DIR}}/.cache/keys/psim-dev.pub.pem" ] || echo "note: verifying with the development key"'
+      - task: _with_key
+        vars: {KEY: '{{.TRUSTED_KEY}}', SCRIPT: verify.sh}
+
+  _with_key:
+    internal: true
+    requires:
+      vars: [KEY, SCRIPT]
+    deps:
+      - task: :toolchain:build
+    cmds:
+      - cmd: |
+          [ -f "{{.KEY}}" ] || { echo "key not found: {{.KEY}}" >&2; exit 1; }
+          if [ "${PSIM_IN_TOOLCHAIN:-0}" = "1" ]; then
+            sh tools/release/{{.SCRIPT}} {{.DIST}} "{{.KEY}}"
+          else
+            docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -v "{{.KEY}}":/run/psim/key.pem:ro -w /repo \
+              {{.TOOLCHAIN_IMAGE}} sh tools/release/{{.SCRIPT}} {{.DIST}} /run/psim/key.pem
+          fi
+
+  keygen:
+    desc: 'Generate an Ed25519 signing key pair in DIR: task release:keygen DIR=/secure/dir'
+    requires:
+      vars: [DIR]
+    deps:
+      - task: :toolchain:build
+    cmds:
+      - '[ ! -e "{{.DIR}}/psim-release.pem" ] || { echo "{{.DIR}}/psim-release.pem exists" >&2; exit 1; }'
+      - task: _keygen
+        vars: {DIR: '{{.DIR}}', NAME: psim-release}
+      - 'echo "private key: {{.DIR}}/psim-release.pem (keep offline); publish {{.DIR}}/psim-release.pub.pem as deploy/keys/psim-release.pub.pem"'
+
+  _dev_key:
+    internal: true
+    status:
+      - test -f {{.DEV_KEY}}
+    cmds:
+      - task: _keygen
+        vars: {DIR: '{{.ROOT_DIR}}/.cache/keys', NAME: psim-dev}
+
+  _keygen:
+    internal: true
+    requires:
+      vars: [DIR, NAME]
+    cmds:
+      - mkdir -p "{{.DIR}}"
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.DIR}}":/keys {{.TOOLCHAIN_IMAGE}} sh -c
+        'umask 077 && openssl genpkey -algorithm ed25519 -out /keys/{{.NAME}}.pem
+        && openssl pkey -in /keys/{{.NAME}}.pem -pubout -out /keys/{{.NAME}}.pub.pem'

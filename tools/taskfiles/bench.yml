@@ -1,0 +1,64 @@
+# Benchmarks and the performance regression gate (B-05, ADR-034). Namespace "bench"; working
+# directory is the repository root. Benchmarks run in the release preset inside the toolchain.
+# The baseline is the last pushed master (merge base with origin/master); its results are cached
+# in .cache/bench/<commit>.json and built from `git archive` of that commit when missing.
+version: '3'
+
+vars:
+  BENCH_DIR: .cache/bench
+  HEAD:
+    sh: git rev-parse HEAD
+  BASE:
+    sh: git merge-base HEAD origin/master 2>/dev/null || git rev-parse master
+  CURRENT: build/{{.PLATFORM}}/release/bench.json
+
+tasks:
+  run:
+    desc: Build the release preset and run every benchmark (results in build/<platform>/release/bench.json)
+    cmds:
+      - rm -f {{.CURRENT}}
+      - task: rerun
+
+  rerun:
+    desc: Run the benchmarks again and merge them into the current results (minimum per benchmark)
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run
+        vars:
+          CMD: python3 -I tools/bench/bench.py run build/{{.PLATFORM}}/release {{.CURRENT}} {{.HEAD}}
+
+  baseline:
+    desc: Measure the baseline commit (merge base with origin/master) unless its results are cached
+    vars:
+      SRC: '{{.BENCH_DIR}}/src-{{.BASE}}'
+    status:
+      - test -f {{.BENCH_DIR}}/{{.BASE}}.json
+    cmds:
+      - rm -rf {{.SRC}} && mkdir -p {{.SRC}}
+      - git archive {{.BASE}} | tar -x -C {{.SRC}}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            cd {{.SRC}} &&
+            conan install . -pr:a tools/conan/profiles/clang21-libcxx --lockfile=conan.lock --build=missing
+            -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan >/dev/null &&
+            cmake --preset release >/dev/null && cmake --build --preset release -j {{.JOBS}} >/dev/null &&
+            python3 -I /repo/tools/bench/bench.py run build/{{.PLATFORM}}/release /repo/{{.BENCH_DIR}}/{{.BASE}}.json {{.BASE}}
+      - rm -rf {{.SRC}}
+
+  compare:
+    desc: Compare benchmarks with the master baseline; a slowdown above 5% fails (B-05)
+    cmds:
+      - task: run
+      - task: baseline
+      # Up to two reruns merged into the current results before a regression is reported.
+      - cmd: |
+          for attempt in 1 2 3; do
+            {{.PYTHON}} tools/bench/bench.py compare {{.BENCH_DIR}}/{{.BASE}}.json {{.CURRENT}} && exit 0
+            [ "$attempt" = 3 ] && exit 1
+            echo "bench: rerun $attempt to rule out noise"
+            {{.TASK_EXE}} bench:rerun >/dev/null
+          done
+      # A clean tree's results become the baseline of this commit once it is pushed.
+      - cmd: '[ -n "$(git status --porcelain)" ] || cp {{.CURRENT}} {{.BENCH_DIR}}/{{.HEAD}}.json'

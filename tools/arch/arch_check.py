@@ -90,7 +90,8 @@ def source_files(root):
 
 
 def is_test_path(rel):
-    return "tests" in rel.split("/")
+    """Tests and benchmarks: may use test frameworks and the simulation bench."""
+    return not {"tests", "benchmarks"}.isdisjoint(rel.split("/"))
 
 
 def classify(rel, rules):

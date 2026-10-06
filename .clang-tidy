@@ -26,7 +26,7 @@ Checks: >
   -portability-avoid-pragma-once
 WarningsAsErrors: '*'
 # Project headers only; generated code (build/) and vendored code (third_party/) are skipped.
-HeaderFilterRegex: '/(libs|services|connectors|tools|contracts/tests)/'
+HeaderFilterRegex: '/(libs|services|connectors|tools|contracts/(tests|benchmarks))/'
 ExcludeHeaderFilterRegex: '/(build|third_party)/'
 SystemHeaders: false
 FormatStyle: file

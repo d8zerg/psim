@@ -1,0 +1,33 @@
+# Supply chain security checks (step 1.3, ADR-031, ADR-034, SR-23). Namespace "security"; working
+# directory is the repository root. Trivy runs in a pinned container; its database is cached in
+# .cache/trivy and refreshed by Trivy itself (network access needed).
+version: '3'
+
+vars:
+  TRIVY: >-
+    docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo:ro -v "{{.CACHE}}/trivy":/cache -w /repo
+    {{.TRIVY_IMAGE}}
+
+tasks:
+  deps:
+    desc: Vulnerabilities (HIGH, CRITICAL) and licenses of dependencies - lock files and SBOM (SEC-02)
+    cmds:
+      - mkdir -p {{.CACHE}}/trivy
+      - task: :release:sbom:app
+      - '{{.TRIVY}} fs --cache-dir /cache --quiet --scanners vuln --severity HIGH,CRITICAL --exit-code 1 conan.lock'
+      - >-
+        {{.TRIVY}} sbom --cache-dir /cache --quiet --severity HIGH,CRITICAL --exit-code 1
+        build/{{.PLATFORM}}/release/app.cdx.json
+      - '{{.PYTHON}} tools/release/sbom.py licenses tools/release/licenses.yaml build/{{.PLATFORM}}/release/app.cdx.json'
+
+  images:
+    desc: Vulnerabilities of the container images; fixable HIGH and CRITICAL ones fail (SEC-03)
+    deps: [':release:images']
+    cmds:
+      - mkdir -p {{.CACHE}}/trivy
+      - for: {var: IMAGES}
+        cmd: >-
+          mkdir -p .cache/tmp && docker save -o .cache/tmp/{{.ITEM}}-image.tar psim/{{.ITEM}}:{{.VERSION}} &&
+          {{.TRIVY}} image --cache-dir /cache --quiet --input .cache/tmp/{{.ITEM}}-image.tar
+          --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1;
+          status=$?; rm -f .cache/tmp/{{.ITEM}}-image.tar; exit $status

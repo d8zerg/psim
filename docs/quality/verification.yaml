@@ -598,6 +598,26 @@ methods:
     task: task arch:selftest
     steps: ['1.2']
     purpose: Достоверность архитектурных проверок при пустом доменном ядре (ADR-033)
+  - id: FF-18
+    kind: fitness
+    name: Установка пакетов на целевых платформах
+    criteria: Каждый пакет DEB ставится, запускается и удаляется в чистых образах Debian 12 и Astra Linux 1.8; зависимость только от libc6
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task release:package:test
+    steps: ['1.3']
+    purpose: Поставка для Debian и Astra Linux (F-PLT-06, ADR-034)
+  - id: FF-19
+    kind: fitness
+    name: Образы без root и лишних прав
+    criteria: Каждый образ запускается не под root, с файловой системой только для чтения, без capabilities и с no-new-privileges
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task release:images:test
+    steps: ['1.3']
+    purpose: Требование SR-24 (ADR-034)
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01

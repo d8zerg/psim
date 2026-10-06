@@ -15,7 +15,7 @@ vars:
   # Project C++ sources: formatting and clang-tidy scope (generated and vendored code excluded).
   CXX_FILES: git ls-files -co --exclude-standard -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**'
   # Translation units checked by clang-tidy (regex over compile_commands.json entries).
-  TIDY_SCOPE: '^/repo/(libs|services|connectors|tools|contracts/tests)/'
+  TIDY_SCOPE: '^/repo/(libs|services|connectors|tools|contracts/(tests|benchmarks))/'
 
 tasks:
   build:

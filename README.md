@@ -13,8 +13,11 @@
 
 ```
 task                          # список задач
-task check                    # все проверки - барьер слияния (контракты, архитектура, качество C++, тесты, документация)
-task hooks:install            # подключить git-хук pre-commit (быстрые проверки перед коммитом)
+task ci                       # локальный конвейер - барьер каждого push: check, зависимости, бенчмарки, пакеты, образы
+task ci:nightly               # ci + воспроизводимость сборки + сканирование образов
+task release                  # ci:nightly + подписанный каталог выпуска dist/ + его проверка
+task check                    # все проверки кода (контракты, архитектура, качество C++, тесты, документация)
+task hooks:install            # подключить git-хуки: pre-commit (быстрые проверки), pre-push (требует task ci)
 task gen                      # перегенерировать сгенерированные файлы
 task cpp:build                # собрать (PRESET=debug|release|relwithdebinfo|asan|tsan|coverage)
 task cpp:test                 # собрать и запустить тесты
@@ -23,6 +26,9 @@ task cpp:lint                 # clang-tidy по профилю проекта
 task cpp:test:sanitizers      # тесты под ASan+UBSan и TSan
 task cpp:coverage             # покрытие и пороги по модулям
 task arch:check               # fitness functions: зависимости модулей, чистота домена, SQL
+task bench:compare            # бенчмарки против базовой линии origin/master (регрессия > 5% - отказ)
+task security:deps            # уязвимости и лицензии зависимостей (Trivy, SBOM)
+task release:dist             # пакеты DEB, образы, SBOM, подпись (ALLOW_DIRTY=true - пробный выпуск)
 task cpp:runtime-test         # запустить собранные тесты на Debian 12 и Astra Linux 1.8
 task cpp:reproducible         # проверить воспроизводимость сборки
 task toolchain:shell          # оболочка в контейнере toolchain

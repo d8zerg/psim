@@ -16,3 +16,7 @@ add_library(psim::contracts ALIAS psim_contracts)
 psim_add_test(psim_contracts_test
   SOURCES tests/contracts_test.cpp
   LIBS psim::contracts)
+
+psim_add_benchmark(psim_contracts_bench
+  SOURCES benchmarks/envelope_bench.cpp
+  LIBS psim::contracts)

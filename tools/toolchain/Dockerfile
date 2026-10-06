@@ -3,7 +3,7 @@
 # and newer distributions and are verified there by `task cpp:runtime-test`.
 # Built by: task toolchain:build (the base image digest is pinned in the root Taskfile)
 ARG BASE=debian:bookworm
-ARG BUF_IMAGE=bufbuild/buf:1.73.0
+ARG BUF_IMAGE=bufbuild/buf:1.73.0@sha256:75d8f756f0919dcded71e67968a91adfe55fe4dd62c4900c57bbfcd7fe625608
 
 FROM ${BUF_IMAGE} AS buf
 

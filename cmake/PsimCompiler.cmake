@@ -27,8 +27,9 @@ add_compile_definitions(
 add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=3>")
 
 if(PSIM_STATIC_RUNTIME)
-  # Executables do not depend on libc++ being installed on Debian or Astra Linux.
-  add_link_options("$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-static-libstdc++>")
+  # Executables depend on glibc only: libc++ and the libgcc unwinder are linked statically, so
+  # packages need just libc6 and images need no C++ runtime (ADR-032, ADR-034).
+  add_link_options("$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-static-libstdc++;-static-libgcc>")
 endif()
 
 # --- Project code ---------------------------------------------------------------------------
@@ -63,4 +64,17 @@ function(psim_add_test name)
   target_link_libraries(${name} PRIVATE ${ARG_LIBS} GTest::gtest_main)
   include(GoogleTest)
   gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST PROPERTIES LABELS unit)
+endfunction()
+
+# psim_add_benchmark(<name> SOURCES ... LIBS ...): Google Benchmark executable <name> (suffix
+# _bench). Measured by `task bench:run` in the release preset and compared with the master baseline
+# by `task bench:compare` (B-05, ADR-034). A one-iteration CTest smoke run keeps it working in
+# every preset, including sanitizers.
+function(psim_add_benchmark name)
+  cmake_parse_arguments(ARG "" "" "SOURCES;LIBS" ${ARGN})
+  add_executable(${name} ${ARG_SOURCES})
+  psim_target_defaults(${name})
+  target_link_libraries(${name} PRIVATE ${ARG_LIBS} benchmark::benchmark_main)
+  add_test(NAME ${name} COMMAND ${name} --benchmark_min_time=1x)
+  set_tests_properties(${name} PROPERTIES LABELS benchmark)
 endfunction()

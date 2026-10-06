@@ -27,11 +27,19 @@ vars:
   # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
   CONTRACTS_TOOLS_IMAGE:
     sh: echo "psim/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
-  # Pinned tool images. Change versions here only.
-  REDOCLY_IMAGE: redocly/cli:2.58.2
-  ASYNCAPI_IMAGE: asyncapi/cli:6.1.0
-  MERMAID_IMAGE: minlag/mermaid-cli:12.0.0
-  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19
+  # Pinned tool and base images: tag for readability, digest for integrity (SR-23). Change here only.
+  REDOCLY_IMAGE: redocly/cli:2.58.2@sha256:02511945b4d6dbc1e51138f1c8fcc532ba269bb61aea30d3dcbc9978af61af42
+  ASYNCAPI_IMAGE: asyncapi/cli:6.1.0@sha256:2240534054590b3d41d691fdf88e1f7a1e581b9cc4fb1d4af65ca93434aa681b
+  MERMAID_IMAGE: minlag/mermaid-cli:12.0.0@sha256:fa995339034aae7e5cd4f61482248b7f5c51be355b1a6f6eda11a2bbf8401f5f
+  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
+  TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+  # Base of the container images (ADR-034): glibc only (executables link libc++ and libgcc statically),
+  # no OpenSSL, no shell, non-root user.
+  DISTROLESS_IMAGE: gcr.io/distroless/base-nossl-debian12:nonroot@sha256:be40c00dfabd86576d92666e87e406714d5618342de1a0c213ad232de255172e
+  # Product version (CMakeLists.txt project VERSION) and container images (deploy/images/<name>).
+  VERSION:
+    sh: sed -n 's/^  VERSION \([0-9.]*\)$/\1/p' {{.ROOT_DIR}}/CMakeLists.txt
+  IMAGES: psimctl
 
 includes:
   toolchain:
@@ -42,6 +50,15 @@ includes:
     dir: .
   arch:
     taskfile: ./tools/taskfiles/arch.yml
+    dir: .
+  bench:
+    taskfile: ./tools/taskfiles/bench.yml
+    dir: .
+  release:
+    taskfile: ./tools/taskfiles/release.yml
+    dir: .
+  security:
+    taskfile: ./tools/taskfiles/security.yml
     dir: .
   contracts:
     taskfile: ./contracts/Taskfile.yml
@@ -58,7 +75,7 @@ tasks:
       - "{{.TASK_EXE}} --list"
 
   check:
-    desc: Run every check (contracts, architecture, C++ quality gates and tests, documentation); the CI gate
+    desc: Run every code check (contracts, architecture, C++ quality gates and tests, documentation)
     cmds:
       - task: contracts:check
       - task: arch:check
@@ -70,11 +87,61 @@ tasks:
       - task: cpp:runtime-test
       - task: docs:check
 
+  ci:
+    desc: 'Local CI pipeline, the gate of every push (ADR-034): checks, dependencies, benchmarks, packages, images'
+    cmds:
+      - task: check                  # build, static analysis, unit tests, sanitizers, coverage, contracts, docs
+      # Integration tests against the local environment join here with step 1.4 (TS-03).
+      - task: security:deps          # SEC-02
+      - task: bench:compare          # B-05
+      - task: release:package:test   # FF-18
+      - task: release:images:test    # SR-24
+      - task: _ci_record
+
+  ci:nightly:
+    desc: Nightly pipeline on master - ci plus reproducibility and image scanning
+    cmds:
+      - task: ci
+      - task: cpp:reproducible       # FF-13
+      - task: security:images        # SEC-03
+
+  release:
+    desc: Release pipeline - nightly checks, signed release directory, verification (FF-14)
+    preconditions:
+      - sh: '[ -z "$(git status --porcelain)" ]'
+        msg: release from a clean working tree only
+    cmds:
+      - task: ci:nightly
+      - task: release:dist
+      - task: release:verify
+
+  _ci_record:
+    internal: true
+    desc: Record that the pipeline passed for this commit (read by the pre-push hook)
+    cmds:
+      - mkdir -p {{.CACHE}}/ci
+      - cmd: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "ci: passed on a working tree with uncommitted changes - not recorded for push"
+          else
+            sha=$(git rev-parse HEAD)
+            date -u +%Y-%m-%dT%H:%M:%SZ > "{{.CACHE}}/ci/$sha.ok"
+            echo "ci: passed for $sha"
+          fi
+
+  ci:status:
+    desc: 'Exit 0 when the pipeline passed for a commit: task ci:status SHA=<commit> (default HEAD)'
+    vars:
+      SHA:
+        sh: git rev-parse {{.SHA | default "HEAD"}}
+    cmds:
+      - test -f {{.CACHE}}/ci/{{.SHA}}.ok
+
   hooks:install:
     desc: Use the repository git hooks (tools/git-hooks) in this clone
     cmds:
       - git config core.hooksPath tools/git-hooks
-      - 'echo "git hooks path: tools/git-hooks (pre-commit)"'
+      - 'echo "git hooks path: tools/git-hooks (pre-commit, pre-push)"'
 
   hooks:pre-commit:
     desc: 'Fast checks of staged files: whitespace, C++ format, proto format, domain purity, SQL, docs'
