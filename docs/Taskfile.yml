@@ -18,6 +18,7 @@ tasks:
       - task: mermaid
       - task: c4
       - task: threats
+      - task: verification
 
   links:
     desc: Check relative links and heading anchors in Markdown
@@ -56,6 +57,24 @@ tasks:
     desc: Regenerate the threat register from the registry
     cmds:
       - task: threats
+      - task: verification
+        vars: {UPDATE: 'true'}
+
+  verification:
+    desc: Verify the verification registry against plan goals and scenarios; the matrix must be up to date
+    vars:
+      UPDATE: '{{.UPDATE | default "false"}}'
+    cmds:
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/quality/verification.py verify {{.ROOT_DIR}} quality/verification.yaml'
+      - mkdir -p {{.CACHE}}/quality
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/quality/verification.py render {{.ROOT_DIR}} quality/verification.yaml {{.CACHE}}/quality/verification-matrix.md'
+      - task: :_publish
+        vars: {SRC: '{{.CACHE}}/quality/verification-matrix.md', DST: '{{.TASKFILE_DIR}}/quality/verification-matrix.md', UPDATE: '{{.UPDATE}}'}
+
+  verification:gen:
+    desc: Regenerate the verification matrix from the registry
+    cmds:
+      - task: verification
         vars: {UPDATE: 'true'}
 
   c4:

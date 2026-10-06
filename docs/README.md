@@ -42,3 +42,10 @@
 
 - [Модель угроз: методика, активы, границы доверия, допущения](security/threat-model.md)
 - [Реестр угроз и требований безопасности](security/threat-register.md) (генерируется из [threat-model.yaml](security/threat-model.yaml))
+
+## Качество и верификация (шаг 0.7)
+
+- [Стратегия качества и верификации](quality/strategy.md)
+- [Матрица верификации](quality/verification-matrix.md) (генерируется из [verification.yaml](quality/verification.yaml))
+- [Методика сквозной сверки потерь и дубликатов](quality/reconciliation.md)
+- [Методика замера задержек](quality/latency-measurement.md)

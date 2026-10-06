@@ -13,8 +13,10 @@
 | 0.3 | Архитектурный документ | утверждён | [arc42](architecture/README.md), [runtime](architecture/runtime-view.md), [deployment](architecture/deployment.md), [crosscutting](architecture/crosscutting.md), [data-flows](architecture/data-flows.md), [scaling](architecture/scaling.md), [quality](architecture/quality.md), [C4 DSL](architecture/c4/workspace.dsl) |
 | 0.4 | Пакет ADR | утверждён | [реестр ADR](adr/README.md): 17 приняты, 10 предложены (принимаются в начале своих шагов) |
 | 0.5 | Контракты v1 | утверждён | [contracts/](../contracts/README.md): proto, OpenAPI, AsyncAPI, реестр топиков, таксономия, каталог ошибок; проверка `task contracts:check`; ADR-028 (ClickHouse), ADR-029 |
-| 0.6 | Модель угроз и требования безопасности | готов | [threat-model](security/threat-model.md), [реестр угроз и требований](security/threat-register.md) (источник - [threat-model.yaml](security/threat-model.yaml)); проверка `task docs:threats` |
-| 0.7 | Стратегия качества и верификации | не начат | |
+| 0.6 | Модель угроз и требования безопасности | утверждён | [threat-model](security/threat-model.md), [реестр угроз и требований](security/threat-register.md) (источник - [threat-model.yaml](security/threat-model.yaml)); проверка `task docs:threats` |
+| 0.7 | Стратегия качества и верификации | готов | [strategy](quality/strategy.md), [матрица верификации](quality/verification-matrix.md) (источник - [verification.yaml](quality/verification.yaml)), [сверка](quality/reconciliation.md), [замер задержек](quality/latency-measurement.md), ADR-031; проверка `task docs:verification` |
+
+**Веха M0** (документы Ф0 утверждены, контракты v1 опубликованы, ADR приняты): все шаги Ф0 выполнены, ожидается утверждение шага 0.7. Решения со статусом «Предложено» принимаются в начале своих шагов (реестр ADR).
 
 ## Ф1-Ф11
 

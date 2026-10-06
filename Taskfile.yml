@@ -45,6 +45,7 @@ tasks:
     cmds:
       - task: contracts:gen
       - task: docs:threats:gen
+      - task: docs:verification:gen
 
   tools:pull:
     desc: Pull pinned tool images
