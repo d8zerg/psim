@@ -37,3 +37,8 @@
 
 - [Контракты v1: состав, соглашения, проверка, покрытие сценариев](../contracts/README.md)
 - [OpenAPI REST v1](../contracts/openapi/psim-api-v1.yaml) · [AsyncAPI топиков](../contracts/asyncapi/psim-topics.yaml) · [справочник proto](../contracts/docs/proto-reference.md)
+
+## Безопасность (шаг 0.6)
+
+- [Модель угроз: методика, активы, границы доверия, допущения](security/threat-model.md)
+- [Реестр угроз и требований безопасности](security/threat-register.md) (генерируется из [threat-model.yaml](security/threat-model.yaml))

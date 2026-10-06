@@ -123,7 +123,7 @@ COMMIT;
 
 ## 7. Безопасность
 
-Обзор; модель угроз и меры - шаг 0.6.
+Обзор. Модель угроз - [threat-model.md](../security/threat-model.md); угрозы, требования безопасности `SR-NN` и их шаги плана - [threat-register.md](../security/threat-register.md).
 
 | Граница | Механизм |
 |---|---|

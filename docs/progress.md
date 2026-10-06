@@ -12,8 +12,8 @@
 | 0.2 | Доменная модель и контексты | утверждён | [glossary](domain/glossary.md), [context-map](domain/context-map.md), [aggregates](domain/aggregates.md), [state-models](domain/state-models.md), [event-taxonomy](domain/event-taxonomy.md) |
 | 0.3 | Архитектурный документ | утверждён | [arc42](architecture/README.md), [runtime](architecture/runtime-view.md), [deployment](architecture/deployment.md), [crosscutting](architecture/crosscutting.md), [data-flows](architecture/data-flows.md), [scaling](architecture/scaling.md), [quality](architecture/quality.md), [C4 DSL](architecture/c4/workspace.dsl) |
 | 0.4 | Пакет ADR | утверждён | [реестр ADR](adr/README.md): 17 приняты, 10 предложены (принимаются в начале своих шагов) |
-| 0.5 | Контракты v1 | готов | [contracts/](../contracts/README.md): proto, OpenAPI, AsyncAPI, реестр топиков, таксономия, каталог ошибок; проверка `task contracts:check`; ADR-028 (ClickHouse), ADR-029 |
-| 0.6 | Модель угроз и требования безопасности | не начат | |
+| 0.5 | Контракты v1 | утверждён | [contracts/](../contracts/README.md): proto, OpenAPI, AsyncAPI, реестр топиков, таксономия, каталог ошибок; проверка `task contracts:check`; ADR-028 (ClickHouse), ADR-029 |
+| 0.6 | Модель угроз и требования безопасности | готов | [threat-model](security/threat-model.md), [реестр угроз и требований](security/threat-register.md) (источник - [threat-model.yaml](security/threat-model.yaml)); проверка `task docs:threats` |
 | 0.7 | Стратегия качества и верификации | не начат | |
 
 ## Ф1-Ф11

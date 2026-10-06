@@ -17,6 +17,7 @@ tasks:
       - task: typography
       - task: mermaid
       - task: c4
+      - task: threats
 
   links:
     desc: Check relative links and heading anchors in Markdown
@@ -39,6 +40,23 @@ tasks:
             docker run --rm -u {{.UID}}:{{.GID}} -v "$PWD":/data {{.MERMAID_IMAGE}} \
               -i /data/{} -o /data/{}.svg >"{}.log" 2>&1 \
               && echo "ok: {}" || { echo "FAIL: {}"; grep -m3 "Error\|Expecting" "{}.log"; exit 255; }'
+
+  threats:
+    desc: Verify the threat model registry and that the rendered register is up to date
+    vars:
+      UPDATE: '{{.UPDATE | default "false"}}'
+    cmds:
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/security/threat_model.py verify {{.ROOT_DIR}} security/threat-model.yaml'
+      - mkdir -p {{.CACHE}}/security
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/security/threat_model.py render security/threat-model.yaml {{.CACHE}}/security/threat-register.md'
+      - task: :_publish
+        vars: {SRC: '{{.CACHE}}/security/threat-register.md', DST: '{{.TASKFILE_DIR}}/security/threat-register.md', UPDATE: '{{.UPDATE}}'}
+
+  threats:gen:
+    desc: Regenerate the threat register from the registry
+    cmds:
+      - task: threats
+        vars: {UPDATE: 'true'}
 
   c4:
     desc: Validate the C4 model (Structurizr DSL)

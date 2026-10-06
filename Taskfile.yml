@@ -44,6 +44,7 @@ tasks:
     desc: Regenerate all committed generated artifacts
     cmds:
       - task: contracts:gen
+      - task: docs:threats:gen
 
   tools:pull:
     desc: Pull pinned tool images
@@ -58,6 +59,23 @@ tasks:
       - docker image inspect {{.CONTRACTS_TOOLS_IMAGE}} >/dev/null 2>&1
     cmds:
       - docker build --quiet -t {{.CONTRACTS_TOOLS_IMAGE}} {{.ROOT_DIR}}/tools/contracts/image
+
+  _publish:
+    internal: true
+    desc: Compare a generated file with the committed one, or copy it when UPDATE=true
+    requires:
+      vars: [SRC, DST]
+    cmds:
+      - cmd: |
+          rel="$(realpath --relative-to="{{.ROOT_DIR}}" "{{.DST}}")"
+          if [ "{{.UPDATE}}" = "true" ]; then
+            cp "{{.SRC}}" "{{.DST}}" && echo "updated: $rel"
+          elif ! diff -q "{{.SRC}}" "{{.DST}}" >/dev/null 2>&1; then
+            echo "STALE: $rel differs from generated output; run: task gen" >&2
+            exit 1
+          else
+            echo "ok: $rel"
+          fi
 
   clean:
     desc: Remove generated caches (.cache/contracts, .cache/mermaid)
