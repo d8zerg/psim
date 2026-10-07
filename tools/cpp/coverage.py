@@ -4,8 +4,10 @@
 Runs in the toolchain container after `ctest --preset coverage`. Thresholds and module groups are
 read from coverage.yaml. Reports: <build-dir>/coverage-report.txt and <build-dir>/coverage-html/.
 
-Usage: coverage.py <coverage-build-dir> <coverage.yaml> [modules]
-  modules  space-separated module directories to gate (task ci passes the affected ones); empty: all
+Usage: coverage.py <coverage-build-dir> <coverage.yaml> [modules] [--component]
+  modules      space-separated module directories to gate (task ci passes the affected ones); empty: all
+  --component  the profiles include the component tests (task test:component): gate the groups with
+               `measured_by: component`, which the unit run only reports
 """
 
 import fnmatch
@@ -60,7 +62,12 @@ def gated_modules(groups, root):
     return found
 
 
-def evaluate(files, groups, root, only=None):
+def gated(group, component):
+    """A group is gated by the run that executes the tests able to cover it."""
+    return group is not None and (group.get("measured_by") == "component") == component
+
+
+def evaluate(files, groups, root, only=None, component=False):
     """Aggregate per-file summaries by module; return (rows, failures). only: modules to gate."""
     modules = {}
     for name, group in gated_modules(groups, root).items():
@@ -83,6 +90,9 @@ def evaluate(files, groups, root, only=None):
         m = modules[name]
         group = m["group"]
         row = [name, group["name"] if group else "-"]
+        if not gated(group, component):
+            row[1] += " (other run)" if group else ""  # gated by the unit or the component run
+            group = None
         if group and not m["lines"][1]:
             failures.append(f"{name}: not measured - no test executable covers its sources")
         for kind in ("lines", "branches"):
@@ -97,6 +107,8 @@ def evaluate(files, groups, root, only=None):
 
 
 def main(argv):
+    component = "--component" in argv
+    argv = [arg for arg in argv if arg != "--component"]
     if len(argv) not in (3, 4):
         print(__doc__, file=sys.stderr)
         return 2
@@ -123,7 +135,7 @@ def main(argv):
     run(["llvm-cov", "show", "-format=html", "-show-branches=count",
          f"-output-dir={os.path.join(build_dir, 'coverage-html')}", *common], stdout=subprocess.DEVNULL)
 
-    rows, failures = evaluate(files, groups, root, only)
+    rows, failures = evaluate(files, groups, root, only, component)
     print(f"{'module':40} {'group':15} {'lines':32} branches")
     for row in rows:
         print(f"{row[0]:40} {row[1]:15} {row[2]:32} {row[3]}")

@@ -33,6 +33,9 @@ task cpp:coverage             # покрытие и пороги по модул
 task arch:check               # fitness functions: зависимости модулей, чистота домена, SQL
 task bench:compare            # бенчмарки против базовой линии origin/master (регрессия > 5% - отказ)
 task bench:async              # накладные расходы асинхронных примитивов (B-02)
+task bench:kafka              # пропускная способность слоя Kafka в окружении (B-01, >= 200 000 сообщ./с)
+task test:component           # компонентные тесты адаптеров против окружения и их покрытие (TS-03)
+task contracts:registry-compat  # совместимость схем топиков в Schema Registry с последним выпуском (FF-04)
 task security:deps            # уязвимости и лицензии зависимостей (Trivy, SBOM)
 task release:dist             # пакеты DEB, образы, SBOM, подпись (ALLOW_DIRTY=true - пробный выпуск)
 task cpp:runtime-test         # запустить собранные тесты на Debian 12 и Astra Linux 1.8

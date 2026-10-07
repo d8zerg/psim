@@ -67,6 +67,18 @@ function(psim_add_test name)
   gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST PROPERTIES LABELS "unit;${name}")
 endfunction()
 
+# psim_add_component_test(<name> SOURCES ... LIBS ...): GoogleTest executable against the
+# containers of the local environment (TS-03, step 2.3). Label "component": the test presets skip it;
+# `task test:component` runs it on the compose network with the PSIM_TEST_* endpoints.
+function(psim_add_component_test name)
+  cmake_parse_arguments(ARG "" "" "SOURCES;LIBS" ${ARGN})
+  add_executable(${name} ${ARG_SOURCES})
+  psim_target_defaults(${name})
+  target_link_libraries(${name} PRIVATE ${ARG_LIBS} GTest::gtest_main)
+  include(GoogleTest)
+  gtest_discover_tests(${name} DISCOVERY_MODE PRE_TEST PROPERTIES LABELS "component;${name}" TIMEOUT 600)
+endfunction()
+
 # psim_add_benchmark(<name> SOURCES ... LIBS ...): Google Benchmark executable <name> (suffix
 # _bench). Measured by `task bench:run` in the release preset and compared with the master baseline
 # by `task bench:compare` (B-05, ADR-034). A one-iteration CTest smoke run keeps it working in

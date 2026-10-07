@@ -170,6 +170,28 @@ tasks:
     cmds:
       - rm -rf build/{{.PLATFORM}}
 
+  _run_env:
+    desc: Run CMD in the toolchain on the compose network of environment PROJECT with its PSIM_TEST_* endpoints
+    internal: true
+    requires:
+      vars: [CMD, PROJECT]
+    vars:
+      CACHE_DIR: '{{.CACHE}}/{{.PLATFORM}}'
+    deps:
+      - task: :toolchain:build
+    env:
+      PSIM_CMD: '{{.CMD}}'
+      PSIM_PLATFORM: '{{.PLATFORM}}'
+    cmds:
+      - cmd: |
+          mkdir -p "{{.CACHE_DIR}}/home"
+          docker run --rm -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
+            -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
+            -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
+            -e PSIM_TEST_TOXIPROXY=toxiproxy:8474 -e PSIM_TEST_REGISTRY=http://registry:8080/apis/ccompat/v7 \
+            -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/home":/cache/home \
+            -w /repo {{.TOOLCHAIN_IMAGE}} bash -c 'eval "$PSIM_CMD"'
+
   _run:
     internal: true
     requires:

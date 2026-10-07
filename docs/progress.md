@@ -36,8 +36,8 @@
 | Шаг | Название | Статус | Артефакты |
 |---|---|---|---|
 | 2.1 | Runtime сервиса | утверждён | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
-| 2.2 | Асинхронная модель исполнения | готов | [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md); `libs/platform/async` (шарды, `Clock`/`ManualClock`, `with_deadline`, `Credits`, `Semaphore`, `BoundedQueue`, `BlockingPool`), секция `runtime` конфигурации; B-02 `task bench:async` |
-| 2.3 | Слой Kafka | не начат | |
+| 2.2 | Асинхронная модель исполнения | утверждён | [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md); `libs/platform/async` (шарды, `Clock`/`ManualClock`, `with_deadline`, `Credits`, `Semaphore`, `BoundedQueue`, `BlockingPool`), секция `runtime` конфигурации; B-02 `task bench:async` |
+| 2.3 | Слой Kafka | готов | [ADR-041](adr/0041-kafka-layer.md); `libs/platform/kafka` (идемпотентный и транзакционный продюсер, потребитель, `Processor` ALO/EOS-K с повторами, DLQ и предохранителем, `ProtobufSerde` и клиент Schema Registry, трассировка в заголовках, метрики); TS-03 `task test:component` (в т. ч. SIGKILL обработчика), FF-04 `task contracts:registry-compat`, B-01 `task bench:kafka` (776 тыс. / 1,26 млн сообщ./с) |
 | 2.4 | Слой PostgreSQL | не начат | |
 | 2.5 | Слой Redis | не начат | |
 | 2.6 | Безопасность платформы | не начат | |

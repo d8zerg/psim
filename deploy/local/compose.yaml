@@ -32,6 +32,10 @@ x-kafka-env: &kafka-env
   KAFKA_MIN_INSYNC_REPLICAS: ${PSIM_KAFKA_MIN_ISR:-1}
   KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
   KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+  # A crashed member's partitions move after the session timeout (KIP-848 groups): 10 s instead
+  # of 45 s keeps the crash tests of step 2.3 short; production keeps the default (ADR-041).
+  KAFKA_GROUP_CONSUMER_MIN_SESSION_TIMEOUT_MS: "6000"
+  KAFKA_GROUP_CONSUMER_SESSION_TIMEOUT_MS: "10000"
   KAFKA_HEAP_OPTS: -Xms512m -Xmx1g
 
 services:

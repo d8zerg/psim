@@ -24,6 +24,12 @@ class PsimConan(ConanFile):
         "prometheus-cpp/*:with_pull": False,
         "prometheus-cpp/*:with_push": False,
         "prometheus-cpp/*:with_compression": False,
+        # Kafka layer (step 2.3, ADR-041): zstd topics (contracts/topics), TLS and SCRAM over OpenSSL
+        # (step 2.6); no Cyrus SASL (GSSAPI) and no libcurl (OIDC token fetch).
+        "librdkafka/*:zstd": True,
+        "librdkafka/*:ssl": True,
+        "librdkafka/*:sasl": False,
+        "librdkafka/*:curl": False,
     }
 
     PROTOBUF = "protobuf/6.33.5"
@@ -40,6 +46,8 @@ class PsimConan(ConanFile):
         self.requires("yaml-cpp/0.9.0")
         self.requires("nlohmann_json/3.11.3")  # the version json-schema-validator requires
         self.requires("json-schema-validator/2.4.0")
+        # Kafka layer (step 2.3, ADR-041): KIP-848 consumer protocol and transactions.
+        self.requires("librdkafka/2.14.2")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

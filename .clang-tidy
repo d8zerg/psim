@@ -28,7 +28,10 @@ Checks: >
   -portability-template-virtual-member-function,
   -cert-err58-cpp,
   -clang-analyzer-core.CallAndMessage,
-  -clang-analyzer-core.NullDereference
+  -clang-analyzer-core.NullDereference,
+  -readability-redundant-member-init
+# readability-redundant-member-init: "{}" on a member marks it optional in designated initializers,
+# which -Wmissing-designated-field-initializers otherwise reports (ADR-041).
 # Disabled for false positives (ADR-039): cert-err58-cpp on libc++ traits instantiated by lambdas;
 # portability-template-virtual-member-function (one compiler); clang-analyzer-core.CallAndMessage and
 # core.NullDereference on Asio coroutine frames (the analyzer does not model C++20 coroutines, ADR-040) -

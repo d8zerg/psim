@@ -109,11 +109,13 @@ tasks:
     desc: 'Local CI pipeline, run before every commit (ADR-034, ADR-036); checks what changed against origin/master (FULL=true: all)'
     vars:
       FULL: '{{.FULL | default "false"}}'
+      NIGHTLY: '{{.NIGHTLY | default "false"}}'
     cmds:
       - task: cpp:configure
         vars: {PRESET: debug}
       - '{{.PYTHON}} tools/ci/scope.py compute . build/{{.PLATFORM}}/debug {{.CI_SCOPE}} {{.FULL}}'
       - task: _ci_stages
+        vars: {NIGHTLY: '{{.NIGHTLY}}'}
       - task: _ci_record
 
   _ci_stages:
@@ -150,9 +152,12 @@ tasks:
         if: '[ "{{.CPP}}" = true ]'
       - task: cpp:runtime-test                # FF-15
         if: '[ "{{.CPP}}" = true ]'
-      - task: env:ci-test                     # step 1.4: fresh environment, startup budget, smoke tests
+      - task: bench:compare                   # B-05; before the environment loads the machine
+        vars: {BENCHES: '{{.BENCHES}}'}
+        if: '[ "{{.BENCH}}" = true ]'
+      - task: env:ci-test                     # fresh environment: smoke tests, FF-06, FF-04, TS-03 (B-01 nightly)
+        vars: {NIGHTLY: '{{.NIGHTLY}}'}
         if: '[ "{{.ENV}}" = true ]'
-      # Component tests of adapters (TS-03) run in this environment from steps 2.3-2.8.
       - task: web:check                       # step 1.5: format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'
       - task: web:e2e                         # Playwright smoke of the built console
@@ -161,9 +166,6 @@ tasks:
         if: '[ "{{.DOCS}}" = true ]'
       - task: security:deps                   # SEC-02
         if: '[ "{{.DEPS}}" = true ]'
-      - task: bench:compare                   # B-05
-        vars: {BENCHES: '{{.BENCHES}}'}
-        if: '[ "{{.BENCH}}" = true ]'
       - task: release:package:test            # FF-18
         if: '[ "{{.RELEASE}}" = true ]'
       - task: release:images:test             # FF-19
@@ -173,7 +175,7 @@ tasks:
     desc: Nightly pipeline - ci over the full scope plus reproducibility and image scanning
     cmds:
       - task: ci
-        vars: {FULL: 'true'}
+        vars: {FULL: 'true', NIGHTLY: 'true'}
       - task: cpp:reproducible                # FF-13
       - task: security:images                 # SEC-03
 

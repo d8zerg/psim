@@ -17,3 +17,8 @@ tools.build:compiler_executables={"c": "clang", "cpp": "clang++"}
 tools.cmake.cmaketoolchain:generator=Ninja
 tools.build:exelinkflags=["-fuse-ld=lld"]
 tools.build:sharedlinkflags=["-fuse-ld=lld"]
+# librdkafka 2.14: rd_atomic32_set/rd_atomic64_set test HAVE_ATOMICS_{32,64}_ATOMIC, which its build
+# never defines, and fall back to plain stores (a data race, found by TSan, ADR-041). The flags make
+# them __atomic_exchange_n; they take part in its package id, so a cached binary is not reused.
+librdkafka/*:tools.build:cflags=["-DHAVE_ATOMICS_32_ATOMIC=1", "-DHAVE_ATOMICS_64_ATOMIC=1"]
+librdkafka/*:tools.info.package_id:confs=["tools.build:cflags"]

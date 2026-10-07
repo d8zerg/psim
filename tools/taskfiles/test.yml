@@ -4,6 +4,27 @@
 version: '3'
 
 tasks:
+  component:
+    desc: 'Component tests of adapters against the environment containers, with coverage of the adapter modules (TS-03, FF-12)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-local"}}'
+      BUILD: build/{{.PLATFORM}}/coverage
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - task: :contracts:registry:register      # the tests read the schemas of the topics
+        vars: {PROJECT: '{{.PROJECT}}'}
+      # Unit and component profiles together: adapter modules are gated on both (coverage.yaml).
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: >-
+            rm -rf {{.BUILD}}/profiles &&
+            export LLVM_PROFILE_FILE=/repo/{{.BUILD}}/profiles/%p-%m.profraw &&
+            ctest --test-dir {{.BUILD}} -LE '^component$' -j {{.JOBS}} --output-on-failure -Q &&
+            ctest --test-dir {{.BUILD}} -L '^component$' -j 1 --output-on-failure &&
+            python3 -I tools/cpp/coverage.py {{.BUILD}} tools/cpp/coverage.yaml '' --component
+
   observability:
     desc: 'Every service exports /health/live, /health/ready, /metrics, JSON logs and traces and drains on SIGTERM (FF-06)'
     vars:

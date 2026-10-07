@@ -5,6 +5,12 @@
 # Tests, generated code (build/), vendored code (third_party/) and dependencies are excluded.
 
 groups:
+  # Adapters whose code runs only against real infrastructure: gated by `task test:component`
+  # (unit and component tests together, TS-03); the unit run reports them.
+  - name: adapters
+    modules: ['libs/platform/kafka']
+    lines: 75
+    measured_by: component
   - name: domain
     modules: ['libs/domain/*']
     lines: 90

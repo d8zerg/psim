@@ -54,6 +54,19 @@ tasks:
       - task: compare
         vars: {BENCHES: psim_platform_async_bench}
 
+  kafka:
+    desc: 'Kafka layer throughput against the environment: >= 200000 msg/s for the producer and the consumer (B-01, nightly)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-local"}}'
+      MESSAGES: '{{.MESSAGES | default "2000000"}}'
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: build/{{.PLATFORM}}/release/libs/platform/kafka/psim_kafka_throughput kafka-1:19092 {{.MESSAGES}} 512 200000
+
   compare:
     desc: Compare benchmarks with the master baseline; a slowdown above 5% fails (B-05). BENCHES limits the set
     cmds:

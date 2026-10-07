@@ -27,6 +27,8 @@ stages:
   docs: ['docs/*', '*.md', 'contracts/*', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
   deps: ['conanfile.py', 'conan.lock', 'web/pnpm-lock.yaml', 'tools/release/licenses.yaml', 'tools/taskfiles/security.yml']
   release: ['deploy/images/*', 'tools/release/*', 'tools/taskfiles/release.yml']
-  env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'contracts/topics/*']
+  # The environment also hosts the component tests of adapters (TS-03) and the registry check (FF-04).
+  env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'tools/taskfiles/test.yml', 'contracts/topics/*',
+        'contracts/proto/*', 'tools/contracts/registry.py', 'libs/platform/kafka/*']
   web: ['web/*', 'contracts/openapi/*', 'contracts/proto/*', 'tools/taskfiles/web.yml']
   bench: ['tools/bench/*', 'tools/taskfiles/bench.yml']

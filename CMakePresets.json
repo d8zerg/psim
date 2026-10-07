@@ -39,7 +39,8 @@
     {"name": "coverage", "configurePreset": "coverage"}
   ],
   "testPresets": [
-    {"name": "base", "hidden": true, "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"}},
+    {"name": "base", "hidden": true, "output": {"outputOnFailure": true}, "execution": {"noTestsAction": "error"},
+     "filter": {"exclude": {"label": "^component$"}}},
     {"name": "debug", "inherits": "base", "configurePreset": "debug"},
     {"name": "release", "inherits": "base", "configurePreset": "release"},
     {"name": "relwithdebinfo", "inherits": "base", "configurePreset": "relwithdebinfo"},

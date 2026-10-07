@@ -35,6 +35,32 @@ tasks:
         vars: {UPDATE: 'true'}
       - task: verify
 
+  registry:register:
+    desc: 'Register the value schemas of all topics in the Schema Registry of environment PROJECT (ADR-003)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-local"}}'
+    cmds:
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: python3 -I tools/contracts/registry.py register http://registry:8080/apis/ccompat/v7
+
+  registry-compat:
+    desc: 'FF-04: topic schemas of the working tree register over the last release (master before the first) under the ADR-004 rules'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-local"}}'
+      BASE:
+        sh: git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || echo master
+      DIR: .cache/tmp/ff04-base
+    cmds:
+      - rm -rf {{.ROOT_DIR}}/{{.DIR}} && mkdir -p {{.ROOT_DIR}}/{{.DIR}}
+      - git -C {{.ROOT_DIR}} archive {{.BASE}} contracts | tar -x -C {{.ROOT_DIR}}/{{.DIR}}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: python3 -I tools/contracts/registry.py compat http://registry:8080/apis/ccompat/v7 /repo/{{.DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.DIR}}
+
   buf:
     desc: 'Run buf in a container, for example: task contracts:buf -- dep update'
     cmds:
