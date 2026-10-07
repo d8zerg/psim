@@ -15,6 +15,7 @@ tasks:
       - mkdir -p {{.CACHE}}/trivy
       - task: :release:sbom:app
       - '{{.TRIVY}} fs --cache-dir /cache --quiet --scanners vuln --severity HIGH,CRITICAL --exit-code 1 conan.lock'
+      - '{{.TRIVY}} fs --cache-dir /cache --quiet --scanners vuln --severity HIGH,CRITICAL --exit-code 1 web/pnpm-lock.yaml'
       - >-
         {{.TRIVY}} sbom --cache-dir /cache --quiet --severity HIGH,CRITICAL --exit-code 1
         build/{{.PLATFORM}}/release/app.cdx.json

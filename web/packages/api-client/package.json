@@ -1,0 +1,22 @@
+{
+  "name": "@psim/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Typed REST v1 client generated from contracts/openapi/psim-api-v1.yaml (ADR-026, ADR-037)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "gen": "openapi-typescript ../../../contracts/openapi/psim-api-v1.yaml --output src/gen/schema.ts",
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

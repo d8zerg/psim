@@ -1,0 +1,23 @@
+{
+  "name": "@psim/realtime-client",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Realtime channel client: WebSocket protocol of contracts/proto/psim/realtime/v1 (ADR-019, ADR-037)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "gen": "buf generate --template buf.gen.yaml",
+    "lint": "eslint --max-warnings 0 .",
+    "typecheck": "tsc --project tsconfig.json",
+    "test": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@bufbuild/protobuf": "2.16.0"
+  },
+  "devDependencies": {
+    "@bufbuild/buf": "1.73.0",
+    "@bufbuild/protoc-gen-es": "2.16.0"
+  }
+}

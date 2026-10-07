@@ -1,0 +1,8 @@
+# Generated and installed files (step 1.5).
+pnpm-lock.yaml
+**/dist
+**/coverage
+**/src/gen
+**/playwright-report
+**/test-results
+.turbo

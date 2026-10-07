@@ -69,6 +69,8 @@ playwright-report/
 test-results/
 blob-report/
 /web/**/playwright/.cache/
+# Clients generated from the contracts on every build (step 1.5, ADR-037)
+/web/**/src/gen/
 npm-debug.log*
 pnpm-debug.log*
 yarn-error.log*

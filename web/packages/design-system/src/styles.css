@@ -1,0 +1,32 @@
+/* PSIM design tokens (Tailwind CSS 4). Dark theme by default for 24/7 operator work (step 8.1);
+   the light theme applies under [data-theme="light"]. Components use only these tokens. */
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-background: oklch(0.18 0.01 260);
+  --color-foreground: oklch(0.95 0.01 260);
+  --color-muted: oklch(0.26 0.01 260);
+  --color-muted-foreground: oklch(0.72 0.02 260);
+  --color-border: oklch(0.32 0.01 260);
+  --color-primary: oklch(0.66 0.15 250);
+  --color-primary-foreground: oklch(0.15 0.01 260);
+  --color-danger: oklch(0.62 0.21 25);
+  --color-danger-foreground: oklch(0.98 0.01 25);
+  --radius-md: 0.375rem;
+}
+
+[data-theme="light"] {
+  --color-background: oklch(0.99 0 0);
+  --color-foreground: oklch(0.2 0.01 260);
+  --color-muted: oklch(0.95 0.01 260);
+  --color-muted-foreground: oklch(0.45 0.02 260);
+  --color-border: oklch(0.88 0.01 260);
+  --color-primary-foreground: oklch(0.99 0 0);
+}
+
+body {
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans);
+}

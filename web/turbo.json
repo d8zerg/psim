@@ -1,0 +1,32 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "ui": "stream",
+  "tasks": {
+    "gen": {
+      "cache": false,
+      "outputs": ["src/gen/**"]
+    },
+    "lint": {
+      "dependsOn": ["gen", "^gen"]
+    },
+    "typecheck": {
+      "dependsOn": ["gen", "^gen"]
+    },
+    "test": {
+      "dependsOn": ["gen", "^gen"],
+      "outputs": ["coverage/**"]
+    },
+    "build": {
+      "dependsOn": ["gen", "^gen"],
+      "outputs": ["dist/**"]
+    },
+    "size": {
+      "dependsOn": ["build"]
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "cache": false,
+      "passThroughEnv": ["PLAYWRIGHT_BROWSERS_PATH", "CI"]
+    }
+  }
+}

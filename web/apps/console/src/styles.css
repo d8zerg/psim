@@ -1,0 +1,4 @@
+@import "@psim/design-system/styles.css";
+
+/* Workspace packages are linked through node_modules, which Tailwind does not scan by default. */
+@source "../../../packages/design-system/src";

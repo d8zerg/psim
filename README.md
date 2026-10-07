@@ -19,6 +19,7 @@ task ci:nightly               # ci + воспроизводимость сбор
 task release                  # ci:nightly + подписанный каталог выпуска dist/ + его проверка
 task check                    # все проверки кода (контракты, архитектура, качество C++, тесты, документация)
 task gen                      # перегенерировать сгенерированные файлы
+task web:check                # веб: формат, ESLint, типы, Vitest, сборка, бюджеты бандла (web:e2e - Playwright, web:dev - сервер разработки)
 task env:up                   # локальное окружение: Kafka, Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, Grafana...
 task env:test                 # смоук-тесты окружения (env:down - остановить, env:reset - удалить данные)
 task cpp:build                # собрать (PRESET=debug|release|relwithdebinfo|asan|tsan|coverage)

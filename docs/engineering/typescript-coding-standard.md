@@ -1,19 +1,20 @@
 # Стандарт кодирования TypeScript
 
-Шаг плана 1.2 · [ADR-033](../adr/0033-code-quality-gates.md) · стек веб-клиента - раздел 0.1 плана
+Шаг плана 1.2 · [ADR-033](../adr/0033-code-quality-gates.md) · инструменты - [ADR-037](../adr/0037-web-monorepo.md) · стек веб-клиента - раздел 0.1 плана
 
-Стандарт действует для `web/` (pnpm + Turborepo, React 19, Vite, TanStack Query и Router, Zustand, Tailwind CSS 4, shadcn/ui). Линтер, форматтер, проверка типов и покрытие настраиваются вместе с веб-монорепозиторием на шаге 1.5 и с этого момента входят в `task check`. Ниже - требования к этой конфигурации и правила для ревью.
+Стандарт действует для `web/` (pnpm + Turborepo, React 19, Vite, TanStack Query и Router, Zustand, Tailwind CSS 4, shadcn/ui). Правила, которые проверяет инструмент, записаны в его конфигурации: `web/tsconfig.base.json`, `web/eslint.config.js`, `web/.prettierrc.json`, `vitest.config.ts` и `.size-limit.json` пакетов. Ниже - их смысл и правила для ревью.
 
-## 1. Барьеры (вводятся на шаге 1.5)
+## 1. Барьеры (`task web:check`, этап `web` конвейера)
 
 | Что | Требование |
 |---|---|
-| Проверка типов | `tsc --noEmit` без ошибок во всех пакетах |
-| Линтер | 0 замечаний, предупреждения считаются ошибками |
-| Формат | проверка форматтером без изменений |
-| Тесты и покрытие | Vitest; ≥ 80% строк для логики: stores, API-клиент, протокол realtime ([strategy.md](../quality/strategy.md#6-покрытие)) |
-| Бюджеты бандла | превышение блокирует слияние (DoD шага 1.5) |
-| Сгенерированный API-клиент | генерируется из OpenAPI, вручную не редактируется, актуальность проверяется |
+| Проверка типов | `tsc` без ошибок во всех пакетах |
+| Линтер | ESLint (typescript-eslint `strictTypeChecked`, react-hooks, jsx-a11y), `--max-warnings 0` |
+| Формат | Prettier без изменений |
+| Тесты и покрытие | Vitest; ≥ 80% строк, ветвей, функций и выражений на пакет ([strategy.md](../quality/strategy.md#6-покрытие)) |
+| Бюджеты бандла | size-limit: JavaScript консоли ≤ 150 КБ gzip, CSS ≤ 15 КБ |
+| Сгенерированные клиенты | REST - из OpenAPI, realtime - из proto; генерируются при каждой сборке в `src/gen`, в git не хранятся |
+| E2E | Playwright по собранной консоли (`task web:e2e`) |
 
 ## 2. Компилятор
 

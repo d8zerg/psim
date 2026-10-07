@@ -62,6 +62,9 @@ includes:
   env:
     taskfile: ./tools/taskfiles/env.yml
     dir: .
+  web:
+    taskfile: ./tools/taskfiles/web.yml
+    dir: .
   security:
     taskfile: ./tools/taskfiles/security.yml
     dir: .
@@ -90,6 +93,7 @@ tasks:
       - task: cpp:test:sanitizers
       - task: cpp:coverage
       - task: cpp:runtime-test
+      - task: web:check
       - task: docs:check
 
   ci:
@@ -113,6 +117,7 @@ tasks:
       RELEASE: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} release'}
       BENCH: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} bench'}
       ENV: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} env'}
+      WEB: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} web'}
       LABELS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} labels'}
       TIDY: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} tidy'}
       MODULES: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} modules'}
@@ -139,6 +144,10 @@ tasks:
       - task: env:ci-test                     # step 1.4: fresh environment, startup budget, smoke tests
         if: '[ "{{.ENV}}" = true ]'
       # Component tests of adapters (TS-03) run in this environment from steps 2.3-2.8.
+      - task: web:check                       # step 1.5: format, generated clients, lint, types, tests, budgets
+        if: '[ "{{.WEB}}" = true ]'
+      - task: web:e2e                         # Playwright smoke of the built console
+        if: '[ "{{.WEB}}" = true ]'
       - task: docs:check                      # FF-08
         if: '[ "{{.DOCS}}" = true ]'
       - task: security:deps                   # SEC-02

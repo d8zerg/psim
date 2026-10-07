@@ -1,0 +1,17 @@
+# Workspaces of the PSIM web monorepo (step 1.5, ADR-037).
+packages:
+  - apps/*
+  - packages/*
+
+# Supply chain (SR-23): dependency build scripts are blocked except for the reviewed ones.
+# @bufbuild/buf: postinstall links the platform binary of buf.
+allowBuilds:
+  "@bufbuild/buf": true
+
+# openapi-typescript 7 declares TypeScript 5; it only prints types and works with TypeScript 6
+# (checked by `pnpm gen` and the type check of @psim/api-client). Revisit with openapi-typescript 8.
+peerDependencyRules:
+  allowedVersions:
+    openapi-typescript>typescript: "6"
+    # eslint-plugin-jsx-a11y 6.10 declares ESLint up to 9; its rules run on ESLint 10 (checked by `pnpm lint`).
+    eslint-plugin-jsx-a11y>eslint: "10"

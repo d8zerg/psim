@@ -1,0 +1,14 @@
+[
+  {
+    "name": "JavaScript, all chunks (gzip); routes beyond the shell are code-split (F8)",
+    "path": "dist/assets/*.js",
+    "limit": "150 kB",
+    "gzip": true
+  },
+  {
+    "name": "CSS (gzip)",
+    "path": "dist/assets/*.css",
+    "limit": "15 kB",
+    "gzip": true
+  }
+]

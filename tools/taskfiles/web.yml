@@ -1,0 +1,93 @@
+# Web monorepo (step 1.5, ADR-037): pnpm + Turborepo in web/. Namespace "web"; working directory is
+# the repository root. Node runs in a pinned container (pnpm through corepack, version from
+# web/package.json, shim in .cache/web/bin); caches live in .cache/web. Playwright runs in its own image with browsers.
+version: '3'
+
+vars:
+  NODE_IMAGE: node:24.21.0-bookworm@sha256:3d27e5c11e5786e309ec3e03f93ae536eb36e6e5eb3714d5eb3300a36157add0
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+  WEB_CACHE: '{{.CACHE}}/web'
+
+tasks:
+  install:
+    desc: Install dependencies from the lock file (web/pnpm-lock.yaml)
+    sources:
+      - web/pnpm-lock.yaml
+      - web/package.json
+      - web/*/*/package.json
+    generates:
+      - web/node_modules/.modules.yaml
+    cmds:
+      - task: _run
+        vars: {CMD: pnpm install --frozen-lockfile}
+
+  lock:
+    desc: Resolve dependencies into web/pnpm-lock.yaml (after changing a package.json)
+    cmds:
+      - task: _run
+        vars: {CMD: pnpm install --no-frozen-lockfile}
+
+  check:
+    desc: 'All web checks: format, generated clients, lint, types, tests with coverage, build, bundle budgets'
+    cmds:
+      - task: install
+      - task: _run
+        vars:
+          CMD: pnpm format && pnpm exec turbo run gen lint typecheck test build size --output-logs=errors-only
+
+  gen:
+    desc: Generate the API client (OpenAPI) and the realtime protocol types (proto)
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm gen}
+
+  test:
+    desc: Unit tests with coverage thresholds (Vitest)
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm test}
+
+  format:fix:
+    desc: Format web sources with Prettier
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm format:fix}
+
+  e2e:
+    desc: End-to-end tests of the built console in Chromium (Playwright)
+    cmds:
+      - task: install
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm exec turbo run e2e --output-logs=errors-only
+
+  dev:
+    desc: Vite dev server of the console on http://localhost:5173
+    interactive: true
+    cmds:
+      - task: install
+      - task: _run
+        vars:
+          TTY: -it -p 127.0.0.1:5173:5173
+          CMD: pnpm --filter @psim/console dev
+
+  _run:
+    internal: true
+    requires:
+      vars: [CMD]
+    env:
+      PSIM_CMD: '{{.CMD}}'
+    cmds:
+      - mkdir -p "{{.WEB_CACHE}}/bin" "{{.WEB_CACHE}}/home" "{{.WEB_CACHE}}/pnpm-store" "{{.WEB_CACHE}}/corepack" "{{.WEB_CACHE}}/buf"
+      - >-
+        docker run --rm {{.TTY}} -u {{.UID}}:{{.GID}}
+        -e PSIM_CMD -e HOME=/cache/home -e COREPACK_HOME=/cache/corepack -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+        -e npm_config_store_dir=/cache/pnpm-store -e BUF_CACHE_DIR=/cache/buf -e TURBO_TELEMETRY_DISABLED=1
+        -e DO_NOT_TRACK=1 -e CI=true -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+        -v "{{.ROOT_DIR}}":/repo -v "{{.WEB_CACHE}}":/cache -w /repo/web
+        {{.IMAGE | default .NODE_IMAGE}} bash -c
+        'corepack enable --install-directory /cache/bin pnpm && export PATH=/cache/bin:$PATH && eval "$PSIM_CMD"'

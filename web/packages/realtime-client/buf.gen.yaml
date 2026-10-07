@@ -1,0 +1,11 @@
+# TypeScript of the realtime protocol and its imports, generated on every build (step 1.5, ADR-037).
+version: v2
+inputs:
+  - directory: ../../../contracts
+    paths: [../../../contracts/proto/psim/realtime/v1]
+plugins:
+  - local: protoc-gen-es
+    out: src/gen
+    include_imports: true
+    opt: [target=ts, import_extension=none]
+clean: true

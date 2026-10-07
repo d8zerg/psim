@@ -628,6 +628,16 @@ methods:
     task: task env:ci-test
     steps: ['1.4']
     purpose: DoD шага 1.4 и требование SR-02 (ADR-035)
+  - id: FF-21
+    kind: fitness
+    name: Качество веб-клиента
+    criteria: Формат, ESLint без предупреждений, строгая проверка типов, Vitest с покрытием не ниже 80% на пакет, бюджеты бандла, клиенты REST и realtime генерируются из контрактов; E2E-смоук консоли в Chromium
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task web:check
+    steps: ['1.5']
+    purpose: Стандарт TypeScript и DoD шага 1.5 (ADR-037)
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01
