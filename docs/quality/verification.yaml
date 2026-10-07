@@ -618,6 +618,16 @@ methods:
     task: task release:images:test
     steps: ['1.3']
     purpose: Требование SR-24 (ADR-034)
+  - id: FF-20
+    kind: fitness
+    name: Локальное окружение с нуля
+    criteria: Окружение поднимается с нуля не дольше 5 минут (1 и 3 брокера Kafka); смоук-тесты всех компонентов и путей между ними проходят; SR-02 в realm Keycloak
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task env:ci-test
+    steps: ['1.4']
+    purpose: DoD шага 1.4 и требование SR-02 (ADR-035)
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01

@@ -69,7 +69,7 @@
 
 | Барьер | Когда | Что блокирует | Состав |
 |---|---|---|---|
-| **PR** | Каждый push (`task ci` в фоне после коммита, хук `pre-push`; область изменения - [ADR-034](../adr/0034-local-ci-and-supply-chain.md)) | Push в `master` | `task check`; сборка с `-Werror`; clang-tidy; unit, property, component, contract; санитайзеры ASan+UBSan и TSan; покрытие; бенчмарки затронутых компонентов (регрессия > 5%); короткая симуляция; смоук integration; fitness functions; SAST и проверка зависимостей |
+| **PR** | Каждый коммит: `task ci` перед коммитом ([ADR-036](../adr/0036-no-git-hooks.md)); область изменения - [ADR-034](../adr/0034-local-ci-and-supply-chain.md) | Коммит и push в `master` | `task check`; сборка с `-Werror`; clang-tidy; unit, property, component, contract; санитайзеры ASan+UBSan и TSan; покрытие; бенчмарки затронутых компонентов (регрессия > 5%); короткая симуляция; смоук integration; fitness functions; SAST и проверка зависимостей |
 | **Nightly** | Ежесуточно на `master` (`task ci:nightly`, полная область) | Следующий выпуск, создаёт задачу при падении | Длинная симуляция (10 000 прогонов); integration и E2E; нагрузка `LOAD-5K`/`LOAD-10K`; базовый хаос-набор; фаззинг 1 ч на каждую цель; сканирование образов |
 | **Release** | Кандидат выпуска (`task release`) | Выпуск | Полная нагрузка `LOAD-50K`; пик ×1,5; soak 24 ч; полный хаос-набор на `E-CLUSTER`; обновление N -> N+1 и откат; DAST; фаззинг 24 ч; проверка TLS; ручные процедуры; SBOM и подписи |
 

@@ -1,0 +1,36 @@
+<!-- ClickHouse server of the local environment (step 1.4, ADR-028): Keeper, cluster psim with one
+     shard and one replica, macros for Replicated tables - the same DDL as in the cluster topology. -->
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <logger>
+        <level>warning</level>
+        <console>1</console>
+    </logger>
+    <zookeeper>
+        <node>
+            <host>keeper</host>
+            <port>9181</port>
+        </node>
+    </zookeeper>
+    <macros>
+        <cluster>psim</cluster>
+        <shard>01</shard>
+        <replica>clickhouse-1</replica>
+    </macros>
+    <remote_servers replace="true">
+        <psim>
+            <shard>
+                <internal_replication>true</internal_replication>
+                <replica>
+                    <host>clickhouse</host>
+                    <port>9000</port>
+                    <user>psim</user>
+                    <password>psim-dev-clickhouse</password>
+                </replica>
+            </shard>
+        </psim>
+    </remote_servers>
+    <distributed_ddl>
+        <path>/clickhouse/task_queue/ddl</path>
+    </distributed_ddl>
+</clickhouse>

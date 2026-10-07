@@ -50,9 +50,10 @@
 - [Методика сквозной сверки потерь и дубликатов](quality/reconciliation.md)
 - [Методика замера задержек](quality/latency-measurement.md)
 
-## Инженерная платформа (шаги 1.1-1.3)
+## Инженерная платформа (шаги 1.1-1.4)
 
 - [Стандарт кодирования C++23](engineering/cpp-coding-standard.md)
 - [Стандарт кодирования TypeScript](engineering/typescript-coding-standard.md)
 - Барьеры качества и fitness functions - [ADR-033](adr/0033-code-quality-gates.md); toolchain - [ADR-032](adr/0032-cpp-toolchain.md)
 - Локальный конвейер CI/CD, пакеты, образы, SBOM и подписи - [ADR-034](adr/0034-local-ci-and-supply-chain.md)
+- Локальное окружение (Kafka, Schema Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, наблюдаемость, Toxiproxy) - [ADR-035](adr/0035-local-environment.md), [deploy/](../deploy/README.md)

@@ -1,9 +1,0 @@
-#!/bin/sh
-# PSIM post-commit hook (step 1.3, ADR-034): starts `task ci` for the new commit in the background
-# (tools/ci/runner.sh, a dedicated clone), so the result is usually ready by the time of push.
-# Set PSIM_CI_BACKGROUND=0 to skip (for example, during a series of fixup commits).
-[ "${PSIM_CI_BACKGROUND:-1}" = "0" ] && exit 0
-root=$(git rev-parse --show-toplevel)
-sha=$(git rev-parse HEAD)
-nohup sh "$root/tools/ci/runner.sh" "$sha" background >/dev/null 2>&1 &
-echo "post-commit: task ci started in background for $(git rev-parse --short HEAD) (task ci:status, task ci:log)"

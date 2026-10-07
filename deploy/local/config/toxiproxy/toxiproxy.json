@@ -1,0 +1,8 @@
+[
+  {"name": "kafka-1", "listen": "0.0.0.0:29092", "upstream": "kafka-1:29093", "enabled": true},
+  {"name": "kafka-2", "listen": "0.0.0.0:29192", "upstream": "kafka-2:29093", "enabled": true},
+  {"name": "kafka-3", "listen": "0.0.0.0:29292", "upstream": "kafka-3:29093", "enabled": true},
+  {"name": "postgres", "listen": "0.0.0.0:15432", "upstream": "postgres:5432", "enabled": true},
+  {"name": "valkey", "listen": "0.0.0.0:16379", "upstream": "valkey:6379", "enabled": true},
+  {"name": "clickhouse", "listen": "0.0.0.0:19000", "upstream": "clickhouse:9000", "enabled": true}
+]

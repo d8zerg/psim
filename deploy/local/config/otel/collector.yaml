@@ -1,0 +1,49 @@
+# OpenTelemetry Collector of the local environment (step 1.4, crosscutting.md section 6):
+# services send OTLP here; traces go to Tempo, logs to Loki, metrics to Prometheus.
+# Tail sampling of the hot path (signals and incidents always kept) arrives with step 9.4.
+receivers:
+  otlp:
+    protocols:
+      grpc: {endpoint: 0.0.0.0:4317}
+      http: {endpoint: 0.0.0.0:4318}
+
+processors:
+  batch: {}
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 512
+
+exporters:
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls: {insecure: true}
+  otlphttp/loki:
+    endpoint: http://loki:3100/otlp
+  prometheusremotewrite:
+    endpoint: http://prometheus:9090/api/v1/write
+    resource_to_telemetry_conversion: {enabled: true}
+
+extensions:
+  health_check: {endpoint: 0.0.0.0:13133}
+
+service:
+  extensions: [health_check]
+  telemetry:
+    metrics:
+      readers:
+        - pull:
+            exporter:
+              prometheus: {host: 0.0.0.0, port: 8888}
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlp/tempo]
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [otlphttp/loki]
+    metrics:
+      receivers: [otlp]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite]

@@ -1,0 +1,145 @@
+{
+  "realm": "psim",
+  "displayName": "PSIM Platform (local)",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "loginWithEmailAllowed": false,
+  "duplicateEmailsAllowed": false,
+  "passwordPolicy": "length(12) and notUsername and passwordHistory(3)",
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "waitIncrementSeconds": 60,
+  "maxFailureWaitSeconds": 900,
+  "maxDeltaTimeSeconds": 43200,
+  "quickLoginCheckMilliSeconds": 1000,
+  "minimumQuickLoginWaitSeconds": 60,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 43200,
+  "accessTokenLifespan": 300,
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "browserFlow": "psim-browser",
+  "roles": {
+    "realm": [
+      {"name": "mfa-required", "description": "Members must pass a second factor at login (SR-02); held by admin and supervisor"}
+    ],
+    "client": {
+      "psim": [
+        {"name": "operator", "description": "Operator: incidents in the access scope"},
+        {"name": "supervisor", "description": "Shift supervisor", "composite": true,
+         "composites": {"realm": ["mfa-required"]}},
+        {"name": "admin", "description": "Administrator: configuration, not incident handling", "composite": true,
+         "composites": {"realm": ["mfa-required"]}},
+        {"name": "integrator", "description": "Integrator: connectors"},
+        {"name": "auditor", "description": "Auditor: read-only audit"},
+        {"name": "manager", "description": "Manager: read-only reports"}
+      ]
+    }
+  },
+  "clients": [
+    {
+      "clientId": "psim",
+      "name": "PSIM API (roles)",
+      "description": "Resource client that owns the PSIM roles (ADR-020); no login",
+      "enabled": true,
+      "bearerOnly": true,
+      "publicClient": false,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false
+    },
+    {
+      "clientId": "psim-console",
+      "name": "PSIM web console",
+      "description": "Users sign in only with Authorization Code + PKCE (SR-02)",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "redirectUris": ["http://localhost:5173/*"],
+      "webOrigins": ["http://localhost:5173"],
+      "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*"}
+    },
+    {
+      "clientId": "psim-services",
+      "name": "PSIM services (development)",
+      "description": "Client credentials of platform services on the local stand",
+      "enabled": true,
+      "publicClient": false,
+      "clientAuthenticatorType": "client-secret",
+      "secret": "psim-dev-services-secret",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true
+    }
+  ],
+  "authenticationFlows": [
+    {
+      "alias": "psim-browser",
+      "description": "Browser login; a second factor for members of mfa-required (SR-02)",
+      "providerId": "basic-flow",
+      "topLevel": true,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-cookie", "requirement": "ALTERNATIVE", "priority": 10, "authenticatorFlow": false},
+        {"flowAlias": "psim-browser-forms", "requirement": "ALTERNATIVE", "priority": 20, "authenticatorFlow": true}
+      ]
+    },
+    {
+      "alias": "psim-browser-forms",
+      "description": "Username and password, then the conditional second factor",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "auth-username-password-form", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false},
+        {"flowAlias": "psim-browser-mfa", "requirement": "CONDITIONAL", "priority": 20, "authenticatorFlow": true}
+      ]
+    },
+    {
+      "alias": "psim-browser-mfa",
+      "description": "One-time password for members of mfa-required",
+      "providerId": "basic-flow",
+      "topLevel": false,
+      "builtIn": false,
+      "authenticationExecutions": [
+        {"authenticator": "conditional-user-role", "authenticatorConfig": "psim-mfa-required", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false},
+        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 20, "authenticatorFlow": false}
+      ]
+    }
+  ],
+  "authenticatorConfig": [
+    {"alias": "psim-mfa-required", "config": {"condUserRole": "mfa-required", "negate": "false"}}
+  ],
+  "requiredActions": [
+    {"alias": "CONFIGURE_TOTP", "name": "Configure OTP", "providerId": "CONFIGURE_TOTP", "enabled": true, "defaultAction": false, "priority": 10}
+  ],
+  "users": [
+    {"username": "operator1", "enabled": true, "firstName": "Dev", "lastName": "Operator",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "clientRoles": {"psim": ["operator"]}},
+    {"username": "supervisor1", "enabled": true, "firstName": "Dev", "lastName": "Supervisor",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "requiredActions": ["CONFIGURE_TOTP"], "clientRoles": {"psim": ["supervisor"]}},
+    {"username": "admin1", "enabled": true, "firstName": "Dev", "lastName": "Admin",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "requiredActions": ["CONFIGURE_TOTP"], "clientRoles": {"psim": ["admin"]}},
+    {"username": "integrator1", "enabled": true, "firstName": "Dev", "lastName": "Integrator",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "clientRoles": {"psim": ["integrator"]}},
+    {"username": "auditor1", "enabled": true, "firstName": "Dev", "lastName": "Auditor",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "clientRoles": {"psim": ["auditor"]}},
+    {"username": "manager1", "enabled": true, "firstName": "Dev", "lastName": "Manager",
+     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
+     "clientRoles": {"psim": ["manager"]}},
+    {"username": "service-account-psim-services", "enabled": true, "serviceAccountClientId": "psim-services"}
+  ]
+}

@@ -9,7 +9,7 @@
   get <scope.json> <key>
       print one value for Taskfile variables: lists space-separated, booleans true/false
 
-Keys: full, cpp, contracts, docs, deps, release, bench (booleans); labels (ctest label regex, empty
+Keys: full, cpp, contracts, docs, deps, release, bench, env (booleans); labels (ctest label regex, empty
 for all), tidy (translation units, empty for all), modules (coverage modules, empty for all),
 benches (benchmark executables, empty for all); base, changed, targets for the report.
 """
@@ -98,7 +98,7 @@ def main(argv):
         with open(argv[4], "w", encoding="utf-8") as f:
             json.dump(scope, f, indent=2)
         what = "full scope" if scope["full"] else f"{len(scope['targets'])} targets"
-        stages = ", ".join(k for k in ("contracts", "docs", "deps", "release", "bench") if scope[k]) or "none"
+        stages = ", ".join(k for k in ("contracts", "docs", "deps", "release", "bench", "env") if scope[k]) or "none"
         print(f"ci scope: {what} ({scope['reason']}); {len(scope['changed'])} changed files; optional stages: {stages}")
         return 0
     if len(argv) == 4 and argv[1] == "get":

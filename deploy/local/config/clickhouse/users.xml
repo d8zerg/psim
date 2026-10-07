@@ -1,0 +1,16 @@
+<!-- ClickHouse users of the local environment (step 1.4). Development-only password; per-service
+     users with minimal rights come with the ClickHouse layer (step 2.8, SR-19). -->
+<clickhouse>
+    <users>
+        <default remove="remove"/>
+        <psim>
+            <password>psim-dev-clickhouse</password>
+            <networks>
+                <ip>::/0</ip>
+            </networks>
+            <profile>default</profile>
+            <quota>default</quota>
+            <access_management>1</access_management>
+        </psim>
+    </users>
+</clickhouse>

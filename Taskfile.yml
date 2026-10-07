@@ -59,6 +59,9 @@ includes:
   release:
     taskfile: ./tools/taskfiles/release.yml
     dir: .
+  env:
+    taskfile: ./tools/taskfiles/env.yml
+    dir: .
   security:
     taskfile: ./tools/taskfiles/security.yml
     dir: .
@@ -90,7 +93,7 @@ tasks:
       - task: docs:check
 
   ci:
-    desc: 'Local CI pipeline, the gate of every push (ADR-034); checks what changed against origin/master (FULL=true: all)'
+    desc: 'Local CI pipeline, run before every commit (ADR-034, ADR-036); checks what changed against origin/master (FULL=true: all)'
     vars:
       FULL: '{{.FULL | default "false"}}'
     cmds:
@@ -109,6 +112,7 @@ tasks:
       DEPS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} deps'}
       RELEASE: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} release'}
       BENCH: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} bench'}
+      ENV: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} env'}
       LABELS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} labels'}
       TIDY: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} tidy'}
       MODULES: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} modules'}
@@ -132,7 +136,9 @@ tasks:
         if: '[ "{{.CPP}}" = true ]'
       - task: cpp:runtime-test                # FF-15
         if: '[ "{{.CPP}}" = true ]'
-      # Integration tests against the local environment join here with step 1.4 (TS-03).
+      - task: env:ci-test                     # step 1.4: fresh environment, startup budget, smoke tests
+        if: '[ "{{.ENV}}" = true ]'
+      # Component tests of adapters (TS-03) run in this environment from steps 2.3-2.8.
       - task: docs:check                      # FF-08
         if: '[ "{{.DOCS}}" = true ]'
       - task: security:deps                   # SEC-02
@@ -165,7 +171,7 @@ tasks:
 
   _ci_record:
     internal: true
-    desc: Record that the pipeline passed for this commit (read by the pre-push hook)
+    desc: Record that the pipeline passed for a commit on a clean tree (task ci:status)
     cmds:
       - mkdir -p {{.CACHE}}/ci
       - cmd: |
@@ -178,7 +184,7 @@ tasks:
           fi
 
   ci:run:
-    desc: 'Run the pipeline for a commit in the dedicated clone: task ci:run SHA=<commit> (default HEAD)'
+    desc: 'Run the pipeline on the committed content of a commit in a clean clone: task ci:run SHA=<commit> (default HEAD)'
     cmds:
       - sh tools/ci/runner.sh {{.SHA | default "HEAD"}}
 
@@ -204,45 +210,6 @@ tasks:
         sh: git rev-parse {{.SHA | default "HEAD"}}
     cmds:
       - tail -n 50 -F {{.CACHE}}/ci/{{.SHA}}.log
-
-  hooks:install:
-    desc: Use the repository git hooks (tools/git-hooks) in this clone
-    cmds:
-      - git config core.hooksPath tools/git-hooks
-      - 'echo "git hooks path: tools/git-hooks (pre-commit, post-commit, pre-push)"'
-
-  hooks:pre-commit:
-    desc: 'Fast checks of staged files: whitespace, C++ format, proto format, domain purity, SQL, docs'
-    vars:
-      STAGED_CXX:
-        sh: git diff --cached --name-only --diff-filter=ACMR -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**' | tr '\n' ' '
-      STAGED_PROTO:
-        sh: git diff --cached --name-only --diff-filter=ACMR -- 'contracts/proto/*.proto' | tr '\n' ' '
-    cmds:
-      - git diff --cached --check
-      - task: _hook_cxx
-        vars: {FILES: '{{.STAGED_CXX}}'}
-      - task: _hook_proto
-        vars: {FILES: '{{.STAGED_PROTO}}'}
-      - task: arch:domain-purity
-      - task: arch:sql
-      - task: docs:typography
-      - task: docs:links
-
-  _hook_cxx:
-    internal: true
-    status:
-      - test -z "{{.FILES}}"
-    cmds:
-      - task: cpp:format
-        vars: {FILES: '{{.FILES}}'}
-
-  _hook_proto:
-    internal: true
-    status:
-      - test -z "{{.FILES}}"
-    cmds:
-      - task: contracts:format
 
   gen:
     desc: Regenerate all committed generated artifacts

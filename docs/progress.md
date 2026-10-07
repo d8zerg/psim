@@ -24,8 +24,8 @@
 |---|---|---|---|
 | 1.1 | Монорепозиторий и toolchain | утверждён | [ADR-032](adr/0032-cpp-toolchain.md), `tools/toolchain`, `CMakePresets.json`, `conanfile.py`, `task cpp:*` |
 | 1.2 | Контроль качества кода | утверждён | [ADR-033](adr/0033-code-quality-gates.md), [стандарт C++](engineering/cpp-coding-standard.md), [стандарт TypeScript](engineering/typescript-coding-standard.md), `.clang-format`, `.clang-tidy`, `tools/arch`, `tools/git-hooks`; проверки `task cpp:format`, `cpp:lint`, `cpp:test:sanitizers`, `cpp:coverage`, `arch:check`; барьер - `task check` |
-| 1.3 | CI/CD и цепочка поставки | готов | [ADR-034](adr/0034-local-ci-and-supply-chain.md); конвейеры `task ci` (хук `pre-push`), `task ci:nightly`, `task release`; пакеты DEB, образы distroless без root, SBOM CycloneDX, Trivy, подпись Ed25519; барьер бенчмарков `bench:compare` |
-| 1.4 | Локальное окружение | не начат | |
+| 1.3 | CI/CD и цепочка поставки | утверждён | [ADR-034](adr/0034-local-ci-and-supply-chain.md); конвейеры `task ci` (перед каждым коммитом, [ADR-036](adr/0036-no-git-hooks.md)), `task ci:nightly`, `task release`; пакеты DEB, образы distroless без root, SBOM CycloneDX, Trivy, подпись Ed25519; барьер бенчмарков `bench:compare` |
+| 1.4 | Локальное окружение | готов | [ADR-035](adr/0035-local-environment.md); `deploy/local/` (Compose, 1 или 3 брокера Kafka), `task env:up`, `env:test`, `env:ci-test` (этап `env` конвейера); realm Keycloak с политикой SR-02; запуск с нуля около 95 с |
 | 1.5 | Веб-монорепозиторий | не начат | |
 | 1.6 | Документация как код | не начат | |
 

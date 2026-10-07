@@ -1,0 +1,18 @@
+<!-- ClickHouse Keeper of the local environment (step 1.4, ADR-028): one node. -->
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <keeper_server>
+        <tcp_port>9181</tcp_port>
+        <server_id>1</server_id>
+        <log_storage_path>/var/lib/clickhouse-keeper/log</log_storage_path>
+        <snapshot_storage_path>/var/lib/clickhouse-keeper/snapshots</snapshot_storage_path>
+        <four_letter_word_white_list>ruok,mntr,stat,conf</four_letter_word_white_list>
+        <raft_configuration>
+            <server>
+                <id>1</id>
+                <hostname>keeper</hostname>
+                <port>9234</port>
+            </server>
+        </raft_configuration>
+    </keeper_server>
+</clickhouse>

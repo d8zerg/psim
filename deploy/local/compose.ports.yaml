@@ -1,0 +1,31 @@
+# Published ports of the interactive local environment (step 1.4): only on 127.0.0.1, so the stand
+# does not expose infrastructure to the network (SR-19). The CI environment does not use this file.
+services:
+  kafka-1:
+    ports: ["127.0.0.1:9092:9092"]
+  kafka-2:
+    ports: ["127.0.0.1:9192:9192"]
+  kafka-3:
+    ports: ["127.0.0.1:9292:9292"]
+  postgres:
+    ports: ["127.0.0.1:5432:5432"]
+  registry:
+    ports: ["127.0.0.1:8081:8080"]
+  clickhouse:
+    ports: ["127.0.0.1:8123:8123", "127.0.0.1:9000:9000"]
+  valkey:
+    ports: ["127.0.0.1:6379:6379"]
+  keycloak:
+    ports: ["127.0.0.1:8180:8080"]
+  otel-collector:
+    ports: ["127.0.0.1:4317:4317", "127.0.0.1:4318:4318"]
+  prometheus:
+    ports: ["127.0.0.1:9090:9090"]
+  loki:
+    ports: ["127.0.0.1:3100:3100"]
+  tempo:
+    ports: ["127.0.0.1:3200:3200"]
+  grafana:
+    ports: ["127.0.0.1:3000:3000"]
+  toxiproxy:
+    ports: ["127.0.0.1:8474:8474"]

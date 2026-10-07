@@ -13,13 +13,14 @@
 
 ```
 task                          # список задач
-task ci                       # локальный конвейер - барьер push, по области изменения (FULL=true - всё)
-task ci:status                # состояние конвейера для HEAD (после коммита он идёт в фоне); ci:log, ci:run
+task ci                       # локальный конвейер - запускать перед каждым коммитом; по области изменения (FULL=true - всё)
+task ci:run                   # конвейер на закоммиченном содержимом в чистом клоне (необязательно); ci:status, ci:log
 task ci:nightly               # ci + воспроизводимость сборки + сканирование образов
 task release                  # ci:nightly + подписанный каталог выпуска dist/ + его проверка
 task check                    # все проверки кода (контракты, архитектура, качество C++, тесты, документация)
-task hooks:install            # git-хуки: pre-commit (быстрые проверки), post-commit (ci в фоне), pre-push (требует ci)
 task gen                      # перегенерировать сгенерированные файлы
+task env:up                   # локальное окружение: Kafka, Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, Grafana...
+task env:test                 # смоук-тесты окружения (env:down - остановить, env:reset - удалить данные)
 task cpp:build                # собрать (PRESET=debug|release|relwithdebinfo|asan|tsan|coverage)
 task cpp:test                 # собрать и запустить тесты
 task cpp:format               # проверить формат C++ (task cpp:format:fix - исправить)

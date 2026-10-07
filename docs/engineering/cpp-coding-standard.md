@@ -17,7 +17,7 @@
 | Чистота домена | запрещённые заголовки и конструкции в `libs/domain` | `task arch:domain-purity` |
 | SQL только с параметрами | эвристика по SQL-литералам (SR-13) | `task arch:sql` |
 
-Всё перечисленное входит в `task check`, а он - в конвейер `task ci`, барьер каждого push ([ADR-034](../adr/0034-local-ci-and-supply-chain.md)). Хук `pre-commit` (`task hooks:install`) запускает быстрые из этих проверок до коммита, хук `pre-push` требует прохождения `task ci`.
+Всё перечисленное входит в `task check`, а он - в конвейер `task ci`, который запускается перед каждым коммитом ([ADR-034](../adr/0034-local-ci-and-supply-chain.md), [ADR-036](../adr/0036-no-git-hooks.md)). Быстрые проверки по отдельности: `task cpp:format`, `task arch:check`, `task docs:typography`.
 
 ## 2. Язык и стандартная библиотека
 

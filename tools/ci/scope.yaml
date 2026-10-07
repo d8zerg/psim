@@ -25,5 +25,6 @@ stages:
   contracts: ['contracts/*', 'tools/contracts/*']
   docs: ['docs/*', '*.md', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
   deps: ['conanfile.py', 'conan.lock', 'tools/release/licenses.yaml', 'tools/taskfiles/security.yml']
-  release: ['deploy/*', 'tools/release/*', 'tools/taskfiles/release.yml']
+  release: ['deploy/images/*', 'tools/release/*', 'tools/taskfiles/release.yml']
+  env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'contracts/topics/*']
   bench: ['tools/bench/*', 'tools/taskfiles/bench.yml']

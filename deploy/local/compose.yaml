@@ -1,0 +1,252 @@
+# PSIM local environment (step 1.4, ADR-035): infrastructure for development and integration tests.
+# Managed by `task env:*` (tools/taskfiles/env.yml); not a production topology (step 9.1).
+#   profiles: kafka3 adds brokers kafka-2 and kafka-3 (`task env:up KAFKA=3`); without it Kafka
+#   is a single broker. compose.ports.yaml publishes ports on 127.0.0.1 for the interactive
+#   environment; the CI environment runs without published ports.
+# Images are pinned by tag and digest (SR-23). Credentials are development-only defaults.
+name: psim-local
+
+x-kafka: &kafka
+  image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
+  restart: unless-stopped
+  healthcheck:
+    test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 >/dev/null 2>&1"]
+    interval: 5s
+    timeout: 10s
+    retries: 30
+    start_period: 10s
+
+x-kafka-env: &kafka-env
+  CLUSTER_ID: cHNpbS1sb2NhbC1rcmFmdA   # base64 UUID of "psim-local-kraft"
+  KAFKA_PROCESS_ROLES: broker,controller
+  KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+  KAFKA_CONTROLLER_QUORUM_VOTERS: ${PSIM_KAFKA_VOTERS:-1@kafka-1:9093}
+  KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+  # INTERNAL - services and tests on the compose network; FAULT - the same broker through
+  # Toxiproxy (network faults, C-07); EXTERNAL - host tools through the published port.
+  KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,INTERNAL:PLAINTEXT,FAULT:PLAINTEXT,EXTERNAL:PLAINTEXT
+  KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${PSIM_KAFKA_RF:-1}
+  KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: ${PSIM_KAFKA_RF:-1}
+  KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: ${PSIM_KAFKA_MIN_ISR:-1}
+  KAFKA_DEFAULT_REPLICATION_FACTOR: ${PSIM_KAFKA_RF:-1}
+  KAFKA_MIN_INSYNC_REPLICAS: ${PSIM_KAFKA_MIN_ISR:-1}
+  KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+  KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: "0"
+  KAFKA_HEAP_OPTS: -Xms512m -Xmx1g
+
+services:
+  kafka-1:
+    <<: *kafka
+    hostname: kafka-1
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:19092,FAULT://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-1:19092,FAULT://toxiproxy:29092,EXTERNAL://localhost:9092
+    volumes: [kafka-1:/var/lib/kafka/data]
+
+  kafka-2:
+    <<: *kafka
+    profiles: [kafka3]
+    hostname: kafka-2
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 2
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:19092,FAULT://:29093,EXTERNAL://:9192
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-2:19092,FAULT://toxiproxy:29192,EXTERNAL://localhost:9192
+    volumes: [kafka-2:/var/lib/kafka/data]
+
+  kafka-3:
+    <<: *kafka
+    profiles: [kafka3]
+    hostname: kafka-3
+    environment:
+      <<: *kafka-env
+      KAFKA_NODE_ID: 3
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:19092,FAULT://:29093,EXTERNAL://:9292
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-3:19092,FAULT://toxiproxy:29292,EXTERNAL://localhost:9292
+    volumes: [kafka-3:/var/lib/kafka/data]
+
+  postgres:
+    image: postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: psim-dev-postgres
+    command: ["postgres", "-c", "max_connections=300", "-c", "shared_buffers=256MB"]
+    volumes:
+      - postgres:/var/lib/postgresql
+      - ./config/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U postgres"]   # TCP: not ready during init scripts
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # Schema Registry (ADR-003): Apicurio with storage in PostgreSQL, Confluent-compatible API.
+  registry:
+    image: apicurio/apicurio-registry:3.3.3@sha256:c9cae4c90ce46538abf673c68eb591345f23bcc6c2aa6bfd47189adcf609d8f1
+    restart: unless-stopped
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      APICURIO_STORAGE_KIND: sql
+      APICURIO_STORAGE_SQL_KIND: postgresql
+      APICURIO_DATASOURCE_URL: jdbc:postgresql://postgres:5432/registry
+      APICURIO_DATASOURCE_USERNAME: registry
+      APICURIO_DATASOURCE_PASSWORD: psim-dev-registry
+      APICURIO_CCOMPAT_LEGACY_ID_MODE_ENABLED: "true"
+      QUARKUS_HTTP_PORT: "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9000/health/ready >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+
+  # ClickHouse (ADR-028): Replicated engines and Keeper in every topology, so DDL is the same.
+  keeper:
+    image: clickhouse/clickhouse-keeper:26.8.19@sha256:21c9b16c4ee1a36b726cf71a0ce81fbc1b2298f5e054833c1fb18c70fb0b79fb
+    restart: unless-stopped
+    hostname: keeper
+    volumes:
+      - keeper:/var/lib/clickhouse-keeper
+      - ./config/clickhouse/keeper.xml:/etc/clickhouse-keeper/keeper_config.d/psim.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "echo ruok | nc -w 2 127.0.0.1 9181 | grep -q imok"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.19@sha256:3ddc359dd4c29921f1b926559344c14c7d98f024e1db9d9d02926e182426fba2
+    restart: unless-stopped
+    hostname: clickhouse
+    depends_on:
+      keeper: {condition: service_healthy}
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    volumes:
+      - clickhouse:/var/lib/clickhouse
+      - ./config/clickhouse/server.xml:/etc/clickhouse-server/config.d/psim.xml:ro
+      - ./config/clickhouse/users.xml:/etc/clickhouse-server/users.d/psim.xml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user psim --password psim-dev-clickhouse -q 'SELECT 1' >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # Redis-compatible store (ADR-015): Valkey.
+  valkey:
+    image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    restart: unless-stopped
+    command: ["valkey-server", "--requirepass", "psim-dev-valkey", "--appendonly", "yes"]
+    volumes: [valkey:/data]
+    healthcheck:
+      test: ["CMD-SHELL", "valkey-cli -a psim-dev-valkey --no-auth-warning ping | grep -q PONG"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # Identity provider with the pre-configured realm psim (SR-02).
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc
+    restart: unless-stopped
+    command: ["start-dev", "--import-realm"]
+    depends_on:
+      postgres: {condition: service_healthy}
+    environment:
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: psim-dev-keycloak
+      KC_HEALTH_ENABLED: "true"
+      KC_HTTP_PORT: "8080"
+      KC_HOSTNAME_STRICT: "false"
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: psim-dev-keycloak-admin
+    volumes:
+      - ./config/keycloak/psim-realm.json:/opt/keycloak/data/import/psim-realm.json:ro
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+
+  # Observability: OTLP into the Collector; metrics -> Prometheus, traces -> Tempo, logs -> Loki.
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    depends_on: [tempo, loki]
+    volumes:
+      - ./config/otel/collector.yaml:/etc/otelcol/config.yaml:ro
+
+  prometheus:
+    image: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+    restart: unless-stopped
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d",
+              "--web.enable-remote-write-receiver"]
+    volumes:
+      - prometheus:/prometheus
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  loki:
+    image: grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/psim.yaml"]
+    volumes:
+      - loki:/loki
+      - ./config/loki/loki.yaml:/etc/loki/psim.yaml:ro
+
+  tempo:
+    image: grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
+    restart: unless-stopped
+    command: ["-config.file=/etc/tempo/psim.yaml"]
+    volumes:
+      - tempo:/var/tempo
+      - ./config/tempo/tempo.yaml:/etc/tempo/psim.yaml:ro
+
+  grafana:
+    image: grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572
+    restart: unless-stopped
+    depends_on: [prometheus, loki, tempo]
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: psim-dev-grafana
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./config/grafana/datasources.yaml:/etc/grafana/provisioning/datasources/psim.yaml:ro
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health | grep -q ok"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  # Network faults for tests (ADR-031, C-07): proxies to Kafka, PostgreSQL, Valkey, ClickHouse.
+  toxiproxy:
+    image: ghcr.io/shopify/toxiproxy:2.12.0@sha256:9378ed52a28bc50edc1350f936f518f31fa95f0d15917d6eb40b8e376d1a214e
+    restart: unless-stopped
+    command: ["-host=0.0.0.0", "-config=/config/toxiproxy.json"]
+    volumes:
+      - ./config/toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
+
+volumes:
+  kafka-1:
+  kafka-2:
+  kafka-3:
+  postgres:
+  keeper:
+  clickhouse:
+  valkey:
+  prometheus:
+  loki:
+  tempo:
+  grafana:
