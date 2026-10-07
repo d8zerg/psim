@@ -20,6 +20,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -29,6 +30,9 @@
 #include <utility>
 
 #include "admin_server.hpp"
+#include "psim/platform/async/blocking_pool.hpp"
+#include "psim/platform/async/clock.hpp"
+#include "psim/platform/async/shards.hpp"
 #include "psim/platform/build_info.hpp"
 #include "psim/platform/config.hpp"
 #include "psim/platform/log.hpp"
@@ -237,10 +241,24 @@ struct Runtime::Impl {
                                       .instance = instance,
                                       .otlp_endpoint = config.get<std::string>("telemetry.otlp_endpoint"),
                                       .sampling_ratio = config.get<double>("telemetry.sampling_ratio")});
-    context = std::make_unique<Context>(io.get_executor(), logger, metrics, *tracing, config);
+    shards = std::make_unique<async::Shards>(static_cast<std::size_t>(config.get<std::int64_t>("runtime.shards")),
+                                             "psim-shard");
+    blocking = std::make_unique<async::BlockingPool>(
+        static_cast<std::size_t>(config.get<std::int64_t>("runtime.blocking_threads")),
+        static_cast<std::size_t>(config.get<std::int64_t>("runtime.blocking_tasks")));
+    shards->start();
+    prometheus::BuildGauge()
+        .Name("psim_runtime_shards")
+        .Help("Threads of the data path (runtime.shards)")
+        .Register(metrics.registry())
+        .Add({})
+        .Set(static_cast<double>(shards->size()));
+    context = std::make_unique<Context>(io.get_executor(), logger, metrics, *tracing, config,
+                                        Execution{.shards = shards.get(), .clock = &clock, .blocking = blocking.get()});
 
     auto created = service.create(*context);
     if (!created) {
+      shards->stop();
       logger.error("service failed to initialize",
                    {{"code", created.error().name()}, {"error", std::string_view(created.error().message())}});
       return kExitStartFailed;
@@ -251,16 +269,21 @@ struct Runtime::Impl {
                                                   [this](std::string_view target) { return handle(target); });
     const auto listening = admin->listen(config.get<std::string>("admin.listen"));
     if (!listening) {
+      shards->stop();
       logger.error("admin endpoint failed", {{"error", std::string_view(listening.error().message())}});
       return kExitStartFailed;
     }
     admin_port = *listening;
     logger.info("service starting", {{"version", build_info().version},
                                      {"commit", build_info().git_commit},
+                                     {"shards", static_cast<std::int64_t>(shards->size())},
                                      {"config", std::string_view(config_summary())}});
     watch_signals();
     asio::co_spawn(io, start_all(), asio::detached);
     io.run();
+    // Components drained on the control loop; now the data path and the blocking pool stop.
+    shards->stop();
+    blocking->stop();
     tracing->flush();
     return exit_code;
   }
@@ -278,6 +301,9 @@ struct Runtime::Impl {
   asio::io_context io{1};
   asio::signal_set signals;
   std::unique_ptr<observability::Tracing> tracing;
+  async::SystemClock clock;
+  std::unique_ptr<async::Shards> shards;
+  std::unique_ptr<async::BlockingPool> blocking;
   std::unique_ptr<Context> context;
   Components components;
   std::unique_ptr<detail::AdminServer> admin;

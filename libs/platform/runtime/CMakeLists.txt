@@ -7,7 +7,7 @@ add_library(psim_platform_runtime STATIC src/runtime.cpp src/admin_server.cpp sr
 add_library(psim::platform_runtime ALIAS psim_platform_runtime)
 target_include_directories(psim_platform_runtime PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(psim_platform_runtime
-  PUBLIC Boost::headers psim::platform_config psim::platform_errors psim::platform_log
+  PUBLIC Boost::headers psim::platform_async psim::platform_config psim::platform_errors psim::platform_log
          psim::platform_observability psim::platform_core)
 psim_target_defaults(psim_platform_runtime)
 

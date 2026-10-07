@@ -207,6 +207,16 @@ TEST(Runtime, ServesHealthMetricsAndInfoThenDrainsOnStop) {
   EXPECT_TRUE(service.logged(R"("service":"fake-service","instance":"fake-0")"));
 }
 
+TEST(Runtime, StartsTheConfiguredShards) {
+  Probe probe;
+  Started service(definition(probe), sources(std::nullopt, {{"PSIM__RUNTIME__SHARDS", "3"}}));
+  const auto port = service.port();
+  EXPECT_EQ(status_when(port, "/health/ready", 200), 200U);
+  EXPECT_NE(request(port, "/metrics").body().find("psim_runtime_shards 3"), std::string::npos);
+  EXPECT_EQ(service.stop(), 0);
+  EXPECT_TRUE(service.logged(R"("shards":3)"));
+}
+
 TEST(Runtime, IsNotReadyUntilEveryComponentIs) {
   Probe probe;
   probe.ready = false;

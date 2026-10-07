@@ -32,6 +32,7 @@ task cpp:test:sanitizers      # тесты под ASan+UBSan и TSan
 task cpp:coverage             # покрытие и пороги по модулям
 task arch:check               # fitness functions: зависимости модулей, чистота домена, SQL
 task bench:compare            # бенчмарки против базовой линии origin/master (регрессия > 5% - отказ)
+task bench:async              # накладные расходы асинхронных примитивов (B-02)
 task security:deps            # уязвимости и лицензии зависимостей (Trivy, SBOM)
 task release:dist             # пакеты DEB, образы, SBOM, подпись (ALLOW_DIRTY=true - пробный выпуск)
 task cpp:runtime-test         # запустить собранные тесты на Debian 12 и Astra Linux 1.8

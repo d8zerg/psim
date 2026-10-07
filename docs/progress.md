@@ -35,8 +35,8 @@
 
 | Шаг | Название | Статус | Артефакты |
 |---|---|---|---|
-| 2.1 | Runtime сервиса | готов | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
-| 2.2 | Асинхронная модель исполнения | не начат | |
+| 2.1 | Runtime сервиса | утверждён | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
+| 2.2 | Асинхронная модель исполнения | готов | [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md); `libs/platform/async` (шарды, `Clock`/`ManualClock`, `with_deadline`, `Credits`, `Semaphore`, `BoundedQueue`, `BlockingPool`), секция `runtime` конфигурации; B-02 `task bench:async` |
 | 2.3 | Слой Kafka | не начат | |
 | 2.4 | Слой PostgreSQL | не начат | |
 | 2.5 | Слой Redis | не начат | |

@@ -15,6 +15,9 @@
 #include <string>
 #include <utility>
 
+#include "psim/platform/async/blocking_pool.hpp"
+#include "psim/platform/async/clock.hpp"
+#include "psim/platform/async/shards.hpp"
 #include "psim/platform/config.hpp"
 #include "psim/platform/log.hpp"
 #include "psim/platform/metrics.hpp"
@@ -56,10 +59,15 @@ struct Fixture {
   psim::platform::observability::Metrics metrics;
   psim::platform::observability::Tracing tracing{tracing_options()};
   Config config;
+  psim::platform::async::Shards shards{1};
+  psim::platform::async::SystemClock clock;
+  psim::platform::async::BlockingPool blocking{1, 1};
   std::unique_ptr<psim::platform::runtime::Context> context;
 
   explicit Fixture(Config c) : config(std::move(c)) {
-    context = std::make_unique<psim::platform::runtime::Context>(io.get_executor(), logger, metrics, tracing, config);
+    context = std::make_unique<psim::platform::runtime::Context>(
+        io.get_executor(), logger, metrics, tracing, config,
+        psim::platform::runtime::Execution{.shards = &shards, .clock = &clock, .blocking = &blocking});
   }
 };
 

@@ -14,6 +14,9 @@
 #include <string_view>
 #include <vector>
 
+#include "psim/platform/async/blocking_pool.hpp"
+#include "psim/platform/async/clock.hpp"
+#include "psim/platform/async/shards.hpp"
 #include "psim/platform/config.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/log.hpp"
@@ -25,11 +28,23 @@ namespace psim::platform::runtime {
 namespace asio = boost::asio;
 
 /// What a component receives from the runtime.
+/// Execution model of the process (ADR-016): data-path shards, time, the pool for blocking calls.
+struct Execution {
+  async::Shards* shards;
+  async::Clock* clock;
+  async::BlockingPool* blocking;
+};
+
 class Context {
  public:
   Context(asio::any_io_executor executor, log::Logger& logger, observability::Metrics& metrics,
-          observability::Tracing& tracing, const config::Config& config)
-      : executor_(std::move(executor)), logger_(&logger), metrics_(&metrics), tracing_(&tracing), config_(&config) {}
+          observability::Tracing& tracing, const config::Config& config, Execution execution)
+      : executor_(std::move(executor)),
+        logger_(&logger),
+        metrics_(&metrics),
+        tracing_(&tracing),
+        config_(&config),
+        execution_(execution) {}
 
   [[nodiscard]] const asio::any_io_executor& executor() const noexcept { return executor_; }
 
@@ -44,15 +59,26 @@ class Context {
   /// Configuration at start; reloads arrive through Component::reconfigure.
   [[nodiscard]] const config::Config& config() const noexcept { return *config_; }
 
+  /// Shards of the data path (runtime.shards); state bound to a shard is touched only on it.
+  [[nodiscard]] async::Shards& shards() const noexcept { return *execution_.shards; }
+
+  /// Time for timestamps, deadlines and waiting; ManualClock in tests.
+  [[nodiscard]] async::Clock& clock() const noexcept { return *execution_.clock; }
+
+  /// Pool for blocking calls (runtime.blocking_threads, runtime.blocking_tasks).
+  [[nodiscard]] async::BlockingPool& blocking() const noexcept { return *execution_.blocking; }
+
  private:
   asio::any_io_executor executor_;
   log::Logger* logger_;
   observability::Metrics* metrics_;
   observability::Tracing* tracing_;
   const config::Config* config_;
+  Execution execution_;
 };
 
-/// A part of a service with its own lifecycle. All methods run on the runtime's executor.
+/// A part of a service with its own lifecycle. All methods run on the runtime's control executor;
+/// data-path work is posted to Context::shards().
 class Component {
  public:
   Component() = default;

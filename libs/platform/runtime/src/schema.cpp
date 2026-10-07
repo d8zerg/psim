@@ -10,7 +10,7 @@ namespace psim::platform::runtime {
 namespace {
 
 // Runtime sections. log.level is applied at run time (SIGHUP); everything else needs a restart.
-constexpr std::string_view kRuntimeSchemaHead = R"({
+constexpr std::string_view kRuntimeSchemaHead = R"json({
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
   "additionalProperties": false,
@@ -42,17 +42,27 @@ constexpr std::string_view kRuntimeSchemaHead = R"({
         "sampling_ratio": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.01}
       }
     },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "properties": {
+        "shards": {"type": "integer", "minimum": 0, "maximum": 1024, "default": 0,
+                   "description": "Threads of the data path; 0: the CPUs available to the process (ADR-016)"},
+        "blocking_threads": {"type": "integer", "minimum": 1, "maximum": 256, "default": 4},
+        "blocking_tasks": {"type": "integer", "minimum": 1, "maximum": 100000, "default": 64,
+                           "description": "Blocking calls running or waiting in the pool; callers beyond wait"}
+      }
+    },
     "shutdown": {
       "type": "object", "additionalProperties": false,
       "properties": {
         "drain_timeout_ms": {"type": "integer", "minimum": 0, "maximum": 600000, "default": 30000}
       }
     },
-    "settings": )";
+    "settings": )json";
 
-constexpr std::string_view kRuntimeSchemaTail = R"(
+constexpr std::string_view kRuntimeSchemaTail = R"json(
   }
-})";
+})json";
 
 }  // namespace
 

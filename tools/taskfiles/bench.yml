@@ -48,6 +48,12 @@ tasks:
             python3 -I /repo/tools/bench/bench.py run build/{{.PLATFORM}}/release /repo/{{.BENCH_DIR}}/{{.BASE}}.json {{.BASE}}
       - rm -rf {{.SRC}}
 
+  async:
+    desc: Overhead of the execution model primitives against the master baseline (B-02, ADR-016)
+    cmds:
+      - task: compare
+        vars: {BENCHES: psim_platform_async_bench}
+
   compare:
     desc: Compare benchmarks with the master baseline; a slowdown above 5% fails (B-05). BENCHES limits the set
     cmds:

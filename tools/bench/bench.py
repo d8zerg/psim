@@ -8,7 +8,7 @@
   compare <base.json> <current.json>    fail when a benchmark is slower than the baseline by more
                                         than the threshold (default 5%)
 
-Each benchmark is reduced to the minimum CPU time over its repetitions: on a shared developer stand
+Each benchmark is reduced to the minimum CPU time (real time for UseRealTime ones) over its repetitions: on a shared developer stand
 the minimum is far less noisy than the mean, and a real regression raises the minimum too. Noise on
 the stand is close to the threshold, so `task bench:compare` reruns the benchmarks of a failed
 comparison and merges the runs: retries can only lower the minimum, so a real slowdown stays.
@@ -53,7 +53,10 @@ def run(build_dir, out_path, commit, only=None):
             if b.get("run_type") != "iteration":
                 continue
             key = f"{os.path.basename(exe)}/{b['run_name']}"
-            ns = b["cpu_time"] * {"ns": 1, "us": 1e3, "ms": 1e6, "s": 1e9}[b["time_unit"]]
+            # Benchmarks measured in real time (UseRealTime: work on other threads) are compared by
+            # real time; the CPU time of the waiting main thread says nothing about them.
+            measure = "real_time" if b["run_name"].endswith("/real_time") else "cpu_time"
+            ns = b[measure] * {"ns": 1, "us": 1e3, "ms": 1e6, "s": 1e9}[b["time_unit"]]
             results[key] = min(results.get(key, ns), ns)
         print(f"ran {os.path.relpath(exe, build_dir)}")
     os.makedirs(os.path.dirname(os.path.abspath(out_path)), exist_ok=True)
