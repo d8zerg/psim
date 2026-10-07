@@ -27,11 +27,24 @@
 | 1.3 | CI/CD и цепочка поставки | утверждён | [ADR-034](adr/0034-local-ci-and-supply-chain.md); конвейеры `task ci` (перед каждым коммитом, [ADR-036](adr/0036-no-git-hooks.md)), `task ci:nightly`, `task release`; пакеты DEB, образы distroless без root, SBOM CycloneDX, Trivy, подпись Ed25519; барьер бенчмарков `bench:compare` |
 | 1.4 | Локальное окружение | утверждён | [ADR-035](adr/0035-local-environment.md); `deploy/local/` (Compose, 1 или 3 брокера Kafka), `task env:up`, `env:test`, `env:ci-test` (этап `env` конвейера); realm Keycloak с политикой SR-02; запуск с нуля около 95 с |
 | 1.5 | Веб-монорепозиторий | утверждён | [ADR-037](adr/0037-web-monorepo.md); `web/`: консоль (Vite, React 19, TanStack, Zustand, Tailwind 4), дизайн-система, API-клиент из OpenAPI, realtime-клиент из proto; `task web:check` (ESLint, типы, Vitest ≥ 80%, бюджеты size-limit), `task web:e2e` (Playwright); этап `web` конвейера |
-| 1.6 | Документация как код | готов | [ADR-038](adr/0038-documentation-portal.md); `task docs:portal` (MkDocs + Material, строгий режим): документы, ADR, C4, справочники REST (Redoc), Kafka (AsyncAPI), Protobuf, коды ошибок; диаграммы в SVG, без внешних ресурсов; архив портала в подписанном выпуске; `task docs:serve` |
+| 1.6 | Документация как код | утверждён | [ADR-038](adr/0038-documentation-portal.md); `task docs:portal` (MkDocs + Material, строгий режим): документы, ADR, C4, справочники REST (Redoc), Kafka (AsyncAPI), Protobuf, коды ошибок; диаграммы в SVG, без внешних ресурсов; архив портала в подписанном выпуске; `task docs:serve` |
 
-Все шаги Ф1 выполнены; фаза завершается утверждением шага 1.6. Следующая фаза - Ф2 «Платформенное ядро».
+Фаза Ф1 завершена.
 
-## Ф2-Ф11
+## Ф2. Платформенное ядро
+
+| Шаг | Название | Статус | Артефакты |
+|---|---|---|---|
+| 2.1 | Runtime сервиса | готов | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
+| 2.2 | Асинхронная модель исполнения | не начат | |
+| 2.3 | Слой Kafka | не начат | |
+| 2.4 | Слой PostgreSQL | не начат | |
+| 2.5 | Слой Redis | не начат | |
+| 2.6 | Безопасность платформы | не начат | |
+| 2.7 | Детерминированный симуляционный стенд | не начат | |
+| 2.8 | Слой ClickHouse | не начат | |
+
+## Ф3-Ф11
 
 Не начаты.
 

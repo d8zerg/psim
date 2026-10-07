@@ -20,14 +20,21 @@ Checks: >
   -misc-no-recursion,
   -modernize-use-trailing-return-type,
   -modernize-use-nodiscard,
+  -modernize-use-designated-initializers,
   -readability-identifier-length,
   -readability-magic-numbers,
   -readability-function-cognitive-complexity,
-  -portability-avoid-pragma-once
+  -portability-avoid-pragma-once,
+  -portability-template-virtual-member-function,
+  -cert-err58-cpp,
+  -clang-analyzer-core.CallAndMessage
+# Disabled for false positives (ADR-039): cert-err58-cpp on libc++ traits instantiated by lambdas;
+# portability-template-virtual-member-function (one compiler); clang-analyzer-core.CallAndMessage on
+# Asio coroutine frames - null calls are still caught by -Wnull-dereference, ASan and UBSan.
 WarningsAsErrors: '*'
 # Project headers only; generated code (build/) and vendored code (third_party/) are skipped.
 HeaderFilterRegex: '/(libs|services|connectors|tools|contracts/(tests|benchmarks))/'
-ExcludeHeaderFilterRegex: '/(build|third_party)/'
+ExcludeHeaderFilterRegex: '/(build|third_party)/|^/cache/'
 SystemHeaders: false
 FormatStyle: file
 CheckOptions:
@@ -60,8 +67,10 @@ CheckOptions:
   readability-identifier-naming.MacroDefinitionCase: UPPER_CASE
   readability-identifier-naming.MacroDefinitionPrefix: PSIM_
   # Include control replaces include-what-you-use (ADR-033). gtest and gmock are used through
-  # their umbrella headers.
-  misc-include-cleaner.IgnoreHeaders: 'gtest/.*;gmock/.*'
+  # their umbrella headers; for Boost, OpenTelemetry, prometheus-cpp, nlohmann and yaml-cpp the
+  # analysis maps symbols to internal headers, so they are not checked (ADR-039). Standard, POSIX
+  # and project headers are.
+  misc-include-cleaner.IgnoreHeaders: 'gtest/.*;gmock/.*;boost/.*;opentelemetry/.*;prometheus/.*;nlohmann/.*;yaml-cpp/.*'
   misc-include-cleaner.DeduplicateFindings: true
   readability-implicit-bool-conversion.AllowPointerConditions: true
   readability-braces-around-statements.ShortStatementLines: 0

@@ -1,0 +1,16 @@
+# Example configuration of psim-service-template (ADR-039). Every setting can be overridden by
+# PSIM__<SECTION>__<KEY>, for example PSIM__LOG__LEVEL=debug. Secrets are file paths (SR-09).
+service:
+  instance: service-template-0
+admin:
+  listen: 0.0.0.0:9100
+log:
+  level: info              # applied at run time on SIGHUP
+telemetry:
+  otlp_endpoint: otel-collector:4317
+  sampling_ratio: 0.01
+shutdown:
+  drain_timeout_ms: 30000
+settings:
+  interval_ms: 100         # applied at run time on SIGHUP
+  work_ms: 20

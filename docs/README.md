@@ -59,3 +59,7 @@
 - Портал документации (`task docs:portal`, `task docs:serve`) - [ADR-038](adr/0038-documentation-portal.md)
 - Веб-монорепозиторий (консоль, дизайн-система, клиенты REST и realtime) - [ADR-037](adr/0037-web-monorepo.md), [web/](../web/README.md)
 - Локальное окружение (Kafka, Schema Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, наблюдаемость, Toxiproxy) - [ADR-035](adr/0035-local-environment.md), [deploy/](../deploy/README.md)
+
+## Платформенное ядро (Ф2)
+
+- Runtime сервиса: конфигурация, логи, метрики, трассировка, health, остановка с дренированием, шаблон сервиса - [ADR-039](adr/0039-service-runtime.md), [сервисы](../services/README.md)

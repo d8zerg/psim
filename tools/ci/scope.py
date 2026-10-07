@@ -78,6 +78,10 @@ def compute(root, build_dir, force_full):
     modules = sorted({arch_check.classify(targets[t]["dir"], rules)[1] for t in affected} - {None})
     tidy = sorted(s for t in affected for s in targets[t]["sources"] if s.endswith((".cpp", ".cc")))
     benches = sorted(t for t in affected if t.endswith("_bench"))
+    # Services run in the environment (FF-06): a change of the runtime or of a service needs it.
+    runs_in_env = any(t == "psim_platform_runtime" or t.startswith("psim-") or targets[t]["dir"].startswith("services/")
+                      for t in affected)
+    stages["env"] = stages["env"] or runs_in_env
     return {
         "base": base or "", "full": full, "reason": reason or "changes", "changed": changed,
         "targets": sorted(affected), "cpp": bool(affected), **stages,

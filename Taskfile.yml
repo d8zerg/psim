@@ -71,6 +71,9 @@ includes:
   web:
     taskfile: ./tools/taskfiles/web.yml
     dir: .
+  test:
+    taskfile: ./tools/taskfiles/test.yml
+    dir: .
   security:
     taskfile: ./tools/taskfiles/security.yml
     dir: .
@@ -197,6 +200,13 @@ tasks:
             date -u +%Y-%m-%dT%H:%M:%SZ > "{{.CACHE}}/ci/$sha.ok"
             echo "ci: passed for $sha"
           fi
+
+  service:new:
+    desc: 'Create a service from the template: task service:new NAME=<kebab-name> CONTEXTS=<ctx,...> [SUMMARY="..."]'
+    requires:
+      vars: [NAME, CONTEXTS]
+    cmds:
+      - '{{.PYTHON}} tools/service-template/new_service.py {{.ROOT_DIR}} {{.NAME}} {{.CONTEXTS}} "{{.SUMMARY | default (print "PSIM " .NAME)}}"'
 
   ci:run:
     desc: 'Run the pipeline on the committed content of a commit in a clean clone: task ci:run SHA=<commit> (default HEAD)'

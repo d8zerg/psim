@@ -5,6 +5,10 @@
                                     have no Docker healthcheck, so readiness is probed over HTTP)
   topics <project> <single|cluster> create the topics of contracts/topics/topics.yaml
   test <project> <brokers>          smoke tests of every component and the paths between them
+  observability <project> <build-dir> <runtime-image>
+                                    FF-06: every service executable of the build (psim-*) runs in the
+                                    environment and exports health, metrics, JSON logs and traces, and
+                                    drains on SIGTERM
 
 Everything runs inside the compose network <project>_default: CLIs through `docker compose exec`,
 HTTP through a probe container with curl. No published ports are needed, so the same tests run
@@ -379,11 +383,84 @@ class Smoke:
         return 1 if self.failures else 0
 
 
+# ---------------------------------------------------------------------------- observability (FF-06)
+
+def service_binaries(build_dir):
+    found = []
+    for top in ("services", "tools/service-template"):
+        for dirpath, dirnames, filenames in os.walk(os.path.join(ROOT, build_dir, top)):
+            dirnames[:] = [d for d in dirnames if d != "CMakeFiles"]
+            for name in filenames:
+                path = os.path.join(dirpath, name)
+                if name.startswith("psim-") and os.access(path, os.X_OK):
+                    found.append(os.path.relpath(path, ROOT))
+    return sorted(found)
+
+
+REQUIRED_LOG_KEYS = {"ts", "level", "service", "instance", "msg"}
+
+
+def observe(env, binary, image):
+    executable = os.path.basename(binary)
+    service = executable[len("psim-"):]
+    container = f"{env.project}-{executable}"
+    subprocess.run(["docker", "rm", "-f", container], capture_output=True)
+    subprocess.run(["docker", "run", "-d", "--name", container, "--network", f"{env.project}_default",
+                    "-v", f"{ROOT}:/repo:ro",
+                    "-e", "PSIM__TELEMETRY__OTLP_ENDPOINT=otel-collector:4317",
+                    "-e", "PSIM__TELEMETRY__SAMPLING_RATIO=1",
+                    "-e", f"PSIM__SERVICE__INSTANCE={service}-ff06",
+                    "-e", "PSIM__ADMIN__LISTEN=0.0.0.0:9100",
+                    image, f"/repo/{binary}"], check=True, capture_output=True)
+    base = f"http://{container}:9100"
+    try:
+        assert until(lambda: env.http("GET", f"{base}/health/live")[0] == 200, 30, 0.5), "/health/live"
+        assert until(lambda: env.http("GET", f"{base}/health/ready")[0] == 200, 30, 0.5), "/health/ready"
+        status, metrics = env.http("GET", f"{base}/metrics")
+        assert status == 200 and "psim_runtime_ready 1" in metrics and "psim_runtime_info{" in metrics, "/metrics"
+
+        def traced():
+            query = urllib.parse.quote(f'{{resource.service.name="{service}"}}')
+            status, body = env.http_json("GET", f"http://tempo:3200/api/search?limit=5&q={query}")
+            return status == 200 and bool(body and body.get("traces"))
+        assert until(traced, 60, 2), f"no traces of {service} in Tempo"
+    finally:
+        subprocess.run(["docker", "stop", "-t", "30", container], capture_output=True)
+    exit_code = subprocess.run(["docker", "inspect", "-f", "{{.State.ExitCode}}", container],
+                               capture_output=True, text=True).stdout.strip()
+    logs = subprocess.run(["docker", "logs", container], capture_output=True, text=True).stdout.splitlines()
+    subprocess.run(["docker", "rm", "-f", container], capture_output=True)
+    assert exit_code == "0", f"exit code {exit_code} after SIGTERM"
+    records = [json.loads(line) for line in logs if line.strip()]
+    missing = [r for r in records if not REQUIRED_LOG_KEYS <= r.keys()]
+    assert not missing, f"log records without {REQUIRED_LOG_KEYS}: {missing[:1]}"
+    assert any(r["msg"] == "service stopped" and r.get("exit_code") == 0 for r in records), "no clean stop in logs"
+    return f"health, metrics, {len(records)} JSON log records, traces in Tempo, clean drain on SIGTERM"
+
+
+def observability(env, build_dir, image):
+    binaries = service_binaries(build_dir)
+    if not binaries:
+        print(f"observability: no service executables in {build_dir}", file=sys.stderr)
+        return 1
+    env.start_probe()
+    smoke = Smoke(env, 1)
+    try:
+        for binary in binaries:
+            smoke.check(f"FF-06 {os.path.basename(binary)}", lambda b=binary: observe(env, b, image))
+    finally:
+        env.stop_probe()
+    print(f"observability: {len(binaries)} services, {len(smoke.failures)} failures")
+    return 1 if smoke.failures else 0
+
+
 def main(argv):
     if len(argv) == 3 and argv[1] == "wait":
         return wait(Env(argv[2]))
     if len(argv) == 4 and argv[1] == "topics" and argv[3] in ("single", "cluster"):
         return topics(Env(argv[2]), argv[3])
+    if len(argv) == 5 and argv[1] == "observability":
+        return observability(Env(argv[2]), argv[3], argv[4])
     if len(argv) == 4 and argv[1] == "test":
         return Smoke(Env(argv[2]), int(argv[3])).run()
     print(__doc__, file=sys.stderr)

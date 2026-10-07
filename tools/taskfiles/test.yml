@@ -1,0 +1,14 @@
+# Cross-component tests against the local environment (Ф2+). Namespace "test"; working directory is
+# the repository root. They need a running environment: `task env:up` (PROJECT=psim-local) or the
+# fresh one of `task env:ci-test` (PROJECT=psim-ci).
+version: '3'
+
+tasks:
+  observability:
+    desc: 'Every service exports /health/live, /health/ready, /metrics, JSON logs and traces and drains on SIGTERM (FF-06)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-local"}}'
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: debug}
+      - '{{.PYTHON}} tools/env/envctl.py observability {{.PROJECT}} build/{{.PLATFORM}}/debug {{index .RUNTIME_IMAGES "debian12"}}'
