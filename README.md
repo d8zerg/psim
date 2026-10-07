@@ -36,7 +36,8 @@ task cpp:runtime-test         # запустить собранные тесты
 task cpp:reproducible         # проверить воспроизводимость сборки
 task toolchain:shell          # оболочка в контейнере toolchain
 task contracts:check          # только контракты
-task docs:check               # только документация
+task docs:check               # только документация (включая сборку портала)
+task docs:portal              # портал документации в build/portal/site (docs:serve - http://localhost:8000)
 ```
 
 Сборка идёт в контейнере на базе Debian 12 (самая старая целевая glibc), артефакты проверяются запуском на Debian 12 и Astra Linux 1.8. Первая сборка зависимостей C++ занимает десятки минут, затем используется кэш (`.cache/debian12/`).

@@ -25,6 +25,12 @@ vars:
       astra18: registry.astralinux.ru/library/astra/ubi18@sha256:b62fb94cf64384778d8c0c0da04a06a30f4ad0abbe18de969caf102e34faf065
   # Contract tooling image built locally from tools/contracts/image (buf + protoc plugins);
   # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
+  # Redoc bundled into the portal image (tools/docs/portal/Dockerfile) for the offline REST reference;
+  # must equal the version the pinned Redocly CLI references (checked by docs:portal).
+  REDOC_VERSION: 2.5.4
+  # Documentation portal image built locally from tools/docs/portal (MkDocs + Material, ADR-038).
+  PORTAL_IMAGE:
+    sh: echo "psim/docs-portal:$(cat {{.ROOT_DIR}}/tools/docs/portal/Dockerfile {{.ROOT_DIR}}/tools/docs/portal/requirements.txt | sha256sum | cut -c1-12)"
   CONTRACTS_TOOLS_IMAGE:
     sh: echo "psim/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
   # Pinned tool and base images: tag for readability, digest for integrity (SR-23). Change here only.

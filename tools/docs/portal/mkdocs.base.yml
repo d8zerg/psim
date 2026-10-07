@@ -1,0 +1,45 @@
+# Documentation portal (step 1.6, ADR-038). Template: tools/docs/portal.py adds docs_dir, site_url,
+# repository links and the navigation built from docs/README.md. Built by `task docs:portal`.
+site_name: PSIM Platform
+site_description: Документация PSIM Platform, собранная из репозитория
+strict: true
+use_directory_urls: false
+theme:
+  name: material
+  language: ru
+  # No web fonts: the portal is served on-premise and opened offline.
+  font: false
+  palette:
+    - scheme: slate
+      toggle: {icon: material/weather-sunny, name: Светлая тема}
+    - scheme: default
+      toggle: {icon: material/weather-night, name: Тёмная тема}
+  features:
+    - navigation.sections
+    - navigation.indexes
+    - navigation.top
+    - search.highlight
+    - content.code.copy
+plugins:
+  # Served over HTTP (docs:serve, release archive); the offline plugin would load a shim from a CDN.
+  - search:
+      lang: [ru, en]
+markdown_extensions:
+  - tables
+  - admonition
+  - attr_list
+  # Heading anchors as on GitHub (Cyrillic kept), the form used and checked by docs:links;
+  # portal.py replaces SLUGIFY with the pymdownx.slugs function.
+  - toc:
+      permalink: true
+      slugify: SLUGIFY
+  - pymdownx.superfences
+  - pymdownx.details
+validation:
+  nav:
+    omitted_files: ignore
+  links:
+    not_found: warn
+    anchors: warn
+    absolute_links: warn
+    unrecognized_links: warn

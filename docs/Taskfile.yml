@@ -19,6 +19,7 @@ tasks:
       - task: c4
       - task: threats
       - task: verification
+      - task: portal
 
   links:
     desc: Check relative links and heading anchors in Markdown
@@ -84,3 +85,56 @@ tasks:
       - >-
         docker run --rm -v "{{.TASKFILE_DIR}}/architecture/c4":/usr/local/structurizr {{.STRUCTURIZR_IMAGE}}
         validate -workspace workspace.dsl
+
+  portal:
+    desc: Build the documentation portal into build/portal/site (FF-09); references are generated from the contracts
+    vars:
+      OUT: '{{.ROOT_DIR}}/build/portal'
+      C4_OUT: '{{.CACHE}}/portal/c4'
+      REDOC_CDN: https://cdn.redocly.com/redoc/v{{.REDOC_VERSION}}/bundles/redoc.standalone.js
+      REPO_URL:
+        sh: git -C {{.ROOT_DIR}} remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##' || echo https://github.com/d8zerg/psim
+      COMMIT:
+        sh: git -C {{.ROOT_DIR}} rev-parse HEAD
+    cmds:
+      - task: portal:image
+      # C4 views -> Mermaid (Structurizr exports next to the workspace, so it works on a copy).
+      - rm -rf {{.C4_OUT}} && mkdir -p {{.C4_OUT}} && cp {{.TASKFILE_DIR}}/architecture/c4/workspace.dsl {{.C4_OUT}}/
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.C4_OUT}}":/usr/local/structurizr {{.STRUCTURIZR_IMAGE}}
+        export -workspace workspace.dsl -format mermaid -output views >/dev/null
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/docs/portal.py stage {{.ROOT_DIR}} {{.OUT}} {{.C4_OUT}}/views {{.REPO_URL}} {{.COMMIT}}'
+      # REST reference: Redoc HTML built from the OpenAPI contract.
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo {{.REDOCLY_IMAGE}}
+        build-docs contracts/openapi/psim-api-v1.yaml --disableGoogleFont --output build/portal/src/reference/rest-api.html >/dev/null
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal/src/reference {{.PORTAL_IMAGE}} sh -c
+        'grep -q "{{.REDOC_CDN}}" rest-api.html || { echo "Redoc version changed; update tools/docs/portal/Dockerfile" >&2; exit 1; };
+        cp /opt/portal/redoc.standalone.js . && sed -i "s#{{.REDOC_CDN}}#redoc.standalone.js#" rest-api.html'
+      # Mermaid -> SVG on white, readable in both themes; the portal needs no JavaScript renderer.
+      - cmd: |
+          cd {{.OUT}}/src
+          find . -name '*.mmd' -path '*/_diagrams/*' | xargs -P 4 -I{} sh -c '
+            docker run --rm -u {{.UID}}:{{.GID}} -v "$PWD":/data {{.MERMAID_IMAGE}} -i "/data/{}" -o "/data/$(echo {} | sed "s/\\.mmd$/.svg/")" -b white >/dev/null 2>&1 \
+              || { echo "FAIL: mermaid {}"; exit 255; }'
+          find . -name '*.mmd' -path '*/_diagrams/*' -delete
+      - >-
+        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal {{.PORTAL_IMAGE}}
+        mkdocs build
+      - 'echo "portal: build/portal/site/index.html ($(find {{.OUT}}/site -name "*.html" | wc -l) pages)"'
+
+  portal:image:
+    desc: Build the MkDocs image of the portal (tools/docs/portal)
+    status:
+      - docker image inspect {{.PORTAL_IMAGE}} >/dev/null 2>&1
+    cmds:
+      - docker build --quiet -t {{.PORTAL_IMAGE}} {{.ROOT_DIR}}/tools/docs/portal >/dev/null
+
+  serve:
+    desc: Serve the built portal on http://localhost:8000
+    interactive: true
+    cmds:
+      - >-
+        docker run --rm -it -u {{.UID}}:{{.GID}} -p 127.0.0.1:8000:8000 -v "{{.ROOT_DIR}}/build/portal/site":/site:ro
+        -w /site {{.PORTAL_IMAGE}} python -m http.server 8000

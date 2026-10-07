@@ -7,6 +7,9 @@
   artifact <app.json> <file> <deb|image> <name> <version> <out.json> [<trivy-image-sbom.json>]
       SBOM of one release artifact: the file with its SHA-256 as metadata.component, the application
       components and, for an image, the operating system packages found by Trivy
+  docs <archive.tar> <version> <commit> <portal-requirements.txt> <redoc-version> <out.json>
+      SBOM of the documentation portal archive: third-party code served with it (Material for MkDocs
+      theme assets with the lunr search, Redoc renderer of the REST reference)
   licenses <licenses.yaml> <sbom.json>...
       every application component has a license allowed by the policy
 
@@ -129,6 +132,34 @@ def artifact_sbom(app, path, kind, name, version, os_sbom=None):
     return bom(component, components, dependencies)
 
 
+def docs_sbom(path, version, commit, requirements, redoc_version):
+    with open(path, "rb") as f:
+        digest = hashlib.sha256(f.read()).hexdigest()
+    pins = {}
+    with open(requirements, encoding="utf-8") as f:
+        for line in f:
+            name, sep, pinned = line.split("#")[0].strip().partition("==")
+            if sep:
+                pins[name] = pinned
+    material = f"pkg:pypi/mkdocs-material@{pins['mkdocs-material']}"
+    redoc = f"pkg:npm/redoc@{redoc_version}"
+    purl = f"pkg:generic/psim-docs@{version}"
+    component = {"type": "file", "bom-ref": purl, "purl": purl, "name": "psim-docs", "version": version,
+                 "hashes": [{"alg": "SHA-256", "content": digest}],
+                 "properties": [{"name": "psim:file", "value": os.path.basename(path)},
+                                {"name": "psim:git-commit", "value": commit}]}
+    components = [
+        {"type": "library", "bom-ref": material, "purl": material, "name": "mkdocs-material",
+         "version": pins["mkdocs-material"], "licenses": license_entry("MIT"),
+         "description": "Theme assets of the portal, including the lunr search"},
+        {"type": "library", "bom-ref": redoc, "purl": redoc, "name": "redoc", "version": redoc_version,
+         "licenses": license_entry("MIT"), "description": "Renderer of the REST reference"},
+    ]
+    dependencies = [{"ref": purl, "dependsOn": [material, redoc]}, {"ref": material, "dependsOn": []},
+                    {"ref": redoc, "dependsOn": []}]
+    return bom(component, components, dependencies)
+
+
 def check_licenses(policy_path, sbom_paths):
     with open(policy_path, encoding="utf-8") as f:
         allowed = set(yaml.safe_load(f)["allowed"])
@@ -137,7 +168,7 @@ def check_licenses(policy_path, sbom_paths):
         doc = load(path)
         for c in doc.get("components", []):
             ref = c.get("bom-ref", "")
-            if not (ref.startswith("pkg:conan/") or ref.startswith("pkg:generic/llvm-")):
+            if not ref.startswith(("pkg:conan/", "pkg:generic/llvm-", "pkg:pypi/", "pkg:npm/")):
                 continue  # PSIM itself and operating system packages of images
             names = [e.get("expression") or e.get("license", {}).get("id") or e.get("license", {}).get("name")
                      for e in c.get("licenses", [])]
@@ -160,6 +191,9 @@ def main(argv):
     if cmd == "artifact" and len(argv) in (8, 9):
         app = load(argv[2])
         save(artifact_sbom(app, argv[3], argv[4], argv[5], argv[6], argv[8] if len(argv) == 9 else None), argv[7])
+        return 0
+    if cmd == "docs" and len(argv) == 8:
+        save(docs_sbom(*argv[2:7]), argv[7])
         return 0
     if cmd == "licenses" and len(argv) >= 4:
         return check_licenses(argv[2], argv[3:])

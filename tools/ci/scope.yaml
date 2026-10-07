@@ -23,7 +23,8 @@ full:
 # target that depends on them (CMake code model).
 stages:
   contracts: ['contracts/*', 'tools/contracts/*']
-  docs: ['docs/*', '*.md', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
+  # The portal (docs:portal) is built from the documents and from the contracts.
+  docs: ['docs/*', '*.md', 'contracts/*', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
   deps: ['conanfile.py', 'conan.lock', 'web/pnpm-lock.yaml', 'tools/release/licenses.yaml', 'tools/taskfiles/security.yml']
   release: ['deploy/images/*', 'tools/release/*', 'tools/taskfiles/release.yml']
   env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'contracts/topics/*']

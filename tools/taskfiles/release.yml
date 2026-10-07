@@ -125,6 +125,15 @@ tasks:
               python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$tar" image "psim/$image" {{.VERSION}} \
                 "$tar.cdx.json" {{.RELEASE_BUILD}}/images/$image/os.cdx.json
             done
+      # Documentation portal (step 1.6): the same archive is published with every release.
+      - task: :docs:portal
+      - >-
+        tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C build/portal/site
+        -cf {{.DIST}}/psim-docs_{{.VERSION}}.tar .
+      - >-
+        SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) {{.PYTHON}} tools/release/sbom.py docs {{.DIST}}/psim-docs_{{.VERSION}}.tar
+        {{.VERSION}} $(git rev-parse HEAD) tools/docs/portal/requirements.txt {{.REDOC_VERSION}} {{.DIST}}/psim-docs_{{.VERSION}}.tar.cdx.json
+      - '{{.PYTHON}} tools/release/sbom.py licenses tools/release/licenses.yaml {{.DIST}}/*.cdx.json'
       - task: sign
 
   sign:
