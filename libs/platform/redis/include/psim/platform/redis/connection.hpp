@@ -34,6 +34,7 @@ struct TlsOptions {
   std::string private_key_file{};
   /// Empty means the endpoint hostname, including a primary discovered through Sentinel.
   std::string server_name{};
+  std::string crl_file{};
 };
 
 struct SentinelOptions {

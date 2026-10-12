@@ -10,7 +10,7 @@ add_library(psim::platform_config ALIAS psim_platform_config)
 target_include_directories(psim_platform_config PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(psim_platform_config
   PUBLIC nlohmann_json::nlohmann_json
-  PRIVATE yaml-cpp::yaml-cpp nlohmann_json_schema_validator)
+  PRIVATE psim::platform_security yaml-cpp::yaml-cpp nlohmann_json_schema_validator)
 psim_target_defaults(psim_platform_config)
 
 psim_add_test(psim_platform_config_test

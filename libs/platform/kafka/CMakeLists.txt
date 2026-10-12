@@ -15,7 +15,7 @@ add_library(psim_platform_kafka STATIC
 add_library(psim::platform_kafka ALIAS psim_platform_kafka)
 target_include_directories(psim_platform_kafka PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")
 target_link_libraries(psim_platform_kafka
-  PUBLIC psim::platform_async psim::platform_errors psim::platform_log Boost::headers protobuf::libprotobuf
+  PUBLIC psim::platform_security psim::platform_async psim::platform_errors psim::platform_log Boost::headers protobuf::libprotobuf
          opentelemetry-cpp::api prometheus-cpp::core
   PRIVATE RdKafka::rdkafka nlohmann_json::nlohmann_json)
 psim_target_defaults(psim_platform_kafka)

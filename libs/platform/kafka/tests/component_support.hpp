@@ -65,7 +65,8 @@ inline std::string unique(std::string_view what) {
 }
 
 inline ClientOptions client(std::string bootstrap = environment().kafka) {
-  return {.bootstrap = std::move(bootstrap), .client_id = "psim-component-test", .properties = {}};
+  return {
+      .bootstrap = std::move(bootstrap), .client_id = "psim-component-test", .properties = {}, .allow_plaintext = true};
 }
 
 /// Topics created for one test and deleted with it.

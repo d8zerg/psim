@@ -248,6 +248,14 @@ asio::awaitable<Result<void>> Connection::open() {
   properties["user"] = options_.user;
   properties["password"] = options_.password;
   properties.try_emplace("sslmode", "verify-full");
+  if (properties.at("sslmode") != "verify-full" && properties.at("sslmode") != "disable") {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "PostgreSQL requires verify-full; disable is development-only");
+  }
+  properties.try_emplace("ssl_min_protocol_version", "TLSv1.3");
+  if (properties.at("ssl_min_protocol_version") != "TLSv1.2"
+      && properties.at("ssl_min_protocol_version") != "TLSv1.3") {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "PostgreSQL requires TLS 1.2 or newer");
+  }
   properties.try_emplace("gssencmode", "disable");
   properties.try_emplace("target_session_attrs", "read-write");
   properties.try_emplace("application_name", "psim");

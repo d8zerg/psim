@@ -409,6 +409,7 @@ def observe(env, binary, image):
                     "-v", f"{ROOT}:/repo:ro",
                     "-e", "PSIM__TELEMETRY__OTLP_ENDPOINT=otel-collector:4317",
                     "-e", "PSIM__TELEMETRY__SAMPLING_RATIO=1",
+                    "-e", "PSIM__TELEMETRY__OTLP_TLS=false",
                     "-e", f"PSIM__SERVICE__INSTANCE={service}-ff06",
                     "-e", "PSIM__ADMIN__LISTEN=0.0.0.0:9100",
                     image, f"/repo/{binary}"], check=True, capture_output=True)

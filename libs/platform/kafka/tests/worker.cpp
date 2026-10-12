@@ -70,7 +70,8 @@ class Worker final : public kafka::Handler {
     const auto executor = co_await asio::this_coro::executor;
     psim::platform::async::SystemClock clock;
     const kafka::Dependencies deps{.blocking = pool, .logger = &logger_};
-    const kafka::ClientOptions client{.bootstrap = args_.bootstrap, .client_id = args_.instance};
+    const kafka::ClientOptions client{
+        .bootstrap = args_.bootstrap, .client_id = args_.instance, .allow_plaintext = true};
     auto consumer = kafka::Consumer::create(executor,
                                             {.client = client,
                                              .group_id = args_.group,

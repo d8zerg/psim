@@ -21,6 +21,8 @@ struct TracingOptions {
   std::string otlp_endpoint;
   /// Head sampling of new traces; a sampled parent is always followed (crosscutting.md 6.1).
   double sampling_ratio = 0.01;
+  bool otlp_tls = true;
+  std::string otlp_ca_file{};
 };
 
 /// Process-wide tracer provider: OTLP gRPC export in batches, resource attributes of the service.

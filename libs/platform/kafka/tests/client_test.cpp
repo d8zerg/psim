@@ -31,7 +31,7 @@ using testing::run;
 constexpr auto kNowhere = "127.0.0.1:1";
 
 ProducerOptions nowhere(milliseconds delivery_timeout = milliseconds(300)) {
-  return {.client = {.bootstrap = kNowhere, .client_id = "psim-test", .properties = {}},
+  return {.client = {.bootstrap = kNowhere, .client_id = "psim-test", .properties = {}, .allow_plaintext = true},
           .transactional_id = {},
           .delivery_timeout = delivery_timeout};
 }
@@ -140,7 +140,7 @@ TEST(Producer, InitTransactionsTimesOutWithoutABroker) {
 }
 
 ConsumerOptions consumer_options() {
-  return {.client = {.bootstrap = kNowhere, .client_id = "psim-test", .properties = {}},
+  return {.client = {.bootstrap = kNowhere, .client_id = "psim-test", .properties = {}, .allow_plaintext = true},
           .group_id = "psim-test",
           .topics = {"psim.test.v1"},
           .read_committed = true,

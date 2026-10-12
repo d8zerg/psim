@@ -8,15 +8,17 @@
 #include <string>
 
 #include "psim/platform/error.hpp"
+#include "psim/platform/security/http.hpp"
 
 namespace psim::platform::kafka {
 
 namespace asio = boost::asio;
 
 struct SchemaRegistryOptions {
-  /// Confluent-compatible API: "http://registry:8080/apis/ccompat/v7" (TLS - step 2.6).
+  /// Confluent-compatible HTTPS API. Plaintext requires http.allow_plaintext for development.
   std::string url;
   std::chrono::milliseconds timeout{5000};
+  security::HttpOptions http{};
 };
 
 /// Thin read-only client of the Schema Registry (ADR-003): services resolve the ids of their
@@ -32,13 +34,11 @@ class SchemaRegistry {
   asio::awaitable<Result<std::string>> schema(std::int32_t id);
 
  private:
-  SchemaRegistry(std::string host, std::string port, std::string base, std::chrono::milliseconds timeout);
+  SchemaRegistry(std::string base, security::HttpOptions options);
   asio::awaitable<Result<std::string>> get(std::string path);
 
-  std::string host_;
-  std::string port_;
   std::string base_;
-  std::chrono::milliseconds timeout_;
+  security::HttpOptions options_;
   std::map<std::int32_t, std::string> schemas_;
 };
 

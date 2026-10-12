@@ -98,7 +98,8 @@ TEST(SchemaRegistry, ResolvesTheLatestIdAndCachesItsSchema) {
   fake.answer("/apis/ccompat/v7/subjects/psim.events.v1-value/versions/latest", http::status::ok,
               R"({"subject":"psim.events.v1-value","version":3,"id":17,"schema":"syntax = \"proto3\";"})");
   fake.answer("/apis/ccompat/v7/schemas/ids/5", http::status::ok, R"({"schema":"message Old {}"})");
-  auto registry = SchemaRegistry::create({.url = fake.url(), .timeout = std::chrono::milliseconds(2000)});
+  auto registry = SchemaRegistry::create(
+      {.url = fake.url(), .timeout = std::chrono::milliseconds(2000), .http = {.allow_plaintext = true}});
   ASSERT_TRUE(registry.has_value());
 
   const auto id = run(io, registry->latest_id("psim.events.v1-value"));
@@ -117,7 +118,8 @@ TEST(SchemaRegistry, EscapesSubjectsWithSlashes) {
   FakeRegistry fake(io);
   fake.answer("/apis/ccompat/v7/subjects/psim%2Fcommon%2Fv1%2Fenvelope.proto/versions/latest", http::status::ok,
               R"({"id":3})");
-  auto registry = SchemaRegistry::create({.url = fake.url(), .timeout = std::chrono::milliseconds(2000)});
+  auto registry = SchemaRegistry::create(
+      {.url = fake.url(), .timeout = std::chrono::milliseconds(2000), .http = {.allow_plaintext = true}});
   EXPECT_EQ(run(io, registry->latest_id("psim/common/v1/envelope.proto")).value(), 3);
 }
 
@@ -127,7 +129,8 @@ TEST(SchemaRegistry, MapsFailuresToCatalogCodes) {
   fake.answer("/apis/ccompat/v7/subjects/broken-value/versions/latest", http::status::ok, "not json");
   fake.answer("/apis/ccompat/v7/subjects/down-value/versions/latest", http::status::service_unavailable, "");
   fake.answer("/apis/ccompat/v7/schemas/ids/9", http::status::ok, R"({"id":9})");
-  auto registry = SchemaRegistry::create({.url = fake.url(), .timeout = std::chrono::milliseconds(2000)});
+  auto registry = SchemaRegistry::create(
+      {.url = fake.url(), .timeout = std::chrono::milliseconds(2000), .http = {.allow_plaintext = true}});
 
   const auto missing = run(io, registry->latest_id("missing-value"));
   ASSERT_FALSE(missing.has_value());
@@ -139,17 +142,21 @@ TEST(SchemaRegistry, MapsFailuresToCatalogCodes) {
 
   const std::string url = fake.url();
   fake.close();
-  auto closed = SchemaRegistry::create({.url = url, .timeout = std::chrono::milliseconds(500)});
+  auto closed = SchemaRegistry::create(
+      {.url = url, .timeout = std::chrono::milliseconds(500), .http = {.allow_plaintext = true}});
   EXPECT_EQ(run(io, closed->latest_id("any-value")).error().code(), ErrorCode::kCommonUnavailable);
-  auto unresolvable =
-      SchemaRegistry::create({.url = "http://no-such-host.invalid:8080", .timeout = std::chrono::milliseconds(500)});
+  auto unresolvable = SchemaRegistry::create({.url = "http://no-such-host.invalid:8080",
+                                              .timeout = std::chrono::milliseconds(500),
+                                              .http = {.allow_plaintext = true}});
   EXPECT_EQ(run(io, unresolvable->latest_id("any-value")).error().code(), ErrorCode::kCommonUnavailable);
 }
 
 TEST(SchemaRegistry, ValidatesTheUrl) {
-  EXPECT_FALSE(SchemaRegistry::create({.url = "https://registry:8080", .timeout = {}}).has_value());
-  EXPECT_FALSE(SchemaRegistry::create({.url = "http://:8080/x", .timeout = {}}).has_value());
-  EXPECT_TRUE(SchemaRegistry::create({.url = "http://registry", .timeout = {}}).has_value());
+  EXPECT_TRUE(SchemaRegistry::create({.url = "https://registry:8080"}).has_value());
+  EXPECT_FALSE(SchemaRegistry::create({.url = "https://:8080/x"}).has_value());
+  EXPECT_FALSE(SchemaRegistry::create({.url = "http://registry"}).has_value());
+  EXPECT_FALSE(SchemaRegistry::create({.url = "https://registry", .timeout = {}}).has_value());
+  EXPECT_TRUE(SchemaRegistry::create({.url = "http://registry", .http = {.allow_plaintext = true}}).has_value());
 }
 
 }  // namespace

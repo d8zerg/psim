@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "psim/platform/security/tls.hpp"
+
 // The Kafka layer (step 2.3, ADR-041) wraps librdkafka; its handles stay out of the public headers
 // except as opaque pointers.
 struct rd_kafka_message_s;  // NOLINT(readability-identifier-naming): librdkafka C type
@@ -38,15 +40,24 @@ struct Dependencies {
 /// Headers of a message in their order; a name may repeat (W3C trace context, DLQ, psim-ts-<stage>).
 using Headers = std::vector<std::pair<std::string, std::string>>;
 
+struct TransportSecurity {
+  security::TlsOptions tls{};
+  /// Empty uses mTLS; otherwise SASL/SCRAM-SHA-512 over verified TLS.
+  std::string username{};
+  std::string password_file{};
+};
+
 /// Connection settings shared by producers and consumers.
 struct ClientOptions {
   /// Bootstrap brokers, "host:port[,host:port]".
   std::string bootstrap{};
   /// Client id in broker logs and quotas: "<service>-<instance>".
   std::string client_id{};
-  /// Additional librdkafka properties: tuning and, from step 2.6, security. They override the
+  /// Additional librdkafka properties for tuning. Transport security uses typed options; they override the
   /// defaults of the layer except the ones the delivery semantics depend on (ADR-041).
   std::map<std::string, std::string> properties{};
+  std::optional<TransportSecurity> security{};
+  bool allow_plaintext = false;
 };
 
 struct TopicPartition {

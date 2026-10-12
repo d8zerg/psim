@@ -139,7 +139,7 @@ struct Producer::State {
     }
   }
 
-  void on_error(int code, const char* reason) {
+  void on_error(int code, const char* /*reason*/) {
     const auto err = static_cast<rd_kafka_resp_err_t>(code);
     if (err == RD_KAFKA_RESP_ERR__FATAL) {
       fatal = true;
@@ -147,12 +147,13 @@ struct Producer::State {
       const auto original = rd_kafka_fatal_error(handle.get(), text.data(), text.size());
       if (deps.logger != nullptr) {
         deps.logger->error("kafka producer failed",
-                           {{"error", rd_kafka_err2name(original)}, {"reason", std::string_view(text.data())}});
+                           {{"error", rd_kafka_err2name(original)}, {"reason", rd_kafka_err2name(original)}});
       }
       return;
     }
     if (deps.logger != nullptr) {
-      deps.logger->warn("kafka producer error", {{"error", rd_kafka_err2name(err)}, {"reason", reason}});
+      deps.logger->warn("kafka producer error",
+                        {{"error", rd_kafka_err2name(err)}, {"reason", rd_kafka_err2name(err)}});
     }
   }
 
@@ -352,7 +353,7 @@ Result<std::unique_ptr<Producer>> Producer::create(const asio::any_io_executor& 
   std::array<char, 512> text{};
   detail::KafkaPtr handle(rd_kafka_new(RD_KAFKA_PRODUCER, conf->get(), text.data(), text.size()));
   if (!handle) {
-    return fail(ErrorCode::kCommonInvalidArgument, "create kafka producer: " + std::string(text.data()));
+    return fail(ErrorCode::kCommonInvalidArgument, "create kafka producer failed");
   }
   std::ignore = conf->release();  // owned by the handle now
   state->handle = std::move(handle);

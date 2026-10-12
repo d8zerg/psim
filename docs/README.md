@@ -74,3 +74,5 @@
 - Слой Kafka: продюсер, транзакции, потребитель, обработчик с повторами и DLQ, реестр схем - [ADR-041](adr/0041-kafka-layer.md)
 - Слой Valkey/Redis: RESP3, Sentinel, кэш, лимиты и сессии - [ADR-015](adr/0015-redis-client-and-role.md), [интерфейсы и примеры](../libs/platform/redis/README.md)
 - Слой PostgreSQL: libpq, пул, транзакции, миграции и inbox/outbox - [ADR-014](adr/0014-postgresql-async-driver.md), [интерфейсы и примеры](../libs/platform/pg/README.md)
+
+- Безопасность платформы: TLS/mTLS, JWT/JWKS, секреты и внешняя PKI - [ADR-043](adr/0043-platform-security.md), [интерфейсы](../libs/platform/security/README.md), [регламент доверия](security/platform-trust.md)

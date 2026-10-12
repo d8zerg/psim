@@ -26,17 +26,11 @@
 
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
+#include "psim/platform/security/http.hpp"
 
 namespace psim::platform::kafka {
 
-namespace beast = boost::beast;
-namespace http = boost::beast::http;
-using asio::ip::tcp;
-
 namespace {
-
-constexpr auto kAwait = asio::as_tuple(asio::use_awaitable);
-constexpr int kHttp11 = 11;
 
 // Subjects are path segments: "/" in "psim/common/v1/envelope.proto" must be escaped.
 std::string escape(std::string_view segment) {
@@ -61,63 +55,35 @@ std::unexpected<Error> unavailable(std::string_view what, std::string_view detai
 
 }  // namespace
 
-SchemaRegistry::SchemaRegistry(std::string host, std::string port, std::string base, std::chrono::milliseconds timeout)
-    : host_(std::move(host)), port_(std::move(port)), base_(std::move(base)), timeout_(timeout) {}
+SchemaRegistry::SchemaRegistry(std::string base, security::HttpOptions options)
+    : base_(std::move(base)), options_(std::move(options)) {}
 
 Result<SchemaRegistry> SchemaRegistry::create(const SchemaRegistryOptions& options) {
-  constexpr std::string_view kScheme = "http://";
-  std::string_view url = options.url;
-  if (!url.starts_with(kScheme)) {
-    return fail(ErrorCode::kCommonInvalidArgument, "schema registry url must start with http:// (TLS: step 2.6)");
+  auto valid = security::validate_url(options.url, options.http.allow_plaintext);
+  if (!valid || options.timeout <= std::chrono::milliseconds::zero()) {
+    return fail(ErrorCode::kCommonInvalidArgument, "invalid schema registry endpoint or timeout");
   }
-  url.remove_prefix(kScheme.size());
-  const auto slash = url.find('/');
-  const std::string_view authority = url.substr(0, slash);
-  std::string base(slash == std::string_view::npos ? std::string_view{} : url.substr(slash));
+  auto base = options.url;
   while (base.ends_with('/')) {
     base.pop_back();
   }
-  const auto colon = authority.rfind(':');
-  std::string host(authority.substr(0, colon));
-  std::string port(colon == std::string_view::npos ? "80" : authority.substr(colon + 1));
-  if (host.empty() || port.empty()) {
-    return fail(ErrorCode::kCommonInvalidArgument, "schema registry url has no host: " + options.url);
-  }
-  return SchemaRegistry(std::move(host), std::move(port), std::move(base), options.timeout);
+  auto http_options = options.http;
+  http_options.timeout = options.timeout;
+  return SchemaRegistry(std::move(base), std::move(http_options));
 }
 
 asio::awaitable<Result<std::string>> SchemaRegistry::get(std::string path) {
-  auto executor = co_await asio::this_coro::executor;
-  tcp::resolver resolver(executor);
-  auto [resolve_ec, endpoints] = co_await resolver.async_resolve(host_, port_, kAwait);
-  if (resolve_ec) {
-    co_return unavailable("resolve " + host_, resolve_ec.message());
+  auto response = co_await security::http_request(base_ + path, options_);
+  if (!response) {
+    co_return std::unexpected(response.error());
   }
-  beast::tcp_stream stream(executor);
-  stream.expires_after(timeout_);
-  if (auto [ec, endpoint] = co_await stream.async_connect(endpoints, kAwait); ec) {
-    co_return unavailable("connect " + host_ + ":" + port_, ec.message());
+  if (response->status == 404) {
+    co_return fail(ErrorCode::kCommonNotFound, "schema registry entry not found");
   }
-  http::request<http::string_body> request(http::verb::get, base_ + path, kHttp11);
-  request.set(http::field::host, host_);
-  request.set(http::field::accept, "application/vnd.schemaregistry.v1+json, application/json");
-  if (auto [ec, bytes] = co_await http::async_write(stream, request, kAwait); ec) {
-    co_return unavailable("request", ec.message());
+  if (response->status != 200) {
+    co_return unavailable("request", "HTTP " + std::to_string(response->status));
   }
-  beast::flat_buffer buffer;
-  http::response<http::string_body> response;
-  if (auto [ec, bytes] = co_await http::async_read(stream, buffer, response, kAwait); ec) {
-    co_return unavailable("response", ec.message());
-  }
-  boost::system::error_code ignored;
-  std::ignore = stream.socket().shutdown(tcp::socket::shutdown_both, ignored);
-  if (response.result() == http::status::not_found) {
-    co_return fail(ErrorCode::kCommonNotFound, "schema registry: " + path + " not found");
-  }
-  if (response.result() != http::status::ok) {
-    co_return unavailable(path, "HTTP " + std::to_string(response.result_int()));
-  }
-  co_return std::move(response.body());
+  co_return std::move(response->body);
 }
 
 asio::awaitable<Result<std::int32_t>> SchemaRegistry::latest_id(std::string subject) {

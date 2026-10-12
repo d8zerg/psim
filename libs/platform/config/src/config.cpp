@@ -2,7 +2,6 @@
 
 #include <nlohmann/json-schema.hpp>
 #include <nlohmann/json.hpp>
-#include <sys/stat.h>
 #include <unistd.h>
 #include <yaml-cpp/yaml.h>
 
@@ -14,17 +13,16 @@
 #include <exception>
 #include <expected>
 #include <format>
-#include <fstream>
 #include <functional>
-#include <ios>
 #include <map>
 #include <optional>
-#include <sstream>
 #include <string>
 #include <string_view>
 #include <system_error>
 #include <utility>
 #include <vector>
+
+#include "psim/platform/security/secret.hpp"
 
 extern char**
     environ;  // NOLINT(readability-redundant-declaration,cppcoreguidelines-avoid-non-const-global-variables): POSIX
@@ -182,23 +180,12 @@ class Collector final : public nlohmann::json_schema::basic_error_handler {
 };
 
 std::optional<std::string> read_secret(const std::string& path, const std::string& setting, Problems& problems) {
-  struct stat info{};
-  if (::stat(path.c_str(), &info) != 0) {
-    problems.push_back({setting, "secret file " + path + " is not readable"});
+  auto loaded = security::read_secret(path);
+  if (!loaded) {
+    problems.push_back({setting, loaded.error().message()});
     return std::nullopt;
   }
-  if ((info.st_mode & 077U) != 0) {
-    problems.push_back({setting, "secret file " + path + " is accessible to group or others; use mode 0400 (SR-09)"});
-    return std::nullopt;
-  }
-  if (info.st_uid != ::geteuid()) {
-    problems.push_back({setting, "secret file " + path + " is not owned by the service user (SR-09)"});
-    return std::nullopt;
-  }
-  const std::ifstream file(path, std::ios::binary);
-  std::ostringstream content;
-  content << file.rdbuf();
-  std::string secret = content.str();
+  std::string secret(loaded->view());
   while (!secret.empty() && (secret.back() == '\n' || secret.back() == '\r')) {
     secret.pop_back();
   }

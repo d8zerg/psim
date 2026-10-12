@@ -71,7 +71,8 @@ bool admin(const std::string& bootstrap, const std::string& topic, bool create) 
 asio::awaitable<Rates> measure(std::string bootstrap, std::string topic, long messages, std::size_t size,
                                psim::platform::async::BlockingPool* pool) {
   const auto executor = co_await asio::this_coro::executor;
-  const kafka::ClientOptions client{.bootstrap = bootstrap, .client_id = "psim-kafka-throughput"};
+  const kafka::ClientOptions client{
+      .bootstrap = bootstrap, .client_id = "psim-kafka-throughput", .allow_plaintext = true};
   Rates rates;
   {
     auto producer = kafka::Producer::create(executor, {.client = client});

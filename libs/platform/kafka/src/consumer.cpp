@@ -160,12 +160,12 @@ struct Consumer::State {
     }
   }
 
-  void on_error(int code, const char* reason) {
+  void on_error(int code, const char* /*reason*/) {
     const auto err = static_cast<rd_kafka_resp_err_t>(code);
     if (err == RD_KAFKA_RESP_ERR__FATAL) {
       fatal = true;
     }
-    log_warn("kafka consumer error", {{"error", rd_kafka_err2name(err)}, {"reason", reason}});
+    log_warn("kafka consumer error", {{"error", rd_kafka_err2name(err)}, {"reason", rd_kafka_err2name(err)}});
   }
 
   void count(const rd_kafka_message_t* message) {
@@ -258,7 +258,7 @@ Result<std::unique_ptr<Consumer>> Consumer::create(const asio::any_io_executor& 
   std::array<char, 512> text{};
   detail::KafkaPtr handle(rd_kafka_new(RD_KAFKA_CONSUMER, conf->get(), text.data(), text.size()));
   if (!handle) {
-    return fail(ErrorCode::kCommonInvalidArgument, "create kafka consumer: " + std::string(text.data()));
+    return fail(ErrorCode::kCommonInvalidArgument, "create kafka consumer failed");
   }
   std::ignore = conf->release();
   rd_kafka_poll_set_consumer(handle.get());  // one queue for messages, rebalances and statistics

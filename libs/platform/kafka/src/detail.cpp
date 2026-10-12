@@ -18,6 +18,7 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
+#include <expected>
 #include <string>
 #include <string_view>
 #include <system_error>
@@ -28,6 +29,8 @@
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
+#include "psim/platform/security/secret.hpp"
+#include "psim/platform/security/tls.hpp"
 
 namespace psim::platform::kafka::detail {
 
@@ -107,11 +110,7 @@ Error make_error(rd_kafka_resp_err_t code, bool retriable, std::string_view what
   std::string message(what);
   message += ": ";
   message += rd_kafka_err2name(code);
-  if (!text.empty()) {
-    message += " (";
-    message += text;
-    message += ")";
-  }
+  (void)text;
   return {catalog_code(code, retriable), std::move(message)};
 }
 
@@ -119,11 +118,13 @@ Error make_error(rd_kafka_resp_err_t code, bool retriable, std::string_view what
 
 Result<ConfPtr> make_conf(const ClientOptions& options, const Properties& defaults, const Properties& fixed) {
   ConfPtr conf(rd_kafka_conf_new());
+  // Native diagnostics may embed secrets. Structured callbacks expose catalog categories only.
+  rd_kafka_conf_set_log_cb(conf.get(), [](const rd_kafka_t*, int, const char*, const char*) {});
   std::array<char, kErrorText> text{};
   std::string problems;
   const auto set = [&](const std::string& name, const std::string& value) {
     if (rd_kafka_conf_set(conf.get(), name.c_str(), value.c_str(), text.data(), text.size()) != RD_KAFKA_CONF_OK) {
-      problems += (problems.empty() ? "" : "; ") + std::string(text.data());
+      problems += (problems.empty() ? "" : "; ") + name + " rejected";
     }
   };
   if (options.bootstrap.empty()) {
@@ -136,7 +137,53 @@ Result<ConfPtr> make_conf(const ClientOptions& options, const Properties& defaul
   for (const auto& [name, value] : defaults) {
     set(name, value);
   }
+  if (!options.security && !options.allow_plaintext) {
+    return fail(ErrorCode::kCommonInvalidArgument, "Kafka transport security is required");
+  }
+  if (options.security) {
+    const auto& security = *options.security;
+    if (security.tls.boundary != security::Boundary::kInternal) {
+      return fail(ErrorCode::kCommonInvalidArgument, "Kafka supports the internal TLS profile");
+    }
+    if (security.username.empty() && security.tls.certificate_file.empty()) {
+      return fail(ErrorCode::kCommonInvalidArgument, "Kafka requires mTLS or SCRAM credentials");
+    }
+    auto context = security::tls_context(security.tls);
+    if (!context) {
+      return std::unexpected(context.error());
+    }
+    set("security.protocol", security.username.empty() ? "SSL" : "SASL_SSL");
+    set("enable.ssl.certificate.verification", "true");
+    set("ssl.endpoint.identification.algorithm", "https");
+    set("ssl.cipher.suites",
+        "ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:"
+        "ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:"
+        "ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305");
+    if (!security.tls.ca_file.empty()) {
+      set("ssl.ca.location", security.tls.ca_file);
+    }
+    if (!security.tls.certificate_file.empty()) {
+      set("ssl.certificate.location", security.tls.certificate_file);
+      set("ssl.key.location", security.tls.private_key_file);
+    }
+    if (!security.tls.crl_file.empty()) {
+      set("ssl.crl.location", security.tls.crl_file);
+    }
+    if (!security.username.empty()) {
+      auto password = security::read_secret(security.password_file);
+      if (!password) {
+        return std::unexpected(password.error());
+      }
+      set("sasl.mechanism", "SCRAM-SHA-512");
+      set("sasl.username", security.username);
+      set("sasl.password", std::string(password->view()));
+    }
+  }
   for (const auto& [name, value] : options.properties) {
+    if (name.starts_with("ssl.") || name.starts_with("sasl.") || name == "security.protocol"
+        || name == "enable.ssl.certificate.verification") {
+      return fail(ErrorCode::kCommonInvalidArgument, "Kafka security properties belong in typed transport options");
+    }
     if (const auto it = fixed.find(name); it != fixed.end() && it->second != value) {
       problems += (problems.empty() ? "" : "; ") + name + " is fixed to " + it->second + " by the delivery semantics";
       continue;

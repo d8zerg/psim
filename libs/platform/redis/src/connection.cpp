@@ -28,6 +28,7 @@
 #include "psim/platform/async/deadline.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
+#include "psim/platform/security/tls.hpp"
 
 namespace psim::platform::redis {
 namespace native = boost::redis;
@@ -230,21 +231,16 @@ asio::awaitable<Result<std::unique_ptr<Connection>>> Connection::open(Endpoint e
   std::shared_ptr<State> state;
   try {
     asio::ssl::context context{asio::ssl::context::tls_client};
-    context.set_options(asio::ssl::context::no_sslv2 | asio::ssl::context::no_sslv3 | asio::ssl::context::no_tlsv1
-                        | asio::ssl::context::no_tlsv1_1);
     if (tls.enabled) {
-      context.set_verify_mode(asio::ssl::verify_peer);
+      auto configured = security::configure_tls(context.native_handle(), {.ca_file = tls.ca_file,
+                                                                          .certificate_file = tls.certificate_file,
+                                                                          .private_key_file = tls.private_key_file,
+                                                                          .crl_file = tls.crl_file});
+      if (!configured) {
+        co_return std::unexpected(configured.error());
+      }
       context.set_verify_callback(
           asio::ssl::host_name_verification(tls.server_name.empty() ? endpoint.host : tls.server_name));
-      if (tls.ca_file.empty()) {
-        context.set_default_verify_paths();
-      } else {
-        context.load_verify_file(tls.ca_file);
-      }
-      if (!tls.certificate_file.empty() || !tls.private_key_file.empty()) {
-        context.use_certificate_chain_file(tls.certificate_file);
-        context.use_private_key_file(tls.private_key_file, asio::ssl::context::pem);
-      }
     }
     state = std::make_shared<State>(executor, std::move(context), std::move(options), std::move(endpoint));
   } catch (const std::exception&) {

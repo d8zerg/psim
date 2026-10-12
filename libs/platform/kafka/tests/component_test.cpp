@@ -453,7 +453,8 @@ asio::awaitable<void> serde_round_trip(SchemaRegistry* registry, std::string top
 TEST(KafkaComponent, SerdeUsesTheSchemaRegisteredForTheTopic) {
   Topics topics;
   const auto topic = topics.create("serde", 1);
-  auto registry = SchemaRegistry::create({.url = environment().registry, .timeout = milliseconds(5000)});
+  auto registry = SchemaRegistry::create(
+      {.url = environment().registry, .timeout = milliseconds(5000), .http = {.allow_plaintext = true}});
   ASSERT_TRUE(registry.has_value());
   run(serde_round_trip(&*registry, topic));
   const auto values = read_all(topic, 1, seconds(20));

@@ -39,6 +39,8 @@ constexpr std::string_view kRuntimeSchemaHead = R"json({
       "type": "object", "additionalProperties": false,
       "properties": {
         "otlp_endpoint": {"type": "string", "default": "", "description": "OTLP gRPC endpoint of the Collector; empty: no export"},
+        "otlp_tls": {"type": "boolean", "default": true, "description": "Verified TLS; false only for isolated development"},
+        "otlp_ca_file": {"type": "string", "default": "", "description": "Collector CA bundle; empty uses system trust"},
         "sampling_ratio": {"type": "number", "minimum": 0, "maximum": 1, "default": 0.01}
       }
     },

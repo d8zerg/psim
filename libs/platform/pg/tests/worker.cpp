@@ -63,8 +63,9 @@ asio::awaitable<void> work(std::string schema, std::string topic, std::string st
     co_await checkpoint(marker);
   }
   auto producer = pg_testing::take(kafka::Producer::create(
-      co_await asio::this_coro::executor,
-      {.client = {.bootstrap = pg_testing::environment("PSIM_TEST_KAFKA"), .client_id = "pg-crash-worker"}}));
+      co_await asio::this_coro::executor, {.client = {.bootstrap = pg_testing::environment("PSIM_TEST_KAFKA"),
+                                                      .client_id = "pg-crash-worker",
+                                                      .allow_plaintext = true}}));
   const auto publish = pg::kafka_publisher(producer.get());
   const pg::Publisher checkpoint_publish = [publish, stage, marker](std::span<const pg::OutboxMessage> messages) {
     return publish_checkpoint(publish, stage, marker, messages);

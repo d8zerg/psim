@@ -87,6 +87,66 @@ services:
       timeout: 5s
       retries: 40
 
+  # Isolated mTLS transports of step 2.6; ordinary development data is unaffected.
+  postgres-tls:
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
+    profiles: [security]
+    environment:
+      POSTGRES_PASSWORD: psim-test-tls-postgres
+      POSTGRES_DB: psim
+    entrypoint:
+      - sh
+      - -ec
+      - |
+        cp /tls/server.key /tmp/postgres-server.key
+        chown postgres:postgres /tmp/postgres-server.key
+        chmod 400 /tmp/postgres-server.key
+        exec docker-entrypoint.sh postgres -c ssl=on -c ssl_min_protocol_version=TLSv1.3 \
+          -c ssl_cert_file=/tls/server.pem -c ssl_key_file=/tmp/postgres-server.key \
+          -c ssl_ca_file=/tls/ca.pem -c hba_file=/etc/psim-pg-hba.conf
+    volumes:
+      - ../../.cache/security-tls:/tls:ro
+      - ./config/security/pg_hba.conf:/etc/psim-pg-hba.conf:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  kafka-tls:
+    <<: *kafka
+    profiles: [security]
+    hostname: kafka-tls
+    environment:
+      <<: *kafka-env
+      CLUSTER_ID: cHNpbS1zZWN1cml0eS10bHM
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENERS: CONTROLLER://:9093,INTERNAL://:19092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka-tls:19092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:SSL,INTERNAL:SSL
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka-tls:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_SSL_KEYSTORE_TYPE: PEM
+      KAFKA_SSL_KEYSTORE_LOCATION: /tls/server-combined.pem
+      KAFKA_SSL_TRUSTSTORE_TYPE: PEM
+      KAFKA_SSL_TRUSTSTORE_LOCATION: /tls/ca.pem
+      KAFKA_SSL_CLIENT_AUTH: required
+      KAFKA_SSL_ENABLED_PROTOCOLS: TLSv1.3
+      KAFKA_SSL_ENDPOINT_IDENTIFICATION_ALGORITHM: https
+    volumes: [../../.cache/security-tls:/tls:ro]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:19092 --command-config /tls/kafka-client.properties >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 10s
+      retries: 30
+      start_period: 10s
+
   # Schema Registry (ADR-003): Apicurio with storage in PostgreSQL, Confluent-compatible API.
   registry:
     image: apicurio/apicurio-registry:3.3.3@sha256:c9cae4c90ce46538abf673c68eb591345f23bcc6c2aa6bfd47189adcf609d8f1
@@ -192,7 +252,7 @@ services:
 
   valkey-tls:
     image: *valkey_image
-    profiles: [valkey-ha]
+    profiles: [valkey-ha, security]
     command: [valkey-server, --port, '0', --tls-port, '6380', --requirepass, psim-dev-valkey,
               --tls-cert-file, /tls/server.pem, --tls-key-file, /tls/server.key, --tls-ca-cert-file, /tls/ca.pem,
               --tls-auth-clients, 'yes']

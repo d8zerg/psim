@@ -708,6 +708,19 @@ methods:
     steps: ['10.3']
     purpose: Требование SR-08
 
+  - id: SEC-08
+    kind: security
+    name: Платформенное доверие и аутентификация
+    criteria: JWT/JWKS и ротация, отказ чужому issuer/audience/алгоритму, TLS/mTLS с проверкой CA/имени/CRL,
+      продление без потери тестовых событий, отзыв открытого потока, истечение и защищённые файлы секретов;
+      реальные Keycloak, Kafka, PostgreSQL и Valkey; ASan/UBSan и TSan
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task test:security:sanitizers
+    steps: ['2.6']
+    purpose: Платформенные механизмы SR-01, SR-03, SR-04, SR-08, SR-09; полный сервисный цикл остаётся в TS-22
+
   # --- Manual procedures ----------------------------------------------------
   - id: M-01
     kind: manual

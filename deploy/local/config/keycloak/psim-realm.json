@@ -65,7 +65,9 @@
       "serviceAccountsEnabled": false,
       "redirectUris": ["http://localhost:5173/*"],
       "webOrigins": ["http://localhost:5173"],
-      "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*"}
+      "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*"},
+      "protocolMappers": [{"name": "psim-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+        "consentRequired": false, "config": {"included.client.audience": "psim", "id.token.claim": "false", "access.token.claim": "true"}}]
     },
     {
       "clientId": "psim-services",
@@ -77,7 +79,9 @@
       "secret": "psim-dev-services-secret",
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true
+      "serviceAccountsEnabled": true,
+      "protocolMappers": [{"name": "psim-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
+        "consentRequired": false, "config": {"included.client.audience": "psim", "id.token.claim": "false", "access.token.claim": "true"}}]
     }
   ],
   "authenticationFlows": [

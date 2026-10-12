@@ -240,7 +240,9 @@ struct Runtime::Impl {
                                       .version = std::string(build_info().version),
                                       .instance = instance,
                                       .otlp_endpoint = config.get<std::string>("telemetry.otlp_endpoint"),
-                                      .sampling_ratio = config.get<double>("telemetry.sampling_ratio")});
+                                      .sampling_ratio = config.get<double>("telemetry.sampling_ratio"),
+                                      .otlp_tls = config.get<bool>("telemetry.otlp_tls"),
+                                      .otlp_ca_file = config.get<std::string>("telemetry.otlp_ca_file")});
     shards = std::make_unique<async::Shards>(static_cast<std::size_t>(config.get<std::int64_t>("runtime.shards")),
                                              "psim-shard");
     blocking = std::make_unique<async::BlockingPool>(

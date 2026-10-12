@@ -43,7 +43,8 @@ namespace {
 std::unique_ptr<sdk::trace::SpanExporter> otlp_exporter(const TracingOptions& options) {
   otel::exporter::otlp::OtlpGrpcExporterOptions exporter_options;
   exporter_options.endpoint = options.otlp_endpoint;
-  exporter_options.use_ssl_credentials = false;  // TLS to the Collector comes with step 2.6 (SR-08)
+  exporter_options.use_ssl_credentials = options.otlp_tls;
+  exporter_options.ssl_credentials_cacert_path = options.otlp_ca_file;
   return otel::exporter::otlp::OtlpGrpcExporterFactory::Create(exporter_options);
 }
 

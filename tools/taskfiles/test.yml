@@ -56,6 +56,40 @@ tasks:
           PROJECT: '{{.PROJECT}}'
           CMD: ctest --test-dir build/{{.PLATFORM}}/tsan -L '^component$' -R '^Pg' -j 1 --output-on-failure
 
+  security:
+    desc: Verify JWT/JWKS, secrets, certificate renewal/revocation and native mTLS transports (SR-01, SR-03, SR-04, SR-08, SR-09)
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:security
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:build
+        vars: {PRESET: debug}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/debug -R '^Security' -j 1 --output-on-failure
+
+  security:sanitizers:
+    desc: Run security unit and component checks with ASan/UBSan and TSan
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:security
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:build
+        vars: {PRESET: asan}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/asan -R '^Security' -j 1 --output-on-failure
+      - task: :cpp:build
+        vars: {PRESET: tsan}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/tsan -R '^Security' -j 1 --output-on-failure
+
   component:
     desc: 'Component tests of adapters against the environment containers, with coverage of the adapter modules (TS-03, FF-12)'
     vars:
@@ -63,6 +97,8 @@ tasks:
       BUILD: build/{{.PLATFORM}}/coverage
     cmds:
       - task: :env:valkey:ha
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :env:security
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: :cpp:build
         vars: {PRESET: coverage}
