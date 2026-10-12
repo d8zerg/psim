@@ -1,5 +1,4 @@
-// Executables link libc++, libc++abi and the libgcc unwinder statically (ADR-032, ADR-034); this
-// checks that exceptions still unwind through several frames and destructors run on the way.
+// Checks that the system C++ runtime unwinds exceptions through several frames and runs destructors.
 
 #include <gtest/gtest.h>
 
@@ -29,7 +28,7 @@ struct Guard {
   fail_deep(depth - 1, destroyed);
 }
 
-TEST(StaticRuntime, ExceptionsUnwindThroughFrames) {
+TEST(RuntimeUnwind, ExceptionsUnwindThroughFrames) {
   int destroyed = 0;
   std::string message;
   try {

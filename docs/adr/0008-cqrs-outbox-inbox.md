@@ -1,7 +1,6 @@
 # ADR-008. CQRS, transactional outbox и inbox
 
 - **Статус:** Принято
-- **Дата:** 2026-10-06
 - **Шаг плана:** 0.4 (реализация - 2.4, 5.3, 7.3)
 - **Связанные:** ADR-006, ADR-019, [crosscutting.md](../architecture/crosscutting.md#3-транзакционные-шаблоны)
 

@@ -10,7 +10,7 @@
 #include <boost/beast/http/string_body.hpp>
 #include <boost/beast/http/write.hpp>
 #include <gtest/gtest.h>
-#include <signal.h>  // NOLINT(modernize-deprecated-headers): kill is POSIX
+#include <signal.h>  // NOLINT(modernize-deprecated-headers): pthread_kill is POSIX
 #include <stdlib.h>  // NOLINT(modernize-deprecated-headers): setenv, unsetenv are POSIX
 #include <unistd.h>
 
@@ -365,7 +365,10 @@ TEST(Main, StopsCleanlyOnSigterm) {
     }
   }
   ASSERT_EQ(status, 200U);
-  ::kill(::getpid(), SIGTERM);
+  // Deliver SIGTERM to the thread running the service entry point. The test driver must not run
+  // Asio's handler concurrently with destruction of the service's signal resources.
+  // NOLINTNEXTLINE(bugprone-bad-signal-to-kill-thread,cert-pos44-c): handled by Asio for graceful shutdown
+  EXPECT_EQ(::pthread_kill(process.native_handle(), SIGTERM), 0);
   process.join();
   ::unsetenv("PSIM__ADMIN__LISTEN");  // NOLINT(concurrency-mt-unsafe): threads joined
   EXPECT_EQ(exit_code, 0);

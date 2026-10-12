@@ -32,14 +32,14 @@ tasks:
           CMD: rm -rf {{.PACKAGES}} && cd {{.RELEASE_BUILD}} && SOURCE_DATE_EPOCH=0 cpack -B packages >/dev/null && ls packages/*.deb
 
   package:test:
-    desc: Install the packages on Debian 12 and Astra Linux 1.8 and run them (FF-18)
+    desc: Install the packages on Debian 13 x86_64 and run them (FF-18)
     vars:
-      RUNTIMES: '{{.RUNTIMES | default "debian12 astra18"}}'
+      RUNTIMES: '{{.RUNTIMES | default "debian13"}}'
     deps: [package]
     cmds:
       - for: {var: RUNTIMES}
         cmd: >-
-          docker run --rm -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
+          docker run --rm --platform linux/amd64 -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
           sh -c 'dpkg -i /packages/*.deb >/dev/null && psimctl version && dpkg -r psim-psimctl >/dev/null
           && echo "ok: packages install, run and remove on {{.ITEM}}"'
 
@@ -59,7 +59,7 @@ tasks:
             -o -type f -perm -u+x -name {{.ITEM}} -print)
           [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
           cp "$bins" "$stage"/
-          docker build --quiet --build-arg BASE={{.DISTROLESS_IMAGE}} \
+          docker build --quiet --platform linux/amd64 --build-arg BASE={{.DISTROLESS_IMAGE}} \
             --label org.opencontainers.image.title=psim-{{.ITEM}} \
             --label org.opencontainers.image.version={{.VERSION}} \
             --label org.opencontainers.image.revision={{.COMMIT}} \
@@ -75,20 +75,20 @@ tasks:
         cmd: |
           user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' psim/{{.ITEM}}:{{.VERSION}})
           case "$user" in ""|0|0:*|root|root:*) echo "FAIL: psim/{{.ITEM}} runs as root" >&2; exit 1 ;; esac
-          docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges psim/{{.ITEM}}:{{.VERSION}} >/dev/null
+          docker run --rm --platform linux/amd64 --read-only --cap-drop ALL --security-opt no-new-privileges psim/{{.ITEM}}:{{.VERSION}} >/dev/null
           echo "ok: psim/{{.ITEM}}:{{.VERSION}} runs read-only, no capabilities, user $user"
 
   sbom:app:
-    desc: SBOM of the components linked into PSIM binaries (Conan host dependencies and libc++)
+    desc: SBOM of the components linked into PSIM binaries (Conan host dependencies and the system C++ runtime)
     cmds:
       - task: :cpp:_run
         vars:
           CMD: >-
             mkdir -p {{.RELEASE_BUILD}} &&
-            conan graph info . -pr:a tools/conan/profiles/clang21-libcxx --lockfile=conan.lock --format=json
+            conan graph info . -pr:a tools/conan/profiles/clang21-libstdcxx --lockfile=conan.lock --format=json
             > {{.RELEASE_BUILD}}/conan-graph.json 2>/dev/null &&
             SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 -I tools/release/sbom.py app
-            {{.RELEASE_BUILD}}/conan-graph.json "$(clang -dumpversion)" {{.VERSION}} "$(git rev-parse HEAD)"
+            {{.RELEASE_BUILD}}/conan-graph.json "$(g++ -dumpfullversion)" {{.VERSION}} "$(git rev-parse HEAD)"
             {{.RELEASE_BUILD}}/app.cdx.json
 
   dist:

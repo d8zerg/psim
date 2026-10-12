@@ -8,6 +8,7 @@
 - [Product Brief](product/product-brief.md)
 - [Роли и пользовательские пути](product/roles-and-journeys.md)
 - [Границы MVP](product/mvp-scope.md)
+- [Эксплуатационные дополнения MVP](architecture/operational-capabilities.md)
 - [Спецификация приёмки S1-S13](product/acceptance-spec.md)
 
 ## Предметная область (шаг 0.2)
@@ -49,6 +50,12 @@
 - [Матрица верификации](quality/verification-matrix.md) (генерируется из [verification.yaml](quality/verification.yaml))
 - [Методика сквозной сверки потерь и дубликатов](quality/reconciliation.md)
 - [Методика замера задержек](quality/latency-measurement.md)
+
+## Участие и поддержка
+
+- [Участие в проекте](../CONTRIBUTING.md)
+- [Сообщения о проблемах безопасности](../SECURITY.md)
+- [Совместимость API, коннекторов и поддержка выпусков](engineering/compatibility-and-support.md)
 
 ## Инженерная платформа (шаги 1.1-1.6)
 

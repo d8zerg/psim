@@ -1,6 +1,6 @@
 """Conan 2 dependencies of the PSIM C++ code base (ADR-032).
 
-Dependencies are built from source with the project profile (clang 21, libc++, C++23) and always
+Dependencies are built from source with the project profile (clang 21, system libstdc++, C++23) and always
 in Release; the project itself is built in any configuration (CMakePresets.json). Versions are
 pinned here and, with recipe revisions, in conan.lock. Steps add their dependencies here.
 """

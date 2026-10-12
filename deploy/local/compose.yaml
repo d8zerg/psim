@@ -4,7 +4,7 @@
 #   is a single broker. compose.ports.yaml publishes ports on 127.0.0.1 for the interactive
 #   environment; the CI environment runs without published ports.
 # Images are pinned by tag and digest (SR-23). Credentials are development-only defaults.
-name: psim-local
+name: psim-platform
 
 x-kafka: &kafka
   image: apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837
@@ -17,7 +17,7 @@ x-kafka: &kafka
     start_period: 10s
 
 x-kafka-env: &kafka-env
-  CLUSTER_ID: cHNpbS1sb2NhbC1rcmFmdA   # base64 UUID of "psim-local-kraft"
+  CLUSTER_ID: cHNpbS1sb2NhbC1rcmFmdA   # fixed KRaft cluster UUID (base64)
   KAFKA_PROCESS_ROLES: broker,controller
   KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
   KAFKA_CONTROLLER_QUORUM_VOTERS: ${PSIM_KAFKA_VOTERS:-1@kafka-1:9093}
@@ -72,7 +72,7 @@ services:
     volumes: [kafka-3:/var/lib/kafka/data]
 
   postgres:
-    image: postgres:18.6-bookworm@sha256:afc7e2d441324c0388fa80c3d24f733b4194a4eb7f47dd8ee2b08eb1a24a647c
+    image: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres

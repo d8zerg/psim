@@ -7,7 +7,7 @@ use_directory_urls: false
 theme:
   name: material
   language: ru
-  # No web fonts: the portal is served on-premise and opened offline.
+  # No web fonts: the portal must work without internet access.
   font: false
   palette:
     - scheme: slate

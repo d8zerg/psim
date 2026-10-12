@@ -1,6 +1,7 @@
 #!/bin/sh
 # Runs built artifacts on a target platform image without the toolchain (ADR-032):
-# every test executable (*_test) and `psimctl version`; psimctl must depend on glibc only. Invoked by `task cpp:runtime-test`.
+# every test executable (*_test) and `psimctl version`, with the distribution's shared libraries.
+# Invoked by `task cpp:runtime-test`.
 # Usage: runtime_test.sh <platform-name> <build-dir>
 set -eu
 platform=$1
@@ -15,8 +16,8 @@ for t in $tests; do
 done
 psimctl=$(find "$build" -path '*/CMakeFiles' -prune -o -type f -name psimctl -print | head -1)
 "$psimctl" version
-if ldd "$psimctl" | grep -q 'libc++\|libgcc_s'; then
-  echo "FAIL: psimctl depends on a shared C++ runtime (libc++ or libgcc_s)" >&2
+if ldd "$psimctl" | grep -q 'not found'; then
+  echo "FAIL: psimctl has unresolved shared-library dependencies" >&2
   exit 1
 fi
-echo "ok: psimctl depends on glibc only on $platform"
+echo "ok: psimctl shared-library dependencies resolve on $platform"

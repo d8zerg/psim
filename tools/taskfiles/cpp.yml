@@ -1,9 +1,9 @@
 # C++ build: Conan dependencies, CMake presets, tests, reproducibility (step 1.1, ADR-032);
 # quality gates: formatting, clang-tidy, sanitizers, coverage (step 1.2, ADR-033).
 # Namespace "cpp"; working directory is the repository root.
-# Build commands run in the toolchain container (Debian 12 base); inside the container
-# (PSIM_IN_TOOLCHAIN=1) they run directly. Artifacts are verified on the target platforms by
-# runtime-test (Debian 12, Astra Linux 1.8).
+# Build commands run in the toolchain container (Debian 13 base); inside the container
+# (PSIM_IN_TOOLCHAIN=1) they run directly. Artifacts are verified on the target platform by
+# runtime-test (Debian 13 x86_64).
 #   PRESET    debug (default) | release | relwithdebinfo | asan | tsan | coverage
 #   JOBS      parallel jobs (default: half of the CPUs)
 #   LABELS    ctest label regex limiting the tests (task ci passes affected targets; empty: all)
@@ -12,11 +12,13 @@
 version: '3'
 
 vars:
-  PROFILE: tools/conan/profiles/clang21-libcxx
+  PROFILE: tools/conan/profiles/clang21-libstdcxx
   # Dependencies instrumented with ThreadSanitizer for the tsan preset (ADR-033).
-  PROFILE_TSAN: tools/conan/profiles/clang21-libcxx-tsan
+  PROFILE_TSAN: tools/conan/profiles/clang21-libstdcxx-tsan
   # Project C++ sources: formatting and clang-tidy scope (generated and vendored code excluded).
-  CXX_FILES: git ls-files -co --exclude-standard -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**'
+  CXX_FILES: >-
+    git ls-files -co --exclude-standard -- '*.cpp' '*.hpp' '*.h' '*.cc' ':!:**/third_party/**' |
+    while IFS= read -r file; do if [ -f "$file" ]; then printf '%s\n' "$file"; fi; done
   # Translation units checked by clang-tidy (regex over compile_commands.json entries).
   TIDY_SCOPE: '^/repo/(libs|services|connectors|tools|contracts/(tests|benchmarks))/'
 
@@ -151,17 +153,17 @@ tasks:
             python3 -I tools/cpp/compare_builds.py build/{{.PLATFORM}}/repro-a build/{{.PLATFORM}}/repro-b
 
   runtime-test:
-    desc: 'Run built tests and psimctl of PRESET on target platforms (RUNTIMES="debian12 astra18")'
+    desc: 'Run built tests and psimctl of PRESET on Debian 13 x86_64 (RUNTIMES="debian13")'
     vars:
       PRESET: '{{.PRESET | default "debug"}}'
-      RUNTIMES: '{{.RUNTIMES | default "debian12 astra18"}}'
+      RUNTIMES: '{{.RUNTIMES | default "debian13"}}'
     deps:
       - task: build
         vars: {PRESET: '{{.PRESET}}'}
     cmds:
       - for: {var: RUNTIMES}
         cmd: >-
-          docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo:ro -w /repo
+          docker run --rm --platform linux/amd64 -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo:ro -w /repo
           {{index .RUNTIME_IMAGES .ITEM}}
           sh /repo/tools/cpp/runtime_test.sh {{.ITEM}} build/{{.PLATFORM}}/{{.PRESET}}
 
@@ -185,7 +187,7 @@ tasks:
     cmds:
       - cmd: |
           mkdir -p "{{.CACHE_DIR}}/home"
-          docker run --rm -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
+          docker run --rm --platform linux/amd64 -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
             -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
             -e PSIM_TEST_TOXIPROXY=toxiproxy:8474 -e PSIM_TEST_REGISTRY=http://registry:8080/apis/ccompat/v7 \
@@ -209,7 +211,7 @@ tasks:
             eval "$PSIM_CMD"
           else
             mkdir -p "{{.CACHE_DIR}}/conan" "{{.CACHE_DIR}}/ccache" "{{.CACHE_DIR}}/home"
-            docker run --rm {{.TTY}} -u {{.UID}}:{{.GID}} \
+            docker run --rm --platform linux/amd64 {{.TTY}} -u {{.UID}}:{{.GID}} \
               -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
               -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/conan":/cache/conan \
               -v "{{.CACHE_DIR}}/ccache":/cache/ccache -v "{{.CACHE_DIR}}/home":/cache/home \

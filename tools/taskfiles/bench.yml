@@ -1,11 +1,12 @@
 # Benchmarks and the performance regression gate (B-05, ADR-034). Namespace "bench"; working
 # directory is the repository root. Benchmarks run in the release preset inside the toolchain.
 # The baseline is the last pushed master (merge base with origin/master); its results are cached
-# in .cache/bench/<commit>.json and built from `git archive` of that commit when missing.
+# in .cache/bench/<platform>/<commit>.json and built from `git archive` when missing, with the
+# current compiler settings and Conan profile so a toolchain migration does not mix environments.
 version: '3'
 
 vars:
-  BENCH_DIR: .cache/bench
+  BENCH_DIR: .cache/bench/{{.PLATFORM}}
   HEAD:
     sh: git rev-parse HEAD
   BASE:
@@ -38,11 +39,12 @@ tasks:
     cmds:
       - rm -rf {{.SRC}} && mkdir -p {{.SRC}}
       - git archive {{.BASE}} | tar -x -C {{.SRC}}
+      - cp cmake/PsimCompiler.cmake {{.SRC}}/cmake/PsimCompiler.cmake
       - task: :cpp:_run
         vars:
           CMD: >-
             cd {{.SRC}} &&
-            conan install . -pr:a tools/conan/profiles/clang21-libcxx --lockfile=conan.lock --build=missing
+            conan install . -pr:a /repo/tools/conan/profiles/clang21-libstdcxx --lockfile=conan.lock --build=missing
             -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan >/dev/null &&
             cmake --preset release >/dev/null && cmake --build --preset release -j {{.JOBS}} >/dev/null &&
             python3 -I /repo/tools/bench/bench.py run build/{{.PLATFORM}}/release /repo/{{.BENCH_DIR}}/{{.BASE}}.json {{.BASE}}
@@ -57,7 +59,7 @@ tasks:
   kafka:
     desc: 'Kafka layer throughput against the environment: >= 200000 msg/s for the producer and the consumer (B-01, nightly)'
     vars:
-      PROJECT: '{{.PROJECT | default "psim-local"}}'
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
       MESSAGES: '{{.MESSAGES | default "2000000"}}'
     cmds:
       - task: :cpp:build

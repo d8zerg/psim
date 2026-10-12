@@ -1,25 +1,27 @@
 {
-  "name": "PSIM toolchain (Debian 12)",
+  "name": "PSIM toolchain (Debian 13)",
   "build": {
     "dockerfile": "../tools/toolchain/Dockerfile",
+    "options": ["--platform", "linux/amd64"],
     "args": {
-      "BASE": "debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858"
+      "BASE": "debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5"
     }
   },
+  "runArgs": ["--platform", "linux/amd64"],
   "workspaceMount": "source=${localWorkspaceFolder},target=/repo,type=bind",
   "workspaceFolder": "/repo",
   "remoteUser": "dev",
   "updateRemoteUserUID": true,
   "containerEnv": {
-    "PSIM_PLATFORM": "debian12",
+    "PSIM_PLATFORM": "debian13",
     "HOME": "/cache/home"
   },
   "mounts": [
-    "source=${localWorkspaceFolder}/.cache/debian12/conan,target=/cache/conan,type=bind",
-    "source=${localWorkspaceFolder}/.cache/debian12/ccache,target=/cache/ccache,type=bind",
-    "source=${localWorkspaceFolder}/.cache/debian12/home,target=/cache/home,type=bind"
+    "source=${localWorkspaceFolder}/.cache/debian13/conan,target=/cache/conan,type=bind",
+    "source=${localWorkspaceFolder}/.cache/debian13/ccache,target=/cache/ccache,type=bind",
+    "source=${localWorkspaceFolder}/.cache/debian13/home,target=/cache/home,type=bind"
   ],
-  "initializeCommand": "mkdir -p .cache/debian12/conan .cache/debian12/ccache .cache/debian12/home",
+  "initializeCommand": "mkdir -p .cache/debian13/conan .cache/debian13/ccache .cache/debian13/home",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -31,7 +33,7 @@
       "settings": {
         "cmake.useCMakePresets": "always",
         "cmake.configureOnOpen": false,
-        "clangd.arguments": ["--compile-commands-dir=build/debian12/debug", "--header-insertion=never"]
+        "clangd.arguments": ["--compile-commands-dir=build/debian13/debug", "--header-insertion=never"]
       }
     }
   }

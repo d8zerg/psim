@@ -22,9 +22,9 @@ TEMPLATE = "tools/service-template"
 COPIED = ["CMakeLists.txt", "src", "tests", "config"]
 NAME = re.compile(r"^[a-z][a-z0-9]*(-[a-z0-9]+)*$")
 
-DOCKERFILE = """# psim-{name} container image (ADR-034, SR-24): distroless base with glibc only, non-root user.
+DOCKERFILE = """# psim-{name} container image (ADR-034, SR-24): Debian 13 distroless with the C++ runtime, non-root user.
 # Built by `task release:images`; the base digest is pinned in the root Taskfile.
-ARG BASE=gcr.io/distroless/base-nossl-debian12:nonroot
+ARG BASE=gcr.io/distroless/cc-debian13:nonroot
 FROM ${{BASE}}
 COPY psim-{name} /usr/bin/psim-{name}
 USER 65532:65532

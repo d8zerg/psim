@@ -1,7 +1,6 @@
 # ADR-039. Runtime сервиса
 
 - **Статус:** Принято
-- **Дата:** 2026-10-07
 - **Шаг плана:** 2.1
 - **Связанные:** ADR-001, ADR-005, ADR-016 (модель потоков, шаг 2.2), [ADR-040](0040-async-primitives.md) (шарды и пул в `Context`), ADR-033, [crosscutting.md](../architecture/crosscutting.md#5-конфигурация) разделы 5 и 6, требование SR-09, метод FF-06
 
@@ -48,8 +47,8 @@
 3. **Эндпоинты:** `/health/live`, `/health/ready` (все компоненты готовы, запуск завершён, остановка не начата; иначе 503 с состоянием компонентов), `/metrics`, `/info` (сборка и экземпляр); только GET и HEAD. Метрики runtime: `psim_runtime_info`, `psim_runtime_ready`, `psim_runtime_start_time_seconds`, `psim_runtime_config_reloads_total{result}`, `psim_runtime_drain_timeouts_total`.
 4. **Жизненный цикл:** компоненты создаются фабрикой сервиса и стартуют по порядку; ошибка старта - код выхода 1. SIGTERM или SIGINT: готовность снимается, компоненты дренируются в обратном порядке до общего дедлайна; превышение дедлайна - код 3 и метрика (работа могла быть потеряна), иначе 0. SIGHUP: конфигурация перечитывается; невалидная отклоняется целиком, изменения неперезагружаемых настроек сообщаются предупреждением, остальные применяются (`reconfigure`).
 5. **Шаблон и генератор:** `tools/service-template` - компилируемый сервис с компонентом-примером (приём и обработка сообщений со спаном и метриками, дренирование всех начатых сообщений); `task service:new NAME=<имя> CONTEXTS=<контексты>` создаёт `services/<имя>` (исполняемый `psim-<имя>`, пакет, образ) и регистрирует сервис в `tools/arch/architecture.yaml`, `services/CMakeLists.txt` и `IMAGES`. CMake-функция `psim_add_service`.
-6. **FF-06** - `task test:observability`: каждый исполняемый файл сервиса запускается в локальном окружении (образ Debian 12); проверяются `/health/live`, `/health/ready`, `/metrics`, JSON-формат всех строк лога, трассы в Tempo через Collector, чистая остановка по SIGTERM. Входит в `env:ci-test`; этап `env` конвейера включается и при изменении runtime или сервисов.
-7. **Профиль clang-tidy** (дополнение к ADR-033): include-cleaner не проверяет заголовки Boost, OpenTelemetry, prometheus-cpp, nlohmann и yaml-cpp (сопоставляет символы с их внутренними заголовками); выключены `modernize-use-designated-initializers` (частичную инициализацию ловит `-Wmissing-designated-field-initializers`) и правила с ложными срабатываниями в чужом коде: `cert-err58-cpp` (трейты libc++), `portability-template-virtual-member-function`, `clang-analyzer-core.CallAndMessage` (кадры корутин Asio; вызовы по нулевому указателю ловят `-Wnull-dereference`, ASan и UBSan).
+6. **FF-06** - `task test:observability`: каждый исполняемый файл сервиса запускается в локальном окружении (образ Debian 13 x86_64); проверяются `/health/live`, `/health/ready`, `/metrics`, JSON-формат всех строк лога, трассы в Tempo через Collector, чистая остановка по SIGTERM. Входит в `env:ci-test`; этап `env` конвейера включается и при изменении runtime или сервисов.
+7. **Профиль clang-tidy** (дополнение к ADR-033): include-cleaner не проверяет заголовки Boost, OpenTelemetry, prometheus-cpp, nlohmann и yaml-cpp (сопоставляет символы с их внутренними заголовками); выключены `modernize-use-designated-initializers` (частичную инициализацию ловит `-Wmissing-designated-field-initializers`) и правила с ложными срабатываниями в чужом коде: `portability-template-virtual-member-function`, `clang-analyzer-core.CallAndMessage` (кадры корутин Asio; вызовы по нулевому указателю ловят `-Wnull-dereference`, ASan и UBSan). После перехода на системную libstdc++ проверка `cert-err58-cpp` включена.
 
 ## Последствия
 

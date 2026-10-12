@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """CycloneDX 1.6 SBOMs of PSIM release artifacts and the license policy (step 1.3, ADR-034, FF-14).
 
-  app <conan-graph.json> <libcxx-version> <version> <commit> <out.json>
+  app <conan-graph.json> <gcc-runtime-version> <version> <commit> <out.json>
       components linked into PSIM binaries: Conan host dependencies (test-only ones excluded) and
-      the statically linked libc++; the dependency graph comes from Conan
+      the dynamically linked libstdc++ and libgcc; the dependency graph comes from Conan
   artifact <app.json> <file> <deb|image> <name> <version> <out.json> [<trivy-image-sbom.json>]
       SBOM of one release artifact: the file with its SHA-256 as metadata.component, the application
       components and, for an image, the operating system packages found by Trivy
@@ -72,7 +72,7 @@ def bom(component, components, dependencies):
     }
 
 
-def app_sbom(graph_path, libcxx_version, version, commit):
+def app_sbom(graph_path, runtime_version, version, commit):
     nodes = load(graph_path)["graph"]["nodes"]
     refs, components = {}, {}
     for node_id, node in nodes.items():
@@ -88,20 +88,23 @@ def app_sbom(graph_path, libcxx_version, version, commit):
             component["description"] = " ".join(node["description"].split())
         components[purl] = component
 
-    libcxx = f"pkg:generic/llvm-libcxx@{libcxx_version}"
-    components[libcxx] = {
-        "type": "library", "bom-ref": libcxx, "name": "llvm-libcxx", "version": libcxx_version, "purl": libcxx,
-        "description": "LLVM libc++ and libc++abi, linked statically into PSIM executables (ADR-032)",
-        "licenses": license_entry("Apache-2.0 WITH LLVM-exception"),
-        "externalReferences": [{"type": "website", "url": "https://libcxx.llvm.org"}],
-    }
+    runtimes = []
+    for name, description in (("gcc-libstdcxx", "GNU libstdc++"), ("gcc-libgcc", "GCC unwinding runtime")):
+        ref = f"pkg:generic/{name}@{runtime_version}"
+        runtimes.append(ref)
+        components[ref] = {
+            "type": "library", "bom-ref": ref, "name": name, "version": runtime_version, "purl": ref,
+            "description": f"{description}, linked dynamically from Debian 13 (ADR-032)",
+            "licenses": license_entry("GPL-3.0-or-later WITH GCC-exception-3.1"),
+            "externalReferences": [{"type": "website", "url": "https://gcc.gnu.org"}],
+        }
 
     def host_deps(node):
         return sorted({refs[d] for d, edge in node.get("dependencies", {}).items()
                        if d in refs and edge.get("direct") and not edge.get("build") and not edge.get("test")})
 
-    dependencies = [{"ref": PSIM_REF, "dependsOn": sorted(set(host_deps(nodes["0"])) | {libcxx})},
-                    {"ref": libcxx, "dependsOn": []}]
+    dependencies = [{"ref": PSIM_REF, "dependsOn": sorted(set(host_deps(nodes["0"])) | set(runtimes))}]
+    dependencies += [{"ref": ref, "dependsOn": []} for ref in runtimes]
     dependencies += [{"ref": refs[i], "dependsOn": host_deps(nodes[i])} for i in sorted(refs, key=refs.get)]
     psim = {"type": "application", "bom-ref": PSIM_REF, "name": "psim", "version": version,
             "properties": [{"name": "psim:git-commit", "value": commit}]}
@@ -168,7 +171,7 @@ def check_licenses(policy_path, sbom_paths):
         doc = load(path)
         for c in doc.get("components", []):
             ref = c.get("bom-ref", "")
-            if not ref.startswith(("pkg:conan/", "pkg:generic/llvm-", "pkg:pypi/", "pkg:npm/")):
+            if not ref.startswith(("pkg:conan/", "pkg:generic/gcc-", "pkg:pypi/", "pkg:npm/")):
                 continue  # PSIM itself and operating system packages of images
             names = [e.get("expression") or e.get("license", {}).get("id") or e.get("license", {}).get("name")
                      for e in c.get("licenses", [])]

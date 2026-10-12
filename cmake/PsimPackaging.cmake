@@ -1,5 +1,4 @@
-# Debian packages of PSIM (step 1.3, ADR-034). One package per installable component; the same
-# package installs on Debian 12 and Astra Linux 1.8 (glibc 2.36, libc++ linked statically, ADR-032).
+# Debian 13 amd64 packages of PSIM (step 1.3, ADR-034). One package per installable component.
 # Built by `task package:build` (cpack in the release preset), checked by `task package:test`.
 #
 # A component is declared next to its target: install(... COMPONENT <name>) and
@@ -23,8 +22,8 @@ macro(psim_finalize_packaging)
   set(CPACK_DEBIAN_PACKAGE_ARCHITECTURE amd64)
   set(CPACK_DEBIAN_PACKAGE_SECTION misc)
   set(CPACK_DEBIAN_PACKAGE_PRIORITY optional)
-  # Only glibc is linked dynamically; 2.36 is the oldest target (Debian 12, Astra Linux 1.8).
-  set(CPACK_DEBIAN_PACKAGE_DEPENDS "libc6 (>= 2.36)")
+  # Derive shared-library dependencies and symbol versions from the actual Debian 13 binaries.
+  set(CPACK_DEBIAN_PACKAGE_SHLIBDEPS ON)
   get_property(psim_packages GLOBAL PROPERTY PSIM_PACKAGES)
   set(CPACK_COMPONENTS_ALL ${psim_packages})
   foreach(component IN LISTS psim_packages)

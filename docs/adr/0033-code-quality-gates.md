@@ -1,7 +1,6 @@
 # ADR-033. Контроль качества кода: форматирование, clang-tidy, контроль include, санитайзеры, покрытие, fitness functions
 
 - **Статус:** Принято
-- **Дата:** 2026-10-06
 - **Шаг плана:** 1.2
 - **Связанные:** ADR-001, ADR-030, ADR-031, ADR-032, [стандарт C++](../engineering/cpp-coding-standard.md), [стандарт TypeScript](../engineering/typescript-coding-standard.md), требование SR-13 ([threat-register.md](../security/threat-register.md))
 
@@ -11,8 +10,8 @@
 
 Ограничения:
 
-- toolchain - clang 21 и libc++ 21 в контейнере на Debian 12 (ADR-032); любые инструменты анализа должны понимать тот же код и те же заголовки libc++;
-- зависимости Conan собираются без инструментирования; пресет `tsan` на шаге 1.1 не работал: заголовки protobuf в режиме TSan требуют библиотеку, собранную с TSan (ADR-032, п. 9);
+- toolchain - clang 21 и системная libstdc++ в контейнере на Debian 13 x86_64 (ADR-032); любые инструменты анализа должны понимать тот же код и те же заголовки стандартной библиотеки;
+- обычные зависимости Conan собираются без инструментирования; для пресета `tsan` заголовки protobuf требуют библиотеку, собранную с TSan (ADR-032);
 - CI появляется на шаге 1.3, поэтому барьер слияния - задача `task check`, которую CI вызывает без изменений;
 - доменных библиотек ещё нет: проверки чистоты домена должны доказывать, что ловят нарушения, без доменного кода.
 
@@ -22,7 +21,7 @@
 
 | Вариант | Плюсы | Минусы |
 |---|---|---|
-| include-what-you-use | Названо в плане; зрелые отчёты | Выпуск IWYU привязан к версии clang: для clang 21 его нужно собирать из исходников против `llvm-21-dev` в образе toolchain; для libc++ нужны файлы соответствий; отдельный прогон и отдельный формат подавлений |
+| include-what-you-use | Названо в плане; зрелые отчёты | Выпуск IWYU привязан к версии clang: для clang 21 его нужно собирать из исходников против `llvm-21-dev` в образе toolchain; отдельный прогон и отдельный формат подавлений |
 | **clang-tidy `misc-include-cleaner`** | Та же библиотека анализа include (include-cleaner из LLVM), что и в clangd; поставляется в `clang-tidy-21`, уже есть в образе; один прогон, одни подавления `NOLINT`, тот же барьер `WarningsAsErrors`; редактор показывает замечания сразу | Не предлагает forward-declarations; соответствия для заголовков сторонних библиотек задаются регулярными выражениями |
 
 ### Санитайзер потоков
@@ -53,7 +52,7 @@
 2. **Форматирование:** `.clang-format` (основа Google, 120 колонок, группировка include), `.editorconfig`; `task cpp:format` - проверка, `task cpp:format:fix` - исправление.
 3. **clang-tidy:** профиль `.clang-tidy` - группы `bugprone`, `cert`, `clang-analyzer`, `concurrency`, `cppcoreguidelines`, `misc`, `modernize`, `performance`, `portability`, `readability` с явным списком исключений; соглашения об именовании; `WarningsAsErrors: '*'`. `task cpp:lint` проверяет все единицы трансляции проекта по `compile_commands.json` сборки `debug`; сгенерированный и вендоренный код не проверяется. Подавление - только `NOLINT(<проверка>)` с причиной.
 4. **Контроль include** - `misc-include-cleaner` в составе профиля clang-tidy вместо отдельного include-what-you-use.
-5. **Санитайзеры:** `asan` (ASan + UBSan) использует обычные зависимости; `tsan` - зависимости, собранные профилем `tools/conan/profiles/clang21-libcxx-tsan` (флаги санитайзера входят в идентификатор пакета через `tools.info.package_id:confs`; инструменты сборки protoc и `grpc_cpp_plugin` - из обычного профиля) в `build/debian12/conan-tsan`. `task cpp:test:sanitizers` запускает тесты под обоими пресетами; любое срабатывание завершает тест с ошибкой (`-fno-sanitize-recover=all`).
+5. **Санитайзеры:** `asan` (ASan + UBSan) использует обычные зависимости; `tsan` - зависимости, собранные профилем `tools/conan/profiles/clang21-libstdcxx-tsan` (флаги санитайзера входят в идентификатор пакета через `tools.info.package_id:confs`; инструменты сборки protoc и `grpc_cpp_plugin` - из обычного профиля) в `build/debian13/conan-tsan`. `task cpp:test:sanitizers` запускает тесты под обоими пресетами; любое срабатывание завершает тест с ошибкой (`-fno-sanitize-recover=all`).
 6. **Покрытие:** llvm-cov source-based (`coverage` пресет); `task cpp:coverage` сливает профили, пишет текстовый и HTML-отчёт и проверяет пороги по модулям: `libs/domain/*` - 90% строк и 80% ветвей, `libs/platform/*` и `services/*/adapters` - 75% строк. Тесты, сгенерированный код и зависимости не измеряются.
 7. **Fitness functions** (`tools/arch/arch_check.py`, правила - `tools/arch/architecture.yaml`):
    - `task arch:deps` (FF-01) - граф целей CMake из File API и директивы `#include` проверяются по правилам ADR-001: домен зависит только от `libs/domain/common` и стандартной библиотеки (в том числе нет внешних каталогов include), контексты домена не зависят друг от друга, сервис не зависит от другого сервиса и использует только свои контексты домена; тесты дополнительно могут использовать `libs/sim`;

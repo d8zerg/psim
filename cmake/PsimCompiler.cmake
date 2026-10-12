@@ -3,8 +3,8 @@
 # psim_target_defaults(<target>) applies to project code: strict warnings, hardening,
 # sanitizers, coverage. Generated and third-party code gets only the common flags below.
 
-if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-  message(FATAL_ERROR "PSIM requires clang (toolchain: tools/toolchain/Dockerfile), got ${CMAKE_CXX_COMPILER_ID}")
+if(NOT CMAKE_CXX_COMPILER_ID MATCHES "^(Clang|GNU)$")
+  message(FATAL_ERROR "PSIM requires a C++23 Clang or GCC compiler, got ${CMAKE_CXX_COMPILER_ID}")
 endif()
 
 # --- Common flags for all code -------------------------------------------------------------
@@ -15,22 +15,18 @@ if(NOT PSIM_COVERAGE)
     "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=."
     "-ffile-prefix-map=${CMAKE_BINARY_DIR}=.")
 endif()
-add_compile_options(-fno-record-gcc-switches)
-add_link_options(-fuse-ld=lld LINKER:--build-id=sha1)
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  add_compile_options(-fno-record-gcc-switches)
+  add_link_options(-fuse-ld=lld)
+endif()
+add_link_options(LINKER:--build-id=sha1)
 
 # Hardening (all configurations): stack protection, control-flow protection, full RELRO, PIE.
 add_compile_options(-fstack-protector-strong -fstack-clash-protection -fcf-protection=full)
 add_link_options(LINKER:-z,relro LINKER:-z,now LINKER:-z,noexecstack -pie)
-# libc++ hardening: extensive checks in debug builds, fast checks otherwise.
-add_compile_definitions(
-  "_LIBCPP_HARDENING_MODE=$<IF:$<CONFIG:Debug>,_LIBCPP_HARDENING_MODE_DEBUG,_LIBCPP_HARDENING_MODE_FAST>")
+# System libstdc++ bounds/precondition checks without changing its ABI.
+add_compile_definitions(_GLIBCXX_ASSERTIONS)
 add_compile_definitions("$<$<NOT:$<CONFIG:Debug>>:_FORTIFY_SOURCE=3>")
-
-if(PSIM_STATIC_RUNTIME)
-  # Executables depend on glibc only: libc++ and the libgcc unwinder are linked statically, so
-  # packages need just libc6 and images need no C++ runtime (ADR-032, ADR-034).
-  add_link_options("$<$<STREQUAL:$<TARGET_PROPERTY:TYPE>,EXECUTABLE>:-static-libstdc++;-static-libgcc>")
-endif()
 
 # --- Project code ---------------------------------------------------------------------------
 set(PSIM_WARNINGS

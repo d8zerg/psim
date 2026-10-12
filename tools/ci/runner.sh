@@ -10,7 +10,7 @@ main=$(git rev-parse --show-toplevel)
 ci="$main/.cache/ci"
 clone="$ci/repo"
 sha=$(git -C "$main" rev-parse "$1^{commit}")
-mkdir -p "$ci" "$main/.cache/debian12" "$main/.cache/trivy"
+mkdir -p "$ci" "$main/.cache/debian13" "$main/.cache/trivy"
 
 echo $$ > "$ci/$sha.running"
 trap 'rm -f "$ci/$sha.running"' EXIT
@@ -26,7 +26,7 @@ git -C "$clone" fetch --quiet --force --update-head-ok "$main" \
 git -C "$clone" checkout --quiet --detach --force "$sha"
 git -C "$clone" clean -fdq   # untracked files; ignored build and cache directories are kept
 mkdir -p "$clone/.cache"
-for shared in debian12 trivy; do ln -sfn "$main/.cache/$shared" "$clone/.cache/$shared"; done
+for shared in debian13 trivy; do ln -sfn "$main/.cache/$shared" "$clone/.cache/$shared"; done
 
 echo "ci: running for $(git -C "$main" log -1 --format='%h %s' "$sha") in .cache/ci/repo (log .cache/ci/$sha.log)"
 start=$(date +%s)

@@ -1,6 +1,6 @@
 # Documentation portal tooling (step 1.6, ADR-038): MkDocs with Material, pinned versions.
 # Built by `task docs:portal:image`; the tag follows this file and requirements.txt.
-ARG BASE=python:3.13.9-slim-bookworm@sha256:b685a4fa58bb19d1814d78a1ec0f0208f351452724f78b20212c984d6e124a34
+ARG BASE=python:3.13.9-slim-trixie@sha256:326df678c20c78d465db501563f3492d17c42a4afe33a1f2bf5406a1d56b0e86
 FROM ${BASE}
 COPY requirements.txt /tmp/requirements.txt
 RUN pip install --no-cache-dir --disable-pip-version-check -r /tmp/requirements.txt && rm /tmp/requirements.txt

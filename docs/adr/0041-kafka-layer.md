@@ -1,7 +1,6 @@
 # ADR-041. Слой Kafka
 
 - **Статус:** Принято
-- **Дата:** 2026-10-07
 - **Шаг плана:** 2.3
 - **Связанные:** ADR-002 (Kafka и librdkafka), ADR-003 (Schema Registry), ADR-004 (wire format), ADR-005 (заголовки трассировки), ADR-006 (семантика доставки; уточняет механизм EOS-K), ADR-016 и [ADR-040](0040-async-primitives.md) (модель исполнения), [crosscutting.md](../architecture/crosscutting.md#33-транзакции-kafka-eos-k) раздел 3.3 и раздел 4, методы TS-03, B-01, FF-04
 

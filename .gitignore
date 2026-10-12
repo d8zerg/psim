@@ -132,3 +132,4 @@ Thumbs.db
 *.bak
 *.log
 tmp/
+AGENTS.md

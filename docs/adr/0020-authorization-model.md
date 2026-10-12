@@ -1,7 +1,6 @@
 # ADR-020. Модель авторизации: RBAC + ABAC, точка принятия решений
 
 - **Статус:** Предложено (принимается в начале шага 7.4)
-- **Дата:** 2026-10-06
 - **Шаг плана:** 7.4
 - **Связанные:** ADR-019, [roles-and-journeys.md](../product/roles-and-journeys.md), [aggregates.md](../domain/aggregates.md#6-identity--access)
 

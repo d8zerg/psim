@@ -108,7 +108,7 @@ TEST(Config, EnvironmentOverridesTheFileWithTypesFromTheSchema) {
   const auto file = dir.write("svc.yaml", "service:\n  instance: a\n");
   const std::map<std::string, std::string> env{{"PSIM__ADMIN__PORT", "9300"}, {"PSIM__ADMIN__ENABLED", "false"},
                                                {"PSIM__ADMIN__RATIO", "0.5"}, {"PSIM__SERVICE__INSTANCE", "b"},
-                                               {"PSIM_PLATFORM", "debian12"}, {"HOME", "/root"}};
+                                               {"PSIM_PLATFORM", "debian13"}, {"HOME", "/root"}};
 
   const auto config = load(schema(), Sources{.file = file, .environment = env});
 

@@ -4,7 +4,7 @@
 #include <boost/asio/awaitable.hpp>
 #include <librdkafka/rdkafka.h>
 #include <nlohmann/json.hpp>
-#include <sys/types.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>

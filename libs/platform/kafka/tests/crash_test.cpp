@@ -2,8 +2,8 @@
 // random moments (SIGKILL: no drain, no commit, an open transaction left behind).
 
 #include <gtest/gtest.h>
+#include <sched.h>
 #include <spawn.h>
-#include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
 

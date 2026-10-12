@@ -3,11 +3,11 @@ version: '3'
 
 tasks:
   build:
-    desc: Build the C++ toolchain image (Debian 12 base, clang 21, libc++ 21)
+    desc: Build the C++ toolchain image (Debian 13 x86_64, clang 21, system libstdc++)
     status:
       - '[ "${PSIM_IN_TOOLCHAIN:-0}" = "1" ] || docker image inspect {{.TOOLCHAIN_IMAGE}} >/dev/null 2>&1'
     cmds:
-      - docker build --build-arg BASE={{.TOOLCHAIN_BASE}} -t {{.TOOLCHAIN_IMAGE}} {{.ROOT_DIR}}/tools/toolchain
+      - docker build --platform linux/amd64 --build-arg BASE={{.TOOLCHAIN_BASE}} -t {{.TOOLCHAIN_IMAGE}} {{.ROOT_DIR}}/tools/toolchain
 
   shell:
     desc: Interactive shell in the toolchain container

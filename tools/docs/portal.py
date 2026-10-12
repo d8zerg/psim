@@ -27,7 +27,7 @@ import sys
 import yaml
 
 # Pages of the portal besides docs/ (repository-relative).
-EXTRA_PAGES = ["README.md", "contracts/README.md", "contracts/docs/proto-reference.md", "deploy/README.md",
+EXTRA_PAGES = ["README.md", "CONTRIBUTING.md", "SECURITY.md", "contracts/README.md", "contracts/docs/proto-reference.md", "deploy/README.md",
                "web/README.md"]
 # MkDocs treats README.md as the index of its directory; the root one would clash with index.md.
 RENAMED = {"README.md": "project.md"}

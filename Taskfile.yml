@@ -12,17 +12,16 @@ vars:
   # Parallel build jobs; override: task cpp:build JOBS=4.
   JOBS:
     sh: echo $(( $(nproc) / 2 ))
-  # C++ toolchain (ADR-032): built on the oldest target glibc (Debian 12, 2.36); the tag follows
-  # the Dockerfile content. Target platforms run the artifacts as plain OS images.
+  # C++ toolchain (ADR-032): Debian 13 x86_64; the tag follows the Dockerfile content.
+  # The target runtime runs the artifacts in a plain Debian 13 image.
   TOOLCHAIN_IMAGE:
-    sh: echo "psim/toolchain:debian12-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
-  TOOLCHAIN_BASE: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+    sh: echo "psim/toolchain:debian13-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
+  TOOLCHAIN_BASE: debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
   # Build platform of the toolchain; build directories are build/<PLATFORM>/<preset>.
-  PLATFORM: debian12
+  PLATFORM: debian13
   RUNTIME_IMAGES:
     map:
-      debian12: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
-      astra18: registry.astralinux.ru/library/astra/ubi18@sha256:b62fb94cf64384778d8c0c0da04a06a30f4ad0abbe18de969caf102e34faf065
+      debian13: debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
   # Contract tooling image built locally from tools/contracts/image (buf + protoc plugins);
   # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
   # Redoc bundled into the portal image (tools/docs/portal/Dockerfile) for the offline REST reference;
@@ -39,9 +38,9 @@ vars:
   MERMAID_IMAGE: minlag/mermaid-cli:12.0.0@sha256:fa995339034aae7e5cd4f61482248b7f5c51be355b1a6f6eda11a2bbf8401f5f
   STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
   TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
-  # Base of the container images (ADR-034): glibc only (executables link libc++ and libgcc statically),
-  # no OpenSSL, no shell, non-root user.
-  DISTROLESS_IMAGE: gcr.io/distroless/base-nossl-debian12:nonroot@sha256:be40c00dfabd86576d92666e87e406714d5618342de1a0c213ad232de255172e
+  # Base of the container images (ADR-034): Debian 13 with the system C++ runtime,
+  # no shell, non-root user.
+  DISTROLESS_IMAGE: gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
   # Product version (CMakeLists.txt project VERSION) and container images (deploy/images/<name>).
   VERSION:
     sh: sed -n 's/^  VERSION \([0-9.]*\)$/\1/p' {{.ROOT_DIR}}/CMakeLists.txt

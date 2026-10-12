@@ -1,8 +1,7 @@
-# PSIM C++ toolchain image (ADR-032): clang 21 + libc++ 21, CMake, Ninja, Conan 2, ccache, buf, Task.
-# Based on Debian 12 - the oldest target glibc (2.36); artifacts run on Debian 12, Astra Linux 1.8
-# and newer distributions and are verified there by `task cpp:runtime-test`.
+# PSIM C++ toolchain image (ADR-032): clang 21 + system libstdc++, CMake, Ninja, Conan 2, ccache, buf, Task.
+# Build and runtime target: Debian 13 x86_64, verified by `task cpp:runtime-test`.
 # Built by: task toolchain:build (the base image digest is pinned in the root Taskfile)
-ARG BASE=debian:bookworm
+ARG BASE=debian:trixie
 ARG BUF_IMAGE=bufbuild/buf:1.73.0@sha256:75d8f756f0919dcded71e67968a91adfe55fe4dd62c4900c57bbfcd7fe625608
 
 FROM ${BUF_IMAGE} AS buf
@@ -18,18 +17,18 @@ ENV DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 LC_ALL=C.UTF-8
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends \
-      ca-certificates curl gnupg git make patch xz-utils bzip2 unzip file \
+      ca-certificates curl gnupg git make patch xz-utils bzip2 unzip file g++ dpkg-dev \
       python3 python3-venv python3-pip pkg-config perl ccache \
  && rm -rf /var/lib/apt/lists/*
 
-# LLVM from apt.llvm.org (bookworm repository; Astra Linux 1.8 is binary compatible with Debian 12).
+# LLVM tools from apt.llvm.org; C++ uses the standard library shipped by Debian 13.
 RUN curl -fsSL https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm.gpg \
- && echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-${LLVM_VERSION} main" \
+ && echo "deb [signed-by=/usr/share/keyrings/llvm.gpg] https://apt.llvm.org/trixie/ llvm-toolchain-trixie-${LLVM_VERSION} main" \
       > /etc/apt/sources.list.d/llvm.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends \
       clang-${LLVM_VERSION} clang-tidy-${LLVM_VERSION} clang-format-${LLVM_VERSION} clang-tools-${LLVM_VERSION} \
-      lld-${LLVM_VERSION} llvm-${LLVM_VERSION} libc++-${LLVM_VERSION}-dev libc++abi-${LLVM_VERSION}-dev \
+      lld-${LLVM_VERSION} llvm-${LLVM_VERSION} \
       libclang-rt-${LLVM_VERSION}-dev \
  && rm -rf /var/lib/apt/lists/* \
  && for t in clang clang++ clang-tidy clang-format clang-apply-replacements run-clang-tidy ld.lld \

@@ -9,7 +9,7 @@
 #include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <librdkafka/rdkafka.h>
-#include <sys/types.h>
+#include <unistd.h>
 
 #include <algorithm>
 #include <array>

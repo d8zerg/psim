@@ -34,7 +34,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
             }
 
             group "Catalog" {
-                resourceCatalog = container "Resource Catalog" "Локации, устройства, источники, коннекторы, импорт, планы" "C++23, REST"
+                resourceCatalog = container "Resource Catalog" "Локации, устройства, источники, коннекторы, импорт, версии планов, обслуживание" "C++23, REST"
             }
 
             group "Event Processing" {
@@ -82,7 +82,8 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
 
             kafka = container "Kafka" "Центральная шина (KRaft)" "Apache Kafka" "Queue"
             schemaRegistry = container "Schema Registry" "Схемы Protobuf" "Confluent-совместимый API"
-            postgres = container "PostgreSQL" "Схема на сервис" "PostgreSQL 16+" "Database"
+            fileStore = container "Файловое хранилище" "Версии поэтажных планов, закрытый доступ; реализация выбирается на шаге 4.4 (ADR-042)" "S3-compatible API" "Database"
+            postgres = container "PostgreSQL" "Схема на сервис" "PostgreSQL 18.x" "Database"
             clickhouse = container "ClickHouse" "История событий, факты инцидентов, аналитика (ADR-028)" "ClickHouse + Keeper" "Database"
             redis = container "Redis-совместимое хранилище" "Сессии, лимиты, горячие проекции" "Redis API" "Database"
         }
@@ -144,6 +145,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
         psim.apiGateway -> psim.redis "Лимиты"
         psim.projectionService -> psim.redis "Горячие проекции"
         psim.resourceCatalog -> psim.postgres "catalog"
+        psim.resourceCatalog -> psim.fileStore "FileStore: версии планов" "S3 API, HTTPS"
         psim.eventHistory -> psim.clickhouse "events, event_signals, signal_facts" "ClickHouse native, TLS"
         psim.correlationEngine -> psim.postgres "правила"
         psim.incidentService -> psim.postgres "incident"
@@ -197,7 +199,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
 
         # Развёртывание
         single = deploymentEnvironment "Single node" {
-            deploymentNode "Сервер" "Debian 12 / Astra Linux 1.8" "Docker Compose или systemd" {
+            deploymentNode "Сервер" "Debian 13 x86_64" "Docker Compose или systemd" {
                 containerInstance psim.connectorGateway
                 containerInstance psim.resourceCatalog
                 containerInstance psim.normalizer
@@ -215,19 +217,23 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
                 containerInstance psim.postgres
                 containerInstance psim.redis
                 containerInstance psim.clickhouse
+                containerInstance psim.fileStore
             }
         }
 
         cluster = deploymentEnvironment "VM cluster" {
             deploymentNode "Балансировщики" "HAProxy + keepalived" "" 2
-            deploymentNode "infra" "Debian 12 / Astra Linux 1.8" "VM 16 vCPU, 64 ГБ, NVMe" 3 {
+            deploymentNode "Хранилище планов" "S3-совместимый endpoint; HA-топология выбирается на шаге 4.4" "" {
+                containerInstance psim.fileStore
+            }
+            deploymentNode "infra" "Debian 13 x86_64" "VM 16 vCPU, 64 ГБ, NVMe" 3 {
                 containerInstance psim.kafka
                 containerInstance psim.postgres
                 containerInstance psim.redis
                 containerInstance psim.schemaRegistry
                 containerInstance psim.clickhouse
             }
-            deploymentNode "app" "Debian 12 / Astra Linux 1.8" "VM 16 vCPU, 32 ГБ" 2 {
+            deploymentNode "app" "Debian 13 x86_64" "VM 16 vCPU, 32 ГБ" 2 {
                 containerInstance psim.connectorGateway
                 containerInstance psim.resourceCatalog
                 containerInstance psim.normalizer
