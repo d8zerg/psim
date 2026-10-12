@@ -1,6 +1,6 @@
 {
   "realm": "psim",
-  "displayName": "PSIM Platform (local)",
+  "displayName": "Open-Source PSIM Platform (local)",
   "enabled": true,
   "sslRequired": "external",
   "registrationAllowed": false,

@@ -1,4 +1,4 @@
-# Модель угроз PSIM Platform
+# Модель угроз Open-Source PSIM Platform
 
 Версия 0.1 · Шаг плана 0.6 · Статус: черновик
 

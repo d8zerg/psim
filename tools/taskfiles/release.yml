@@ -1,6 +1,6 @@
 # Release artifacts: Debian packages, container images, SBOMs, signatures (step 1.3, ADR-034).
 # Namespace "release"; working directory is the repository root. Artifacts are built from the
-# release preset; a signed release directory is dist/psim-<version>-<commit>/.
+# release preset; a signed release directory is dist/psim-platform-<version>-<commit>/.
 #   PSIM_SIGNING_KEY   Ed25519 private key (PEM) for release:dist; default: a development key in .cache/keys
 #   PSIM_TRUSTED_KEY   public key trusted by release:verify; default: deploy/keys/psim-release.pub.pem when
 #                      present, otherwise the development key
@@ -11,7 +11,7 @@ vars:
   PACKAGES: '{{.RELEASE_BUILD}}/packages'
   COMMIT:
     sh: git rev-parse --short=12 HEAD
-  DIST: dist/psim-{{.VERSION}}-{{.COMMIT}}
+  DIST: dist/psim-platform-{{.VERSION}}-{{.COMMIT}}
   # Keys may live outside the repository: they are mounted read-only into the toolchain container.
   DEV_KEY: '{{.ROOT_DIR}}/.cache/keys/psim-dev.pem'
   SIGNING_KEY: '{{.PSIM_SIGNING_KEY | default .DEV_KEY}}'
@@ -61,12 +61,12 @@ tasks:
           [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
           cp "$bins" "$stage"/
           docker build --quiet --platform linux/amd64 --build-arg BASE={{.DISTROLESS_IMAGE}} \
-            --label org.opencontainers.image.title=psim-{{.ITEM}} \
+            --label org.opencontainers.image.title=psim-platform-{{.ITEM}} \
             --label org.opencontainers.image.version={{.VERSION}} \
             --label org.opencontainers.image.revision={{.COMMIT}} \
-            --label org.opencontainers.image.vendor="PSIM Platform" \
-            -t psim/{{.ITEM}}:{{.VERSION}} "$stage" >/dev/null
-          echo "image: psim/{{.ITEM}}:{{.VERSION}}"
+            --label org.opencontainers.image.vendor="Open-Source PSIM Platform" \
+            -t {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} "$stage" >/dev/null
+          echo "image: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}}"
 
   images:test:
     desc: Run every image read-only, without capabilities, as non-root (SR-24)
@@ -74,10 +74,10 @@ tasks:
     cmds:
       - for: {var: IMAGES}
         cmd: |
-          user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' psim/{{.ITEM}}:{{.VERSION}})
-          case "$user" in ""|0|0:*|root|root:*) echo "FAIL: psim/{{.ITEM}} runs as root" >&2; exit 1 ;; esac
-          docker run --rm --platform linux/amd64 --read-only --cap-drop ALL --security-opt no-new-privileges psim/{{.ITEM}}:{{.VERSION}} >/dev/null
-          echo "ok: psim/{{.ITEM}}:{{.VERSION}} runs read-only, no capabilities, user $user"
+          user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}})
+          case "$user" in ""|0|0:*|root|root:*) echo "FAIL: {{.IMAGE_NAMESPACE}}/{{.ITEM}} runs as root" >&2; exit 1 ;; esac
+          docker run --rm --platform linux/amd64 --read-only --cap-drop ALL --security-opt no-new-privileges {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} >/dev/null
+          echo "ok: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} runs read-only, no capabilities, user $user"
 
   sbom:app:
     desc: SBOM of the components linked into PSIM binaries (Conan host dependencies and the system C++ runtime)
@@ -94,7 +94,7 @@ tasks:
             {{.RELEASE_BUILD}}/app.cdx.json
 
   dist:
-    desc: Build a signed release directory dist/psim-<version>-<commit> (packages, images, SBOMs)
+    desc: Build a signed release directory dist/psim-platform-<version>-<commit> (packages, images, SBOMs)
     preconditions:
       - sh: '[ "{{.ALLOW_DIRTY}}" = "true" ] || [ -z "$(git status --porcelain)" ]'
         msg: 'release from a clean working tree only (ALLOW_DIRTY=true for a trial run)'
@@ -106,13 +106,13 @@ tasks:
       - cp {{.PACKAGES}}/*.deb {{.DIST}}/
       - for: {var: IMAGES}
         cmd: >-
-          docker save -o {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar psim/{{.ITEM}}:{{.VERSION}} &&
-          chmod 644 {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar
+          docker save -o {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} &&
+          chmod 644 {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar
       - for: {var: IMAGES}
         cmd: >-
           docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE}}/trivy":/cache -w /repo
           {{.TRIVY_IMAGE}} image --cache-dir /cache --quiet --format cyclonedx
-          --input {{.DIST}}/psim-{{.ITEM}}_{{.VERSION}}_image.tar
+          --input {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar
           --output {{.RELEASE_BUILD}}/images/{{.ITEM}}/os.cdx.json
       - task: :cpp:_run
         vars:
@@ -123,18 +123,18 @@ tasks:
               python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$deb" deb "$name" {{.VERSION}} "$deb.cdx.json"
             done
             for image in {{.IMAGES}}; do
-              tar={{.DIST}}/psim-${image}_{{.VERSION}}_image.tar
-              python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$tar" image "psim/$image" {{.VERSION}} \
+              tar={{.DIST}}/psim-platform-${image}_{{.VERSION}}_image.tar
+              python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$tar" image "{{.IMAGE_NAMESPACE}}/$image" {{.VERSION}} \
                 "$tar.cdx.json" {{.RELEASE_BUILD}}/images/$image/os.cdx.json
             done
       # Documentation portal (step 1.6): the same archive is published with every release.
       - task: :docs:portal
       - >-
         tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C build/portal/site
-        -cf {{.DIST}}/psim-docs_{{.VERSION}}.tar .
+        -cf {{.DIST}}/psim-platform-docs_{{.VERSION}}.tar .
       - >-
-        SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) {{.PYTHON}} tools/release/sbom.py docs {{.DIST}}/psim-docs_{{.VERSION}}.tar
-        {{.VERSION}} $(git rev-parse HEAD) tools/docs/portal/requirements.txt {{.REDOC_VERSION}} {{.DIST}}/psim-docs_{{.VERSION}}.tar.cdx.json
+        SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) {{.PYTHON}} tools/release/sbom.py docs {{.DIST}}/psim-platform-docs_{{.VERSION}}.tar
+        {{.VERSION}} $(git rev-parse HEAD) tools/docs/portal/requirements.txt {{.REDOC_VERSION}} {{.DIST}}/psim-platform-docs_{{.VERSION}}.tar.cdx.json
       - '{{.PYTHON}} tools/release/sbom.py licenses tools/release/licenses.yaml {{.DIST}}/*.cdx.json'
       - task: sign
 

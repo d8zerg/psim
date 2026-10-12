@@ -9,7 +9,7 @@ afterEach(cleanup);
 describe("console shell", () => {
   it("renders the home page with the connection state", async () => {
     render(<RouterProvider router={createAppRouter()} />);
-    expect(await screen.findByRole("heading", { name: "PSIM Platform" })).toBeDefined();
+    expect(await screen.findByRole("heading", { name: "Open-Source PSIM Platform" })).toBeDefined();
     expect(screen.getByTestId("connection-status").textContent).toBe("offline");
   });
 });

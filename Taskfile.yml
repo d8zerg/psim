@@ -1,9 +1,11 @@
-# PSIM Platform: single entry point for build, generation and checks (ADR-030).
+# Open-Source PSIM Platform: single entry point for build, generation and checks (ADR-030).
 # Install Task: https://taskfile.dev. Run `task` to list tasks.
 version: '3'
 
 vars:
   CACHE: '{{.ROOT_DIR}}/.cache'
+  # Technical namespace for platform build and delivery images.
+  IMAGE_NAMESPACE: psim-platform
   UID:
     sh: id -u
   GID:
@@ -15,7 +17,7 @@ vars:
   # C++ toolchain (ADR-032): Debian 13 x86_64; the tag follows the Dockerfile content.
   # The target runtime runs the artifacts in a plain Debian 13 image.
   TOOLCHAIN_IMAGE:
-    sh: echo "psim/toolchain:debian13-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
+    sh: echo "{{.IMAGE_NAMESPACE}}/toolchain:debian13-$(sha256sum {{.ROOT_DIR}}/tools/toolchain/Dockerfile | cut -c1-12)"
   TOOLCHAIN_BASE: debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
   # Build platform of the toolchain; build directories are build/<PLATFORM>/<preset>.
   PLATFORM: debian13
@@ -29,9 +31,9 @@ vars:
   REDOC_VERSION: 2.5.4
   # Documentation portal image built locally from tools/docs/portal (MkDocs + Material, ADR-038).
   PORTAL_IMAGE:
-    sh: echo "psim/docs-portal:$(cat {{.ROOT_DIR}}/tools/docs/portal/Dockerfile {{.ROOT_DIR}}/tools/docs/portal/requirements.txt | sha256sum | cut -c1-12)"
+    sh: echo "{{.IMAGE_NAMESPACE}}/docs-portal:$(cat {{.ROOT_DIR}}/tools/docs/portal/Dockerfile {{.ROOT_DIR}}/tools/docs/portal/requirements.txt | sha256sum | cut -c1-12)"
   CONTRACTS_TOOLS_IMAGE:
-    sh: echo "psim/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
+    sh: echo "{{.IMAGE_NAMESPACE}}/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
   # Pinned tool and base images: tag for readability, digest for integrity (SR-23). Change here only.
   REDOCLY_IMAGE: redocly/cli:2.58.2@sha256:02511945b4d6dbc1e51138f1c8fcc532ba269bb61aea30d3dcbc9978af61af42
   ASYNCAPI_IMAGE: asyncapi/cli:6.1.0@sha256:2240534054590b3d41d691fdf88e1f7a1e581b9cc4fb1d4af65ca93434aa681b

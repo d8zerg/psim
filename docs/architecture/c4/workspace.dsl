@@ -1,4 +1,4 @@
-workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
+workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
 
     !identifiers hierarchical
 
@@ -19,7 +19,7 @@ workspace "PSIM Platform" "C4-модель MVP. Шаг плана 0.3." {
         webhookReceivers = softwareSystem "Получатели webhook" "Внешние системы" "External"
         observability = softwareSystem "Стек наблюдаемости" "OTel Collector, Prometheus, Grafana, логи, трассировки" "External"
 
-        psim = softwareSystem "PSIM Platform" "Вендор-нейтральная платформа управления ситуациями" {
+        psim = softwareSystem "Open-Source PSIM Platform" "Вендор-нейтральная платформа управления ситуациями" {
 
             connectorSdk = container "Connector SDK" "Библиотека коннекторов: протокол, буфер на диске, команды" "C++ library" "Library"
 

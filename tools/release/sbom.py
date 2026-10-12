@@ -146,8 +146,8 @@ def docs_sbom(path, version, commit, requirements, redoc_version):
                 pins[name] = pinned
     material = f"pkg:pypi/mkdocs-material@{pins['mkdocs-material']}"
     redoc = f"pkg:npm/redoc@{redoc_version}"
-    purl = f"pkg:generic/psim-docs@{version}"
-    component = {"type": "file", "bom-ref": purl, "purl": purl, "name": "psim-docs", "version": version,
+    purl = f"pkg:generic/psim-platform-docs@{version}"
+    component = {"type": "file", "bom-ref": purl, "purl": purl, "name": "psim-platform-docs", "version": version,
                  "hashes": [{"alg": "SHA-256", "content": digest}],
                  "properties": [{"name": "psim:file", "value": os.path.basename(path)},
                                 {"name": "psim:git-commit", "value": commit}]}

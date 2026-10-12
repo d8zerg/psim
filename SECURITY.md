@@ -1,6 +1,6 @@
 # Сообщения о проблемах безопасности
 
-PSIM Platform находится в разработке MVP. Реализованные функции перечислены в [progress.md](docs/progress.md); правила поддержки выпусков - в [политике совместимости](docs/engineering/compatibility-and-support.md).
+Open-Source PSIM Platform находится в разработке MVP. Реализованные функции перечислены в [progress.md](docs/progress.md); правила поддержки выпусков - в [политике совместимости](docs/engineering/compatibility-and-support.md).
 
 ## Поддерживаемые версии
 

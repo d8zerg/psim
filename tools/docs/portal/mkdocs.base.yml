@@ -1,7 +1,7 @@
 # Documentation portal (step 1.6, ADR-038). Template: tools/docs/portal.py adds docs_dir, site_url,
 # repository links and the navigation built from docs/README.md. Built by `task docs:portal`.
-site_name: PSIM Platform
-site_description: Документация PSIM Platform, собранная из репозитория
+site_name: Open-Source PSIM Platform
+site_description: Документация Open-Source PSIM Platform, собранная из репозитория
 strict: true
 use_directory_urls: false
 theme:

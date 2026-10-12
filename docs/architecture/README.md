@@ -1,4 +1,4 @@
-# Архитектура PSIM Platform (arc42)
+# Архитектура Open-Source PSIM Platform (arc42)
 
 Версия 0.1 · Шаг плана 0.3 · Статус: черновик
 
@@ -99,7 +99,7 @@ flowchart TB
     AUD([Аудитор / руководитель])
     ENG([Инженер эксплуатации])
 
-    PSIM[[PSIM Platform]]
+    PSIM[[Open-Source PSIM Platform]]
 
     SEC[(Системы безопасности:<br/>охрана, пожар, СКУД,<br/>видео, периметр)]
     ENGSYS[(Инженерные системы<br/>и IoT)]

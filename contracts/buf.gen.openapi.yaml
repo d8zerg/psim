@@ -17,7 +17,7 @@ plugins:
       - enum_type=string
       - fq_schema_naming=true
       - default_response=false
-      - title=PSIM Platform REST API
+      - title=Open-Source PSIM Platform REST API
       - version=1.0.0
 inputs:
   - directory: proto

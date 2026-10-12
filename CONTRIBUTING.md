@@ -1,4 +1,4 @@
-# Участие в PSIM Platform
+# Участие в Open-Source PSIM Platform
 
 Проект находится в разработке MVP. Перед началом работы ознакомьтесь с [README](README.md), [планом](docs/psim-mvp-development-plan.md), [прогрессом](docs/progress.md) и [архитектурными решениями](docs/adr/README.md).
 

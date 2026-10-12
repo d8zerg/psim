@@ -1,5 +1,5 @@
 {
-  "name": "PSIM toolchain (Debian 13)",
+  "name": "psim-platform toolchain (Debian 13)",
   "build": {
     "dockerfile": "../tools/toolchain/Dockerfile",
     "options": ["--platform", "linux/amd64"],

@@ -138,7 +138,7 @@ def generate_asyncapi(reg):
     return {
         "asyncapi": "3.1.0",
         "info": {
-            "title": "PSIM Platform Kafka topics",
+            "title": "Open-Source PSIM Platform Kafka topics",
             "version": "1.0.0",
             "description": "Generated from contracts/topics/topics.yaml by tools/contracts/contracts.py. "
                            "Every message value is a topic record with an Envelope and a oneof payload "

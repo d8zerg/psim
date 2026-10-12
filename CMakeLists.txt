@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.28)
 
 project(psim
   VERSION 0.1.0
-  DESCRIPTION "PSIM Platform"
+  DESCRIPTION "Open-Source PSIM Platform"
   LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)

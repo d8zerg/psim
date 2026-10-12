@@ -6,7 +6,7 @@ export function HomePage() {
   const status = useConnectionStore((state) => state.status);
   return (
     <main className="mx-auto flex max-w-3xl flex-col gap-6 p-8">
-      <h1 className="text-2xl font-semibold">PSIM Platform</h1>
+      <h1 className="text-2xl font-semibold">Open-Source PSIM Platform</h1>
       <p className="text-muted-foreground">
         Console shell. The incident feed, response scenarios and administration arrive in phase F8.
       </p>

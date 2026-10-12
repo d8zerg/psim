@@ -2,12 +2,12 @@
 # Do not edit; change the proto files or the overlay and run: task contracts:gen.
 openapi: 3.0.3
 info:
-  title: PSIM Platform REST API
+  title: Open-Source PSIM Platform REST API
   version: 1.0.0
   license:
     name: MIT
     url: https://opensource.org/licenses/MIT
-  description: 'PSIM Platform REST API v1. Generated from contracts/proto/psim/api/v1 and this overlay.
+  description: 'Open-Source PSIM Platform REST API v1. Generated from contracts/proto/psim/api/v1 and this overlay.
 
     JSON is the canonical protobuf JSON mapping. Lists use cursor pagination
 

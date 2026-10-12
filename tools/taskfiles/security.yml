@@ -28,7 +28,7 @@ tasks:
       - mkdir -p {{.CACHE}}/trivy
       - for: {var: IMAGES}
         cmd: >-
-          mkdir -p .cache/tmp && docker save -o .cache/tmp/{{.ITEM}}-image.tar psim/{{.ITEM}}:{{.VERSION}} &&
+          mkdir -p .cache/tmp && docker save -o .cache/tmp/{{.ITEM}}-image.tar {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} &&
           {{.TRIVY}} image --cache-dir /cache --quiet --input .cache/tmp/{{.ITEM}}-image.tar
           --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1;
           status=$?; rm -f .cache/tmp/{{.ITEM}}-image.tar; exit $status

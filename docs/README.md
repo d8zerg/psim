@@ -1,4 +1,4 @@
-# Документация PSIM Platform
+# Документация Open-Source PSIM Platform
 
 - [План разработки MVP](psim-mvp-development-plan.md) · [диаграммы](psim-mvp-diagrams.drawio)
 - [Прогресс по шагам плана](progress.md)
