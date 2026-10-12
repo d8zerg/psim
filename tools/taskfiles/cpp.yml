@@ -105,6 +105,7 @@ tasks:
     desc: Build or fetch Conan dependencies (Release, pinned by conan.lock)
     sources:
       - conanfile.py
+      - 'tools/conan/recipes/**'
       - conan.lock
       - '{{.PROFILE}}'
     generates:
@@ -113,6 +114,7 @@ tasks:
       - task: _run
         vars:
           CMD: >-
+            conan export tools/conan/recipes/librdkafka && conan export tools/conan/recipes/libpq &&
             conan install . -pr:a {{.PROFILE}} --lockfile=conan.lock --build=missing
             -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan
 
@@ -120,6 +122,7 @@ tasks:
     desc: Build or fetch Conan dependencies instrumented with ThreadSanitizer (tsan preset)
     sources:
       - conanfile.py
+      - 'tools/conan/recipes/**'
       - conan.lock
       - '{{.PROFILE}}'
       - '{{.PROFILE_TSAN}}'
@@ -129,6 +132,7 @@ tasks:
       - task: _run
         vars:
           CMD: >-
+            conan export tools/conan/recipes/librdkafka && conan export tools/conan/recipes/libpq &&
             conan install . -pr:h {{.PROFILE_TSAN}} -pr:b {{.PROFILE}} --lockfile=conan.lock --build=missing
             -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan-tsan
 
@@ -137,7 +141,7 @@ tasks:
     cmds:
       - task: _run
         vars:
-          CMD: conan lock create . -pr:a {{.PROFILE}} --lockfile-out=conan.lock
+          CMD: conan export tools/conan/recipes/librdkafka && conan export tools/conan/recipes/libpq && conan lock create . -pr:a {{.PROFILE}} --lockfile="" --lockfile-out=conan.lock
 
   reproducible:
     desc: Build release twice in different directories without ccache and compare artifacts (FF-13)
@@ -153,7 +157,7 @@ tasks:
             python3 -I tools/cpp/compare_builds.py build/{{.PLATFORM}}/repro-a build/{{.PLATFORM}}/repro-b
 
   runtime-test:
-    desc: 'Run built tests and psimctl of PRESET on Debian 13 x86_64 (RUNTIMES="debian13")'
+    desc: 'Run built tests, psimctl and the migration runner of PRESET on Debian 13 x86_64 (RUNTIMES="debian13")'
     vars:
       PRESET: '{{.PRESET | default "debug"}}'
       RUNTIMES: '{{.RUNTIMES | default "debian13"}}'
@@ -190,6 +194,7 @@ tasks:
           docker run --rm --platform linux/amd64 -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
             -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
+            -e PSIM_TEST_POSTGRES=postgres -e PSIM_TEST_POSTGRES_FAULT=toxiproxy \
             -e PSIM_TEST_TOXIPROXY=toxiproxy:8474 -e PSIM_TEST_REGISTRY=http://registry:8080/apis/ccompat/v7 \
             -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/home":/cache/home \
             -w /repo {{.TOOLCHAIN_IMAGE}} bash -c 'eval "$PSIM_CMD"'

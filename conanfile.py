@@ -48,6 +48,8 @@ class PsimConan(ConanFile):
         self.requires("json-schema-validator/2.4.0")
         # Kafka layer (step 2.3, ADR-041): KIP-848 consumer protocol and transactions.
         self.requires("librdkafka/2.14.2")
+        # PostgreSQL layer (step 2.4, ADR-014): static libpq with TLS.
+        self.requires("libpq/18.6")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

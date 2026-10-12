@@ -44,6 +44,7 @@ tasks:
         vars:
           CMD: >-
             cd {{.SRC}} &&
+            for recipe in libpq librdkafka; do if [ -f tools/conan/recipes/$recipe/conanfile.py ]; then conan export tools/conan/recipes/$recipe >/dev/null; fi; done &&
             conan install . -pr:a /repo/tools/conan/profiles/clang21-libstdcxx --lockfile=conan.lock --build=missing
             -c tools.build:jobs={{.JOBS}} -of build/{{.PLATFORM}}/conan >/dev/null &&
             cmake --preset release >/dev/null && cmake --build --preset release -j {{.JOBS}} >/dev/null &&
@@ -85,3 +86,15 @@ tasks:
           done
       # A clean tree's results become the baseline of this commit once it is pushed.
       - cmd: '[ -n "$(git status --porcelain)" ] || cp {{.CURRENT}} {{.BENCH_DIR}}/{{.HEAD}}.json'
+
+  pg:
+    desc: 'PostgreSQL COPY and pipeline throughput, query p50/p99 against the local environment (ADR-014)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: build/{{.PLATFORM}}/release/libs/platform/pg/psim_pg_throughput

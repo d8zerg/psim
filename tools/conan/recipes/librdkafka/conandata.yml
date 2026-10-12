@@ -1,0 +1,12 @@
+patches:
+  2.14.2:
+  - patch_file: patches/0005-Atomic-consumer-group-flags.patch
+    patch_description: Synchronize shared heartbeat flags with application polling
+    patch_type: portability
+  - patch_file: patches/0001-Change-library-names-1-9-1.patch
+  - patch_file: patches/0002-Change-library-targets-and-result-variables-2-5-0.patch
+  - patch_file: patches/0004-Fix_compilation_with_CMake_and_without_CURL.patch
+sources:
+  2.14.2:
+    sha256: d7eec9c31c817fa44402f679c252dfbf97e4c338a849a25c3579a31fd127beb8
+    url: https://github.com/edenhill/librdkafka/archive/v2.14.2.tar.gz

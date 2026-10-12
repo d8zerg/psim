@@ -33,6 +33,7 @@ find_package(benchmark REQUIRED CONFIG)
 add_subdirectory(contracts)
 add_subdirectory(libs)
 add_subdirectory(tools/psimctl)
+add_subdirectory(tools/pg-migrate)
 add_subdirectory(tools/service-template)
 add_subdirectory(services)
 

@@ -6,3 +6,5 @@ add_subdirectory(platform/observability)
 add_subdirectory(platform/runtime)
 add_subdirectory(platform/async)
 add_subdirectory(platform/kafka)
+
+add_subdirectory(platform/pg)

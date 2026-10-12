@@ -4,6 +4,24 @@
 version: '3'
 
 tasks:
+  pg:sanitizers:
+    desc: 'PostgreSQL component tests with ASan+UBSan and TSan against the environment (FF-11, ADR-014)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: asan}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/asan -L '^component$' -R '^Pg' -j 1 --output-on-failure
+      - task: :cpp:build
+        vars: {PRESET: tsan}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/tsan -L '^component$' -R '^Pg' -j 1 --output-on-failure
+
   component:
     desc: 'Component tests of adapters against the environment containers, with coverage of the adapter modules (TS-03, FF-12)'
     vars:

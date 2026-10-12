@@ -40,7 +40,8 @@ tasks:
       - for: {var: RUNTIMES}
         cmd: >-
           docker run --rm --platform linux/amd64 -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
-          sh -c 'dpkg -i /packages/*.deb >/dev/null && psimctl version && dpkg -r psim-psimctl >/dev/null
+          sh -c 'dpkg -i /packages/*.deb >/dev/null && psimctl version &&
+          (psim-pg-migrate >/dev/null 2>&1; [ "$?" = 2 ]) && dpkg -r psim-psimctl psim-psim-pg-migrate >/dev/null
           && echo "ok: packages install, run and remove on {{.ITEM}}"'
 
   images:
@@ -85,6 +86,7 @@ tasks:
         vars:
           CMD: >-
             mkdir -p {{.RELEASE_BUILD}} &&
+            conan export tools/conan/recipes/librdkafka >/dev/null && conan export tools/conan/recipes/libpq >/dev/null &&
             conan graph info . -pr:a tools/conan/profiles/clang21-libstdcxx --lockfile=conan.lock --format=json
             > {{.RELEASE_BUILD}}/conan-graph.json 2>/dev/null &&
             SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) python3 -I tools/release/sbom.py app

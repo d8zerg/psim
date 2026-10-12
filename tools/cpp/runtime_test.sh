@@ -1,6 +1,6 @@
 #!/bin/sh
 # Runs built artifacts on a target platform image without the toolchain (ADR-032):
-# every test executable (*_test) and `psimctl version`, with the distribution's shared libraries.
+# Test executables (*_test), psimctl and the migration runner use the distribution's shared libraries.
 # Invoked by `task cpp:runtime-test`.
 # Usage: runtime_test.sh <platform-name> <build-dir>
 set -eu
@@ -21,3 +21,13 @@ if ldd "$psimctl" | grep -q 'not found'; then
   exit 1
 fi
 echo "ok: psimctl shared-library dependencies resolve on $platform"
+migrator=$(find "$build" -path '*/CMakeFiles' -prune -o -type f -name psim-pg-migrate -print | head -1)
+[ -n "$migrator" ] || { echo "migration runner missing in $build" >&2; exit 1; }
+status=0
+"$migrator" >/tmp/psim-migrate.log 2>&1 || status=$?
+[ "$status" = 2 ] || { cat /tmp/psim-migrate.log; echo "FAIL: migration runner on $platform" >&2; exit 1; }
+if ldd "$migrator" | grep -q 'not found'; then
+  echo "FAIL: migration runner has unresolved shared-library dependencies" >&2
+  exit 1
+fi
+echo "ok: psim-pg-migrate runs and shared-library dependencies resolve on $platform"

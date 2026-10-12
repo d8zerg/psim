@@ -43,12 +43,21 @@
 |---|---|---|---|
 | 2.1 | Runtime сервиса | утверждён | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
 | 2.2 | Асинхронная модель исполнения | утверждён | [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md); `libs/platform/async` (шарды, `Clock`/`ManualClock`, `with_deadline`, `Credits`, `Semaphore`, `BoundedQueue`, `BlockingPool`), секция `runtime` конфигурации; B-02 `task bench:async` |
-| 2.3 | Слой Kafka | готов | [ADR-041](adr/0041-kafka-layer.md); `libs/platform/kafka` (идемпотентный и транзакционный продюсер, потребитель, `Processor` ALO/EOS-K с повторами, DLQ и предохранителем, `ProtobufSerde` и клиент Schema Registry, трассировка в заголовках, метрики); TS-03 `task test:component` (в т. ч. SIGKILL обработчика), FF-04 `task contracts:registry-compat`, B-01 `task bench:kafka` (776 тыс. / 1,26 млн сообщ./с) |
-| 2.4 | Слой PostgreSQL | не начат | |
+| 2.3 | Слой Kafka | утверждён | [ADR-041](adr/0041-kafka-layer.md); `libs/platform/kafka` (идемпотентный и транзакционный продюсер, потребитель, `Processor` ALO/EOS-K с повторами, DLQ и предохранителем, `ProtobufSerde` и клиент Schema Registry, трассировка в заголовках, метрики); TS-03 `task test:component` (в т. ч. SIGKILL обработчика), FF-04 `task contracts:registry-compat`, B-01 `task bench:kafka` (776 тыс. / 1,26 млн сообщ./с) |
+| 2.4 | Слой PostgreSQL | готов | [ADR-014](adr/0014-postgresql-async-driver.md); [libs/platform/pg](../libs/platform/pg/README.md) (libpq 18.6 + Asio, pipeline, COPY, уведомления, пул, транзакции, единица работы, expand/contract, inbox/outbox и реле), CLI `psim-pg-migrate`; `task test:component`, `task test:pg:sanitizers`, `task bench:pg` |
 | 2.5 | Слой Redis | не начат | |
 | 2.6 | Безопасность платформы | не начат | |
 | 2.7 | Детерминированный симуляционный стенд | не начат | |
 | 2.8 | Слой ClickHouse | не начат | |
+
+### Проверка шага 2.4
+
+- 4 модульных и 17 компонентных сценариев PostgreSQL проходят. Проверены отмена, дедлайны, read-only endpoint, сетевой разрыв и восстановление; SIGKILL до COMMIT, после COMMIT и после подтверждения Kafka сохраняет зафиксированные события и исключает повторные эффекты inbox.
+- 101 тест проходит под ASan/UBSan и TSan; компонентные сценарии PostgreSQL проходят под обоими санитайзерами. Все 26 компонентных сценариев Kafka и PostgreSQL проходят под TSan после атомарного патча librdkafka из ADR-041. Проверка PostgreSQL под санитайзерами включена в `env:ci-test`; изменения модуля запускают этап окружения CI.
+- Покрытие PostgreSQL - 79,01% при пороге 75%. clang-tidy, форматирование, архитектурные ограничения и проверка зависимостей/лицензий проходят. CLI проверен повторным expand/contract и поставляется отдельным DEB-пакетом; пакеты устанавливаются, запускаются и удаляются на Debian 13 x86_64.
+- `task bench:pg`: COPY - около 1,08 млн строк/с, pipeline - 55,5 тыс. строк/с, запрос p50/p99 - 0,075/0,131 мс на локальном окружении. Проверка B-01 Kafka после патча также проходит: 791 тыс. / 1,08 млн сообщ./с при пороге 200 тыс.
+
+Шаг 2.4 ждёт утверждения владельца. Проверка полноценного HA-кластера с Patroni и переключением primary относится к шагу 9.1, как указано в ADR-014.
 
 ## Ф3-Ф11
 
