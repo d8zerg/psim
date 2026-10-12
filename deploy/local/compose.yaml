@@ -151,6 +151,58 @@ services:
       timeout: 5s
       retries: 40
 
+  # Isolated Sentinel fixture for adapter tests; the default local topology stays standalone.
+  valkey-primary:
+    image: &valkey_image valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
+    profiles: [valkey-ha]
+    command: [valkey-server, --requirepass, psim-dev-valkey, --masterauth, psim-dev-valkey, --replica-announce-ip, valkey-primary]
+    healthcheck: &valkey_health
+      test: [CMD-SHELL, "valkey-cli -a psim-dev-valkey --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  valkey-replica-1:
+    image: *valkey_image
+    profiles: [valkey-ha]
+    command: [valkey-server, --requirepass, psim-dev-valkey, --masterauth, psim-dev-valkey, --replicaof, valkey-primary, '6379', --replica-announce-ip, valkey-replica-1]
+    healthcheck: *valkey_health
+    depends_on: {valkey-primary: {condition: service_healthy}}
+  valkey-replica-2:
+    image: *valkey_image
+    profiles: [valkey-ha]
+    command: [valkey-server, --requirepass, psim-dev-valkey, --masterauth, psim-dev-valkey, --replicaof, valkey-primary, '6379', --replica-announce-ip, valkey-replica-2]
+    healthcheck: *valkey_health
+    depends_on: {valkey-primary: {condition: service_healthy}}
+  valkey-sentinel-1: &valkey_sentinel
+    image: *valkey_image
+    profiles: [valkey-ha]
+    entrypoint: [sh, /config/sentinel.sh]
+    volumes: [./config/valkey/sentinel.sh:/config/sentinel.sh:ro]
+    tmpfs: [/data]
+    depends_on: {valkey-replica-1: {condition: service_healthy}, valkey-replica-2: {condition: service_healthy}}
+    healthcheck:
+      test: [CMD-SHELL, "valkey-cli -p 26379 -a psim-dev-sentinel --no-auth-warning SENTINEL CKQUORUM psim | grep -q OK"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  valkey-sentinel-2:
+    <<: *valkey_sentinel
+  valkey-sentinel-3:
+    <<: *valkey_sentinel
+
+  valkey-tls:
+    image: *valkey_image
+    profiles: [valkey-ha]
+    command: [valkey-server, --port, '0', --tls-port, '6380', --requirepass, psim-dev-valkey,
+              --tls-cert-file, /tls/server.pem, --tls-key-file, /tls/server.key, --tls-ca-cert-file, /tls/ca.pem,
+              --tls-auth-clients, 'yes']
+    volumes: [../../.cache/valkey-tls:/tls:ro]
+    healthcheck:
+      test: [CMD-SHELL, "valkey-cli --tls --cacert /tls/ca.pem --cert /tls/client.pem --key /tls/client.key -p 6380 -a psim-dev-valkey --no-auth-warning ping | grep -q PONG"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
   # Identity provider with the pre-configured realm psim (SR-02).
   keycloak:
     image: quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc

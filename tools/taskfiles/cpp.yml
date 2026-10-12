@@ -195,6 +195,8 @@ tasks:
             -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
             -e PSIM_TEST_POSTGRES=postgres -e PSIM_TEST_POSTGRES_FAULT=toxiproxy \
+            -e PSIM_TEST_REDIS=valkey -e PSIM_TEST_REDIS_FAULT=toxiproxy \
+            -e PSIM_TEST_SENTINELS=valkey-sentinel-1,valkey-sentinel-2,valkey-sentinel-3 \
             -e PSIM_TEST_TOXIPROXY=toxiproxy:8474 -e PSIM_TEST_REGISTRY=http://registry:8080/apis/ccompat/v7 \
             -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/home":/cache/home \
             -w /repo {{.TOOLCHAIN_IMAGE}} bash -c 'eval "$PSIM_CMD"'

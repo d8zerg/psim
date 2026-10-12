@@ -6,8 +6,8 @@ vars:
   TOOLS: '{{.ROOT_DIR}}/tools/docs'
   MERMAID_OUT: '{{.CACHE}}/mermaid'
   # Markdown with links to check; text sources with typography rules.
-  LINK_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts/README.md {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md'
-  TEXT_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts {{.ROOT_DIR}}/tools {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/Taskfile.yml'
+  LINK_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts/README.md {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/libs/platform/redis/README.md'
+  TEXT_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts {{.ROOT_DIR}}/tools {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/libs/platform/redis/README.md {{.ROOT_DIR}}/Taskfile.yml'
 
 tasks:
   check:

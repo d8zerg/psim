@@ -44,8 +44,8 @@
 | 2.1 | Runtime сервиса | утверждён | [ADR-039](adr/0039-service-runtime.md); `libs/platform/{errors,log,config,observability,runtime}`, шаблон `tools/service-template`, `task service:new`; FF-06 `task test:observability` |
 | 2.2 | Асинхронная модель исполнения | утверждён | [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md); `libs/platform/async` (шарды, `Clock`/`ManualClock`, `with_deadline`, `Credits`, `Semaphore`, `BoundedQueue`, `BlockingPool`), секция `runtime` конфигурации; B-02 `task bench:async` |
 | 2.3 | Слой Kafka | утверждён | [ADR-041](adr/0041-kafka-layer.md); `libs/platform/kafka` (идемпотентный и транзакционный продюсер, потребитель, `Processor` ALO/EOS-K с повторами, DLQ и предохранителем, `ProtobufSerde` и клиент Schema Registry, трассировка в заголовках, метрики); TS-03 `task test:component` (в т. ч. SIGKILL обработчика), FF-04 `task contracts:registry-compat`, B-01 `task bench:kafka` (776 тыс. / 1,26 млн сообщ./с) |
-| 2.4 | Слой PostgreSQL | готов | [ADR-014](adr/0014-postgresql-async-driver.md); [libs/platform/pg](../libs/platform/pg/README.md) (libpq 18.6 + Asio, pipeline, COPY, уведомления, пул, транзакции, единица работы, expand/contract, inbox/outbox и реле), CLI `psim-pg-migrate`; `task test:component`, `task test:pg:sanitizers`, `task bench:pg` |
-| 2.5 | Слой Redis | не начат | |
+| 2.4 | Слой PostgreSQL | утверждён | [ADR-014](adr/0014-postgresql-async-driver.md); [libs/platform/pg](../libs/platform/pg/README.md) (libpq 18.6 + Asio, pipeline, COPY, уведомления, пул, транзакции, единица работы, expand/contract, inbox/outbox и реле), CLI `psim-pg-migrate`; `task test:component`, `task test:pg:sanitizers`, `task bench:pg` |
+| 2.5 | Слой Redis | готов | [ADR-015](adr/0015-redis-client-and-role.md); [libs/platform/redis](../libs/platform/redis/README.md) (Boost.Redis 1.90, RESP3, TLS/mTLS, Sentinel, ограниченный пул, байты/Protobuf, кэш, атомарные лимиты, TTL-сессии и Pub/Sub); `task test:redis`, `task test:redis:sanitizers`, `task test:component` |
 | 2.6 | Безопасность платформы | не начат | |
 | 2.7 | Детерминированный симуляционный стенд | не начат | |
 | 2.8 | Слой ClickHouse | не начат | |
@@ -57,7 +57,16 @@
 - Покрытие PostgreSQL - 79,01% при пороге 75%. clang-tidy, форматирование, архитектурные ограничения и проверка зависимостей/лицензий проходят. CLI проверен повторным expand/contract и поставляется отдельным DEB-пакетом; пакеты устанавливаются, запускаются и удаляются на Debian 13 x86_64.
 - `task bench:pg`: COPY - около 1,08 млн строк/с, pipeline - 55,5 тыс. строк/с, запрос p50/p99 - 0,075/0,131 мс на локальном окружении. Проверка B-01 Kafka после патча также проходит: 791 тыс. / 1,08 млн сообщ./с при пороге 200 тыс.
 
-Шаг 2.4 ждёт утверждения владельца. Проверка полноценного HA-кластера с Patroni и переключением primary относится к шагу 9.1, как указано в ADR-014.
+Шаг 2.4 утверждён владельцем. Проверка полноценного HA-кластера с Patroni и переключением primary относится к шагу 9.1, как указано в ADR-014.
+
+### Проверка шага 2.5
+
+- 5 модульных и 15 компонентных сценариев Valkey проходят. Проверены бинарные параметры и pipeline, исключение чувствительных данных из ошибок, ограничения запросов/ответов, отмена и дедлайны без автоматического повторения записи, ограниченный пул, TTL, Protobuf, изоляция тенантов, атомарные лимиты и токены поколения сессий. Уведомление проверено настоящим RESP3-подписчиком.
+- Стенд primary + 2 реплики + 3 Sentinel начинает каждый прогон с чистой топологии. После остановки ответов primary Sentinel автоматически повышает реплику, а пул обнаруживает её и возобновляет записи под нагрузкой. Отдельно проходит восстановление после разрыва через Toxiproxy.
+- TLS/mTLS проверены с доверенным CA и сертификатом клиента, а также с неверным именем сервера, недоверенным CA и отсутствующим клиентским сертификатом. Все 106 тестов без внешней инфраструктуры проходят под ASan/UBSan и TSan; 15 компонентных сценариев Valkey проходят под обоими санитайзерами.
+- Общая проверка всех 41 компонентного сценария Kafka, PostgreSQL и Valkey проходит. Покрытие нового модуля - 86,27% при пороге 75%. clang-tidy, форматирование, архитектурные ограничения, зависимости/лицензии, документация и запуск на Debian 13 x86_64 проверены. Компонентные проверки Valkey под санитайзерами подключены к `env:ci-test`; изменение модуля включает этап окружения CI.
+
+Шаг 2.5 ждёт утверждения владельца. Топология MVP следует ADR-015: standalone или primary с репликами под Sentinel. Шардирование Cluster не входит в MVP; эксплуатационное размещение узлов, ACL и ротация сертификатов относятся к шагам 2.6 и 9.1.
 
 ## Ф3-Ф11
 

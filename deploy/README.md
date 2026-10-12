@@ -24,3 +24,9 @@ task env:ci-test         # окружение конвейера: с нуля, �
 - Сервисы и тесты в сети Compose обращаются к компонентам по именам (`kafka-1:19092`, `postgres:5432`, `clickhouse:9000`, `valkey:6379`, `registry:8080`, `keycloak:8080`, `otel-collector:4317`); для сетевых сбоев - через `toxiproxy` (Kafka `toxiproxy:29092`, PostgreSQL `:15432`, Valkey `:16379`, ClickHouse `:19000`).
 - Топики Kafka создаются из реестра [`contracts/topics/topics.yaml`](../contracts/topics/topics.yaml); автосоздание выключено.
 - Учётные данные `psim-dev-*` - только для разработки.
+
+## Стенд Valkey HA
+
+`task env:valkey:ha` запускает профиль `valkey-ha`: отдельный primary, две реплики, три Sentinel с quorum 2 и mTLS-endpoint `valkey-tls:6380`. Каждый запуск пересоздаёт только этот тестовый профиль с чистой топологией; сертификаты генерируются в игнорируемом `.cache/valkey-tls`. Его автоматически используют `task test:redis`, `task test:redis:sanitizers` и `task test:component`. Профиль не публикует порты и изолирован от обычного Valkey. Sentinel использует пароль `psim-dev-sentinel`; хранилище - `psim-dev-valkey`. `env:down` останавливает также HA-контейнеры, `env:reset` удаляет их состояние.
+
+Тесты используют `PSIM_TEST_REDIS`, `PSIM_TEST_REDIS_FAULT` и список `PSIM_TEST_SENTINELS` из `cpp:_run_env`. В производственном кластере размещение и TLS определяются [ADR-015](../docs/adr/0015-redis-client-and-role.md) и фазой Ф9.

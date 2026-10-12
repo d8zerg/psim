@@ -72,4 +72,5 @@
 - Runtime сервиса: конфигурация, логи, метрики, трассировка, health, остановка с дренированием, шаблон сервиса - [ADR-039](adr/0039-service-runtime.md), [сервисы](../services/README.md)
 - Асинхронная модель: шарды, корутины, дедлайны, противодавление, пул блокирующих операций - [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md)
 - Слой Kafka: продюсер, транзакции, потребитель, обработчик с повторами и DLQ, реестр схем - [ADR-041](adr/0041-kafka-layer.md)
+- Слой Valkey/Redis: RESP3, Sentinel, кэш, лимиты и сессии - [ADR-015](adr/0015-redis-client-and-role.md), [интерфейсы и примеры](../libs/platform/redis/README.md)
 - Слой PostgreSQL: libpq, пул, транзакции, миграции и inbox/outbox - [ADR-014](adr/0014-postgresql-async-driver.md), [интерфейсы и примеры](../libs/platform/pg/README.md)

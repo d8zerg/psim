@@ -8,3 +8,4 @@ add_subdirectory(platform/async)
 add_subdirectory(platform/kafka)
 
 add_subdirectory(platform/pg)
+add_subdirectory(platform/redis)
