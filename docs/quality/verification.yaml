@@ -2,7 +2,7 @@
 # Rendered to verification-matrix.md by `task docs:verification:gen`; checked by `task docs:verification`.
 #
 # methods.kind: test, load, soak, chaos, benchmark, fitness, security, manual
-# methods.gate: pr (blocks merge), nightly (blocks next release), release (blocks release)
+# methods.gate: pr (blocks merge), nightly (blocks next release), release (blocks release), on-demand (manual launch)
 # methods.barrier: automated (pass/fail without a person) or manual (documented procedure and sign-off)
 # methods.task: Task command that runs the method (introduced by the listed plan steps)
 # methods.purpose: required when the method is not linked to a goal or a scenario
@@ -69,18 +69,18 @@ methods:
   - id: TS-07
     kind: test
     name: Симуляция конвейера, короткий прогон
-    criteria: 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 дубликатов
-    env: E-CI
-    gate: pr
+    criteria: Ручной запуск 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 повторных эффектов; до 5.2 проверяется эталонная цепочка доставки (ADR-044)
+    env: E-DEV
+    gate: on-demand
     barrier: automated
     task: task sim:short
     steps: ['2.7', '5.2']
   - id: TS-08
     kind: test
     name: Симуляция конвейера, длинный прогон
-    criteria: 10 000 прогонов; любая ошибка воспроизводится по зерну и сохраняется как регрессионный тест
-    env: E-CI
-    gate: nightly
+    criteria: Ручной запуск 10 000 прогонов; ошибка воспроизводится по зерну, версии модели и параметрам; трасса сохраняется для регрессионного теста (ADR-044)
+    env: E-DEV
+    gate: on-demand
     barrier: automated
     task: task sim:long
     steps: ['2.7', '5.2']

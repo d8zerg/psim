@@ -10,3 +10,4 @@ add_subdirectory(platform/kafka)
 
 add_subdirectory(platform/pg)
 add_subdirectory(platform/redis)
+add_subdirectory(sim EXCLUDE_FROM_ALL)

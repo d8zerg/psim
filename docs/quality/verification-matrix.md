@@ -1,21 +1,21 @@
 # Матрица верификации
 
 Сгенерировано из [verification.yaml](verification.yaml) задачей `task docs:verification:gen`. Не редактировать вручную.
-Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск.
+Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск; `on-demand` запускается вручную и не входит в CI.
 
 ## 1. Сводка
 
-| Вид | pr | nightly | release | Всего |
-|---|---|---|---|---|
-| Наборы тестов | 9 | 14 | 0 | 23 |
-| Нагрузка | 0 | 3 | 6 | 9 |
-| Длительная нагрузка | 0 | 0 | 1 | 1 |
-| Хаос и отказы | 0 | 5 | 9 | 14 |
-| Бенчмарки | 4 | 1 | 0 | 5 |
-| Fitness functions | 18 | 1 | 2 | 21 |
-| Безопасность | 3 | 2 | 3 | 8 |
-| Ручные процедуры | 0 | 0 | 5 | 5 |
-| **Всего** | 34 | 26 | 26 | **86** |
+| Вид | pr | nightly | release | on-demand | Всего |
+|---|---|---|---|---|---|
+| Наборы тестов | 8 | 13 | 0 | 2 | 23 |
+| Нагрузка | 0 | 3 | 6 | 0 | 9 |
+| Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
+| Хаос и отказы | 0 | 5 | 9 | 0 | 14 |
+| Бенчмарки | 4 | 1 | 0 | 0 | 5 |
+| Fitness functions | 18 | 1 | 2 | 0 | 21 |
+| Безопасность | 3 | 2 | 3 | 0 | 8 |
+| Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
+| **Всего** | 33 | 25 | 26 | 2 | **86** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -25,8 +25,8 @@
 | G-02 | Задержка событие -> сигнал | p99 ≤ 300 мс | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
 | G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (nightly), FF-05 (release) |
 | G-04 | Задержка отклика REST API | p99 ≤ 200 мс для операций чтения консоли | L-05 (release) |
-| G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (pr), TS-08 (nightly), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
-| G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (pr), TS-08 (nightly), C-02 (nightly), C-11 (release) |
+| G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
+| G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), C-11 (release) |
 | G-07 | RTO, кластерная топология | ≤ 60 с при отказе любого одного узла | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release) |
 | G-08 | RPO для инцидентов | 0 в кластерной топологии | C-03 (release), C-11 (release) |
 | G-09 | Обновление | Без простоя обработки в кластерной топологии | C-12 (release) |
@@ -53,12 +53,12 @@
 | [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly) |
 | [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), L-07 (nightly), TS-18 (nightly) |
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
-| [S4](../product/acceptance-spec.md) | TS-07 (pr), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
-| [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (pr), TS-08 (nightly), C-02 (nightly) |
+| [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
+| [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly) |
 | [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly) |
 | [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly) |
 | [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly) |
-| [S9](../product/acceptance-spec.md) | TS-08 (nightly), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly) |
+| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly) |
 | [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly) |
 | [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
@@ -76,8 +76,8 @@
 | TS-04 | Проверка контрактов | task contracts:check зелёный - формат, линтер, buf breaking, OpenAPI и AsyncAPI валидны и актуальны, согласованность реестров. | E-CI | pr | `task contracts:check` | 0.5, 1.3 |
 | TS-05 | Контрактные тесты REST против OpenAPI | Schemathesis по psim-api-v1.yaml - ответы соответствуют схеме, коды ошибок из каталога, RFC 9457. | E-CI | nightly | `task test:api-contract` | 7.1 |
 | TS-06 | Тестовый набор соответствия протоколу коннекторов | Эталонные коннекторы и симулятор проходят весь набор; обрыв связи 10 мин без потерь. | E-CI | pr | `task connectors:conformance` | 4.1, 4.3 |
-| TS-07 | Симуляция конвейера, короткий прогон | 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 дубликатов. | E-CI | pr | `task sim:short` | 2.7, 5.2 |
-| TS-08 | Симуляция конвейера, длинный прогон | 10 000 прогонов; любая ошибка воспроизводится по зерну и сохраняется как регрессионный тест. | E-CI | nightly | `task sim:long` | 2.7, 5.2 |
+| TS-07 | Симуляция конвейера, короткий прогон | Ручной запуск 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 повторных эффектов; до 5.2 проверяется эталонная цепочка доставки (ADR-044). | E-DEV | on-demand | `task sim:short` | 2.7, 5.2 |
+| TS-08 | Симуляция конвейера, длинный прогон | Ручной запуск 10 000 прогонов; ошибка воспроизводится по зерну, версии модели и параметрам; трасса сохраняется для регрессионного теста (ADR-044). | E-DEV | on-demand | `task sim:long` | 2.7, 5.2 |
 | TS-09 | Сквозной смоук-тест конвейера в Docker Compose | Событие симулятора порождает инцидент, видимый через API и realtime; одна трассировка на весь путь. | E-CI | pr | `task test:smoke` | 3.1 |
 | TS-10 | Приёмочные API-тесты сценариев | Сценарии acceptance-spec.md, выполнимые через API и протокол коннекторов, включая негативные проверки. | E-CI | nightly | `task test:acceptance` | 3.1, 11.3 |
 | TS-11 | Сквозные UI-тесты Playwright | Сценарии S1, S2, S6-S10, S13 через интерфейс; замер событие -> отрисовка. | E-CI | nightly | `task web:e2e` | 8.3, 8.4, 8.5, 8.6 |

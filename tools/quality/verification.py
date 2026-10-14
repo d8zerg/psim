@@ -25,7 +25,7 @@ KIND_NAMES = {
     "benchmark": "Бенчмарки", "fitness": "Fitness functions", "security": "Безопасность",
     "manual": "Ручные процедуры",
 }
-GATES = ["pr", "nightly", "release"]
+GATES = ["pr", "nightly", "release", "on-demand"]
 BARRIERS = {"automated", "manual"}
 ENVS = {"E-DEV", "E-CI", "E-LOCAL", "E-CLUSTER"}
 
@@ -141,7 +141,7 @@ def render(root, reg):
     w("# Матрица верификации")
     w("")
     w("Сгенерировано из [verification.yaml](verification.yaml) задачей `task docs:verification:gen`. Не редактировать вручную.")
-    w("Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск.")
+    w("Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск; `on-demand` запускается вручную и не входит в CI.")
     w("")
     w("## 1. Сводка")
     w("")

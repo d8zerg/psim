@@ -33,7 +33,8 @@ Open-Source PSIM Platform предназначена для служб безо�
 | [Слой PostgreSQL](libs/platform/pg/README.md): асинхронные запросы, пул, транзакции, миграции, inbox/outbox | Шаг 2.4 утверждён |
 | [Слой Valkey/Redis](libs/platform/redis/README.md): Sentinel, пул, кэш, лимиты, сессии и уведомления | Шаг 2.5 утверждён |
 | [Безопасность платформы](libs/platform/security/README.md): TLS/mTLS, JWT/JWKS, секреты и сертификаты | Шаг 2.6 утверждён |
-| Адаптер ClickHouse и симуляционный стенд | Следующие шаги Ф2, не начаты |
+| [Симуляционный стенд](libs/sim/README.md): управляемое время, модели Kafka и inbox/outbox, сбои и replay | Шаг 2.7 готов к утверждению; ручной запуск через `sim:*` |
+| Адаптеры ClickHouse и S3-совместимого хранилища | Следующие шаги Ф2, не начаты |
 | Доменные сервисы, интеграции, операторская консоль и эксплуатационные функции | Ф3-Ф11, запланированы |
 
 Веб-приложение сейчас представляет собой оболочку с дизайн-системой и клиентами API. `task env:up` запускает инфраструктуру разработки и интеграционных тестов. Возможности целевого продукта перечислены ниже; готовность их реализации отслеживается в [progress.md](docs/progress.md).
@@ -168,6 +169,8 @@ task docs:serve              # портал: http://localhost:8000
 | `task cpp:format` / `task cpp:lint` | Формат C++ и clang-tidy |
 | `task cpp:test:sanitizers` / `task cpp:coverage` | ASan+UBSan, TSan и контроль покрытия |
 | `task cpp:runtime-test` | Запуск артефактов на Debian 13 x86_64 без toolchain |
+| `task sim:test` / `task sim:short` / `task sim:long` | Ручные проверки стенда и 200/10 000 прогонов; в CI не входят |
+| `task sim:replay SEED=42` | Воспроизведение одного зерна с полной трассой |
 | `task arch:check` | Границы модулей, чистота доменного ядра и правила SQL |
 | `task bench:compare` | Сравнение производительности с базовой линией |
 | `task security:deps` | Уязвимости и лицензии зависимостей, SBOM |

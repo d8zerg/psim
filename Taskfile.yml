@@ -75,6 +75,9 @@ includes:
   test:
     taskfile: ./tools/taskfiles/test.yml
     dir: .
+  sim:
+    taskfile: ./tools/taskfiles/sim.yml
+    dir: .
   security:
     taskfile: ./tools/taskfiles/security.yml
     dir: .

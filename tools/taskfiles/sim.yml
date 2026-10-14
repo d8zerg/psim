@@ -1,0 +1,86 @@
+# Step 2.7, ADR-044: explicit manual tasks only. No CTest registration or CI invocation.
+version: '3'
+
+vars:
+  PRESET: '{{.PRESET | default "debug"}}'
+  SEED: '{{.SEED | default "1"}}'
+  EVENTS: '{{.EVENTS | default "24"}}'
+  PARTITIONS: '{{.PARTITIONS | default "3"}}'
+  FAULT_DECISIONS: '{{.FAULT_DECISIONS | default "120"}}'
+  MAX_HANDLERS: '{{.MAX_HANDLERS | default "100000"}}'
+  MAX_TIME_MS: '{{.MAX_TIME_MS | default "30000"}}'
+  MODEL_VERSION: '{{.MODEL_VERSION | default "1"}}'
+  SIM_BUILD: build/{{.PLATFORM}}/{{.PRESET}}/libs/sim
+
+tasks:
+  build:
+    desc: Build the deterministic simulation tooling of PRESET (excluded from the default build)
+    cmds:
+      - task: :cpp:configure
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: cmake --build --preset {{.PRESET}} --target psim-sim psim_sim_checks -j {{.JOBS}}
+
+  test:
+    desc: Manually run model, scheduler, fault-window and CLI regression tests
+    cmds:
+      - task: build
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            {{.SIM_BUILD}}/psim_sim_checks &&
+            python3 -I tools/sim/test_cli.py {{.SIM_BUILD}}/psim-sim
+
+  short:
+    desc: Manually run 200 seeded delivery simulations (TS-07)
+    cmds:
+      - task: _run
+        vars: {RUNS: '200'}
+
+  long:
+    desc: Manually run 10000 seeded delivery simulations (TS-08)
+    cmds:
+      - task: _run
+        vars: {RUNS: '10000'}
+
+  replay:
+    desc: Reproduce one simulation by SEED and save its complete trace
+    cmds:
+      - task: _run
+        vars: {RUNS: '1', EXTRA: '--save-trace'}
+
+  sanitizers:
+    desc: Manually run regression tests and 200 simulations under ASan/UBSan and TSan
+    cmds:
+      - task: test
+        vars: {PRESET: asan}
+      - task: short
+        vars: {PRESET: asan}
+      - task: test
+        vars: {PRESET: tsan}
+      - task: short
+        vars: {PRESET: tsan}
+
+  coverage:
+    desc: Manually measure simulation coverage and enforce 75 percent of lines
+    cmds:
+      - task: build
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            python3 -I tools/sim/coverage.py build/{{.PLATFORM}}/coverage/libs/sim
+
+  _run:
+    internal: true
+    requires:
+      vars: [RUNS]
+    cmds:
+      - task: build
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            {{.SIM_BUILD}}/psim-sim --model-version {{.MODEL_VERSION}} --seed {{.SEED}} --runs {{.RUNS}}
+            --events {{.EVENTS}} --partitions {{.PARTITIONS}} --fault-decisions {{.FAULT_DECISIONS}}
+            --max-handlers {{.MAX_HANDLERS}} --max-time-ms {{.MAX_TIME_MS}} {{.EXTRA}}
