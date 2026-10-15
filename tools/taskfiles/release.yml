@@ -40,9 +40,14 @@ tasks:
       - for: {var: RUNTIMES}
         cmd: >-
           docker run --rm --platform linux/amd64 -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
-          sh -c 'dpkg -i /packages/*.deb >/dev/null && psimctl version &&
-          (psim-pg-migrate >/dev/null 2>&1; [ "$?" = 2 ]) && dpkg -r psim-psimctl psim-psim-pg-migrate >/dev/null
-          && echo "ok: packages install, run and remove on {{.ITEM}}"'
+          sh -ec 'dpkg -i /packages/*.deb >/dev/null;
+          for binary in {{.IMAGES}}; do
+            case "$binary" in psimctl) "$binary" version ;; *) "$binary" --version ;; esac;
+          done;
+          status=0; psim-pg-migrate >/dev/null 2>&1 || status=$?; [ "$status" = 2 ];
+          package_names=$(for archive in /packages/*.deb; do dpkg-deb -f "$archive" Package; done);
+          dpkg -r $package_names >/dev/null;
+          echo "ok: packages install, run and remove on {{.ITEM}}"'
 
   images:
     desc: Build container images (distroless, non-root) from the release preset

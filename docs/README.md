@@ -19,6 +19,8 @@
 - [Модели состояний](domain/state-models.md)
 - [Таксономия событий v1 и модель критичности](domain/event-taxonomy.md)
 
+- [Сквозной стенд M1](engineering/event-flow.md)
+
 ## Архитектура (шаг 0.3)
 
 - [Архитектурный документ arc42](architecture/README.md)

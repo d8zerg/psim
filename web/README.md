@@ -19,3 +19,5 @@ task web:lock       # обновить pnpm-lock.yaml после изменен�
 ```
 
 Node и pnpm на хосте не нужны: команды выполняются в контейнере `node:24` (pnpm 12 через corepack).
+
+Шаг 3.1 добавляет вход PKCE и минимальную ленту инцидентов со снимком и WebSocket-дельтами. Реальный стенд и браузерная проверка - [M1](../docs/engineering/event-flow.md), `task flow:up` и `task flow:test`.

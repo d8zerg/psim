@@ -19,6 +19,8 @@ void inject(const opentelemetry::trace::Span& span, Headers& headers);
 /// The remote parent carried by a consumed message; invalid when it has none or a malformed one.
 [[nodiscard]] opentelemetry::trace::SpanContext extract(const Message& message);
 
+[[nodiscard]] opentelemetry::trace::SpanContext extract(const Headers& headers);
+
 /// Consumer span of a message: kind CONSUMER, the producer's span as parent, messaging attributes.
 /// Spans are not kept active across co_await (ADR-016): pass the span on explicitly.
 [[nodiscard]] opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span> start_consumer_span(

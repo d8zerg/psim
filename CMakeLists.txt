@@ -36,5 +36,7 @@ add_subdirectory(tools/psimctl)
 add_subdirectory(tools/pg-migrate)
 add_subdirectory(tools/service-template)
 add_subdirectory(services)
+add_subdirectory(connectors/simulator)
 
 psim_finalize_packaging()
+add_subdirectory(tools/event-flow)

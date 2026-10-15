@@ -1,4 +1,4 @@
-// psimctl - PSIM administration CLI. Skeleton of step 1.1: version and a contract sample.
+// psimctl - PSIM administration CLI. Step 1.1: version and a contract sample.
 
 #include <google/protobuf/util/json_util.h>
 

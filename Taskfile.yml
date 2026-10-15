@@ -46,7 +46,7 @@ vars:
   # Product version (CMakeLists.txt project VERSION) and container images (deploy/images/<name>).
   VERSION:
     sh: sed -n 's/^  VERSION \([0-9.]*\)$/\1/p' {{.ROOT_DIR}}/CMakeLists.txt
-  IMAGES: psimctl
+  IMAGES: psimctl psim-connector-gateway psim-normalizer psim-correlation-engine psim-incident-service psim-api-gateway
   # Scope of the last `task ci` run (tools/ci/scope.py).
   CI_SCOPE: build/{{.PLATFORM}}/ci-scope.json
 
@@ -74,6 +74,9 @@ includes:
     dir: .
   test:
     taskfile: ./tools/taskfiles/test.yml
+    dir: .
+  flow:
+    taskfile: ./tools/taskfiles/flow.yml
     dir: .
   sim:
     taskfile: ./tools/taskfiles/sim.yml

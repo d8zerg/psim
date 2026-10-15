@@ -62,8 +62,10 @@ Tracing::Tracing(const TracingOptions& options, std::unique_ptr<sdk::trace::Span
       sdk::trace::TraceIdRatioBasedSamplerFactory::Create(options.sampling_ratio)));
   std::vector<std::unique_ptr<sdk::trace::SpanProcessor>> processors;
   if (exporter) {
-    processors.push_back(
-        sdk::trace::BatchSpanProcessorFactory::Create(std::move(exporter), sdk::trace::BatchSpanProcessorOptions{}));
+    sdk::trace::BatchSpanProcessorOptions batch;
+    // Keep sparse traces visible promptly and the worker wakeup below the flush deadline.
+    batch.schedule_delay_millis = std::chrono::milliseconds(100);
+    processors.push_back(sdk::trace::BatchSpanProcessorFactory::Create(std::move(exporter), batch));
   }
   state_->provider = sdk::trace::TracerProviderFactory::Create(std::move(processors), resource, std::move(sampler));
   otel::trace::Provider::SetTracerProvider(otel::nostd::shared_ptr<otel::trace::TracerProvider>(state_->provider));

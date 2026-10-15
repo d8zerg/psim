@@ -1,0 +1,10 @@
+service:
+  instance: event-flow
+runtime:
+  shards: 1
+telemetry:
+  otlp_endpoint: otel-collector:4317
+  otlp_tls: false
+  sampling_ratio: 1
+settings:
+  allow_plaintext: true

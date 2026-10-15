@@ -8,7 +8,11 @@ groups:
   # Adapters whose code runs only against real infrastructure: gated by `task test:component`
   # (unit and component tests together, TS-03); the unit run reports them.
   - name: adapters
-    modules: ['libs/platform/kafka', 'libs/platform/pg', 'libs/platform/redis', 'libs/platform/clickhouse', 'libs/platform/s3']
+    modules: ['libs/platform/kafka', 'libs/platform/pg', 'libs/platform/redis', 'libs/platform/clickhouse', 'libs/platform/s3', 'libs/platform/stream']
+    lines: 75
+    measured_by: component
+  - name: pipeline
+    modules: ['services/connector-gateway', 'services/normalizer', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway']
     lines: 75
     measured_by: component
   - name: domain

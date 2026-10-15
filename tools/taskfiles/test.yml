@@ -203,8 +203,12 @@ tasks:
             rm -rf {{.BUILD}}/profiles &&
             export LLVM_PROFILE_FILE=/repo/{{.BUILD}}/profiles/%p-%m.profraw &&
             ctest --test-dir {{.BUILD}} -LE '^component$' -j {{.JOBS}} --output-on-failure -Q &&
-            ctest --test-dir {{.BUILD}} -L '^component$' -j 1 --output-on-failure &&
-            python3 -I tools/cpp/coverage.py {{.BUILD}} tools/cpp/coverage.yaml '' --component
+            ctest --test-dir {{.BUILD}} -L '^component$' -j 1 --output-on-failure
+      - task: :flow:test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: python3 -I tools/cpp/coverage.py {{.BUILD}} tools/cpp/coverage.yaml '' --component
 
   observability:
     desc: 'Every service exports /health/live, /health/ready, /metrics, JSON logs and traces and drains on SIGTERM (FF-06)'

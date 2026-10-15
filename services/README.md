@@ -8,4 +8,4 @@
 task service:new NAME=incident-service CONTEXTS=incident SUMMARY="PSIM Incident Service"
 ```
 
-Генератор копирует `tools/service-template` в `services/<имя>` (исполняемый файл `psim-<имя>`, пакет DEB, образ `deploy/images/psim-<имя>`) и регистрирует сервис в `tools/arch/architecture.yaml` с его контекстами домена. Сервис сразу получает конфигурацию (YAML и `PSIM__*`), JSON-логи, метрики `/metrics`, трассировку OTLP, `/health/live`, `/health/ready` и остановку с дренированием; проверка - `task test:observability` (FF-06). Первые сервисы - шаг 3.1.
+Генератор копирует `tools/service-template` в `services/<имя>` (исполняемый файл `psim-<имя>`, пакет DEB, образ `deploy/images/psim-<имя>`) и регистрирует сервис в `tools/arch/architecture.yaml` с его контекстами домена. Сервис сразу получает конфигурацию (YAML и `PSIM__*`), JSON-логи, метрики `/metrics`, трассировку OTLP, `/health/live`, `/health/ready` и остановку с дренированием; проверка - `task test:observability` (FF-06). Минимальные Connector Gateway, Normalizer, Correlation Engine, Incident Service и API Gateway работают в [стенде M1](../docs/engineering/event-flow.md).

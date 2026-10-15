@@ -1,3 +1,6 @@
+include:
+  - compose.event-flow.yaml
+
 # PSIM local environment (step 1.4, ADR-035): infrastructure for development and integration tests.
 # Managed by `task env:*` (tools/taskfiles/env.yml); not a production topology (step 9.1).
 #   profiles: kafka3 adds brokers kafka-2 and kafka-3 (`task env:up KAFKA=3`); without it Kafka

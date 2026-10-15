@@ -1,0 +1,8 @@
+# UUIDv5 namespace constants; component names use varint length followed by UTF-8 bytes (ADR-005).
+source:
+  namespace: 728d47ed-1c69-5809-a2df-6e8b98e48ca6
+  components: [connector_id, source_ref]
+signal:
+  namespace: c8b07c6e-a8aa-5eb0-9744-705b51f8c211
+  components: [tenant_id, rule_id, rule_version, event_id]
+  scope: single-event rule of step 3.1

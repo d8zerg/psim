@@ -90,7 +90,19 @@ void inject(const otel::trace::Span& span, Headers& headers) {
 }
 
 otel::trace::SpanContext extract(const Message& message) {
-  const auto parent = message.header(kTraceParent);
+  return extract(message.headers());
+}
+
+otel::trace::SpanContext extract(const Headers& headers) {
+  const auto header = [&headers](std::string_view name) -> std::optional<std::string_view> {
+    for (auto it = headers.rbegin(); it != headers.rend(); ++it) {
+      if (it->first == name) {
+        return it->second;
+      }
+    }
+    return std::nullopt;
+  };
+  const auto parent = header(kTraceParent);
   if (!parent || parent->size() != kTraceParentSize || !parent->starts_with("00-") || (*parent)[35] != '-'
       || (*parent)[52] != '-') {
     return otel::trace::SpanContext::GetInvalid();
@@ -102,7 +114,7 @@ otel::trace::SpanContext extract(const Message& message) {
     return otel::trace::SpanContext::GetInvalid();
   }
   std::ignore = parse_hex(parent->substr(53, 2), flags);  // zero flags are valid: not sampled
-  const auto state = message.header(kTraceState).value_or(std::string_view{});
+  const auto state = header(kTraceState).value_or(std::string_view{});
   using TraceBytes = otel::nostd::span<const std::uint8_t, kTraceIdHex / 2>;
   using SpanBytes = otel::nostd::span<const std::uint8_t, kSpanIdHex / 2>;
   return {otel::trace::TraceId(TraceBytes(trace_id.data(), trace_id.size())),

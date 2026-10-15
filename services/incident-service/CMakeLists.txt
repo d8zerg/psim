@@ -1,0 +1,5 @@
+add_library(psim_incident_repository STATIC adapters/repository.cpp)
+target_include_directories(psim_incident_repository PUBLIC adapters)
+target_link_libraries(psim_incident_repository PUBLIC psim::platform_stream)
+psim_target_defaults(psim_incident_repository)
+psim_add_service(incident-service SOURCES src/main.cpp LIBS psim_incident_repository SUMMARY "PSIM Incident Service")

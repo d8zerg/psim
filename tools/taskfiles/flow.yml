@@ -1,0 +1,64 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-platform"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+  APPS: connector-gateway normalizer correlation-engine incident-service api-gateway console
+  ISSUER: '{{.ISSUER | default "http://localhost:8180/realms/psim"}}'
+tasks:
+  prepare:
+    desc: Build the event flow and its isolated development identities
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - mkdir -p build/{{.PLATFORM}}/{{.PRESET}}/profiles
+      - task: :cpp:_run
+        vars: {CMD: sh tools/env/event_flow_tls.sh}
+      - task: :web:install
+      - task: :web:_run
+        vars: {CMD: pnpm exec turbo run gen build --output-logs=errors-only}
+  up:
+    desc: Start the event-to-browser flow on http://localhost:4173
+    cmds:
+      - task: :env:up
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: prepare
+      - task: :contracts:registry:register
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: _start
+        vars: {PUBLISH: 'true'}
+  _start:
+    internal: true
+    cmds:
+      - task: :cpp:_run_env
+        vars: {PROJECT: '{{.PROJECT}}', CMD: python3 -I tools/env/keycloak_security.py http://keycloak:8080}
+      - cmd: |
+          python3 -c 'import json,pathlib; pathlib.Path(".cache/event-flow/{{.PROJECT}}.config.js").write_text("window.psimConfig = " + json.dumps({"issuer":"{{.ISSUER}}"}) + ";\n")'
+          PSIM_UID={{.UID}} PSIM_GID={{.GID}} PSIM_PRESET={{.PRESET}} PSIM_OIDC_ISSUER={{.ISSUER}} \
+            docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml {{if eq .PUBLISH "true"}}-f deploy/local/compose.ports.yaml{{end}} \
+            --profile event-flow up -d --force-recreate {{.APPS}}
+      - python3 -I tools/env/event_flow.py ready {{.PROJECT}}
+  emit:
+    desc: Emit synthetic alarms over the real mTLS connector protocol (COUNT=1)
+    vars: {COUNT: '{{.COUNT | default "1"}}'}
+    cmds:
+      - PSIM_UID={{.UID}} PSIM_GID={{.GID}} PSIM_PRESET={{.PRESET}} docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml run --rm simulator --count {{.COUNT}}
+  test:
+    desc: Browser E2E, duplicate delivery, reconnect, API restart, traces and latency baseline
+    cmds:
+      - task: prepare
+      - task: :contracts:registry:register
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - defer: {task: down}
+      - task: _start
+        vars: {ISSUER: 'http://keycloak:8080/realms/psim', PUBLISH: 'false'}
+      - PSIM_PRESET={{.PRESET}} python3 -I tools/env/event_flow.py test {{.PROJECT}}
+  down:
+    desc: Stop the event flow and keep its database and broker data
+    cmds:
+      - docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml --profile event-flow stop {{.APPS}}
+  sanitizers:
+    desc: Run the complete browser flow under ASan/UBSan and TSan
+    cmds:
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}'}

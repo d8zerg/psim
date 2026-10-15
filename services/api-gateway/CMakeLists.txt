@@ -1,0 +1,5 @@
+add_library(psim_feed_projection STATIC adapters/projection.cpp)
+target_include_directories(psim_feed_projection PUBLIC adapters)
+target_link_libraries(psim_feed_projection PUBLIC psim::platform_stream)
+psim_target_defaults(psim_feed_projection)
+psim_add_service(api-gateway SOURCES src/main.cpp LIBS psim_feed_projection SUMMARY "PSIM API Gateway")

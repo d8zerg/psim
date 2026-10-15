@@ -31,3 +31,8 @@ services:
     ports: ["127.0.0.1:3000:3000"]
   toxiproxy:
     ports: ["127.0.0.1:8474:8474"]
+
+  api-gateway:
+    ports: ["127.0.0.1:8088:8080"]
+  console:
+    ports: ["127.0.0.1:4173:4173"]

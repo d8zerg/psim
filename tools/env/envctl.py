@@ -416,13 +416,16 @@ def observe(env, binary, image):
     container = f"{env.project}-{executable}"
     subprocess.run(["docker", "rm", "-f", container], capture_output=True)
     subprocess.run(["docker", "run", "-d", "--name", container, "--network", f"{env.project}_default",
+                    "-u", f"{os.getuid()}:{os.getgid()}",
                     "-v", f"{ROOT}:/repo:ro",
                     "-e", "PSIM__TELEMETRY__OTLP_ENDPOINT=otel-collector:4317",
                     "-e", "PSIM__TELEMETRY__SAMPLING_RATIO=1",
                     "-e", "PSIM__TELEMETRY__OTLP_TLS=false",
                     "-e", f"PSIM__SERVICE__INSTANCE={service}-ff06",
                     "-e", "PSIM__ADMIN__LISTEN=0.0.0.0:9100",
-                    image, f"/repo/{binary}"], check=True, capture_output=True)
+                    image, f"/repo/{binary}",
+                    *(["--config", f"/repo/deploy/local/config/event-flow/{service}.yaml"]
+                      if os.path.isfile(os.path.join(ROOT, "deploy/local/config/event-flow", service + ".yaml")) else [])], check=True, capture_output=True)
     base = f"http://{container}:9100"
     try:
         assert until(lambda: env.http("GET", f"{base}/health/live")[0] == 200, 30, 0.5), "/health/live"

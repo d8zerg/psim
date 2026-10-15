@@ -1,0 +1,52 @@
+# Local binaries and console built by task flow:up. The profile is opt-in.
+x-event-flow: &event-flow
+  image: debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5
+  profiles: [event-flow]
+  user: "${PSIM_UID:-1000}:${PSIM_GID:-1000}"
+  read_only: true
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  volumes: ["../..:/repo:ro", "../../build/debian13/${PSIM_PRESET:-debug}/profiles:/profiles"]
+  environment:
+    LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+    ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
+  working_dir: /repo
+  tmpfs: [/tmp]
+  stop_grace_period: 35s
+services:
+  connector-gateway:
+    <<: *event-flow
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
+  normalizer:
+    <<: *event-flow
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
+  correlation-engine:
+    <<: *event-flow
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
+  incident-service:
+    <<: *event-flow
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/incident-service/psim-incident-service", "--config", "/repo/deploy/local/config/event-flow/incident-service.yaml"]
+  api-gateway:
+    <<: *event-flow
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://localhost:8180/realms/psim}"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/api-gateway/psim-api-gateway", "--config", "/repo/deploy/local/config/event-flow/api-gateway.yaml"]
+  simulator:
+    <<: *event-flow
+    profiles: [simulator]
+    entrypoint: ["/repo/build/debian13/${PSIM_PRESET:-debug}/connectors/simulator/psim-simulator"]
+  console:
+    profiles: [event-flow]
+    image: node:24.21.0-trixie@sha256:1278a37eb510ec1606fba0e80f554bcc941ae0b44f35ae373c4822ae7717c64d
+    user: "${PSIM_UID:-1000}:${PSIM_GID:-1000}"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp]
+    working_dir: /repo/web/apps/console
+    environment:
+      PSIM_API_UPSTREAM: http://api-gateway:8080
+    volumes: ["../..:/repo:ro", "../../.cache/event-flow/${COMPOSE_PROJECT_NAME}.config.js:/repo/web/apps/console/dist/config.js:ro"]
+    command: ["node", "node_modules/vite/bin/vite.js", "preview", "--configLoader", "native", "--host", "0.0.0.0", "--port", "4173"]
