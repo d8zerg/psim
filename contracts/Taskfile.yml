@@ -120,6 +120,7 @@ tasks:
         vars: {ARGS: export . --output /repo/.cache/contracts/export}
       - mkdir -p {{.OUT}}/third_party/proto
       - cd {{.OUT}}/export && find . -name '*.proto' ! -path './psim/*' -exec cp --parents {} {{.OUT}}/third_party/proto/ \;
+      - '{{.PYTHON}} {{.TOOLS}}/normalize_vendor.py {{.OUT}}/third_party/proto'
       - task: :_publish_dir
         vars: {SRC: '{{.OUT}}/third_party/proto', DST: '{{.TASKFILE_DIR}}/third_party/proto', UPDATE: '{{.UPDATE}}'}
 

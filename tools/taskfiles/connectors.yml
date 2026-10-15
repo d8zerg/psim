@@ -1,0 +1,16 @@
+version: '3'
+vars:
+  PRESET: '{{.PRESET | default "debug"}}'
+  OUTAGE_SECONDS: '{{.OUTAGE_SECONDS | default "600"}}'
+tasks:
+  conformance:
+    desc: Connector protocol suite and external example against TLS peer, including a real 10-minute outage
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            build/{{.PLATFORM}}/{{.PRESET}}/libs/platform/connector/psim_connector_test &&
+            sh tools/env/event_flow_tls.sh .cache/connector-conformance &&
+            python3 -I tools/connectors/conformance.py --preset {{.PRESET}} --outage-seconds {{.OUTAGE_SECONDS}}

@@ -408,7 +408,12 @@
     - [Registered](#psim-connector-v1-Registered)
     - [SessionRequest](#psim-connector-v1-SessionRequest)
     - [SessionResponse](#psim-connector-v1-SessionResponse)
+    - [SourceCursor](#psim-connector-v1-SourceCursor)
+    - [StateObservation](#psim-connector-v1-StateObservation)
+    - [StateObservation.ValuesEntry](#psim-connector-v1-StateObservation-ValuesEntry)
+    - [StateReport](#psim-connector-v1-StateReport)
   
+    - [DeviceAvailability](#psim-connector-v1-DeviceAvailability)
     - [GoodbyeReason](#psim-connector-v1-GoodbyeReason)
   
     - [ConnectorGatewayService](#psim-connector-v1-ConnectorGatewayService)
@@ -6175,6 +6180,8 @@ ConnectorEvent is one event from a source.
 | raw_code | [string](#string) |  |  |
 | attributes | [ConnectorEvent.AttributesEntry](#psim-connector-v1-ConnectorEvent-AttributesEntry) | repeated |  |
 | traceparent | [string](#string) |  | W3C traceparent of the connector span, optional. |
+| live_observation | [bool](#bool) |  | False for events captured without an active session, or replayed after reconnect. Such events populate history but cannot establish current state. |
+| observation_session_id | [string](#string) |  | Gateway session in which this observation was captured; old sessions cannot refresh state. |
 
 
 
@@ -6288,6 +6295,7 @@ Register opens the session.
 | connector_version | [string](#string) |  |  |
 | instance_id | [string](#string) |  | Unique per running connector process, for diagnostics. |
 | config_version | [uint64](#uint64) |  | Catalog configuration version the connector already has. |
+| capabilities | [string](#string) | repeated | Optional features: &#34;state.v1&#34; observations, &#34;snapshot.v1&#34; queries and &#34;commands.v1&#34; execution. |
 
 
 
@@ -6310,6 +6318,7 @@ Registered confirms the session.
 | session_timeout | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
 | max_batch_events | [uint32](#uint32) |  |  |
 | max_batch_bytes | [uint32](#uint32) |  |  |
+| capabilities | [string](#string) | repeated | Intersection of supported features; absent for a protocol 1.0 gateway. |
 
 
 
@@ -6330,6 +6339,7 @@ SessionRequest is a message from the connector to the gateway.
 | command_ack | [CommandAck](#psim-connector-v1-CommandAck) |  |  |
 | command_result | [CommandResult](#psim-connector-v1-CommandResult) |  |  |
 | goodbye | [Goodbye](#psim-connector-v1-Goodbye) |  |  |
+| state_report | [StateReport](#psim-connector-v1-StateReport) |  |  |
 
 
 
@@ -6356,7 +6366,93 @@ SessionResponse is a message from the gateway to the connector.
 
 
 
+
+<a name="psim-connector-v1-SourceCursor"></a>
+
+### SourceCursor
+SourceCursor identifies the ordering boundary captured before querying equipment.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| source_ref | [string](#string) |  |  |
+| source_epoch | [uint32](#uint32) |  |  |
+| source_seq | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="psim-connector-v1-StateObservation"></a>
+
+### StateObservation
+StateObservation is a current equipment observation, never historical event replay.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| cursor | [SourceCursor](#psim-connector-v1-SourceCursor) |  |  |
+| observed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| availability | [DeviceAvailability](#psim-connector-v1-DeviceAvailability) |  |  |
+| values | [StateObservation.ValuesEntry](#psim-connector-v1-StateObservation-ValuesEntry) | repeated |  |
+
+
+
+
+
+
+<a name="psim-connector-v1-StateObservation-ValuesEntry"></a>
+
+### StateObservation.ValuesEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-connector-v1-StateReport"></a>
+
+### StateReport
+StateReport is sent only after negotiating state.v1. A fresh snapshot is queried each session.
+Snapshot reports additionally require snapshot.v1; sources without a query remain unknown.
+Snapshot cursors are fixed before the query: later events win over an older snapshot.
+Missing sources remain unknown; complete does not imply that all devices are online.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| snapshot_id | [string](#string) |  |  |
+| snapshot | [bool](#bool) |  |  |
+| complete | [bool](#bool) |  |  |
+| observations | [StateObservation](#psim-connector-v1-StateObservation) | repeated |  |
+
+
+
+
+
  
+
+
+<a name="psim-connector-v1-DeviceAvailability"></a>
+
+### DeviceAvailability
+DeviceAvailability describes equipment connectivity independently of connector connectivity.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DEVICE_AVAILABILITY_UNSPECIFIED | 0 |  |
+| DEVICE_AVAILABILITY_UNKNOWN | 1 |  |
+| DEVICE_AVAILABILITY_ONLINE | 2 |  |
+| DEVICE_AVAILABILITY_OFFLINE | 3 |  |
+
 
 
 <a name="psim-connector-v1-GoodbyeReason"></a>
@@ -7219,8 +7315,8 @@ Stream selects what to receive.
 | ----------- | ----- | --- | ---- | ------ | -- | -- | --- | ---- |
 | <a name="double" /> double |  | double | double | float | float64 | double | float | Float |
 | <a name="float" /> float |  | float | float | float | float32 | float | float | Float |
-| <a name="int32" /> int32 | Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values, use sint32 instead. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
-| <a name="int64" /> int64 | Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values, use sint64 instead. | int64 | long | int/long | int64 | long | integer/string | Bignum |
+| <a name="int32" /> int32 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
+| <a name="int64" /> int64 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead. | int64 | long | int/long | int64 | long | integer/string | Bignum |
 | <a name="uint32" /> uint32 | Uses variable-length encoding. | uint32 | int | int/long | uint32 | uint | integer | Bignum or Fixnum (as required) |
 | <a name="uint64" /> uint64 | Uses variable-length encoding. | uint64 | long | int/long | uint64 | ulong | integer/string | Bignum or Fixnum (as required) |
 | <a name="sint32" /> sint32 | Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |

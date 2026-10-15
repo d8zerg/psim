@@ -20,6 +20,7 @@
 - [Таксономия событий v1 и модель критичности](domain/event-taxonomy.md)
 
 - [Сквозной стенд M1](engineering/event-flow.md)
+- [Разработка коннектора и набор соответствия](engineering/connector-sdk.md)
 
 ## Архитектура (шаг 0.3)
 

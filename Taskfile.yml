@@ -75,6 +75,9 @@ includes:
   test:
     taskfile: ./tools/taskfiles/test.yml
     dir: .
+  connectors:
+    taskfile: ./tools/taskfiles/connectors.yml
+    dir: .
   flow:
     taskfile: ./tools/taskfiles/flow.yml
     dir: .
@@ -107,6 +110,7 @@ tasks:
       - task: cpp:lint
       - task: cpp:test
       - task: cpp:test:sanitizers
+      - task: connectors:conformance         # TS-06
       - task: cpp:coverage
       - task: cpp:runtime-test
       - task: web:check
@@ -135,6 +139,7 @@ tasks:
       RELEASE: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} release'}
       BENCH: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} bench'}
       ENV: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} env'}
+      CONNECTORS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} connectors'}
       WEB: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} web'}
       LABELS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} labels'}
       TIDY: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} tidy'}
@@ -165,6 +170,8 @@ tasks:
       - task: env:ci-test                     # fresh environment: smoke tests, FF-06, FF-04, TS-03 (B-01 nightly)
         vars: {NIGHTLY: '{{.NIGHTLY}}'}
         if: '[ "{{.ENV}}" = true ]'
+      - task: connectors:conformance         # TS-06: real outage and an external connector fixture
+        if: '[ "{{.CONNECTORS}}" = true ]'
       - task: web:check                       # step 1.5: format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'
       - task: web:e2e                         # Playwright smoke of the built console

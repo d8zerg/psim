@@ -24,6 +24,7 @@ message SessionRequest {
     CommandAck command_ack = 4;
     CommandResult command_result = 5;
     Goodbye goodbye = 6;
+    StateReport state_report = 7;
   }
 }
 
@@ -50,6 +51,8 @@ message Register {
   string instance_id = 3;
   // Catalog configuration version the connector already has.
   uint64 config_version = 4;
+  // Optional features: "state.v1" observations, "snapshot.v1" queries and "commands.v1" execution.
+  repeated string capabilities = 5;
 }
 
 // Registered confirms the session.
@@ -63,6 +66,8 @@ message Registered {
   google.protobuf.Duration session_timeout = 6;
   uint32 max_batch_events = 7;
   uint32 max_batch_bytes = 8;
+  // Intersection of supported features; absent for a protocol 1.0 gateway.
+  repeated string capabilities = 9;
 }
 
 // Heartbeat keeps the session alive; sent by both sides.
@@ -100,6 +105,11 @@ message ConnectorEvent {
   map<string, string> attributes = 7 [(buf.validate.field).map.max_pairs = 64];
   // W3C traceparent of the connector span, optional.
   string traceparent = 8;
+  // False for events captured without an active session, or replayed after reconnect.
+  // Such events populate history but cannot establish current state.
+  bool live_observation = 9;
+  // Gateway session in which this observation was captured; old sessions cannot refresh state.
+  string observation_session_id = 10;
 }
 
 // BatchAck reports that a batch was durably written (acks=all) or rejected.
@@ -177,4 +187,38 @@ enum GoodbyeReason {
   GOODBYE_REASON_SUPERSEDED = 3;
   GOODBYE_REASON_REVOKED = 4;
   GOODBYE_REASON_PROTOCOL_ERROR = 5;
+}
+
+// SourceCursor identifies the ordering boundary captured before querying equipment.
+message SourceCursor {
+  string source_ref = 1;
+  uint32 source_epoch = 2;
+  uint64 source_seq = 3;
+}
+
+// DeviceAvailability describes equipment connectivity independently of connector connectivity.
+enum DeviceAvailability {
+  DEVICE_AVAILABILITY_UNSPECIFIED = 0;
+  DEVICE_AVAILABILITY_UNKNOWN = 1;
+  DEVICE_AVAILABILITY_ONLINE = 2;
+  DEVICE_AVAILABILITY_OFFLINE = 3;
+}
+
+// StateObservation is a current equipment observation, never historical event replay.
+message StateObservation {
+  SourceCursor cursor = 1;
+  google.protobuf.Timestamp observed_at = 2;
+  DeviceAvailability availability = 3;
+  map<string, string> values = 4;
+}
+
+// StateReport is sent only after negotiating state.v1. A fresh snapshot is queried each session.
+// Snapshot reports additionally require snapshot.v1; sources without a query remain unknown.
+// Snapshot cursors are fixed before the query: later events win over an older snapshot.
+// Missing sources remain unknown; complete does not imply that all devices are online.
+message StateReport {
+  string snapshot_id = 1;
+  bool snapshot = 2;
+  bool complete = 3;
+  repeated StateObservation observations = 4;
 }

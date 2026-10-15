@@ -1,4 +1,4 @@
-#include "psim/platform/stream/grpc_process.hpp"
+#include "psim/platform/connector/grpc_process.hpp"
 
 #include <grpc/event_engine/event_engine.h>
 #include <grpc/grpc.h>
@@ -7,10 +7,10 @@
 
 #include <stdexcept>
 
-namespace psim::platform::stream {
+namespace psim::platform::connector {
 GrpcProcess::GrpcProcess() {
-  // Own OpenSSL initialization before gRPC can request OPENSSL_INIT_NO_ATEXIT.
-  if (OPENSSL_init_ssl(0, nullptr) != 1) {
+  // Match gRPC: the default crypto context has process lifetime, independent of detached worker TLS cleanup.
+  if (OPENSSL_init_ssl(OPENSSL_INIT_NO_ATEXIT, nullptr) != 1) {
     throw std::runtime_error("OpenSSL initialization failed");
   }
   grpc_init();
@@ -19,8 +19,7 @@ GrpcProcess::GrpcProcess() {
 
 GrpcProcess::~GrpcProcess() {
   grpc_shutdown();
-  // Join workers before cleaning their OpenSSL thread-local random generators.
+  // Drain transport work; do not unload process-wide crypto state from a library destructor.
   grpc_event_engine::experimental::ShutdownDefaultEventEngine();
-  OPENSSL_cleanup();
 }
-}  // namespace psim::platform::stream
+}  // namespace psim::platform::connector

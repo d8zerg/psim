@@ -16,5 +16,6 @@ add_subdirectory(platform/clickhouse)
 
 add_subdirectory(platform/s3)
 
+add_subdirectory(platform/connector)
 add_subdirectory(platform/stream)
 add_subdirectory(domain/processing)

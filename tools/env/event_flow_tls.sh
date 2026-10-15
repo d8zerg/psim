@@ -2,7 +2,7 @@
 # Isolated development identities; production enrollment belongs to the installer.
 set -eu
 umask 077
-target=.cache/event-flow
+target=${1:-.cache/event-flow}
 mkdir -p "$target"
 chmod 755 "$target"
 if [ ! -f "$target/server.pem" ] || ! openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then

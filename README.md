@@ -35,6 +35,7 @@ Open-Source PSIM Platform предназначена для служб безо�
 | [Безопасность платформы](libs/platform/security/README.md): TLS/mTLS, JWT/JWKS, секреты и сертификаты | Шаг 2.6 утверждён |
 | [Симуляционный стенд](libs/sim/README.md): управляемое время, модели Kafka и inbox/outbox, сбои и replay | Шаг 2.7 утверждён; ручной запуск через `sim:*` |
 | Адаптеры [ClickHouse](libs/platform/clickhouse/README.md) и [S3](libs/platform/s3/README.md) | Шаги 2.8 и 2.9 утверждены; Ф2 завершена |
+| [Connector SDK](docs/engineering/connector-sdk.md) | Шаг 4.1 |
 | [Сквозной стенд M1](docs/engineering/event-flow.md): событие -> инцидент -> браузер | Шаг 3.1 |
 | Полные доменные сервисы, интеграции, операторская консоль и эксплуатационные функции | Ф4-Ф11, запланированы |
 

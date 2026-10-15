@@ -40,3 +40,4 @@ add_subdirectory(connectors/simulator)
 
 psim_finalize_packaging()
 add_subdirectory(tools/event-flow)
+add_subdirectory(tools/connector-conformance)
