@@ -30,6 +30,7 @@ class PsimConan(ConanFile):
         "librdkafka/*:ssl": True,
         "librdkafka/*:sasl": False,
         "librdkafka/*:curl": False,
+        "clickhouse-cpp/*:with_openssl": True,
     }
 
     PROTOBUF = "protobuf/6.33.5"
@@ -50,6 +51,8 @@ class PsimConan(ConanFile):
         self.requires("librdkafka/2.14.2")
         # PostgreSQL layer (step 2.4, ADR-014): static libpq with TLS.
         self.requires("libpq/18.6")
+        # ClickHouse layer (step 2.8, ADR-045): native protocol with TLS.
+        self.requires("clickhouse-cpp/2.6.1")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

@@ -199,6 +199,66 @@ services:
       timeout: 5s
       retries: 40
 
+  clickhouse-1:
+    image: clickhouse/clickhouse-server:26.8.19@sha256:3ddc359dd4c29921f1b926559344c14c7d98f024e1db9d9d02926e182426fba2
+    profiles: [clickhouse-ha]
+    hostname: clickhouse-1
+    depends_on:
+      keeper: {condition: service_healthy}
+    environment:
+      CLICKHOUSE_USER: psim
+      CLICKHOUSE_PASSWORD: psim-dev-clickhouse
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      PSIM_CH_REPLICA: clickhouse-1
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    tmpfs:
+      - /var/log/clickhouse-server
+    volumes:
+      - /var/lib/clickhouse
+      - ../../.cache/clickhouse-tls:/tls:ro
+      - ./config/clickhouse/component.xml:/etc/clickhouse-server/config.d/psim.xml:ro
+      - ./config/clickhouse/users.xml:/etc/clickhouse-server/users.d/psim.xml:ro
+      - ./config/clickhouse/component-init.sql:/docker-entrypoint-initdb.d/psim.sql:ro
+    networks:
+      default:
+        aliases: [clickhouse-wrong]
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user psim --password psim-dev-clickhouse -q 'SELECT 1' >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
+  clickhouse-2:
+    image: clickhouse/clickhouse-server:26.8.19@sha256:3ddc359dd4c29921f1b926559344c14c7d98f024e1db9d9d02926e182426fba2
+    profiles: [clickhouse-ha]
+    hostname: clickhouse-2
+    depends_on:
+      keeper: {condition: service_healthy}
+    environment:
+      CLICKHOUSE_USER: psim
+      CLICKHOUSE_PASSWORD: psim-dev-clickhouse
+      CLICKHOUSE_SKIP_USER_SETUP: "1"
+      PSIM_CH_REPLICA: clickhouse-2
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    tmpfs:
+      - /var/log/clickhouse-server
+    volumes:
+      - /var/lib/clickhouse
+      - ../../.cache/clickhouse-tls:/tls:ro
+      - ./config/clickhouse/component.xml:/etc/clickhouse-server/config.d/psim.xml:ro
+      - ./config/clickhouse/users.xml:/etc/clickhouse-server/users.d/psim.xml:ro
+      - ./config/clickhouse/component-init.sql:/docker-entrypoint-initdb.d/psim.sql:ro
+    networks:
+      default:
+        aliases: [clickhouse-second]
+    healthcheck:
+      test: ["CMD-SHELL", "clickhouse-client --user psim --password psim-dev-clickhouse -q 'SELECT 1' >/dev/null"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
   # Redis-compatible store (ADR-015): Valkey.
   valkey:
     image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11

@@ -1,0 +1,23 @@
+<!-- Isolated two-replica fixture; the production topology is configured in step 9.1. -->
+<clickhouse>
+    <listen_host>0.0.0.0</listen_host>
+    <tcp_port>9000</tcp_port>
+    <tcp_port_secure>9440</tcp_port_secure>
+    <logger><level>warning</level><console>1</console></logger>
+    <zookeeper><node><host>keeper</host><port>9181</port></node></zookeeper>
+    <macros><shard>ch-component</shard><replica from_env="PSIM_CH_REPLICA"/></macros>
+    <openSSL><server>
+        <certificateFile>/tls/server-combined.pem</certificateFile>
+        <privateKeyFile>/tls/server-combined.pem</privateKeyFile>
+        <caConfig>/tls/ca.pem</caConfig>
+        <verificationMode>strict</verificationMode>
+        <loadDefaultCAFile>false</loadDefaultCAFile>
+        <disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols>
+    </server></openSSL>
+    <remote_servers replace="true"><psim_clickhouse><shard>
+        <internal_replication>true</internal_replication>
+        <replica><host>clickhouse-1</host><port>9000</port><user>psim</user><password>psim-dev-clickhouse</password></replica>
+        <replica><host>clickhouse-2</host><port>9000</port><user>psim</user><password>psim-dev-clickhouse</password></replica>
+    </shard></psim_clickhouse></remote_servers>
+    <distributed_ddl><path>/clickhouse/ch-component/ddl</path></distributed_ddl>
+</clickhouse>

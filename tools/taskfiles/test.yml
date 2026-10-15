@@ -4,6 +4,63 @@
 version: '3'
 
 tasks:
+  clickhouse:
+    desc: Native ClickHouse TLS, batching, migrations, replica recovery and SIGKILL tests
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:clickhouse:ha
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:build
+        vars: {PRESET: debug}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/debug -R '^ClickHouse' -j 1 --output-on-failure
+      - task: clickhouse:replica
+        vars: {PROJECT: '{{.PROJECT}}'}
+
+  clickhouse:replica:
+    desc: Stop a real ClickHouse replica, write through failover and reconcile after restart
+    dir: deploy/local
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+      PRESET: '{{.PRESET | default "debug"}}'
+      PROBE_TABLE:
+        sh: python3 -c 'import secrets; print("chprobe_" + secrets.token_hex(8))'
+      COMPOSE: docker compose -p {{.PROJECT}} -f compose.yaml --profile clickhouse-ha
+    cmds:
+      - '{{.COMPOSE}} exec -T clickhouse-1 clickhouse-client --user psim --password psim-dev-clickhouse -q "CREATE TABLE IF NOT EXISTS {{.PROBE_TABLE}} ON CLUSTER psim_clickhouse (tenant_id String, event_id String, occurred_at DateTime64(3), value String) ENGINE=ReplicatedReplacingMergeTree(''/clickhouse/ch-component/{shard}/{database}/{{.PROBE_TABLE}}'', ''{replica}'') ORDER BY (tenant_id,occurred_at,event_id)"'
+      - defer: {cmd: '{{.COMPOSE}} start --wait --wait-timeout 120 clickhouse-1'}
+      - '{{.COMPOSE}} stop -t 5 clickhouse-1'
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: build/{{.PLATFORM}}/{{.PRESET}}/libs/platform/clickhouse/psim_clickhouse_test_worker replica {{.PROBE_TABLE}} write
+      - '{{.COMPOSE}} start --wait --wait-timeout 120 clickhouse-1'
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: build/{{.PLATFORM}}/{{.PRESET}}/libs/platform/clickhouse/psim_clickhouse_test_worker replica {{.PROBE_TABLE}} verify
+      - '{{.COMPOSE}} exec -T clickhouse-1 clickhouse-client --user psim --password psim-dev-clickhouse -q "DROP TABLE {{.PROBE_TABLE}} ON CLUSTER psim_clickhouse SYNC"'
+
+
+  clickhouse:sanitizers:
+    desc: Native ClickHouse unit and component paths under ASan/UBSan and TSan
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:clickhouse:ha
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - for: [asan, tsan]
+        task: :cpp:build
+        vars: {PRESET: '{{.ITEM}}'}
+      - for: [asan, tsan]
+        task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/{{.ITEM}} -R '^ClickHouse' -j 1 --output-on-failure
+
   redis:
     desc: Valkey and Sentinel component tests against the local environment (ADR-015)
     vars:
@@ -96,6 +153,8 @@ tasks:
       PROJECT: '{{.PROJECT | default "psim-platform"}}'
       BUILD: build/{{.PLATFORM}}/coverage
     cmds:
+      - task: :env:clickhouse:ha
+        vars: {PROJECT: '{{.PROJECT}}'}
       - task: :env:valkey:ha
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: :env:security

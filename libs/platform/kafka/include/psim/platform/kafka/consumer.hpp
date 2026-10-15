@@ -86,6 +86,10 @@ class Consumer {
 
   /// Continue reading the partitions from the given offsets.
   Result<void> seek(const Offsets& offsets);
+  /// Wait for the fetch position to change in the blocking pool; on success no old fetched
+  /// records can escape. Dependencies::blocking is required, as for commit().
+  asio::awaitable<Result<void>> seek_and_wait(Offsets offsets, Duration timeout);
+
   Result<void> pause(const std::vector<TopicPartition>& partitions);
   Result<void> resume(const std::vector<TopicPartition>& partitions);
 

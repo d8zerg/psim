@@ -361,6 +361,32 @@ Result<void> Consumer::seek(const Offsets& offsets) {
   return {};
 }
 
+asio::awaitable<Result<void>> Consumer::seek_and_wait(Offsets offsets, Duration timeout) {
+  auto state = state_;
+  if (state->deps.blocking == nullptr || timeout.count() <= 0 || timeout.count() > 3600000) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "seek requires a blocking pool and a bounded timeout");
+  }
+  co_return co_await state->deps.blocking->run([state, offsets = std::move(offsets), timeout]() -> Result<void> {
+    if (offsets.empty()) {
+      return {};
+    }
+    const auto list = detail::to_list(offsets);
+    const detail::ErrorPtr error(
+        rd_kafka_seek_partitions(state->handle.get(), list.get(), static_cast<int>(timeout.count())));
+    if (error) {
+      return std::unexpected(detail::to_error(error.get(), "seek"));
+    }
+    for (int index = 0; index < list->cnt; ++index) {
+      // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): librdkafka C array
+      if (const auto code = list->elems[index].err;
+          code) {  // NOLINT(cppcoreguidelines-pro-bounds-pointer-arithmetic): librdkafka C array
+        return std::unexpected(detail::to_error(code, "seek"));
+      }
+    }
+    return {};
+  });
+}
+
 Result<void> Consumer::pause(const std::vector<TopicPartition>& partitions) {
   const auto list = detail::to_list(partitions);
   if (const auto err = rd_kafka_pause_partitions(state_->handle.get(), list.get()); err) {

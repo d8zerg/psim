@@ -98,3 +98,18 @@ tasks:
         vars:
           PROJECT: '{{.PROJECT}}'
           CMD: build/{{.PLATFORM}}/release/libs/platform/pg/psim_pg_throughput
+
+  clickhouse:
+    desc: 'Native TLS batch insertion >= 100000 rows/s with row reconciliation (step 2.8)'
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+      ROWS: '{{.ROWS | default "1000000"}}'
+    cmds:
+      - task: :env:clickhouse:ha
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: build/{{.PLATFORM}}/release/libs/platform/clickhouse/psim_clickhouse_throughput {{.ROWS}} 100000
