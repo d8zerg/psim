@@ -250,6 +250,15 @@ class Smoke:
             self.env.exec("clickhouse", *q, f"DROP TABLE IF EXISTS {table} ON CLUSTER psim SYNC", check=False)
         return "ReplicatedMergeTree through Keeper, cluster psim"
 
+    # --- S3
+    def s3(self):
+        status, _ = self.env.http("GET", "http://s3:8333/")
+        assert status == 403, f"anonymous S3 request was not denied: {status}"
+        output = self.env.exec("s3", "weed", "shell", "-filer=s3:8888",
+                               stdin="s3.bucket.list\n")
+        assert "psim-plans" in output, output
+        return "private psim-plans bucket, anonymous access denied"
+
     # --- Valkey
     def valkey(self, host="valkey", port="6379"):
         cli = ["valkey-cli", "-h", host, "-p", port, "-a", "psim-dev-valkey", "--no-auth-warning"]
@@ -369,6 +378,7 @@ class Smoke:
             self.check("postgresql", self.postgres)
             self.check("postgresql through Toxiproxy", lambda: self.postgres("toxiproxy", "15432"))
             self.check("clickhouse", self.clickhouse)
+            self.check("s3 private bucket", self.s3)
             self.check("valkey", self.valkey)
             self.check("valkey through Toxiproxy", lambda: self.valkey("toxiproxy", "16379"))
             self.check("keycloak", self.keycloak)

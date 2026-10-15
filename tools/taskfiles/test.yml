@@ -4,6 +4,36 @@
 version: '3'
 
 tasks:
+  s3:
+    desc: S3 streaming, integrity, conditional writes, cancellation and network recovery
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:s3
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:build
+        vars: {PRESET: debug}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/debug -R '^S3' -j 1 --output-on-failure
+
+  s3:sanitizers:
+    desc: S3 unit and component checks under ASan/UBSan and TSan
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :env:s3
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - for: [asan, tsan]
+        task: :cpp:build
+        vars: {PRESET: '{{.ITEM}}'}
+      - for: [asan, tsan]
+        task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: ctest --test-dir build/{{.PLATFORM}}/{{.ITEM}} -R '^S3' -j 1 --output-on-failure
+
   clickhouse:
     desc: Native ClickHouse TLS, batching, migrations, replica recovery and SIGKILL tests
     vars:
@@ -153,6 +183,8 @@ tasks:
       PROJECT: '{{.PROJECT | default "psim-platform"}}'
       BUILD: build/{{.PLATFORM}}/coverage
     cmds:
+      - task: :env:s3
+        vars: {PROJECT: '{{.PROJECT}}'}
       - task: :env:clickhouse:ha
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: :env:valkey:ha

@@ -259,6 +259,25 @@ services:
       timeout: 5s
       retries: 40
 
+  # S3-compatible file storage, shared by development and component tests.
+  s3:
+    image: chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d
+    hostname: s3
+    restart: unless-stopped
+    command: ["server", "-dir=/data", "-ip=s3", "-ip.bind=0.0.0.0", "-master.telemetry=false", "-master.volumeSizeLimitMB=64", "-volume.max=8", "-filer", "-s3", "-s3.port=8333", "-s3.port.https=8443", "-s3.cert.file=/tls/server.pem", "-s3.key.file=/tls/server.key", "-s3.config=/config/identities.json", "-s3.port.iceberg=0", "-s3.port.lance=0"]
+    volumes:
+      - s3:/data
+      - ../../.cache/s3-tls:/tls:ro
+      - ./config/s3/identities.json:/config/identities.json:ro
+    networks:
+      default:
+        aliases: [s3-wrong]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9333/cluster/status"]
+      interval: 3s
+      timeout: 5s
+      retries: 40
+
   # Redis-compatible store (ADR-015): Valkey.
   valkey:
     image: valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11
@@ -415,6 +434,7 @@ services:
       - ./config/toxiproxy/toxiproxy.json:/config/toxiproxy.json:ro
 
 volumes:
+  s3:
   kafka-1:
   kafka-2:
   kafka-3:

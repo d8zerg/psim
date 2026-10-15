@@ -1,0 +1,7 @@
+{
+  "identities": [
+    {"name": "psim-bootstrap", "credentials": [{"accessKey": "psim-dev-admin", "secretKey": "psim-dev-admin-secret"}], "actions": ["Admin", "Read", "Write", "List", "Tagging"]},
+    {"name": "psim-filestore", "credentials": [{"accessKey": "psim-dev-filestore", "secretKey": "psim-dev-filestore-secret"}], "actions": ["Read:psim-plans", "Write:psim-plans"]},
+    {"name": "psim-reader", "credentials": [{"accessKey": "psim-dev-reader", "secretKey": "psim-dev-reader-secret"}], "actions": ["Read:psim-plans"]}
+  ]
+}

@@ -13,3 +13,5 @@ add_subdirectory(platform/redis)
 add_subdirectory(sim EXCLUDE_FROM_ALL)
 
 add_subdirectory(platform/clickhouse)
+
+add_subdirectory(platform/s3)

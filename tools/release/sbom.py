@@ -89,12 +89,16 @@ def app_sbom(graph_path, runtime_version, version, commit):
         components[purl] = component
 
     runtimes = []
-    for name, description in (("gcc-libstdcxx", "GNU libstdc++"), ("gcc-libgcc", "GCC unwinding runtime")):
+    runtime_libraries = [("gcc-libstdcxx", "GNU libstdc++", "dynamically"),
+                         ("gcc-libgcc", "GCC unwinding runtime", "dynamically")]
+    if any(c["name"] == "aws-c-common" for c in components.values()):
+        runtime_libraries.append(("gcc-libatomic", "GCC atomic operations runtime", "statically"))
+    for name, description, linkage in runtime_libraries:
         ref = f"pkg:generic/{name}@{runtime_version}"
         runtimes.append(ref)
         components[ref] = {
             "type": "library", "bom-ref": ref, "name": name, "version": runtime_version, "purl": ref,
-            "description": f"{description}, linked dynamically from Debian 13 (ADR-032)",
+            "description": f"{description}, linked {linkage} from Debian 13 (ADR-032, ADR-046)",
             "licenses": license_entry("GPL-3.0-or-later WITH GCC-exception-3.1"),
             "externalReferences": [{"type": "website", "url": "https://gcc.gnu.org"}],
         }

@@ -194,6 +194,7 @@ tasks:
           docker run --rm --platform linux/amd64 -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
             -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
+            -e PSIM_TEST_S3=https://s3:8443 -e PSIM_TEST_S3_FAULT=https://toxiproxy:18443 \
             -e PSIM_TEST_CLICKHOUSE=clickhouse-1 -e PSIM_TEST_CLICKHOUSE_SECOND=clickhouse-2 -e PSIM_TEST_CLICKHOUSE_FAULT=toxiproxy \
             -e PSIM_TEST_POSTGRES=postgres -e PSIM_TEST_POSTGRES_FAULT=toxiproxy \
             -e PSIM_TEST_REDIS=valkey -e PSIM_TEST_REDIS_FAULT=toxiproxy \

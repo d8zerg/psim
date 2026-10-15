@@ -31,6 +31,14 @@ class PsimConan(ConanFile):
         "librdkafka/*:sasl": False,
         "librdkafka/*:curl": False,
         "clickhouse-cpp/*:with_openssl": True,
+        "aws-sdk-cpp/*:s3": True,
+        "aws-sdk-cpp/*:access-management": False,
+        "aws-sdk-cpp/*:identity-management": False,
+        "aws-sdk-cpp/*:queues": False,
+        "aws-sdk-cpp/*:s3-encryption": False,
+        "aws-sdk-cpp/*:text-to-speech": False,
+        "aws-sdk-cpp/*:transfer": False,
+        "aws-sdk-cpp/*:monitoring": False,
     }
 
     PROTOBUF = "protobuf/6.33.5"
@@ -53,6 +61,7 @@ class PsimConan(ConanFile):
         self.requires("libpq/18.6")
         # ClickHouse layer (step 2.8, ADR-045): native protocol with TLS.
         self.requires("clickhouse-cpp/2.6.1")
+        self.requires("aws-sdk-cpp/1.11.692")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

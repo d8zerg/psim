@@ -10,6 +10,7 @@ allowed:
   - BSD-2-Clause
   - BSD-3-Clause
   - BSL-1.0
+  - curl
   - GPL-3.0-or-later WITH GCC-exception-3.1
   - ISC
   - MIT
