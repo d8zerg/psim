@@ -41,6 +41,27 @@ channels:
       cluster: 48
       single: 12
     x-psim-semantics: ALO+ID
+  ingestStateV1:
+    address: psim.ingest.state.v1
+    title: Authenticated connector connections and equipment observations
+    description: 'Key: connector_id. Semantics: ALO+ID.'
+    messages:
+      GatewayStateRecord:
+        $ref: '#/components/messages/GatewayStateRecord'
+    bindings:
+      kafka:
+        topic: psim.ingest.state.v1
+        partitions: 12
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 604800000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 12
+      single: 4
+    x-psim-semantics: ALO+ID
   eventsNormalizedV1:
     address: psim.events.normalized.v1
     title: Normalized events
@@ -497,6 +518,27 @@ operations:
     messages:
     - $ref: '#/channels/ingestRawV1/messages/RawEventRecord'
     x-psim-service: normalizer
+  connectorGatewaySendIngestStateV1:
+    action: send
+    channel:
+      $ref: '#/channels/ingestStateV1'
+    messages:
+    - $ref: '#/channels/ingestStateV1/messages/GatewayStateRecord'
+    x-psim-service: connector-gateway
+  normalizerReceiveIngestStateV1:
+    action: receive
+    channel:
+      $ref: '#/channels/ingestStateV1'
+    messages:
+    - $ref: '#/channels/ingestStateV1/messages/GatewayStateRecord'
+    x-psim-service: normalizer
+  projectionServiceReceiveIngestStateV1:
+    action: receive
+    channel:
+      $ref: '#/channels/ingestStateV1'
+    messages:
+    - $ref: '#/channels/ingestStateV1/messages/GatewayStateRecord'
+    x-psim-service: projection-service
   normalizerSendEventsNormalizedV1:
     action: send
     channel:
@@ -828,6 +870,23 @@ components:
           key:
             type: string
             description: source_id
+          schemaIdLocation: payload
+          schemaIdPayloadEncoding: confluent
+          bindingVersion: 0.5.0
+    GatewayStateRecord:
+      name: GatewayStateRecord
+      title: psim.ingest.v1.GatewayStateRecord
+      contentType: application/x-protobuf
+      summary: Protobuf message psim.ingest.v1.GatewayStateRecord in Confluent wire format (ADR-004).
+      payload:
+        type: object
+        description: 'See contracts/proto: psim.ingest.v1.GatewayStateRecord.'
+        x-psim-proto: psim.ingest.v1.GatewayStateRecord
+      bindings:
+        kafka:
+          key:
+            type: string
+            description: connector_id
           schemaIdLocation: payload
           schemaIdPayloadEncoding: confluent
           bindingVersion: 0.5.0

@@ -88,15 +88,35 @@ asio::awaitable<Result<std::unique_ptr<pg::Pool>>> Worker::database() {
   if (config.get<bool>("settings.allow_plaintext")) {
     options.connection.properties["sslmode"] = "disable";
   }
+  for (const auto& [key, setting] :
+       {std::pair{"sslrootcert", "settings.pg_ca_file"}, std::pair{"sslcert", "settings.pg_certificate_file"},
+        std::pair{"sslkey", "settings.pg_private_key_file"}}) {
+    const auto value = config.get<std::string>(setting);
+    if (!value.empty()) {
+      options.connection.properties[key] = value;
+    }
+  }
   co_return std::make_unique<pg::Pool>(std::move(options));
+}
+
+kafka::ClientOptions Worker::kafka_options(std::string client_id) const {
+  const auto& config = context_.config();
+  kafka::ClientOptions options{.bootstrap = config.get<std::string>("settings.brokers"),
+                               .client_id = std::move(client_id),
+                               .properties = {{"linger.ms", "1"}},
+                               .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
+  if (!options.allow_plaintext) {
+    options.security = kafka::TransportSecurity{
+        .tls = {.ca_file = config.get<std::string>("settings.kafka_ca_file"),
+                .certificate_file = config.get<std::string>("settings.kafka_certificate_file"),
+                .private_key_file = config.get<std::string>("settings.kafka_private_key_file")}};
+  }
+  return options;
 }
 
 asio::awaitable<Result<void>> Worker::open() {
   const auto& config = context_.config();
-  kafka::ClientOptions const options{.bootstrap = config.get<std::string>("settings.brokers"),
-                                     .client_id = stage_ + "-" + config.get<std::string>("service.instance"),
-                                     .properties = {{"linger.ms", "1"}},
-                                     .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
+  const auto options = kafka_options(stage_ + "-" + config.get<std::string>("service.instance"));
   const auto transactional = semantics_ == kafka::Semantics::kExactlyOnce && !input_.empty();
   auto producer = kafka::Producer::create(executor_,
                                           {.client = options,

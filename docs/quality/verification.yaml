@@ -220,7 +220,7 @@ methods:
     env: E-CLUSTER
     gate: release
     barrier: automated
-    task: task load:ingest
+    task: task gateway:verify
     steps: ['4.2']
   - id: L-07
     kind: load

@@ -22,10 +22,11 @@ tasks:
       - task: :env:up
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: prepare
+        vars: {PRESET: '{{.PRESET}}'}
       - task: :contracts:registry:register
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: _start
-        vars: {PUBLISH: 'true'}
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}', PUBLISH: 'true'}
   _start:
     internal: true
     cmds:
@@ -34,8 +35,14 @@ tasks:
       - cmd: |
           python3 -c 'import json,pathlib; pathlib.Path(".cache/event-flow/{{.PROJECT}}.config.js").write_text("window.psimConfig = " + json.dumps({"issuer":"{{.ISSUER}}"}) + ";\n")'
           PSIM_UID={{.UID}} PSIM_GID={{.GID}} PSIM_PRESET={{.PRESET}} PSIM_OIDC_ISSUER={{.ISSUER}} \
-            docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml {{if eq .PUBLISH "true"}}-f deploy/local/compose.ports.yaml{{end}} \
+            docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml {{if eq .PRESET "tsan"}}-f deploy/local/compose.sanitizer.yaml{{end}} {{if eq .PUBLISH "true"}}-f deploy/local/compose.ports.yaml{{end}} \
             --profile event-flow up -d --force-recreate {{.APPS}}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          PRESET: '{{.PRESET}}'
+          RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
+          CMD: python3 -I tools/env/gateway_bootstrap.py http://keycloak:8080 connector-gateway:8080 build/{{.PLATFORM}}/{{.PRESET}}/tools/gateway-admin/psim-gateway-admin .cache/event-flow
       - python3 -I tools/env/event_flow.py ready {{.PROJECT}}
   emit:
     desc: Emit synthetic alarms over the real mTLS connector protocol (COUNT=1)
@@ -46,11 +53,12 @@ tasks:
     desc: Browser E2E, duplicate delivery, reconnect, API restart, traces and latency baseline
     cmds:
       - task: prepare
+        vars: {PRESET: '{{.PRESET}}'}
       - task: :contracts:registry:register
         vars: {PROJECT: '{{.PROJECT}}'}
-      - defer: {task: down}
+      - defer: {task: down, vars: {PROJECT: '{{.PROJECT}}'}}
       - task: _start
-        vars: {ISSUER: 'http://keycloak:8080/realms/psim', PUBLISH: 'false'}
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}', ISSUER: 'http://keycloak:8080/realms/psim', PUBLISH: 'false'}
       - PSIM_PRESET={{.PRESET}} python3 -I tools/env/event_flow.py test {{.PROJECT}}
   down:
     desc: Stop the event flow and keep its database and broker data
@@ -61,4 +69,4 @@ tasks:
     cmds:
       - for: [asan, tsan]
         task: test
-        vars: {PRESET: '{{.ITEM}}'}
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}

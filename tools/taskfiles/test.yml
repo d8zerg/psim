@@ -204,6 +204,8 @@ tasks:
             export LLVM_PROFILE_FILE=/repo/{{.BUILD}}/profiles/%p-%m.profraw &&
             ctest --test-dir {{.BUILD}} -LE '^component$' -j {{.JOBS}} --output-on-failure -Q &&
             ctest --test-dir {{.BUILD}} -L '^component$' -j 1 --output-on-failure
+      - task: :gateway:test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :flow:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :cpp:_run

@@ -54,6 +54,8 @@ tasks:
         vars: {PRESET: '{{.PRESET}}'}
       - task: _run
         vars:
+          PRESET: '{{.PRESET}}'
+          RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
           CMD: ctest --preset {{.PRESET}} -j {{.JOBS}}{{if .LABELS}} -L '{{.LABELS}}' --no-tests=ignore{{end}}
 
   test:sanitizers:
@@ -191,7 +193,7 @@ tasks:
     cmds:
       - cmd: |
           mkdir -p "{{.CACHE_DIR}}/home"
-          docker run --rm --platform linux/amd64 -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
+          docker run --rm --platform linux/amd64 {{.RUN_OPTIONS | default ""}} -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
             -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
             -e PSIM_TEST_S3=https://s3:8443 -e PSIM_TEST_S3_FAULT=https://toxiproxy:18443 \
@@ -221,7 +223,7 @@ tasks:
             eval "$PSIM_CMD"
           else
             mkdir -p "{{.CACHE_DIR}}/conan" "{{.CACHE_DIR}}/ccache" "{{.CACHE_DIR}}/home"
-            docker run --rm --platform linux/amd64 {{.TTY}} -u {{.UID}}:{{.GID}} \
+            docker run --rm --platform linux/amd64 {{.RUN_OPTIONS | default ""}} {{.TTY}} -u {{.UID}}:{{.GID}} \
               -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
               -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/conan":/cache/conan \
               -v "{{.CACHE_DIR}}/ccache":/cache/ccache -v "{{.CACHE_DIR}}/home":/cache/home \

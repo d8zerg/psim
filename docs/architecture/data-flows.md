@@ -213,6 +213,7 @@
 | Топик | Ключ | Семантика | Retention по умолчанию | Отличие от плана |
 |---|---|---|---|---|
 | `psim.ingest.raw.v1` | `source_id` | ALO+ID | 6 ч | - |
+| `psim.ingest.state.v1` | `connector_id` | ALO+ID | 7 сут | - |
 | `psim.events.normalized.v1` | `site_id:zone_id` | EOS-K | 24 ч | EOS-K вместо at-least-once |
 | `psim.normalizer.state.v1` | `source_id:epoch` | compacted | ∞ | Новый внутренний топик |
 | `psim.signals.v1` | `grouping_key` | EOS-K | 7 сут | Ключ `grouping_key` вместо `correlation_key` |

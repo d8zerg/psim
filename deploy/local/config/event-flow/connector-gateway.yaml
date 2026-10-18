@@ -7,4 +7,7 @@ telemetry:
   otlp_tls: false
   sampling_ratio: 1
 settings:
+  issuer: http://keycloak:8080/realms/psim
+  pg_password_file: /repo/.cache/event-flow/postgres.secret
+  redis_password_file: /repo/.cache/event-flow/redis.secret
   allow_plaintext: true

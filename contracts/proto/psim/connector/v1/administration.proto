@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package psim.connector.v1;
+
+import "psim/catalog/v1/catalog.proto";
+
+// ConnectorAdministrationService manages registrations over mTLS and delegated operator JWTs.
+service ConnectorAdministrationService {
+  // Manage commits a versioned change and waits until live gateways enforce it.
+  rpc Manage(ManageRequest) returns (ManageResponse);
+}
+
+// RegistrationAction selects a credential or registration change.
+enum RegistrationAction {
+  REGISTRATION_ACTION_UNSPECIFIED = 0;
+  REGISTRATION_ACTION_REGISTER = 1;
+  REGISTRATION_ACTION_ROTATE = 2;
+  REGISTRATION_ACTION_REVOKE = 3;
+  REGISTRATION_ACTION_RECOVER = 4;
+  REGISTRATION_ACTION_DISABLE = 5;
+  REGISTRATION_ACTION_INSPECT = 6;
+}
+
+// ManageRequest is idempotent per tenant, operator and request_id.
+message ManageRequest {
+  string request_id = 1;
+  RegistrationAction action = 2;
+  // Only registration uses name, connector_type and limits; credentials are derived from PEM.
+  psim.catalog.v1.Connector connector = 3;
+  uint64 expected_version = 4;
+  // Public certificate only; the private key never leaves the connector.
+  string certificate_pem = 5;
+  // Required for revocation, ignored for other actions.
+  string fingerprint = 6;
+}
+
+// ManageResponse returns the committed registration and global enforcement revision.
+// A deadline error can mean that the change committed but enforcement is still pending;
+// retry the exact request with its original request_id to resolve that outcome.
+message ManageResponse {
+  psim.catalog.v1.Connector connector = 1;
+  uint64 revision = 2;
+}

@@ -1,0 +1,77 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-platform"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  prepare:
+    desc: Build and start two authenticated gateway instances with synthetic identities
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - mkdir -p build/{{.PLATFORM}}/{{.PRESET}}/profiles
+      - task: :cpp:_run
+        vars: {CMD: sh tools/env/event_flow_tls.sh && python3 -I tools/env/gateway_fixtures.py}
+      - task: :contracts:registry:register
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          CMD: python3 -I tools/env/keycloak_security.py http://keycloak:8080
+      - PSIM_GATEWAY_SAMPLING_RATIO=0.001 PSIM_UID={{.UID}} PSIM_GID={{.GID}} PSIM_PRESET={{.PRESET}} docker compose -p {{.PROJECT}} -f deploy/local/compose.yaml {{if eq .PRESET "tsan"}}-f deploy/local/compose.sanitizer.yaml{{end}} --profile gateway-test up -d --force-recreate connector-gateway gateway-2
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          PRESET: '{{.PRESET}}'
+          RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
+          CMD: python3 -I tools/env/gateway_bootstrap.py http://keycloak:8080 connector-gateway:8080 build/{{.PLATFORM}}/{{.PRESET}}/tools/gateway-admin/psim-gateway-admin .cache/event-flow
+  test:
+    desc: Real gateway protocol, durable delivery, cross-instance revocation and heartbeat checks
+    cmds:
+      - task: prepare
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}'}
+      - defer: {task: down, vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}'}}
+      - python3 -I tools/env/gateway_test.py {{.PROJECT}} {{.PRESET}} network
+  failover:
+    desc: SIGKILL the active gateway, reconnect the durable SDK through another and reconcile every event
+    cmds:
+      - task: prepare
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}'}
+      - defer: {task: down, vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}'}}
+      - python3 -I tools/env/gateway_test.py {{.PROJECT}} {{.PRESET}} failover
+  bench:
+    desc: At least 50000 durably acknowledged events per second through two gateway instances, with reconciliation
+    cmds:
+      - task: prepare
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: release}
+      - defer: {task: down, vars: {PROJECT: '{{.PROJECT}}', PRESET: release}}
+      - python3 -I tools/env/gateway_test.py {{.PROJECT}} release bench
+  verify:
+    desc: Two-instance throughput and automatic recovery without lost events
+    cmds:
+      - task: bench
+        vars: {PROJECT: '{{.PROJECT}}'}
+      - task: failover
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: release}
+  coverage:
+    desc: Real gateway network checks and protocol tests with service coverage
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L '^psim_connector_gateway_test$' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/connector-gateway' --component
+  sanitizers:
+    desc: Gateway protocol and lifecycle checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: psim_connector_gateway_test}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  down:
+    internal: true
+    cmds:
+      - python3 -I tools/env/gateway_test.py {{.PROJECT}} {{.PRESET}} shutdown

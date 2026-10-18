@@ -78,6 +78,9 @@ includes:
   connectors:
     taskfile: ./tools/taskfiles/connectors.yml
     dir: .
+  gateway:
+    taskfile: ./tools/taskfiles/gateway.yml
+    dir: .
   flow:
     taskfile: ./tools/taskfiles/flow.yml
     dir: .

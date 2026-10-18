@@ -16,6 +16,18 @@ x-event-flow: &event-flow
 services:
   connector-gateway:
     <<: *event-flow
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
+      PSIM__TELEMETRY__SAMPLING_RATIO: "${PSIM_GATEWAY_SAMPLING_RATIO:-1}"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
+  gateway-2:
+    <<: *event-flow
+    profiles: [gateway-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: gateway-2
+      PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
   normalizer:
     <<: *event-flow

@@ -1,0 +1,16 @@
+# Isolated TSan checks need personality(ADDR_NO_RANDOMIZE) on hosts with high ASLR entropy.
+services:
+  connector-gateway:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  gateway-2:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  normalizer:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  correlation-engine:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  incident-service:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  api-gateway:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  simulator:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]

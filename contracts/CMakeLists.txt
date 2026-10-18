@@ -10,7 +10,8 @@ psim_proto_library(psim_contracts
     "${CMAKE_CURRENT_SOURCE_DIR}/proto"
     "${CMAKE_CURRENT_SOURCE_DIR}/third_party/proto"
   PROTOS ${third_party_protos} ${psim_protos}
-  GRPC_PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/proto/psim/connector/v1/connector.proto")
+  GRPC_PROTOS "${CMAKE_CURRENT_SOURCE_DIR}/proto/psim/connector/v1/connector.proto"
+    "${CMAKE_CURRENT_SOURCE_DIR}/proto/psim/connector/v1/administration.proto")
 add_library(psim::contracts ALIAS psim_contracts)
 
 psim_add_test(psim_contracts_test

@@ -21,6 +21,17 @@ topics:
     producers: [connector-gateway]
     consumers: [normalizer]
 
+  - name: psim.ingest.state.v1
+    title: Authenticated connector connections and equipment observations
+    record: psim.ingest.v1.GatewayStateRecord
+    key: connector_id
+    partitions: {cluster: 12, single: 4}
+    retention: P7D
+    cleanup: delete
+    semantics: ALO+ID
+    producers: [connector-gateway]
+    consumers: [normalizer, projection-service]
+
   - name: psim.events.normalized.v1
     title: Normalized events
     record: psim.processing.v1.EventRecord

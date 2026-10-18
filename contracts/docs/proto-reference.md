@@ -6,18 +6,18 @@
 - [psim/common/v1/envelope.proto](#psim_common_v1_envelope-proto)
     - [Actor](#psim-common-v1-Actor)
     - [Envelope](#psim-common-v1-Envelope)
-  
+
     - [ActorKind](#psim-common-v1-ActorKind)
-  
+
 - [psim/audit/v1/audit.proto](#psim_audit_v1_audit-proto)
     - [AuditChainEntry](#psim-audit-v1-AuditChainEntry)
     - [AuditCheckpoint](#psim-audit-v1-AuditCheckpoint)
     - [AuditEntry](#psim-audit-v1-AuditEntry)
     - [AuditEntry.DetailsEntry](#psim-audit-v1-AuditEntry-DetailsEntry)
     - [AuditEventRecord](#psim-audit-v1-AuditEventRecord)
-  
+
     - [AuditOutcome](#psim-audit-v1-AuditOutcome)
-  
+
 - [psim/api/v1/audit.proto](#psim_api_v1_audit-proto)
     - [AuditQuery](#psim-api-v1-AuditQuery)
     - [ExportAuditRecordsRequest](#psim-api-v1-ExportAuditRecordsRequest)
@@ -26,17 +26,17 @@
     - [SearchAuditRecordsResponse](#psim-api-v1-SearchAuditRecordsResponse)
     - [VerifyAuditIntegrityRequest](#psim-api-v1-VerifyAuditIntegrityRequest)
     - [VerifyAuditIntegrityResponse](#psim-api-v1-VerifyAuditIntegrityResponse)
-  
+
     - [AuditService](#psim-api-v1-AuditService)
-  
+
 - [psim/common/v1/types.proto](#psim_common_v1_types-proto)
     - [LocationRef](#psim-common-v1-LocationRef)
     - [Position](#psim-common-v1-Position)
-  
+
     - [EventClass](#psim-common-v1-EventClass)
     - [Priority](#psim-common-v1-Priority)
     - [Severity](#psim-common-v1-Severity)
-  
+
 - [psim/catalog/v1/catalog.proto](#psim_catalog_v1_catalog-proto)
     - [Capability](#psim-catalog-v1-Capability)
     - [CatalogRecord](#psim-catalog-v1-CatalogRecord)
@@ -50,11 +50,11 @@
     - [ParameterSpec](#psim-catalog-v1-ParameterSpec)
     - [Source](#psim-catalog-v1-Source)
     - [SourceTemplate](#psim-catalog-v1-SourceTemplate)
-  
+
     - [LocationKind](#psim-catalog-v1-LocationKind)
     - [ParameterType](#psim-catalog-v1-ParameterType)
     - [ResourceState](#psim-catalog-v1-ResourceState)
-  
+
 - [psim/api/v1/catalog.proto](#psim_api_v1_catalog-proto)
     - [ArchiveLocationRequest](#psim-api-v1-ArchiveLocationRequest)
     - [ArchiveLocationResponse](#psim-api-v1-ArchiveLocationResponse)
@@ -101,11 +101,11 @@
     - [UpdateLocationResponse](#psim-api-v1-UpdateLocationResponse)
     - [UploadFloorPlanRequest](#psim-api-v1-UploadFloorPlanRequest)
     - [UploadFloorPlanResponse](#psim-api-v1-UploadFloorPlanResponse)
-  
+
     - [ImportState](#psim-api-v1-ImportState)
-  
+
     - [CatalogService](#psim-api-v1-CatalogService)
-  
+
 - [psim/response/v1/command.proto](#psim_response_v1_command-proto)
     - [Command](#psim-response-v1-Command)
     - [Command.ParametersEntry](#psim-response-v1-Command-ParametersEntry)
@@ -115,9 +115,9 @@
     - [CommandOutcome](#psim-response-v1-CommandOutcome)
     - [CommandReceipt](#psim-response-v1-CommandReceipt)
     - [CommandResultRecord](#psim-response-v1-CommandResultRecord)
-  
+
     - [CommandState](#psim-response-v1-CommandState)
-  
+
 - [psim/api/v1/commands.proto](#psim_api_v1_commands-proto)
     - [ApproveCommandRequest](#psim-api-v1-ApproveCommandRequest)
     - [ApproveCommandResponse](#psim-api-v1-ApproveCommandResponse)
@@ -132,14 +132,14 @@
     - [RequestCommandRequest](#psim-api-v1-RequestCommandRequest)
     - [RequestCommandRequest.ParametersEntry](#psim-api-v1-RequestCommandRequest-ParametersEntry)
     - [RequestCommandResponse](#psim-api-v1-RequestCommandResponse)
-  
+
     - [CommandService](#psim-api-v1-CommandService)
-  
+
 - [psim/processing/v1/event.proto](#psim_processing_v1_event-proto)
     - [Event](#psim-processing-v1-Event)
     - [Event.AttributesEntry](#psim-processing-v1-Event-AttributesEntry)
     - [EventRecord](#psim-processing-v1-EventRecord)
-  
+
 - [psim/api/v1/events.proto](#psim_api_v1_events-proto)
     - [GetEventRequest](#psim-api-v1-GetEventRequest)
     - [GetEventResponse](#psim-api-v1-GetEventResponse)
@@ -148,9 +148,9 @@
     - [SearchEventsRequest](#psim-api-v1-SearchEventsRequest)
     - [SearchEventsResponse](#psim-api-v1-SearchEventsResponse)
     - [StoredEvent](#psim-api-v1-StoredEvent)
-  
+
     - [EventHistoryService](#psim-api-v1-EventHistoryService)
-  
+
 - [psim/incident/v1/incident.proto](#psim_incident_v1_incident-proto)
     - [Incident](#psim-incident-v1-Incident)
     - [IncidentType](#psim-incident-v1-IncidentType)
@@ -158,12 +158,12 @@
     - [StepRef](#psim-incident-v1-StepRef)
     - [TimelineEntry](#psim-incident-v1-TimelineEntry)
     - [TimelineEntry.DetailsEntry](#psim-incident-v1-TimelineEntry-DetailsEntry)
-  
+
     - [IncidentState](#psim-incident-v1-IncidentState)
     - [PrioritySource](#psim-incident-v1-PrioritySource)
     - [Resolution](#psim-incident-v1-Resolution)
     - [TimelineEntryKind](#psim-incident-v1-TimelineEntryKind)
-  
+
 - [psim/api/v1/feed.proto](#psim_api_v1_feed-proto)
     - [DeviceStatus](#psim-api-v1-DeviceStatus)
     - [GetIncidentFeedRequest](#psim-api-v1-GetIncidentFeedRequest)
@@ -174,16 +174,16 @@
     - [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse)
     - [OperatorLoad](#psim-api-v1-OperatorLoad)
     - [ZoneStatus](#psim-api-v1-ZoneStatus)
-  
+
     - [FeedService](#psim-api-v1-FeedService)
-  
+
 - [psim/processing/v1/signal.proto](#psim_processing_v1_signal-proto)
     - [Signal](#psim-processing-v1-Signal)
     - [SignalOrigin](#psim-processing-v1-SignalOrigin)
     - [SignalRecord](#psim-processing-v1-SignalRecord)
-  
+
     - [SignalOriginKind](#psim-processing-v1-SignalOriginKind)
-  
+
 - [psim/api/v1/incidents.proto](#psim_api_v1_incidents-proto)
     - [AcknowledgeIncidentRequest](#psim-api-v1-AcknowledgeIncidentRequest)
     - [AcknowledgeIncidentResponse](#psim-api-v1-AcknowledgeIncidentResponse)
@@ -218,15 +218,15 @@
     - [StartIncidentWorkResponse](#psim-api-v1-StartIncidentWorkResponse)
     - [UpdateIncidentTypeRequest](#psim-api-v1-UpdateIncidentTypeRequest)
     - [UpdateIncidentTypeResponse](#psim-api-v1-UpdateIncidentTypeResponse)
-  
+
     - [IncidentService](#psim-api-v1-IncidentService)
-  
+
 - [psim/api/v1/me.proto](#psim_api_v1_me-proto)
     - [GetMeRequest](#psim-api-v1-GetMeRequest)
     - [GetMeResponse](#psim-api-v1-GetMeResponse)
-  
+
     - [MeService](#psim-api-v1-MeService)
-  
+
 - [psim/response/v1/plan.proto](#psim_response_v1_plan-proto)
     - [AutomatedParams](#psim-response-v1-AutomatedParams)
     - [ChecklistItem](#psim-response-v1-ChecklistItem)
@@ -246,28 +246,28 @@
     - [SlaTarget](#psim-response-v1-SlaTarget)
     - [Step](#psim-response-v1-Step)
     - [WaitParams](#psim-response-v1-WaitParams)
-  
+
     - [NotificationChannel](#psim-response-v1-NotificationChannel)
     - [PlanState](#psim-response-v1-PlanState)
-  
+
 - [psim/response/v1/notification.proto](#psim_response_v1_notification-proto)
     - [Notification](#psim-response-v1-Notification)
     - [Notification.DataEntry](#psim-response-v1-Notification-DataEntry)
-  
+
     - [NotificationState](#psim-response-v1-NotificationState)
-  
+
 - [psim/api/v1/notifications.proto](#psim_api_v1_notifications-proto)
     - [ListMyNotificationsRequest](#psim-api-v1-ListMyNotificationsRequest)
     - [ListMyNotificationsResponse](#psim-api-v1-ListMyNotificationsResponse)
     - [MarkNotificationReadRequest](#psim-api-v1-MarkNotificationReadRequest)
     - [MarkNotificationReadResponse](#psim-api-v1-MarkNotificationReadResponse)
-  
+
     - [NotificationService](#psim-api-v1-NotificationService)
-  
+
 - [psim/api/v1/problem.proto](#psim_api_v1_problem-proto)
     - [FieldViolation](#psim-api-v1-FieldViolation)
     - [Problem](#psim-api-v1-Problem)
-  
+
 - [psim/api/v1/reports.proto](#psim_api_v1_reports-proto)
     - [ExportIncidentReportRequest](#psim-api-v1-ExportIncidentReportRequest)
     - [ExportIncidentReportResponse](#psim-api-v1-ExportIncidentReportResponse)
@@ -275,19 +275,19 @@
     - [GetIncidentReportResponse](#psim-api-v1-GetIncidentReportResponse)
     - [IncidentMetrics](#psim-api-v1-IncidentMetrics)
     - [ReportFilter](#psim-api-v1-ReportFilter)
-  
+
     - [ReportGrouping](#psim-api-v1-ReportGrouping)
-  
+
     - [ReportService](#psim-api-v1-ReportService)
-  
+
 - [psim/response/v1/run.proto](#psim_response_v1_run-proto)
     - [ResponseRun](#psim-response-v1-ResponseRun)
     - [StepExecution](#psim-response-v1-StepExecution)
     - [StepResult](#psim-response-v1-StepResult)
-  
+
     - [RunState](#psim-response-v1-RunState)
     - [StepState](#psim-response-v1-StepState)
-  
+
 - [psim/api/v1/response.proto](#psim_api_v1_response-proto)
     - [ArchivePlanRequest](#psim-api-v1-ArchivePlanRequest)
     - [ArchivePlanResponse](#psim-api-v1-ArchivePlanResponse)
@@ -317,16 +317,16 @@
     - [UpdateEscalationPolicyResponse](#psim-api-v1-UpdateEscalationPolicyResponse)
     - [ValidatePlanRequest](#psim-api-v1-ValidatePlanRequest)
     - [ValidatePlanResponse](#psim-api-v1-ValidatePlanResponse)
-  
+
     - [EscalationPolicyService](#psim-api-v1-EscalationPolicyService)
     - [ResponsePlanService](#psim-api-v1-ResponsePlanService)
     - [ResponseRunService](#psim-api-v1-ResponseRunService)
-  
+
 - [psim/processing/v1/mapping.proto](#psim_processing_v1_mapping-proto)
     - [MappingRule](#psim-processing-v1-MappingRule)
     - [MappingRule.AttributeMapEntry](#psim-processing-v1-MappingRule-AttributeMapEntry)
     - [MappingRuleSet](#psim-processing-v1-MappingRuleSet)
-  
+
 - [psim/processing/v1/rules.proto](#psim_processing_v1_rules-proto)
     - [AbsenceSpec](#psim-processing-v1-AbsenceSpec)
     - [ConjunctionSpec](#psim-processing-v1-ConjunctionSpec)
@@ -337,10 +337,10 @@
     - [SequenceSpec](#psim-processing-v1-SequenceSpec)
     - [SingleSpec](#psim-processing-v1-SingleSpec)
     - [ThresholdSpec](#psim-processing-v1-ThresholdSpec)
-  
+
     - [CorrelationScope](#psim-processing-v1-CorrelationScope)
     - [RuleState](#psim-processing-v1-RuleState)
-  
+
 - [psim/api/v1/rules.proto](#psim_api_v1_rules-proto)
     - [ActivateRuleSetRequest](#psim-api-v1-ActivateRuleSetRequest)
     - [ActivateRuleSetResponse](#psim-api-v1-ActivateRuleSetResponse)
@@ -368,17 +368,17 @@
     - [StartDryRunResponse](#psim-api-v1-StartDryRunResponse)
     - [ValidateRuleRequest](#psim-api-v1-ValidateRuleRequest)
     - [ValidateRuleResponse](#psim-api-v1-ValidateRuleResponse)
-  
+
     - [DryRunState](#psim-api-v1-DryRunState)
-  
+
     - [CorrelationRuleService](#psim-api-v1-CorrelationRuleService)
     - [MappingService](#psim-api-v1-MappingService)
-  
+
 - [psim/config/v1/config.proto](#psim_config_v1_config-proto)
     - [ConfigRecord](#psim-config-v1-ConfigRecord)
     - [ProcessingSettings](#psim-config-v1-ProcessingSettings)
     - [RetentionSettings](#psim-config-v1-RetentionSettings)
-  
+
 - [psim/api/v1/settings.proto](#psim_api_v1_settings-proto)
     - [GetSettingsRequest](#psim-api-v1-GetSettingsRequest)
     - [GetSettingsResponse](#psim-api-v1-GetSettingsResponse)
@@ -386,9 +386,17 @@
     - [UpdateProcessingSettingsResponse](#psim-api-v1-UpdateProcessingSettingsResponse)
     - [UpdateRetentionSettingsRequest](#psim-api-v1-UpdateRetentionSettingsRequest)
     - [UpdateRetentionSettingsResponse](#psim-api-v1-UpdateRetentionSettingsResponse)
-  
+
     - [SettingsService](#psim-api-v1-SettingsService)
-  
+
+- [psim/connector/v1/administration.proto](#psim_connector_v1_administration-proto)
+    - [ManageRequest](#psim-connector-v1-ManageRequest)
+    - [ManageResponse](#psim-connector-v1-ManageResponse)
+
+    - [RegistrationAction](#psim-connector-v1-RegistrationAction)
+
+    - [ConnectorAdministrationService](#psim-connector-v1-ConnectorAdministrationService)
+
 - [psim/connector/v1/connector.proto](#psim_connector_v1_connector-proto)
     - [BatchAck](#psim-connector-v1-BatchAck)
     - [Command](#psim-connector-v1-Command)
@@ -412,12 +420,12 @@
     - [StateObservation](#psim-connector-v1-StateObservation)
     - [StateObservation.ValuesEntry](#psim-connector-v1-StateObservation-ValuesEntry)
     - [StateReport](#psim-connector-v1-StateReport)
-  
+
     - [DeviceAvailability](#psim-connector-v1-DeviceAvailability)
     - [GoodbyeReason](#psim-connector-v1-GoodbyeReason)
-  
+
     - [ConnectorGatewayService](#psim-connector-v1-ConnectorGatewayService)
-  
+
 - [psim/incident/v1/events.proto](#psim_incident_v1_events-proto)
     - [IncidentAcknowledged](#psim-incident-v1-IncidentAcknowledged)
     - [IncidentAssigned](#psim-incident-v1-IncidentAssigned)
@@ -433,12 +441,16 @@
     - [IncidentResolved](#psim-incident-v1-IncidentResolved)
     - [IncidentWorkStarted](#psim-incident-v1-IncidentWorkStarted)
     - [SignalAttached](#psim-incident-v1-SignalAttached)
-  
+
 - [psim/ingest/v1/raw_event.proto](#psim_ingest_v1_raw_event-proto)
     - [RawEvent](#psim-ingest-v1-RawEvent)
     - [RawEvent.AttributesEntry](#psim-ingest-v1-RawEvent-AttributesEntry)
     - [RawEventRecord](#psim-ingest-v1-RawEventRecord)
-  
+
+- [psim/ingest/v1/state.proto](#psim_ingest_v1_state-proto)
+    - [ConnectorConnection](#psim-ingest-v1-ConnectorConnection)
+    - [GatewayStateRecord](#psim-ingest-v1-GatewayStateRecord)
+
 - [psim/processing/v1/internal.proto](#psim_processing_v1_internal-proto)
     - [CorrelationChangelogRecord](#psim-processing-v1-CorrelationChangelogRecord)
     - [CorrelationStateEntry](#psim-processing-v1-CorrelationStateEntry)
@@ -446,7 +458,7 @@
     - [RepartitionRecord](#psim-processing-v1-RepartitionRecord)
     - [RepartitionedEvent](#psim-processing-v1-RepartitionedEvent)
     - [SourceSequenceState](#psim-processing-v1-SourceSequenceState)
-  
+
 - [psim/response/v1/events.proto](#psim_response_v1_events-proto)
     - [CommandUpdated](#psim-response-v1-CommandUpdated)
     - [EscalationLevelTriggered](#psim-response-v1-EscalationLevelTriggered)
@@ -454,9 +466,9 @@
     - [ResponseEventRecord](#psim-response-v1-ResponseEventRecord)
     - [RunUpdated](#psim-response-v1-RunUpdated)
     - [SlaBreached](#psim-response-v1-SlaBreached)
-  
+
     - [RunChange](#psim-response-v1-RunChange)
-  
+
 - [psim/realtime/v1/realtime.proto](#psim_realtime_v1_realtime-proto)
     - [Authenticate](#psim-realtime-v1-Authenticate)
     - [Authenticated](#psim-realtime-v1-Authenticated)
@@ -471,9 +483,9 @@
     - [Subscribe](#psim-realtime-v1-Subscribe)
     - [Subscribed](#psim-realtime-v1-Subscribed)
     - [Unsubscribe](#psim-realtime-v1-Unsubscribe)
-  
+
     - [Stream](#psim-realtime-v1-Stream)
-  
+
 - [Scalar Value Types](#scalar-value-types)
 
 
@@ -526,7 +538,7 @@ See ADR-005. The payload type is defined by the oneof of the topic record (ADR-0
 
 
 
- 
+
 
 
 <a name="psim-common-v1-ActorKind"></a>
@@ -543,11 +555,11 @@ ActorKind is the kind of subject.
 | ACTOR_KIND_SYSTEM | 4 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -654,7 +666,7 @@ AuditEventRecord is the value of topic psim.audit.v1 (key: tenant_id).
 
 
 
- 
+
 
 
 <a name="psim-audit-v1-AuditOutcome"></a>
@@ -670,11 +682,11 @@ AuditOutcome is the result of the audited action.
 | AUDIT_OUTCOME_FAILED | 3 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -804,11 +816,11 @@ VerifyAuditIntegrityResponse is the response of VerifyAuditIntegrity.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-AuditService"></a>
@@ -822,7 +834,7 @@ AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Servi
 | VerifyAuditIntegrity | [VerifyAuditIntegrityRequest](#psim-api-v1-VerifyAuditIntegrityRequest) | [VerifyAuditIntegrityResponse](#psim-api-v1-VerifyAuditIntegrityResponse) | VerifyAuditIntegrity recomputes the chain over a range of records. |
 | ExportAuditRecords | [ExportAuditRecordsRequest](#psim-api-v1-ExportAuditRecordsRequest) | [ExportAuditRecordsResponse](#psim-api-v1-ExportAuditRecordsResponse) | ExportAuditRecords exports records with neighbouring hashes and checkpoints (JSON lines). |
 
- 
+
 
 
 
@@ -864,7 +876,7 @@ Position is a point on a floor plan in plan units.
 
 
 
- 
+
 
 
 <a name="psim-common-v1-EventClass"></a>
@@ -914,11 +926,11 @@ Severity of a single event.
 | SEVERITY_CRITICAL | 5 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -1162,7 +1174,7 @@ SourceTemplate describes a source every device of the type has.
 
 
 
- 
+
 
 
 <a name="psim-catalog-v1-LocationKind"></a>
@@ -1209,11 +1221,11 @@ ResourceState is the lifecycle state shared by catalog resources.
 | RESOURCE_STATE_ARCHIVED | 3 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -1940,7 +1952,7 @@ UploadFloorPlanResponse is the response of UploadFloorPlan.
 
 
 
- 
+
 
 
 <a name="psim-api-v1-ImportState"></a>
@@ -1956,9 +1968,9 @@ ImportState is the state of an import job.
 | IMPORT_STATE_FAILED | 3 |  |
 
 
- 
 
- 
+
+
 
 
 <a name="psim-api-v1-CatalogService"></a>
@@ -1991,7 +2003,7 @@ Owner: Resource Catalog. Scenarios S1, S2.
 | RotateConnectorCertificate | [RotateConnectorCertificateRequest](#psim-api-v1-RotateConnectorCertificateRequest) | [RotateConnectorCertificateResponse](#psim-api-v1-RotateConnectorCertificateResponse) | RotateConnectorCertificate adds a new certificate and sets expiry of the old one (C1). |
 | RevokeConnector | [RevokeConnectorRequest](#psim-api-v1-RevokeConnectorRequest) | [RevokeConnectorResponse](#psim-api-v1-RevokeConnectorResponse) | RevokeConnector revokes a connector and closes its sessions (C2). |
 
- 
+
 
 
 
@@ -2151,7 +2163,7 @@ CommandResultRecord is the value of topic psim.commands.results.v1 (key: command
 
 
 
- 
+
 
 
 <a name="psim-response-v1-CommandState"></a>
@@ -2173,11 +2185,11 @@ CommandState is the lifecycle state of a command.
 | COMMAND_STATE_CANCELLED | 9 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -2395,11 +2407,11 @@ RequestCommandResponse is the response of RequestCommand.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-CommandService"></a>
@@ -2416,7 +2428,7 @@ CommandService manages commands to devices. Owner: Command Service. Scenario S8.
 | RejectCommand | [RejectCommandRequest](#psim-api-v1-RejectCommandRequest) | [RejectCommandResponse](#psim-api-v1-RejectCommandResponse) | RejectCommand rejects a critical command. |
 | CancelCommand | [CancelCommandRequest](#psim-api-v1-CancelCommandRequest) | [CancelCommandResponse](#psim-api-v1-CancelCommandResponse) | CancelCommand cancels a command before it is sent. |
 
- 
+
 
 
 
@@ -2487,13 +2499,13 @@ EventRecord is the value of topic psim.events.normalized.v1 (key: site_id:zone_i
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -2625,11 +2637,11 @@ StoredEvent is a normalized event with its envelope times.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-EventHistoryService"></a>
@@ -2643,7 +2655,7 @@ EventHistoryService searches stored events (ADR-028). Owner: Event History. Scen
 | GetEvent | [GetEventRequest](#psim-api-v1-GetEventRequest) | [GetEventResponse](#psim-api-v1-GetEventResponse) | GetEvent returns one event. |
 | ListIncidentEvents | [ListIncidentEventsRequest](#psim-api-v1-ListIncidentEventsRequest) | [ListIncidentEventsResponse](#psim-api-v1-ListIncidentEventsResponse) | ListIncidentEvents returns source events of all signals of an incident. |
 
- 
+
 
 
 
@@ -2785,7 +2797,7 @@ TimelineEntry is one record of an incident timeline.
 
 
 
- 
+
 
 
 <a name="psim-incident-v1-IncidentState"></a>
@@ -2852,11 +2864,11 @@ TimelineEntryKind classifies timeline entries.
 | TIMELINE_ENTRY_KIND_NOTIFICATION | 10 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -3016,11 +3028,11 @@ ZoneStatus is the aggregated state of a zone.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-FeedService"></a>
@@ -3034,7 +3046,7 @@ FeedService serves console read models. Owner: Projection Service. Scenarios S6,
 | GetLocationStatus | [GetLocationStatusRequest](#psim-api-v1-GetLocationStatusRequest) | [GetLocationStatusResponse](#psim-api-v1-GetLocationStatusResponse) | GetLocationStatus returns the state of devices and zones of a location for the object view. |
 | GetOperatorLoad | [GetOperatorLoadRequest](#psim-api-v1-GetOperatorLoadRequest) | [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse) | GetOperatorLoad returns the current load of operators (supervisor). |
 
- 
+
 
 
 
@@ -3105,7 +3117,7 @@ SignalRecord is the value of topic psim.signals.v1 (key: grouping_key).
 
 
 
- 
+
 
 
 <a name="psim-processing-v1-SignalOriginKind"></a>
@@ -3120,11 +3132,11 @@ SignalOriginKind is the kind of signal producer.
 | SIGNAL_ORIGIN_KIND_EXTERNAL | 2 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -3662,11 +3674,11 @@ UpdateIncidentTypeResponse is the response of UpdateIncidentType.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-IncidentService"></a>
@@ -3693,7 +3705,7 @@ IncidentService manages incidents and incident types. Owner: Incident Service.
 | CreateIncidentType | [CreateIncidentTypeRequest](#psim-api-v1-CreateIncidentTypeRequest) | [CreateIncidentTypeResponse](#psim-api-v1-CreateIncidentTypeResponse) | CreateIncidentType creates an incident type. |
 | UpdateIncidentType | [UpdateIncidentTypeRequest](#psim-api-v1-UpdateIncidentTypeRequest) | [UpdateIncidentTypeResponse](#psim-api-v1-UpdateIncidentTypeResponse) | UpdateIncidentType replaces an incident type (If-Match required). |
 
- 
+
 
 
 
@@ -3736,11 +3748,11 @@ GetMeResponse is the response of GetMe.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-MeService"></a>
@@ -3752,7 +3764,7 @@ MeService describes the caller. Owner: API Gateway (from the access token and th
 | ----------- | ------------ | ------------- | ------------|
 | GetMe | [GetMeRequest](#psim-api-v1-GetMeRequest) | [GetMeResponse](#psim-api-v1-GetMeResponse) | GetMe returns the caller identity, roles, scopes and allowed actions. |
 
- 
+
 
 
 
@@ -4079,7 +4091,7 @@ WaitParams pauses the plan.
 
 
 
- 
+
 
 
 <a name="psim-response-v1-NotificationChannel"></a>
@@ -4109,11 +4121,11 @@ PlanState is the lifecycle state of a plan version.
 | PLAN_STATE_ARCHIVED | 3 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -4166,7 +4178,7 @@ Notification is a message to a recipient over a channel.
 
 
 
- 
+
 
 
 <a name="psim-response-v1-NotificationState"></a>
@@ -4184,11 +4196,11 @@ NotificationState is the delivery state.
 | NOTIFICATION_STATE_AGGREGATED | 5 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -4262,11 +4274,11 @@ MarkNotificationReadResponse is the response of MarkNotificationRead.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-NotificationService"></a>
@@ -4279,7 +4291,7 @@ NotificationService serves in-app notifications of the caller. Owner: Notificati
 | ListMyNotifications | [ListMyNotificationsRequest](#psim-api-v1-ListMyNotificationsRequest) | [ListMyNotificationsResponse](#psim-api-v1-ListMyNotificationsResponse) | ListMyNotifications lists in-app notifications of the caller; newest first. |
 | MarkNotificationRead | [MarkNotificationReadRequest](#psim-api-v1-MarkNotificationReadRequest) | [MarkNotificationReadResponse](#psim-api-v1-MarkNotificationReadResponse) | MarkNotificationRead marks an in-app notification as read. |
 
- 
+
 
 
 
@@ -4328,13 +4340,13 @@ Problem is the error body of every failed REST request (RFC 9457).
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -4450,7 +4462,7 @@ ReportFilter selects incidents for a report.
 
 
 
- 
+
 
 
 <a name="psim-api-v1-ReportGrouping"></a>
@@ -4469,9 +4481,9 @@ ReportGrouping is the grouping dimension of report rows.
 | REPORT_GROUPING_DAY | 6 |  |
 
 
- 
 
- 
+
+
 
 
 <a name="psim-api-v1-ReportService"></a>
@@ -4485,7 +4497,7 @@ Owner: Projection Service. Scenario S13.
 | GetIncidentReport | [GetIncidentReportRequest](#psim-api-v1-GetIncidentReportRequest) | [GetIncidentReportResponse](#psim-api-v1-GetIncidentReportResponse) | GetIncidentReport returns incident metrics for a period. |
 | ExportIncidentReport | [ExportIncidentReportRequest](#psim-api-v1-ExportIncidentReportRequest) | [ExportIncidentReportResponse](#psim-api-v1-ExportIncidentReportResponse) | ExportIncidentReport exports the same report as CSV. |
 
- 
+
 
 
 
@@ -4560,7 +4572,7 @@ StepResult is what the step produced.
 
 
 
- 
+
 
 
 <a name="psim-response-v1-RunState"></a>
@@ -4593,11 +4605,11 @@ StepState is the state of a step.
 | STEP_STATE_CANCELLED | 6 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -5045,11 +5057,11 @@ ValidatePlanResponse is the response of ValidatePlan.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-EscalationPolicyService"></a>
@@ -5092,7 +5104,7 @@ ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
 | RetryStep | [RetryStepRequest](#psim-api-v1-RetryStepRequest) | [RetryStepResponse](#psim-api-v1-RetryStepResponse) | RetryStep retries a failed step. |
 | OverrideStep | [OverrideStepRequest](#psim-api-v1-OverrideStepRequest) | [OverrideStepResponse](#psim-api-v1-OverrideStepResponse) | OverrideStep completes a failed step by a supervisor decision. |
 
- 
+
 
 
 
@@ -5159,13 +5171,13 @@ Published in psim.config.v1 under key &#34;mapping/&lt;tenant_id&gt;/&lt;connect
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -5338,7 +5350,7 @@ ThresholdSpec fires when at least count matching events occur within the window.
 
 
 
- 
+
 
 
 <a name="psim-processing-v1-CorrelationScope"></a>
@@ -5372,11 +5384,11 @@ RuleState is the lifecycle state of a rule version.
 | RULE_STATE_ARCHIVED | 4 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -5790,7 +5802,7 @@ ValidateRuleResponse is the response of ValidateRule.
 
 
 
- 
+
 
 
 <a name="psim-api-v1-DryRunState"></a>
@@ -5806,9 +5818,9 @@ DryRunState is the state of a dry run.
 | DRY_RUN_STATE_FAILED | 3 |  |
 
 
- 
 
- 
+
+
 
 
 <a name="psim-api-v1-CorrelationRuleService"></a>
@@ -5841,7 +5853,7 @@ MappingService manages mapping rules of connector types. Owner: Normalizer. Scen
 | GetMappingRuleSet | [GetMappingRuleSetRequest](#psim-api-v1-GetMappingRuleSetRequest) | [GetMappingRuleSetResponse](#psim-api-v1-GetMappingRuleSetResponse) | GetMappingRuleSet returns the active mapping rule set of a connector type. |
 | PublishMappingRuleSet | [PublishMappingRuleSetRequest](#psim-api-v1-PublishMappingRuleSetRequest) | [PublishMappingRuleSetResponse](#psim-api-v1-PublishMappingRuleSetResponse) | PublishMappingRuleSet validates and publishes a new version (M1-M3). |
 
- 
+
 
 
 
@@ -5909,13 +5921,13 @@ RetentionSettings are data retention periods of a tenant.
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -6011,11 +6023,11 @@ UpdateRetentionSettingsResponse is the response of UpdateRetentionSettings.
 
 
 
- 
 
- 
 
- 
+
+
+
 
 
 <a name="psim-api-v1-SettingsService"></a>
@@ -6030,7 +6042,88 @@ Owner: Resource Catalog; changes are published to psim.config.v1.
 | UpdateRetentionSettings | [UpdateRetentionSettingsRequest](#psim-api-v1-UpdateRetentionSettingsRequest) | [UpdateRetentionSettingsResponse](#psim-api-v1-UpdateRetentionSettingsResponse) | UpdateRetentionSettings replaces retention settings (If-Match required). |
 | UpdateProcessingSettings | [UpdateProcessingSettingsRequest](#psim-api-v1-UpdateProcessingSettingsRequest) | [UpdateProcessingSettingsResponse](#psim-api-v1-UpdateProcessingSettingsResponse) | UpdateProcessingSettings replaces processing settings (If-Match required). |
 
- 
+
+
+
+
+<a name="psim_connector_v1_administration-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/connector/v1/administration.proto
+
+
+
+<a name="psim-connector-v1-ManageRequest"></a>
+
+### ManageRequest
+ManageRequest is idempotent per tenant, operator and request_id.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| action | [RegistrationAction](#psim-connector-v1-RegistrationAction) |  |  |
+| connector | [psim.catalog.v1.Connector](#psim-catalog-v1-Connector) |  | Only registration uses name, connector_type and limits; credentials are derived from PEM. |
+| expected_version | [uint64](#uint64) |  |  |
+| certificate_pem | [string](#string) |  | Public certificate only; the private key never leaves the connector. |
+| fingerprint | [string](#string) |  | Required for revocation, ignored for other actions. |
+
+
+
+
+
+
+<a name="psim-connector-v1-ManageResponse"></a>
+
+### ManageResponse
+ManageResponse returns the committed registration and global enforcement revision.
+A deadline error can mean that the change committed but enforcement is still pending;
+retry the exact request with its original request_id to resolve that outcome.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connector | [psim.catalog.v1.Connector](#psim-catalog-v1-Connector) |  |  |
+| revision | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+
+
+<a name="psim-connector-v1-RegistrationAction"></a>
+
+### RegistrationAction
+RegistrationAction selects a credential or registration change.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| REGISTRATION_ACTION_UNSPECIFIED | 0 |  |
+| REGISTRATION_ACTION_REGISTER | 1 |  |
+| REGISTRATION_ACTION_ROTATE | 2 |  |
+| REGISTRATION_ACTION_REVOKE | 3 |  |
+| REGISTRATION_ACTION_RECOVER | 4 |  |
+| REGISTRATION_ACTION_DISABLE | 5 |  |
+| REGISTRATION_ACTION_INSPECT | 6 |  |
+
+
+
+
+
+
+
+<a name="psim-connector-v1-ConnectorAdministrationService"></a>
+
+### ConnectorAdministrationService
+ConnectorAdministrationService manages registrations over mTLS and delegated operator JWTs.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| Manage | [ManageRequest](#psim-connector-v1-ManageRequest) | [ManageResponse](#psim-connector-v1-ManageResponse) | Manage commits a versioned change and waits until live gateways enforce it. |
+
+
 
 
 
@@ -6437,7 +6530,7 @@ Missing sources remain unknown; complete does not imply that all devices are onl
 
 
 
- 
+
 
 
 <a name="psim-connector-v1-DeviceAvailability"></a>
@@ -6469,9 +6562,9 @@ GoodbyeReason is the reason to close a session.
 | GOODBYE_REASON_PROTOCOL_ERROR | 5 |  |
 
 
- 
 
- 
+
+
 
 
 <a name="psim-connector-v1-ConnectorGatewayService"></a>
@@ -6484,7 +6577,7 @@ Transport: gRPC over TLS 1.3 with mutual TLS; the client certificate identifies 
 | ----------- | ------------ | ------------- | ------------|
 | Session | [SessionRequest](#psim-connector-v1-SessionRequest) stream | [SessionResponse](#psim-connector-v1-SessionResponse) stream | Session is the single bidirectional stream of a connector session. The first client message must be Register; the server answers Registered or closes the stream. |
 
- 
+
 
 
 
@@ -6726,13 +6819,13 @@ SignalAttached is published when a signal joins an open incident.
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -6761,6 +6854,9 @@ envelope.sequence is the source sequence number, envelope.occurred_at is the eve
 | attributes | [RawEvent.AttributesEntry](#psim-ingest-v1-RawEvent-AttributesEntry) | repeated |  |
 | clock_skew_corrected | [bool](#bool) |  | Set when occurred_at was replaced with received_at because of clock skew (ADR-010). |
 | source_occurred_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Original source timestamp when clock_skew_corrected is set. |
+| live_observation | [bool](#bool) |  | True only for a recent observation captured in the authenticated gateway session. |
+| observation_session_id | [string](#string) |  |  |
+| gateway_session_id | [string](#string) |  | Authenticated receiving session, including when the event is historical replay. |
 
 
 
@@ -6798,13 +6894,66 @@ RawEventRecord is the value of topic psim.ingest.raw.v1 (key: source_id).
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
+
+
+
+<a name="psim_ingest_v1_state-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/ingest/v1/state.proto
+
+
+
+<a name="psim-ingest-v1-ConnectorConnection"></a>
+
+### ConnectorConnection
+ConnectorConnection never implies that its equipment has a current observation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| online | [bool](#bool) |  |  |
+| reason | [string](#string) |  |  |
+| quality | [string](#string) |  | A new session always starts with unknown equipment quality. |
+
+
+
+
+
+
+<a name="psim-ingest-v1-GatewayStateRecord"></a>
+
+### GatewayStateRecord
+GatewayStateRecord carries authenticated connection and equipment observations.
+Topic psim.ingest.state.v1 is keyed by connector_id; source cursors order equipment updates.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| envelope | [psim.common.v1.Envelope](#psim-common-v1-Envelope) |  |  |
+| connector_id | [string](#string) |  |  |
+| session_id | [string](#string) |  |  |
+| connection | [ConnectorConnection](#psim-ingest-v1-ConnectorConnection) |  |  |
+| state_report | [psim.connector.v1.StateReport](#psim-connector-v1-StateReport) |  |  |
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -6920,13 +7069,13 @@ SourceSequenceState is the deduplication tracker of one source epoch.
 
 
 
- 
 
- 
 
- 
 
- 
+
+
+
+
 
 
 
@@ -7040,7 +7189,7 @@ SlaBreached reports that an incident missed its SLA.
 
 
 
- 
+
 
 
 <a name="psim-response-v1-RunChange"></a>
@@ -7062,11 +7211,11 @@ StepFailed, MandatoryStepsChanged, ResponseRunCompleted, ResponseRunCancelled.
 | RUN_CHANGE_RUN_CANCELLED | 8 |  |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 
@@ -7285,7 +7434,7 @@ Unsubscribe closes a subscription.
 
 
 
- 
+
 
 
 <a name="psim-realtime-v1-Stream"></a>
@@ -7300,11 +7449,11 @@ Stream selects what to receive.
 | STREAM_INCIDENT | 2 | Changes of one incident (filter.incident_id required). |
 
 
- 
 
- 
 
- 
+
+
+
 
 
 

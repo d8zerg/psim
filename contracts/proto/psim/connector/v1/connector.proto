@@ -5,6 +5,11 @@ package psim.connector.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
 import "google/protobuf/timestamp.proto";
+// Standard RPC error details are serialized into transport trailers by the gateway.
+// buf:lint:ignore IMPORT_USED
+import "google/rpc/error_details.proto";
+// buf:lint:ignore IMPORT_USED
+import "google/rpc/status.proto";
 
 // ConnectorGatewayService is the connector protocol v1 (ADR-017).
 // Transport: gRPC over TLS 1.3 with mutual TLS; the client certificate identifies the connector.

@@ -39,4 +39,9 @@ message RawEvent {
   bool clock_skew_corrected = 7;
   // Original source timestamp when clock_skew_corrected is set.
   google.protobuf.Timestamp source_occurred_at = 8;
+  // True only for a recent observation captured in the authenticated gateway session.
+  bool live_observation = 9;
+  string observation_session_id = 10;
+  // Authenticated receiving session, including when the event is historical replay.
+  string gateway_session_id = 11;
 }

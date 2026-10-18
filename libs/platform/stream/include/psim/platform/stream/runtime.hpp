@@ -28,6 +28,12 @@ inline constexpr std::string_view kSettings = R"({"type":"object","additionalPro
  "brokers":{"type":"string","default":"kafka-1:19092"},
  "registry":{"type":"string","default":"http://registry:8080/apis/ccompat/v7"},
  "allow_plaintext":{"type":"boolean","default":false},
+ "kafka_ca_file":{"type":"string","default":""},
+ "kafka_certificate_file":{"type":"string","default":""},
+ "kafka_private_key_file":{"type":"string","default":""},
+ "pg_ca_file":{"type":"string","default":""},
+ "pg_certificate_file":{"type":"string","default":""},
+ "pg_private_key_file":{"type":"string","default":""},
  "pg_host":{"type":"string","default":"postgres"},
  "pg_password_file":{"type":"string","x-psim-secret":true},
  "listen_port":{"type":"integer","minimum":1,"maximum":65535,"default":8080},
@@ -67,6 +73,7 @@ class Worker : public runtime::Component, public kafka::Handler {
 
   [[nodiscard]] const asio::any_io_executor& executor() const { return executor_; }
 
+  [[nodiscard]] kafka::ClientOptions kafka_options(std::string client_id) const;
   asio::awaitable<Result<void>> schema(std::string topic);
   asio::awaitable<Result<std::unique_ptr<pg::Pool>>> database();
   [[nodiscard]] kafka::Record record(std::string topic, std::string key, const google::protobuf::Message& value,

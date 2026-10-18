@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package psim.ingest.v1;
+
+import "psim/common/v1/envelope.proto";
+import "psim/connector/v1/connector.proto";
+
+// GatewayStateRecord carries authenticated connection and equipment observations.
+// Topic psim.ingest.state.v1 is keyed by connector_id; source cursors order equipment updates.
+message GatewayStateRecord {
+  psim.common.v1.Envelope envelope = 1;
+  string connector_id = 2;
+  string session_id = 3;
+  oneof payload {
+    ConnectorConnection connection = 4;
+    psim.connector.v1.StateReport state_report = 5;
+  }
+}
+
+// ConnectorConnection never implies that its equipment has a current observation.
+message ConnectorConnection {
+  bool online = 1;
+  string reason = 2;
+  // A new session always starts with unknown equipment quality.
+  string quality = 3;
+}

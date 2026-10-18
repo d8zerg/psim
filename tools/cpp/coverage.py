@@ -34,6 +34,10 @@ def test_binaries(build_dir):
         command = test.get("command") or []
         if command and command[0] not in binaries:
             binaries.append(command[0])
+    # Services execute outside CTest during component checks; include their coverage maps.
+    for binary in sorted(glob.glob(os.path.join(build_dir, "services", "*", "psim-*"))):
+        if os.path.isfile(binary) and os.access(binary, os.X_OK) and binary not in binaries:
+            binaries.append(binary)
     return binaries
 
 

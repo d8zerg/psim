@@ -4,6 +4,7 @@
 #include <nlohmann/json.hpp>
 #include <psim/connector/v1/connector.pb.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <exception>
@@ -93,11 +94,39 @@ int main(int argc, char** argv) {
                                               .otlp_endpoint = "otel-collector:4317",
                                               .sampling_ratio = 1,
                                               .otlp_tls = false});
+    const auto next = [&](connector::v1::SessionResponse::MessageCase type) {
+      while (session->Read(&response)) {
+        if (response.message_case() == type) {
+          return true;
+        }
+        if (!response.has_heartbeat()) {
+          return false;
+        }
+      }
+      return false;
+    };
     const auto started = std::chrono::steady_clock::now();
+    auto heartbeat_at = started + std::chrono::seconds(2);
+    const auto heartbeat = [&] {
+      connector::v1::SessionRequest pulse;
+      *pulse.mutable_heartbeat()->mutable_sent_at() = google::protobuf::util::TimeUtil::GetCurrentTime();
+      if (!session->Write(pulse) || !next(connector::v1::SessionResponse::kHeartbeat)) {
+        throw std::runtime_error("heartbeat failed");
+      }
+      heartbeat_at = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+    };
     for (int i = 0; i < count; ++i) {
       // Open-loop schedule: source time is the intended send time, including generator lateness.
       const auto scheduled = started + std::chrono::milliseconds(i * interval);
-      std::this_thread::sleep_until(scheduled);
+      while (std::chrono::steady_clock::now() < scheduled) {
+        std::this_thread::sleep_until(std::min(scheduled, heartbeat_at));
+        if (std::chrono::steady_clock::now() >= heartbeat_at) {
+          heartbeat();
+        }
+      }
+      if (std::chrono::steady_clock::now() >= heartbeat_at) {
+        heartbeat();
+      }
       const auto late = std::chrono::steady_clock::now() - scheduled;
       const auto wall = std::chrono::system_clock::now() - late;
       const auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(wall.time_since_epoch()).count();
@@ -106,7 +135,6 @@ int main(int argc, char** argv) {
       platform::kafka::inject(*trace, headers);
       request.Clear();
       auto* batch = request.mutable_event_batch();
-      batch->set_batch_seq(static_cast<std::uint64_t>(i) + 1);
       auto* event = batch->add_events();
       event->set_event_id(platform::stream::uuid7());
       event->set_source_ref(source);
@@ -116,11 +144,12 @@ int main(int argc, char** argv) {
       event->set_raw_code(code);
       event->set_traceparent(headers.at(0).second);
       for (int attempt = 0; attempt < repeat; ++attempt) {
-        if (!session->Write(request) || !session->Read(&response) || !response.has_batch_ack()
+        batch->set_batch_seq(static_cast<std::uint64_t>((i * repeat) + attempt) + 1);
+        if (!session->Write(request) || !next(connector::v1::SessionResponse::kBatchAck)
             || response.batch_ack().accepted() != 1) {
           throw std::runtime_error("event was not acknowledged");
         }
-        if (!session->Read(&response) || !response.has_credits()) {
+        if (!next(connector::v1::SessionResponse::kCredits)) {
           throw std::runtime_error("missing credits");
         }
       }

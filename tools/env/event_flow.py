@@ -17,7 +17,8 @@ PLAYWRIGHT = "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af
 
 
 def compose(project, *args, **kwargs):
-    return subprocess.run(["docker", "compose", "-p", project, "-f", "deploy/local/compose.yaml", *args],
+    overlay = ["-f", "deploy/local/compose.sanitizer.yaml"] if PRESET == "tsan" else []
+    return subprocess.run(["docker", "compose", "-p", project, "-f", "deploy/local/compose.yaml", *overlay, *args],
                           cwd=ROOT, check=True, text=True, capture_output=True,
                           env={**os.environ, "PSIM_UID": str(os.getuid()), "PSIM_GID": str(os.getgid())}, **kwargs)
 
@@ -109,7 +110,8 @@ def main(project):
     time.sleep(1)
     assert int(sql(project, "SELECT count(*) FROM incident.psim_inbox")) == before + expected
     toolchain = "psim-platform/toolchain:debian13-" + hashlib.sha256((ROOT / "tools/toolchain/Dockerfile").read_bytes()).hexdigest()[:12]
-    probe = subprocess.run(["docker", "run", "--rm", "--network", project + "_default", "-u", f"{os.getuid()}:{os.getgid()}",
+    security = ["--security-opt", "seccomp=unconfined"] if PRESET == "tsan" else []
+    probe = subprocess.run(["docker", "run", "--rm", *security, "--network", project + "_default", "-u", f"{os.getuid()}:{os.getgid()}",
         "-v", f"{ROOT}:/repo", "-w", "/repo", "-e", f"LLVM_PROFILE_FILE=/repo/build/debian13/{PRESET}/profiles/%p-%m.profraw", toolchain,
         f"build/debian13/{PRESET}/tools/event-flow/psim-event-flow-probe", "/repo/build/event-flow-test/input.json"], capture_output=True, text=True, check=True)
     accounting = json.loads(probe.stdout)
