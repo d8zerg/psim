@@ -1,4 +1,4 @@
-# Native analytical adapter and durable Kafka batch loader (step 2.8, ADR-028).
+# Native analytical adapter and durable Kafka batch loader (ADR-028).
 find_package(clickhouse-cpp REQUIRED CONFIG)
 find_package(RdKafka REQUIRED CONFIG)
 find_package(OpenSSL REQUIRED CONFIG)

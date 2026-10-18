@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Architecture fitness functions of the C++ code base (step 1.2, ADR-001, ADR-033).
+"""Architecture fitness functions of the C++ code base (ADR-001, ADR-033).
 
   deps <root> <build-dir>  FF-01: module dependency directions in the CMake target graph (File API
                            code model of a configured build) and in #include directives
@@ -38,8 +38,8 @@ cassert cctype cerrno cfenv cfloat cinttypes climits clocale cmath csetjmp csign
 cstdint cstdio cstdlib cstring ctime cuchar cwchar cwctype
 """.split())
 
-# FF-02. The domain core is deterministic: time, randomness and I/O come through ports
-# (crosscutting.md section 12), errors are values (std::expected), execution is single-threaded.
+# FF-02. The domain core is deterministic: time, randomness and I/O come through ports,
+# errors are values (std::expected), execution is single-threaded.
 PURITY_HEADERS = {
     "ctime": "system time; use the Clock port",
     "random": "randomness; use the Random or IdGenerator port",

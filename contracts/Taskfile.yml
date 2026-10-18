@@ -1,4 +1,4 @@
-# Contracts: buf, OpenAPI, AsyncAPI, proto reference, consistency checks (step 0.5).
+# Contracts: buf, OpenAPI, AsyncAPI, proto reference, consistency checks.
 # Included from the root Taskfile as namespace "contracts"; working directory is contracts/.
 version: '3'
 

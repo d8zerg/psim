@@ -1,7 +1,7 @@
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vitest/config";
 
-// Logic of the console (stores, routing glue) is covered at 80% (strategy.md section 6).
+// Logic of the console (stores, routing glue) is covered at 80%.
 export default defineConfig({
   plugins: [react()],
   test: {

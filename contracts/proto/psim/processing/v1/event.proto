@@ -32,7 +32,7 @@ message Event {
   uint32 source_epoch = 10;
   // Vendor event code, always preserved.
   string raw_code = 11;
-  // Standard attributes (event-taxonomy.md, section 6) and connector attributes prefixed with "x.".
+  // Standard taxonomy attributes and connector attributes prefixed with "x.".
   map<string, string> attributes = 12;
   // Significant events are stored long-term in Event History (ADR-028).
   bool significant = 13;

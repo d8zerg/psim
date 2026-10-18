@@ -1,4 +1,4 @@
-# Kafka topic registry - single source of truth for topics (data-flows.md, scaling.md, ADR-006, ADR-007).
+# Kafka topic registry - single source of truth for topics (ADR-006, ADR-007).
 # Generates contracts/asyncapi/psim-topics.yaml; used by the installer to create topics.
 # partitions: per deployment profile; replication: cluster RF 3 / min.insync 2, single node RF 1.
 # retention: ISO 8601 duration or "infinite"; cleanup: delete | compact.
@@ -157,7 +157,7 @@ topics:
     consumers: [audit-service]
 
 dlq:
-  # psim.dlq.<stage>.v1: original bytes and key, error in headers (data-flows.md, 3.10).
+  # psim.dlq.<stage>.v1: original bytes and key, error in headers.
   stages: [normalizer, correlation, history, incident, response, command, notification, audit, projection]
   partitions: {cluster: 3, single: 1}
   retention: P14D

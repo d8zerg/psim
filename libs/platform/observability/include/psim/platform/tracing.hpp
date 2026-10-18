@@ -19,7 +19,7 @@ struct TracingOptions {
   std::string instance;
   /// OTLP gRPC endpoint of the Collector, for example "otel-collector:4317"; empty disables export.
   std::string otlp_endpoint;
-  /// Head sampling of new traces; a sampled parent is always followed (crosscutting.md 6.1).
+  /// Head sampling of new traces; a sampled parent is always followed.
   double sampling_ratio = 0.01;
   bool otlp_tls = true;
   std::string otlp_ca_file{};

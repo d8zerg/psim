@@ -870,7 +870,7 @@ Position is a point on a floor plan in plan units.
 <a name="psim-common-v1-EventClass"></a>
 
 ### EventClass
-EventClass is the behavioural class of a taxonomy type (event-taxonomy.md, section 2).
+EventClass is the behavioural class of a taxonomy type.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -902,7 +902,7 @@ Priority of a signal or an incident; P1 is the highest.
 <a name="psim-common-v1-Severity"></a>
 
 ### Severity
-Severity of a single event (event-taxonomy.md, section 3).
+Severity of a single event.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -986,7 +986,7 @@ CertificateFingerprint binds an mTLS client certificate to a connector.
 <a name="psim-catalog-v1-Connector"></a>
 
 ### Connector
-Connector is a registered connector with its credentials and limits (aggregates.md, 1.4).
+Connector is a registered connector with its credentials and limits.
 
 
 | Field | Type | Label | Description |
@@ -1023,7 +1023,7 @@ ConnectorLimits are per-connector ingestion limits enforced by the gateway.
 <a name="psim-catalog-v1-Device"></a>
 
 ### Device
-Device is a physical or logical device with its sources (aggregates.md, 1.3).
+Device is a physical or logical device with its sources.
 
 
 | Field | Type | Label | Description |
@@ -1049,7 +1049,7 @@ Device is a physical or logical device with its sources (aggregates.md, 1.3).
 <a name="psim-catalog-v1-DeviceType"></a>
 
 ### DeviceType
-DeviceType describes a class of devices, its sources and capabilities (aggregates.md, 1.2).
+DeviceType describes a class of devices, its sources and capabilities.
 
 
 | Field | Type | Label | Description |
@@ -1089,7 +1089,7 @@ FloorPlan is an image of a floor with a coordinate system for device positions.
 <a name="psim-catalog-v1-Location"></a>
 
 ### Location
-Location is a site, building, floor or zone (aggregates.md, 1.1).
+Location is a site, building, floor or zone.
 
 
 | Field | Type | Label | Description |
@@ -1518,7 +1518,7 @@ GetLocationResponse is the response of GetLocation.
 <a name="psim-api-v1-ImportJob"></a>
 
 ### ImportJob
-ImportJob is a bulk import and its results (aggregates.md, 1.5).
+ImportJob is a bulk import and its results.
 
 
 | Field | Type | Label | Description |
@@ -2005,7 +2005,7 @@ Owner: Resource Catalog. Scenarios S1, S2.
 <a name="psim-response-v1-Command"></a>
 
 ### Command
-Command is a request to act on a device (aggregates.md, 5.3; state-models.md, 3).
+Command is a request to act on a device.
 
 
 | Field | Type | Label | Description |
@@ -2447,7 +2447,7 @@ envelope.sequence equals the source sequence number.
 | connector_id | [string](#string) |  |  |
 | source_epoch | [uint32](#uint32) |  |  |
 | raw_code | [string](#string) |  | Vendor event code, always preserved. |
-| attributes | [Event.AttributesEntry](#psim-processing-v1-Event-AttributesEntry) | repeated | Standard attributes (event-taxonomy.md, section 6) and connector attributes prefixed with &#34;x.&#34;. |
+| attributes | [Event.AttributesEntry](#psim-processing-v1-Event-AttributesEntry) | repeated | Standard taxonomy attributes and connector attributes prefixed with &#34;x.&#34;. |
 | significant | [bool](#bool) |  | Significant events are stored long-term in Event History (ADR-028). |
 | clock_skew_corrected | [bool](#bool) |  | Event time was corrected because of source clock skew (ADR-010). |
 
@@ -2657,7 +2657,7 @@ EventHistoryService searches stored events (ADR-028). Owner: Event History. Scen
 <a name="psim-incident-v1-Incident"></a>
 
 ### Incident
-Incident is the central aggregate (aggregates.md, 4.2; state-models.md, 1; ADR-027).
+Incident groups signals and tracks the response lifecycle (ADR-027).
 
 
 | Field | Type | Label | Description |
@@ -2694,7 +2694,7 @@ Incident is the central aggregate (aggregates.md, 4.2; state-models.md, 1; ADR-0
 <a name="psim-incident-v1-IncidentType"></a>
 
 ### IncidentType
-IncidentType is a class of situations that defines response plan and SLA (aggregates.md, 4.1).
+IncidentType is a class of situations that defines response plan and SLA.
 
 
 | Field | Type | Label | Description |
@@ -3673,7 +3673,6 @@ UpdateIncidentTypeResponse is the response of UpdateIncidentType.
 
 ### IncidentService
 IncidentService manages incidents and incident types. Owner: Incident Service.
-Scenarios S5-S7, S9. State transitions follow state-models.md, section 1.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -3917,7 +3916,7 @@ EscalationLevel is one level of escalation.
 <a name="psim-response-v1-EscalationPolicy"></a>
 
 ### EscalationPolicy
-EscalationPolicy defines SLA and escalation levels (aggregates.md, 5.4).
+EscalationPolicy defines SLA and escalation levels.
 
 
 | Field | Type | Label | Description |
@@ -4003,7 +4002,7 @@ Recipient is a notification recipient: a user or a role within the incident scop
 <a name="psim-response-v1-ResponsePlan"></a>
 
 ### ResponsePlan
-ResponsePlan is one immutable version of a response plan (aggregates.md, 5.1).
+ResponsePlan is one immutable version of a response plan.
 
 
 | Field | Type | Label | Description |
@@ -4128,7 +4127,7 @@ PlanState is the lifecycle state of a plan version.
 <a name="psim-response-v1-Notification"></a>
 
 ### Notification
-Notification is a message to a recipient over a channel (aggregates.md, 5.6).
+Notification is a message to a recipient over a channel.
 
 
 | Field | Type | Label | Description |
@@ -4173,7 +4172,7 @@ Notification is a message to a recipient over a channel (aggregates.md, 5.6).
 <a name="psim-response-v1-NotificationState"></a>
 
 ### NotificationState
-NotificationState is the delivery state (state-models.md, 6).
+NotificationState is the delivery state.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -4413,7 +4412,7 @@ GetIncidentReportResponse is the response of GetIncidentReport.
 <a name="psim-api-v1-IncidentMetrics"></a>
 
 ### IncidentMetrics
-IncidentMetrics are incident metrics for a group (definitions in acceptance-spec.md, S13).
+IncidentMetrics are incident counts, response times and SLA compliance for a group.
 
 
 | Field | Type | Label | Description |
@@ -4500,7 +4499,7 @@ Owner: Projection Service. Scenario S13.
 <a name="psim-response-v1-ResponseRun"></a>
 
 ### ResponseRun
-ResponseRun is the execution of a plan version for an incident (aggregates.md, 5.2).
+ResponseRun is the execution of a plan version for an incident.
 
 
 | Field | Type | Label | Description |
@@ -4567,7 +4566,7 @@ StepResult is what the step produced.
 <a name="psim-response-v1-RunState"></a>
 
 ### RunState
-RunState is the lifecycle state of a run (state-models.md, 2.1).
+RunState is the lifecycle state of a run.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -4581,7 +4580,7 @@ RunState is the lifecycle state of a run (state-models.md, 2.1).
 <a name="psim-response-v1-StepState"></a>
 
 ### StepState
-StepState is the state of a step (state-models.md, 2.2).
+StepState is the state of a step.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -5142,8 +5141,8 @@ MappingRule maps a raw event to a taxonomy type.
 <a name="psim-processing-v1-MappingRuleSet"></a>
 
 ### MappingRuleSet
-MappingRuleSet is a published version of mapping rules for one connector type
-(aggregates.md, 3.1). Published in psim.config.v1 under key &#34;mapping/&lt;tenant_id&gt;/&lt;connector_type&gt;&#34;.
+MappingRuleSet is a published version of mapping rules for one connector type.
+Published in psim.config.v1 under key &#34;mapping/&lt;tenant_id&gt;/&lt;connector_type&gt;&#34;.
 
 
 | Field | Type | Label | Description |
@@ -5212,7 +5211,7 @@ ConjunctionSpec fires when every part matched within the window, in any order.
 <a name="psim-processing-v1-CorrelationRule"></a>
 
 ### CorrelationRule
-CorrelationRule is one immutable version of a correlation rule (aggregates.md, 3.3; ADR-011).
+CorrelationRule is one immutable version of a correlation rule (ADR-011).
 
 
 | Field | Type | Label | Description |
@@ -5282,7 +5281,7 @@ RuleOutput describes the signal produced by a rule.
 <a name="psim-processing-v1-RuleSet"></a>
 
 ### RuleSet
-RuleSet is the set of rule versions active for a tenant (aggregates.md, 3.4).
+RuleSet is the set of rule versions active for a tenant.
 Published in psim.config.v1 under key &#34;ruleset/&lt;tenant_id&gt;&#34;.
 
 
@@ -5345,7 +5344,7 @@ ThresholdSpec fires when at least count matching events occur within the window.
 <a name="psim-processing-v1-CorrelationScope"></a>
 
 ### CorrelationScope
-CorrelationScope defines the correlation key of a rule (scaling.md, 3).
+CorrelationScope defines the correlation key of a rule.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -5362,7 +5361,7 @@ CorrelationScope defines the correlation key of a rule (scaling.md, 3).
 <a name="psim-processing-v1-RuleState"></a>
 
 ### RuleState
-RuleState is the lifecycle state of a rule version (state-models.md, 5).
+RuleState is the lifecycle state of a rule version.
 
 | Name | Number | Description |
 | ---- | ------ | ----------- |
@@ -6907,7 +6906,7 @@ RepartitionedEvent carries an event already filtered by a rule wider than a zone
 <a name="psim-processing-v1-SourceSequenceState"></a>
 
 ### SourceSequenceState
-SourceSequenceState is the deduplication tracker of one source epoch (data-flows.md, 3.2).
+SourceSequenceState is the deduplication tracker of one source epoch.
 
 
 | Field | Type | Label | Description |

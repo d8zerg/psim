@@ -1,4 +1,4 @@
-# C++ formatting of PSIM (step 1.2, coding standard: docs/engineering/cpp-coding-standard.md).
+# C++ formatting of psim.
 # clang-format 21 from the toolchain image; check: task cpp:format, fix: task cpp:format:fix.
 BasedOnStyle: Google
 Language: Cpp

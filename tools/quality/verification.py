@@ -1,14 +1,13 @@
 #!/usr/bin/env python3
-"""Verification registry: render the matrix and verify coverage (step 0.7).
+"""Verification registry: render the matrix and verify coverage.
 
 Commands:
   render <repo-root> <verification.yaml> <out.md>
-      Generate the Markdown verification matrix: goals of plan tables 1.3 and 1.4 with
-      targets and methods, scenarios S1-S13, method catalog, methods by plan step.
+      Generate the Markdown verification matrix: service and engineering quality goals,
+      targets and methods, acceptance scenarios, method catalog and implementation coverage.
   verify <repo-root> <verification.yaml>
-      Check the registry. DoD of step 0.7: every row of plan tables 1.3 and 1.4 and every
-      acceptance scenario has a verification method with an automated barrier or a manual
-      procedure; SLO goals (1.3) have at least one automated method.
+      Check that every goal and acceptance scenario has a verification method with an
+      automated barrier or a manual procedure; SLO goals require an automated method.
 
 Exit code 1 and a list of problems when verification fails.
 """

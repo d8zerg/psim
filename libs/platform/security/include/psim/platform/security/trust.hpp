@@ -12,8 +12,8 @@
 #include "psim/platform/security/tls.hpp"
 
 namespace psim::platform::security {
-/// Shard-owned projection of Resource Catalog registrations (C1/C2). Persistent registration,
-/// authorization and audit belong to step 4.2; distribute revocation to every gateway before ack.
+/// Shard-owned projection of Resource Catalog registrations (C1/C2). The caller handles persistence,
+/// authorization and audit, and distributes revocation to every gateway before acknowledging it.
 class ConnectorTrust {
  public:
   using Time = std::chrono::system_clock::time_point;

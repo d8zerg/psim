@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the C++ error code header from the error catalog (step 2.1, ADR-039).
+"""Generate the C++ error code header from the error catalog (ADR-039).
 
   gen_error_codes.py <contracts/errors/errors.yaml> <out/psim/platform/error_codes.hpp>
 

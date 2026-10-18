@@ -1,4 +1,4 @@
-// ESLint of the PSIM web monorepo (step 1.5, ADR-037; TypeScript standard). Zero warnings is the
+// ESLint of the PSIM web monorepo (ADR-037). Zero warnings is the
 // gate: every package runs `eslint --max-warnings 0`. Type-aware rules use each package tsconfig.
 import js from "@eslint/js";
 import jsxA11y from "eslint-plugin-jsx-a11y";
@@ -20,7 +20,7 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.flatConfigs.recommended.rules,
-      // Standard, section 3: no enums, explicit type imports, every promise handled.
+      // No enums, explicit type imports, every promise handled.
       "no-restricted-syntax": [
         "error",
         { selector: "TSEnumDeclaration", message: "Use a union of literals or an `as const` object" },

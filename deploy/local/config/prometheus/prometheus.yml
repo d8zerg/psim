@@ -1,5 +1,5 @@
-# Prometheus of the local environment (step 1.4). Service metrics arrive by remote write from the
-# Collector; services started on the stand are scraped at /metrics by the jobs added with step 2.1.
+# Prometheus of the local environment. Service metrics arrive by remote write from the
+# Collector; services running on the local environment expose /metrics for scrape jobs.
 global:
   scrape_interval: 15s
   evaluation_interval: 15s

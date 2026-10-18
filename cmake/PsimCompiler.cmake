@@ -64,7 +64,7 @@ function(psim_add_test name)
 endfunction()
 
 # psim_add_component_test(<name> SOURCES ... LIBS ...): GoogleTest executable against the
-# containers of the local environment (TS-03, step 2.3). Label "component": the test presets skip it;
+# containers of the local environment (TS-03). Label "component": the test presets skip it;
 # `task test:component` runs it on the compose network with the PSIM_TEST_* endpoints.
 function(psim_add_component_test name)
   cmake_parse_arguments(ARG "" "" "SOURCES;LIBS" ${ARGN})

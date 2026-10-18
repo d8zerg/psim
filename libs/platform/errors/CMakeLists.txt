@@ -1,4 +1,4 @@
-# psim::platform_errors - error model of the platform (step 2.1, ADR-039): codes from the catalog
+# psim::platform_errors - error model of the platform (ADR-039): codes from the catalog
 # contracts/errors/errors.yaml, Error, Result<T>.
 
 set(gen "${CMAKE_CURRENT_BINARY_DIR}/gen/psim/platform/error_codes.hpp")

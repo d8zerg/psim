@@ -7,8 +7,8 @@ import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
 
-// MappingRuleSet is a published version of mapping rules for one connector type
-// (aggregates.md, 3.1). Published in psim.config.v1 under key "mapping/<tenant_id>/<connector_type>".
+// MappingRuleSet is a published version of mapping rules for one connector type.
+// Published in psim.config.v1 under key "mapping/<tenant_id>/<connector_type>".
 message MappingRuleSet {
   string mapping_rule_set_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 version = 2;

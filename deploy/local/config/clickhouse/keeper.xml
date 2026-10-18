@@ -1,4 +1,4 @@
-<!-- ClickHouse Keeper of the local environment (step 1.4, ADR-028): one node. -->
+<!-- ClickHouse Keeper of the local environment (ADR-028): one node. -->
 <clickhouse>
     <listen_host>0.0.0.0</listen_host>
     <keeper_server>

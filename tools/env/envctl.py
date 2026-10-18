@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Local environment control: readiness, Kafka topics, smoke tests (step 1.4, ADR-035).
+"""Local environment control: readiness, Kafka topics, smoke tests (ADR-035).
 
   wait <project>                    wait until every component answers (images without a shell
                                     have no Docker healthcheck, so readiness is probed over HTTP)

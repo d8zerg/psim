@@ -1,6 +1,6 @@
-# OpenTelemetry Collector of the local environment (step 1.4, crosscutting.md section 6):
+# OpenTelemetry Collector of the local environment:
 # services send OTLP here; traces go to Tempo, logs to Loki, metrics to Prometheus.
-# Tail sampling of the hot path (signals and incidents always kept) arrives with step 9.4.
+# Tail sampling is not configured in this local collector.
 receivers:
   otlp:
     protocols:

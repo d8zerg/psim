@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// Coverage threshold of the realtime protocol logic (strategy.md section 6).
+// Coverage threshold of the realtime protocol logic.
 export default defineConfig({
   test: {
     coverage: {

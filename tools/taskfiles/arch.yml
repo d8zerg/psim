@@ -1,4 +1,4 @@
-# Architecture fitness functions (step 1.2, ADR-001, ADR-033). Namespace "arch"; working directory
+# Architecture fitness functions (ADR-001, ADR-033). Namespace "arch"; working directory
 # is the repository root. Rules: tools/arch/architecture.yaml.
 version: '3'
 

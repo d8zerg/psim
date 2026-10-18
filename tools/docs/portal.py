@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sources of the documentation portal (step 1.6, ADR-038).
+"""Sources of the documentation portal (ADR-038).
 
   stage <repo-root> <out-dir> <c4-mermaid-dir> <repo-url> <commit>
 
@@ -140,7 +140,7 @@ def c4(mermaid_dir):
 def index():
     return "\n".join([
         "# Open-Source PSIM Platform - документация", "",
-        "Портал собирается из репозитория (шаг 1.6): документы - из `docs/`, справочники - из контрактов "
+        "Портал собирается из репозитория: документы - из `docs/`, справочники - из контрактов "
         "при каждой сборке, поэтому не расходятся с ними.", "",
         "- [Документация: продукт, предметная область, архитектура, ADR, качество, безопасность](docs/README.md)",
         "- [План MVP](docs/psim-mvp-development-plan.md) · [прогресс](docs/progress.md)",

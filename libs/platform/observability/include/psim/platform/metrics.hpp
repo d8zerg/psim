@@ -7,7 +7,7 @@
 
 namespace psim::platform::observability {
 
-/// Metrics of a process, exposed at /metrics in the Prometheus text format (crosscutting.md 6.2).
+/// Metrics of a process, exposed at /metrics in the Prometheus text format.
 /// Names follow psim_<subsystem>_<metric>_<unit>; components register their families on registry().
 class Metrics {
  public:

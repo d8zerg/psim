@@ -1,4 +1,4 @@
-# psim::platform_runtime - lifecycle of a service process (step 2.1, ADR-039): configuration,
+# psim::platform_runtime - lifecycle of a service process (ADR-039): configuration,
 # logging, metrics and tracing, admin HTTP endpoints (/health/live, /health/ready, /metrics, /info),
 # OS signals, graceful shutdown with drain.
 find_package(Boost REQUIRED CONFIG)

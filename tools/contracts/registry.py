@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Schemas of the Kafka topics in the Schema Registry (ADR-003, ADR-004, step 2.3).
+"""Schemas of the Kafka topics in the Schema Registry (ADR-003, ADR-004).
 
   register <url> [<root>]          register the value schema of every topic of the registry
                                    (contracts/topics/topics.yaml under <root>, default: the repository)

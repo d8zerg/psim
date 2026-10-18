@@ -1,4 +1,4 @@
-# Host profile for the tsan preset (step 1.2, ADR-033): dependencies instrumented with ThreadSanitizer.
+# Host profile for the tsan preset (ADR-033): dependencies instrumented with ThreadSanitizer.
 # The sanitizer flags take part in the package id, so instrumented binaries never mix with plain
 # ones in the Conan cache. Build tools (protoc, grpc_cpp_plugin) use the plain profile:
 #   conan install . -pr:h tools/conan/profiles/clang21-libstdcxx-tsan -pr:b tools/conan/profiles/clang21-libstdcxx

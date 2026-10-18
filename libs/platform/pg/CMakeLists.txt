@@ -1,4 +1,4 @@
-# PostgreSQL adapter (step 2.4, ADR-014): libpq, transactions, migrations, inbox and outbox.
+# PostgreSQL adapter (ADR-014): libpq, transactions, migrations, inbox and outbox.
 find_package(RdKafka REQUIRED CONFIG)
 find_package(PostgreSQL REQUIRED CONFIG)
 find_package(OpenSSL REQUIRED CONFIG)

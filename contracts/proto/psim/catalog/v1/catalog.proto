@@ -28,7 +28,7 @@ enum ResourceState {
   RESOURCE_STATE_ARCHIVED = 3;
 }
 
-// Location is a site, building, floor or zone (aggregates.md, 1.1).
+// Location is a site, building, floor or zone.
 message Location {
   string location_id = 1 [(buf.validate.field).string.uuid = true];
   LocationKind kind = 2 [(buf.validate.field).enum = {
@@ -74,7 +74,7 @@ message FloorPlan {
   double height = 4 [(buf.validate.field).double.gt = 0];
 }
 
-// DeviceType describes a class of devices, its sources and capabilities (aggregates.md, 1.2).
+// DeviceType describes a class of devices, its sources and capabilities.
 message DeviceType {
   string device_type_id = 1 [(buf.validate.field).string.uuid = true];
   string code = 2 [(buf.validate.field).string.min_len = 1];
@@ -121,7 +121,7 @@ enum ParameterType {
   PARAMETER_TYPE_DURATION = 5;
 }
 
-// Device is a physical or logical device with its sources (aggregates.md, 1.3).
+// Device is a physical or logical device with its sources.
 message Device {
   string device_id = 1 [(buf.validate.field).string.uuid = true];
   string device_type_id = 2 [(buf.validate.field).string.uuid = true];
@@ -154,7 +154,7 @@ message Source {
   string name = 4;
 }
 
-// Connector is a registered connector with its credentials and limits (aggregates.md, 1.4).
+// Connector is a registered connector with its credentials and limits.
 message Connector {
   string connector_id = 1 [(buf.validate.field).string.uuid = true];
   string name = 2 [(buf.validate.field).string.min_len = 1];

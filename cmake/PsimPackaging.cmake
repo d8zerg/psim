@@ -1,4 +1,4 @@
-# Debian 13 amd64 packages of PSIM (step 1.3, ADR-034). One package per installable component.
+# Debian 13 amd64 packages of PSIM (ADR-034). One package per installable component.
 # Built by `task package:build` (cpack in the release preset), checked by `task package:test`.
 #
 # A component is declared next to its target: install(... COMPONENT <name>) and

@@ -1,4 +1,4 @@
-# TypeScript of the realtime protocol and its imports, generated on every build (step 1.5, ADR-037).
+# TypeScript of the realtime protocol and its imports, generated on every build (ADR-037).
 version: v2
 inputs:
   - directory: ../../../contracts

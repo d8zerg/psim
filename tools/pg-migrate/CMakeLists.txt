@@ -1,4 +1,4 @@
-# Explicit expand/contract migrations of step 2.4. Manifest is a trusted release artifact.
+# Explicit expand/contract PostgreSQL migrations. Manifest is a trusted release artifact.
 find_package(nlohmann_json REQUIRED CONFIG)
 add_executable(psim-pg-migrate src/main.cpp)
 psim_target_defaults(psim-pg-migrate)

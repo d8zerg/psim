@@ -14,7 +14,7 @@ class PsimConan(ConanFile):
     settings = "os", "arch", "compiler", "build_type"
     default_options = {
         "*:shared": False,
-        # Service runtime (step 2.1, ADR-039): Asio and Beast are header-only.
+        # Service runtime (ADR-039): Asio and Beast are header-only.
         "boost/*:header_only": True,
         # Traces leave over OTLP gRPC only (gRPC is already a dependency); no libcurl.
         "opentelemetry-cpp/*:with_otlp_grpc": True,
@@ -24,8 +24,8 @@ class PsimConan(ConanFile):
         "prometheus-cpp/*:with_pull": False,
         "prometheus-cpp/*:with_push": False,
         "prometheus-cpp/*:with_compression": False,
-        # Kafka layer (step 2.3, ADR-041): zstd topics (contracts/topics), TLS and SCRAM over OpenSSL
-        # (step 2.6); no Cyrus SASL (GSSAPI) and no libcurl (OIDC token fetch).
+        # Kafka layer (ADR-041): zstd compression, TLS and SCRAM over OpenSSL;
+        # no Cyrus SASL (GSSAPI) and no libcurl (OIDC token fetch).
         "librdkafka/*:zstd": True,
         "librdkafka/*:ssl": True,
         "librdkafka/*:sasl": False,
@@ -48,18 +48,18 @@ class PsimConan(ConanFile):
         self.requires(self.PROTOBUF)
         self.requires(self.GRPC)
         self.requires("openssl/3.5.9")
-        # Service runtime (step 2.1, ADR-039).
+        # Service runtime (ADR-039).
         self.requires("boost/1.90.0")
         self.requires("opentelemetry-cpp/1.26.0")
         self.requires("prometheus-cpp/1.3.0")
         self.requires("yaml-cpp/0.9.0")
         self.requires("nlohmann_json/3.11.3")  # the version json-schema-validator requires
         self.requires("json-schema-validator/2.4.0")
-        # Kafka layer (step 2.3, ADR-041): KIP-848 consumer protocol and transactions.
+        # Kafka layer (ADR-041): KIP-848 consumer protocol and transactions.
         self.requires("librdkafka/2.14.2")
-        # PostgreSQL layer (step 2.4, ADR-014): static libpq with TLS.
+        # PostgreSQL layer (ADR-014): static libpq with TLS.
         self.requires("libpq/18.6")
-        # ClickHouse layer (step 2.8, ADR-045): native protocol with TLS.
+        # ClickHouse layer (ADR-045): native protocol with TLS.
         self.requires("clickhouse-cpp/2.6.1")
         self.requires("aws-sdk-cpp/1.11.692")
 

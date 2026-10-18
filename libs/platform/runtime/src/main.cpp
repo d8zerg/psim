@@ -59,7 +59,7 @@ int run(int argc, char** argv, const ServiceDefinition& service) {
   config::Sources sources{.file = file, .environment = config::process_environment()};
   auto loaded = config::load(*schema, sources);
   if (!loaded) {
-    // Every problem at once (crosscutting.md section 5), before anything starts.
+    // Report all configuration errors before starting the service.
     for (const auto& problem : loaded.error()) {
       std::println(stderr, "{}: config: {}: {}", service.name, problem.path.empty() ? "<document>" : problem.path,
                    problem.message);

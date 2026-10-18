@@ -1,4 +1,4 @@
-// Realtime connection state shown by the console shell (step 8.2 connects it to RealtimeClient).
+// Realtime connection state shown by the console.
 import type { ConnectionStatus } from "@psim/realtime-client";
 import { create } from "zustand";
 
@@ -20,7 +20,7 @@ export const useConnectionStore = create<ConnectionState>()((set) => ({
   },
 }));
 
-/** Operators must see at a glance whether the feed is live (step 8.2, S6). */
+/** Operators must see at a glance whether the feed is live. */
 export function connectionLabel(status: ConnectionStatus): string {
   switch (status) {
     case "open":

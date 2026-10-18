@@ -1,5 +1,5 @@
--- Databases of the local environment (step 1.4). Development-only passwords.
--- psim: platform services, one schema per service (step 2.4, crosscutting.md section 13);
+-- Databases of the local environment. Development-only passwords.
+-- psim: platform services, one schema per service;
 -- registry: Apicurio Registry (ADR-003); keycloak: identity provider.
 CREATE ROLE psim LOGIN PASSWORD 'psim-dev-psim';
 CREATE ROLE registry LOGIN PASSWORD 'psim-dev-registry';

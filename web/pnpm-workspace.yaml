@@ -1,4 +1,4 @@
-# Workspaces of the PSIM web monorepo (step 1.5, ADR-037).
+# Workspaces of the PSIM web monorepo (ADR-037).
 packages:
   - apps/*
   - packages/*

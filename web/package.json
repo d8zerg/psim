@@ -1,7 +1,7 @@
 {
   "name": "psim-web",
   "private": true,
-  "description": "PSIM web monorepo: console application and shared packages (step 1.5, ADR-037)",
+  "description": "PSIM web monorepo: console application and shared packages (ADR-037)",
   "packageManager": "pnpm@12.9.1",
   "engines": {
     "node": ">=24.21.0 <25"

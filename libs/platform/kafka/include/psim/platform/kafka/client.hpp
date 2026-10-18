@@ -12,7 +12,7 @@
 
 #include "psim/platform/security/tls.hpp"
 
-// The Kafka layer (step 2.3, ADR-041) wraps librdkafka; its handles stay out of the public headers
+// The Kafka layer (ADR-041) wraps librdkafka; its handles stay out of the public headers
 // except as opaque pointers.
 struct rd_kafka_message_s;  // NOLINT(readability-identifier-naming): librdkafka C type
 

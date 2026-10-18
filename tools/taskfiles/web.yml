@@ -1,4 +1,4 @@
-# Web monorepo (step 1.5, ADR-037): pnpm + Turborepo in web/. Namespace "web"; working directory is
+# Web monorepo (ADR-037): pnpm + Turborepo in web/. Namespace "web"; working directory is
 # the repository root. Node runs in a pinned container (pnpm through corepack, version from
 # web/package.json, shim in .cache/web/bin); caches live in .cache/web. Playwright runs in its own image with browsers.
 version: '3'

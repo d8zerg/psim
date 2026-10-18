@@ -1,4 +1,4 @@
-<!-- Isolated two-replica fixture; the production topology is configured in step 9.1. -->
+<!-- Isolated two-replica fixture for component tests. -->
 <clickhouse>
     <listen_host>0.0.0.0</listen_host>
     <tcp_port>9000</tcp_port>

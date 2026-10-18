@@ -1,4 +1,4 @@
-# psim::platform_config - service configuration (step 2.1, ADR-039, crosscutting.md section 5):
+# psim::platform_config - service configuration (ADR-039):
 # YAML file and PSIM__* environment overrides, JSON Schema validation reporting every problem,
 # secrets read from protected files (SR-09), partial hot reload.
 find_package(yaml-cpp REQUIRED CONFIG)

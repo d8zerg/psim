@@ -1,4 +1,4 @@
-# Step 2.7, ADR-044: explicit manual tasks only. No CTest registration or CI invocation.
+# Deterministic simulation (ADR-044): explicit manual tasks only. No CTest registration or CI invocation.
 version: '3'
 
 vars:

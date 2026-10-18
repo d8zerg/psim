@@ -1,5 +1,5 @@
-<!-- ClickHouse users of the local environment (step 1.4). Development-only password; per-service
-     users with minimal rights come with the ClickHouse layer (step 2.8, SR-19). -->
+<!-- ClickHouse users of the local environment. Development-only password.
+     Do not use these credentials in production (SR-19). -->
 <clickhouse>
     <users>
         <default remove="remove"/>

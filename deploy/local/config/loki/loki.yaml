@@ -1,5 +1,5 @@
-# Loki of the local environment (step 1.4): single binary, filesystem storage, OTLP ingestion.
-# The production log store is decided in step 9.4 (ADR-028 names ClickHouse as a candidate).
+# Loki of the local environment: single binary, filesystem storage, OTLP ingestion.
+
 auth_enabled: false
 
 server:

@@ -1,6 +1,6 @@
 #!/bin/sh
-# Verifies a signed release directory (step 1.3, ADR-034, FF-14, SR-24); the installer (step 9.2)
-# runs the same checks before installation and upgrade. Needs only openssl and sha256sum.
+# Verifies a signed release directory (ADR-034, FF-14, SR-24).
+# Needs only openssl and sha256sum.
 #   1. SHA256SUMS is signed by the trusted public key (never the key shipped in the directory);
 #   2. every file matches its checksum and no unlisted file is present;
 #   3. every artifact (.deb, image .tar) has an SBOM <artifact>.cdx.json describing exactly its hash.

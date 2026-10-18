@@ -1,5 +1,5 @@
 # psim::platform_observability - metrics (Prometheus text format) and tracing (OpenTelemetry, OTLP
-# gRPC) of every service (step 2.1, ADR-039, crosscutting.md section 6).
+# gRPC) of every service (ADR-039).
 find_package(prometheus-cpp REQUIRED CONFIG)
 find_package(opentelemetry-cpp REQUIRED CONFIG)
 

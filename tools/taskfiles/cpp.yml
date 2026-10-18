@@ -1,5 +1,5 @@
-# C++ build: Conan dependencies, CMake presets, tests, reproducibility (step 1.1, ADR-032);
-# quality gates: formatting, clang-tidy, sanitizers, coverage (step 1.2, ADR-033).
+# C++ build: Conan dependencies, CMake presets, tests, reproducibility (ADR-032);
+# quality gates: formatting, clang-tidy, sanitizers, coverage (ADR-033).
 # Namespace "cpp"; working directory is the repository root.
 # Build commands run in the toolchain container (Debian 13 base); inside the container
 # (PSIM_IN_TOOLCHAIN=1) they run directly. Artifacts are verified on the target platform by

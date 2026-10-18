@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package psim.common.v1;
 
-// Severity of a single event (event-taxonomy.md, section 3).
+// Severity of a single event.
 enum Severity {
   SEVERITY_UNSPECIFIED = 0;
   SEVERITY_INFO = 1;
@@ -21,7 +21,7 @@ enum Priority {
   PRIORITY_P4 = 4;
 }
 
-// EventClass is the behavioural class of a taxonomy type (event-taxonomy.md, section 2).
+// EventClass is the behavioural class of a taxonomy type.
 enum EventClass {
   EVENT_CLASS_UNSPECIFIED = 0;
   EVENT_CLASS_ALARM = 1;

@@ -1,4 +1,4 @@
-# Generated and installed files (step 1.5).
+# Generated and installed files.
 pnpm-lock.yaml
 **/dist
 **/coverage

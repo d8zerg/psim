@@ -100,7 +100,7 @@ tasks:
           CMD: build/{{.PLATFORM}}/release/libs/platform/pg/psim_pg_throughput
 
   clickhouse:
-    desc: 'Native TLS batch insertion >= 100000 rows/s with row reconciliation (step 2.8)'
+    desc: 'Native TLS batch insertion >= 100000 rows/s with row reconciliation'
     vars:
       PROJECT: '{{.PROJECT | default "psim-platform"}}'
       ROWS: '{{.ROWS | default "1000000"}}'

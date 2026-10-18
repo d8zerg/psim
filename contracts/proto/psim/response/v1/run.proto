@@ -5,7 +5,7 @@ package psim.response.v1;
 import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 
-// ResponseRun is the execution of a plan version for an incident (aggregates.md, 5.2).
+// ResponseRun is the execution of a plan version for an incident.
 message ResponseRun {
   string run_id = 1;
   string incident_id = 2;
@@ -21,7 +21,7 @@ message ResponseRun {
   uint64 version = 11;
 }
 
-// RunState is the lifecycle state of a run (state-models.md, 2.1).
+// RunState is the lifecycle state of a run.
 enum RunState {
   RUN_STATE_UNSPECIFIED = 0;
   RUN_STATE_RUNNING = 1;
@@ -40,7 +40,7 @@ message StepExecution {
   StepResult result = 7;
 }
 
-// StepState is the state of a step (state-models.md, 2.2).
+// StepState is the state of a step.
 enum StepState {
   STEP_STATE_UNSPECIFIED = 0;
   STEP_STATE_PENDING = 1;

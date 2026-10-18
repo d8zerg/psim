@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a service from the template (step 2.1, ADR-039).
+"""Create a service from the template (ADR-039).
 
   new_service.py <repo-root> <name> <contexts> [summary]
 

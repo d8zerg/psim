@@ -1,5 +1,5 @@
-# Tempo of the local environment (step 1.4): monolithic mode, local storage, OTLP ingestion.
-# The production trace store is decided in step 9.4 (ADR-028 names ClickHouse as a candidate).
+# Tempo of the local environment: monolithic mode, local storage, OTLP ingestion.
+
 stream_over_http_enabled: true
 
 server:

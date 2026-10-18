@@ -1,6 +1,6 @@
 import { defineConfig } from "vitest/config";
 
-// Coverage threshold of client logic (strategy.md section 6); generated types carry no code.
+// Coverage threshold of client logic; generated types carry no code.
 export default defineConfig({
   test: {
     coverage: {

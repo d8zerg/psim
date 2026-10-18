@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
 
-// ResponsePlan is one immutable version of a response plan (aggregates.md, 5.1).
+// ResponsePlan is one immutable version of a response plan.
 message ResponsePlan {
   string plan_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 version = 2;
@@ -151,7 +151,7 @@ enum NotificationChannel {
   NOTIFICATION_CHANNEL_WEBHOOK = 3;
 }
 
-// EscalationPolicy defines SLA and escalation levels (aggregates.md, 5.4).
+// EscalationPolicy defines SLA and escalation levels.
 message EscalationPolicy {
   string policy_id = 1 [(buf.validate.field).string.uuid = true];
   string name = 2 [(buf.validate.field).string.min_len = 1];

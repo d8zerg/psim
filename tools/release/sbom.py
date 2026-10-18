@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CycloneDX 1.6 SBOMs of PSIM release artifacts and the license policy (step 1.3, ADR-034, FF-14).
+"""CycloneDX 1.6 SBOMs of PSIM release artifacts and the license policy (ADR-034, FF-14).
 
   app <conan-graph.json> <gcc-runtime-version> <version> <commit> <out.json>
       components linked into PSIM binaries: Conan host dependencies (test-only ones excluded) and

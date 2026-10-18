@@ -1,4 +1,4 @@
-# clang-tidy profile of PSIM (step 1.2, ADR-033): 0 findings is the gate (FF-10, SEC-01).
+# clang-tidy profile of PSIM (ADR-033): 0 findings is the gate (FF-10, SEC-01).
 # Run: task cpp:lint. Suppressions in code need NOLINT(<check>) with a reason after it.
 Checks: >
   -*,

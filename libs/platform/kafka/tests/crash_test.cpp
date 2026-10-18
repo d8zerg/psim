@@ -1,4 +1,4 @@
-// DoD of step 2.3: no losses and exactly-once output when the processing process is killed at
+// Verify no losses and exactly-once output when the processing process is killed at
 // random moments (SIGKILL: no drain, no commit, an open transaction left behind).
 
 #include <gtest/gtest.h>

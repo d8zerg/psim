@@ -45,7 +45,7 @@ enum ReportGrouping {
   REPORT_GROUPING_DAY = 6;
 }
 
-// IncidentMetrics are incident metrics for a group (definitions in acceptance-spec.md, S13).
+// IncidentMetrics are incident counts, response times and SLA compliance for a group.
 message IncidentMetrics {
   // Group key: site id, incident type id, priority, user id or date; empty for totals.
   string group = 1;

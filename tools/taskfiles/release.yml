@@ -1,4 +1,4 @@
-# Release artifacts: Debian packages, container images, SBOMs, signatures (step 1.3, ADR-034).
+# Release artifacts: Debian packages, container images, SBOMs, signatures (ADR-034).
 # Namespace "release"; working directory is the repository root. Artifacts are built from the
 # release preset; a signed release directory is dist/psim-platform-<version>-<commit>/.
 #   PSIM_SIGNING_KEY   Ed25519 private key (PEM) for release:dist; default: a development key in .cache/keys
@@ -132,7 +132,7 @@ tasks:
               python3 -I tools/release/sbom.py artifact {{.RELEASE_BUILD}}/app.cdx.json "$tar" image "{{.IMAGE_NAMESPACE}}/$image" {{.VERSION}} \
                 "$tar.cdx.json" {{.RELEASE_BUILD}}/images/$image/os.cdx.json
             done
-      # Documentation portal (step 1.6): the same archive is published with every release.
+      # Documentation portal: the same archive is published with every release.
       - task: :docs:portal
       - >-
         tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner -C build/portal/site

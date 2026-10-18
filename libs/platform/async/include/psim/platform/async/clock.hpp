@@ -16,7 +16,7 @@ using SteadyTime = std::chrono::steady_clock::time_point;
 using Duration = std::chrono::nanoseconds;
 
 /// Time port (ADR-016): event time, monotonic time and waiting. Code that waits or measures
-/// through Clock runs deterministically under ManualClock (tests, simulation of step 2.7).
+/// through Clock runs deterministically under ManualClock (tests and simulation).
 class Clock {
  public:
   Clock() = default;

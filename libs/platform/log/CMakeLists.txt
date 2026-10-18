@@ -1,4 +1,4 @@
-# psim::platform_log - structured JSON logging to stdout (step 2.1, ADR-039, crosscutting.md 6.3).
+# psim::platform_log - structured JSON logging to stdout (ADR-039).
 add_library(psim_platform_log STATIC src/log.cpp)
 add_library(psim::platform_log ALIAS psim_platform_log)
 target_include_directories(psim_platform_log PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/include")

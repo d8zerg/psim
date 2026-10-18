@@ -16,7 +16,7 @@ message NormalizerStateRecord {
   }
 }
 
-// SourceSequenceState is the deduplication tracker of one source epoch (data-flows.md, 3.2).
+// SourceSequenceState is the deduplication tracker of one source epoch.
 message SourceSequenceState {
   string source_id = 1;
   uint32 source_epoch = 2;

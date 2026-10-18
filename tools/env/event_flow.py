@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Step 3.1: real processes, browser rendering, durable effects and causal traces."""
+"""End-to-end event flow: real processes, browser rendering, durable effects and causal traces."""
 import hashlib
 import json
 import math

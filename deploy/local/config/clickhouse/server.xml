@@ -1,4 +1,4 @@
-<!-- ClickHouse server of the local environment (step 1.4, ADR-028): Keeper, cluster psim with one
+<!-- ClickHouse server of the local environment (ADR-028): Keeper, cluster psim with one
      shard and one replica, macros for Replicated tables - the same DDL as in the cluster topology. -->
 <clickhouse>
     <listen_host>0.0.0.0</listen_host>

@@ -1,4 +1,4 @@
-# Supply chain security checks (step 1.3, ADR-031, ADR-034, SR-23). Namespace "security"; working
+# Supply chain security checks (ADR-031, ADR-034, SR-23). Namespace "security"; working
 # directory is the repository root. Trivy runs in a pinned container; its database is cached in
 # .cache/trivy and refreshed by Trivy itself (network access needed).
 version: '3'

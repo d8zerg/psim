@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
 
-// CorrelationRule is one immutable version of a correlation rule (aggregates.md, 3.3; ADR-011).
+// CorrelationRule is one immutable version of a correlation rule (ADR-011).
 message CorrelationRule {
   string rule_id = 1 [(buf.validate.field).string.uuid = true];
   uint32 version = 2;
@@ -41,7 +41,7 @@ message CorrelationRule {
   psim.common.v1.Actor created_by = 18;
 }
 
-// RuleState is the lifecycle state of a rule version (state-models.md, 5).
+// RuleState is the lifecycle state of a rule version.
 enum RuleState {
   RULE_STATE_UNSPECIFIED = 0;
   RULE_STATE_DRAFT = 1;
@@ -50,7 +50,7 @@ enum RuleState {
   RULE_STATE_ARCHIVED = 4;
 }
 
-// CorrelationScope defines the correlation key of a rule (scaling.md, 3).
+// CorrelationScope defines the correlation key of a rule.
 enum CorrelationScope {
   CORRELATION_SCOPE_UNSPECIFIED = 0;
   CORRELATION_SCOPE_SOURCE = 1;
@@ -118,7 +118,7 @@ message RuleOutput {
   string summary_template = 5 [(buf.validate.field).string.max_len = 1024];
 }
 
-// RuleSet is the set of rule versions active for a tenant (aggregates.md, 3.4).
+// RuleSet is the set of rule versions active for a tenant.
 // Published in psim.config.v1 under key "ruleset/<tenant_id>".
 message RuleSet {
   string rule_set_id = 1 [(buf.validate.field).string.uuid = true];

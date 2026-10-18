@@ -11,7 +11,7 @@
 
 namespace psim::platform::kafka {
 
-/// W3C trace context in the Kafka headers traceparent and tracestate (ADR-005, crosscutting.md 6.1).
+/// W3C trace context in the Kafka headers traceparent and tracestate (ADR-005).
 
 /// Write the context of `span` into the headers of an outgoing record; an invalid span writes nothing.
 void inject(const opentelemetry::trace::Span& span, Headers& headers);

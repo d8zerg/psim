@@ -1,4 +1,4 @@
-# Valkey adapter (step 2.5, ADR-015): Boost.Redis RESP3, Sentinel and ephemeral data patterns.
+# Valkey adapter (ADR-015): Boost.Redis RESP3, Sentinel and ephemeral data patterns.
 find_package(Boost REQUIRED CONFIG)
 find_package(OpenSSL REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED CONFIG)

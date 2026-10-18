@@ -10,7 +10,6 @@ import "psim/incident/v1/incident.proto";
 import "psim/processing/v1/signal.proto";
 
 // IncidentService manages incidents and incident types. Owner: Incident Service.
-// Scenarios S5-S7, S9. State transitions follow state-models.md, section 1.
 service IncidentService {
   // ListIncidents lists incidents within the caller scope.
   rpc ListIncidents(ListIncidentsRequest) returns (ListIncidentsResponse) {

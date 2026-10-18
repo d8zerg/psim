@@ -38,7 +38,7 @@ class Sink {
   virtual void write(std::string_view line) = 0;
 };
 
-/// Standard output: the Collector reads container logs (crosscutting.md 6.3).
+/// Standard output: the Collector reads container logs.
 class StdoutSink final : public Sink {
  public:
   void write(std::string_view line) override;

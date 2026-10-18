@@ -1,4 +1,4 @@
-/* PSIM design tokens (Tailwind CSS 4). Dark theme by default for 24/7 operator work (step 8.1);
+/* PSIM design tokens (Tailwind CSS 4). Dark theme by default for 24/7 operator work;
    the light theme applies under [data-theme="light"]. Components use only these tokens. */
 @import "tailwindcss";
 

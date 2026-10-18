@@ -1,5 +1,5 @@
 #!/bin/sh
-# Signs a release directory (step 1.3, ADR-034, SR-24): SHA256SUMS lists every artifact and SBOM,
+# Signs a release directory (ADR-034, SR-24): SHA256SUMS lists every artifact and SBOM,
 # SHA256SUMS.sig is its Ed25519 signature, psim-signing.pub.pem is the public key for reference
 # (verification trusts only a key obtained separately, see verify.sh).
 # Usage: sign.sh <release-dir> <private-key.pem>

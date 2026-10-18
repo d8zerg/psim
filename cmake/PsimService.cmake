@@ -1,4 +1,4 @@
-# Services on the platform runtime (step 2.1, ADR-039).
+# Services on the platform runtime (ADR-039).
 #
 # psim_add_service(<name> SOURCES ... [LIBS ...] [SUMMARY <text>] [NO_PACKAGE])
 #   Executable psim-<name> linked with psim::platform_runtime; installed into bin/ and packaged as

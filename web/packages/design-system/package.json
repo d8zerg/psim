@@ -2,7 +2,7 @@
   "name": "@psim/design-system",
   "version": "0.0.0",
   "private": true,
-  "description": "PSIM design system: Tailwind CSS 4 tokens and shadcn/ui-style components (step 1.5 foundation, step 8.1)",
+  "description": "PSIM design system: Tailwind CSS 4 tokens and shadcn/ui-style components",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

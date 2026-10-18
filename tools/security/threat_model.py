@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Threat model registry: render the register and verify it (step 0.6).
+"""Threat model registry: render the register and verify it.
 
 Commands:
   render <threat-model.yaml> <out.md>
       Generate the Markdown register: summary, boundary x STRIDE matrix, threats,
       requirements, requirements by plan step.
   verify <repo-root> <threat-model.yaml>
-      Check the registry: references, scales, coverage, plan steps; DoD of step 0.6:
+      Check the registry: references, scales, coverage and implementation assignments;
       every high threat has a requirement assigned to an existing plan step and verified
       by something stronger than review.
 

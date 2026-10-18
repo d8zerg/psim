@@ -6,7 +6,7 @@ import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 
-// Command is a request to act on a device (aggregates.md, 5.3; state-models.md, 3).
+// Command is a request to act on a device.
 message Command {
   string command_id = 1 [(buf.validate.field).string.uuid = true];
   string device_id = 2 [(buf.validate.field).string.uuid = true];

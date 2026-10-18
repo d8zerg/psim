@@ -1,4 +1,4 @@
-# psim::platform_kafka - Kafka layer (step 2.3, ADR-041): librdkafka on Asio without polling
+# psim::platform_kafka - Kafka layer (ADR-041): librdkafka on Asio without polling
 # threads, idempotent and transactional producer, group consumer with manual offsets, the
 # consume - handle - produce processor (ALO and EOS-K, retries, DLQ), Confluent wire format with
 # the Schema Registry client, W3C trace context in headers, metrics.

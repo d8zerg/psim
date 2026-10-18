@@ -1,4 +1,4 @@
-# Platform trust primitives (step 2.6, ADR-043); cryptography stays in OpenSSL 3.
+# Platform trust primitives (ADR-043); cryptography stays in OpenSSL 3.
 find_package(Boost REQUIRED CONFIG)
 find_package(OpenSSL REQUIRED CONFIG)
 find_package(nlohmann_json REQUIRED CONFIG)

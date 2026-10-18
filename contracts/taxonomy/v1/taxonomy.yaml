@@ -1,4 +1,4 @@
-# Event taxonomy v1 - single source of truth (docs/domain/event-taxonomy.md describes it).
+# Event taxonomy v1 - single source of truth for event types, classes and severities.
 # Rules: codes are only added; removal goes through deprecated: true until the next major version.
 version: '1'
 classes:

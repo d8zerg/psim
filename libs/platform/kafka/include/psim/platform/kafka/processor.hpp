@@ -47,7 +47,7 @@ struct ProcessorOptions {
   /// How often offsets (ALO) or transactions (EOS-K: 20-50 ms, ADR-006) are committed.
   std::chrono::milliseconds commit_interval{1000};
   RetryPolicy retry{};
-  /// Program errors (exceptions) in a row that stop a partition (crosscutting.md, section 4).
+  /// Program errors (exceptions) in a row that stop a partition.
   std::uint32_t circuit_breaker = 5;
   /// Bound of flushes, commits and aborts.
   std::chrono::milliseconds timeout{30000};

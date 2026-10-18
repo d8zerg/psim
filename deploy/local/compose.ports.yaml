@@ -1,4 +1,4 @@
-# Published ports of the interactive local environment (step 1.4): only on 127.0.0.1, so the stand
+# Published ports of the interactive local environment: only on 127.0.0.1, so the stand
 # does not expose infrastructure to the network (SR-19). The CI environment does not use this file.
 services:
   kafka-1:

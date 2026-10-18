@@ -172,7 +172,7 @@ tasks:
         if: '[ "{{.ENV}}" = true ]'
       - task: connectors:conformance         # TS-06: real outage and an external connector fixture
         if: '[ "{{.CONNECTORS}}" = true ]'
-      - task: web:check                       # step 1.5: format, generated clients, lint, types, tests, budgets
+      - task: web:check                       # format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'
       - task: web:e2e                         # Playwright smoke of the built console
         if: '[ "{{.WEB}}" = true ]'

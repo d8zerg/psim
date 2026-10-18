@@ -1,6 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 
-// End-to-end smoke of the built console (step 1.5); scenario tests arrive with step 8.6.
+// End-to-end smoke tests of the built console.
 export default defineConfig({
   testDir: "e2e",
   forbidOnly: true,

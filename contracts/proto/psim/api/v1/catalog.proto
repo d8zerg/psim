@@ -345,7 +345,7 @@ message GetImportResponse {
   ImportJob import_job = 1;
 }
 
-// ImportJob is a bulk import and its results (aggregates.md, 1.5).
+// ImportJob is a bulk import and its results.
 message ImportJob {
   string import_id = 1;
   ImportState state = 2;

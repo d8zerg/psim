@@ -3705,7 +3705,7 @@ components:
         finishedAt:
           type: string
           format: date-time
-      description: ImportJob is a bulk import and its results (aggregates.md, 1.5).
+      description: ImportJob is a bulk import and its results.
     psim.api.v1.ImportRowError:
       type: object
       properties:
@@ -3747,7 +3747,7 @@ components:
           format: double
         escalated:
           type: string
-      description: IncidentMetrics are incident metrics for a group (definitions in acceptance-spec.md, S13).
+      description: IncidentMetrics are incident counts, response times and SLA compliance for a group.
     psim.api.v1.IncidentSignal:
       type: object
       properties:
@@ -4492,7 +4492,7 @@ components:
           format: enum
         version:
           type: string
-      description: Connector is a registered connector with its credentials and limits (aggregates.md, 1.4).
+      description: Connector is a registered connector with its credentials and limits.
     psim.catalog.v1.ConnectorLimits:
       type: object
       properties:
@@ -4540,7 +4540,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      description: Device is a physical or logical device with its sources (aggregates.md, 1.3).
+      description: Device is a physical or logical device with its sources.
     psim.catalog.v1.DeviceType:
       type: object
       properties:
@@ -4571,7 +4571,7 @@ components:
           format: enum
         version:
           type: string
-      description: DeviceType describes a class of devices, its sources and capabilities (aggregates.md, 1.2).
+      description: DeviceType describes a class of devices, its sources and capabilities.
     psim.catalog.v1.FloorPlan:
       type: object
       properties:
@@ -4631,7 +4631,7 @@ components:
         updatedAt:
           type: string
           format: date-time
-      description: Location is a site, building, floor or zone (aggregates.md, 1.1).
+      description: Location is a site, building, floor or zone.
     psim.catalog.v1.ParameterSpec:
       type: object
       properties:
@@ -4840,7 +4840,7 @@ components:
         version:
           type: string
           description: Aggregate version, used as ETag.
-      description: Incident is the central aggregate (aggregates.md, 4.2; state-models.md, 1; ADR-027).
+      description: Incident groups signals and tracks the response lifecycle (ADR-027).
     psim.incident.v1.IncidentType:
       type: object
       properties:
@@ -4873,7 +4873,7 @@ components:
           description: Delay between resolved and automatic close.
         version:
           type: string
-      description: IncidentType is a class of situations that defines response plan and SLA (aggregates.md, 4.1).
+      description: IncidentType is a class of situations that defines response plan and SLA.
     psim.incident.v1.Link:
       type: object
       properties:
@@ -5011,7 +5011,7 @@ components:
           format: date-time
         createdBy:
           $ref: '#/components/schemas/psim.common.v1.Actor'
-      description: CorrelationRule is one immutable version of a correlation rule (aggregates.md, 3.3; ADR-011).
+      description: CorrelationRule is one immutable version of a correlation rule (ADR-011).
     psim.processing.v1.Event:
       type: object
       properties:
@@ -5062,7 +5062,7 @@ components:
           type: object
           additionalProperties:
             type: string
-          description: Standard attributes (event-taxonomy.md, section 6) and connector attributes prefixed with "x.".
+          description: Standard taxonomy attributes and connector attributes prefixed with "x.".
         significant:
           type: boolean
           description: Significant events are stored long-term in Event History (ADR-028).
@@ -5152,8 +5152,8 @@ components:
           format: date-time
         publishedBy:
           $ref: '#/components/schemas/psim.common.v1.Actor'
-      description: "MappingRuleSet is a published version of mapping rules for one connector type\n (aggregates.md, 3.1).\
-        \ Published in psim.config.v1 under key \"mapping/<tenant_id>/<connector_type>\"."
+      description: "MappingRuleSet is a published version of mapping rules for one connector type.\n Published in psim.config.v1\
+        \ under key \"mapping/<tenant_id>/<connector_type>\"."
     psim.processing.v1.RuleOutput:
       type: object
       properties:
@@ -5204,8 +5204,8 @@ components:
           format: date-time
         activatedBy:
           $ref: '#/components/schemas/psim.common.v1.Actor'
-      description: "RuleSet is the set of rule versions active for a tenant (aggregates.md, 3.4).\n Published in psim.config.v1\
-        \ under key \"ruleset/<tenant_id>\"."
+      description: "RuleSet is the set of rule versions active for a tenant.\n Published in psim.config.v1 under key \"ruleset/<tenant_id>\"\
+        ."
     psim.processing.v1.SequenceSpec:
       type: object
       properties:
@@ -5375,7 +5375,7 @@ components:
           type: string
         version:
           type: string
-      description: Command is a request to act on a device (aggregates.md, 5.3; state-models.md, 3).
+      description: Command is a request to act on a device.
     psim.response.v1.CommandParams:
       type: object
       properties:
@@ -5467,7 +5467,7 @@ components:
           description: Strictly increasing delays (EP1).
         version:
           type: string
-      description: EscalationPolicy defines SLA and escalation levels (aggregates.md, 5.4).
+      description: EscalationPolicy defines SLA and escalation levels.
     psim.response.v1.InstructionParams:
       type: object
       properties:
@@ -5526,7 +5526,7 @@ components:
           description: In-app notifications only.
         version:
           type: string
-      description: Notification is a message to a recipient over a channel (aggregates.md, 5.6).
+      description: Notification is a message to a recipient over a channel.
     psim.response.v1.NotifyParams:
       type: object
       properties:
@@ -5617,7 +5617,7 @@ components:
           format: date-time
         publishedBy:
           $ref: '#/components/schemas/psim.common.v1.Actor'
-      description: ResponsePlan is one immutable version of a response plan (aggregates.md, 5.1).
+      description: ResponsePlan is one immutable version of a response plan.
     psim.response.v1.ResponseRun:
       type: object
       properties:
@@ -5659,7 +5659,7 @@ components:
           format: date-time
         version:
           type: string
-      description: ResponseRun is the execution of a plan version for an incident (aggregates.md, 5.2).
+      description: ResponseRun is the execution of a plan version for an incident.
     psim.response.v1.SlaTarget:
       type: object
       properties:
@@ -5849,8 +5849,7 @@ tags:
 - name: FeedService
   description: 'FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.'
 - name: IncidentService
-  description: "IncidentService manages incidents and incident types. Owner: Incident Service.\n Scenarios S5-S7, S9. State\
-    \ transitions follow state-models.md, section 1."
+  description: 'IncidentService manages incidents and incident types. Owner: Incident Service.'
 - name: MappingService
   description: 'MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.'
 - name: MeService

@@ -1,4 +1,4 @@
-# Cross-component tests against the local environment (Ф2+). Namespace "test"; working directory is
+# Cross-component tests against the local environment. Namespace "test"; working directory is
 # the repository root. They need a running environment: `task env:up` (PROJECT=psim-platform) or the
 # fresh one of `task env:ci-test` (PROJECT=psim-ci).
 version: '3'

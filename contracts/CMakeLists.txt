@@ -1,4 +1,4 @@
-# C++ library generated from the contracts (step 1.1): every message of contracts/proto and the
+# C++ library generated from the contracts: every message of contracts/proto and the
 # gRPC stubs of the connector protocol. Third-party imports (google/api, buf/validate) are vendored
 # in third_party/proto by `task contracts:vendor`.
 

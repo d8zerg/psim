@@ -1,5 +1,5 @@
-# Grafana data sources of the local environment (step 1.4): metrics, logs and traces linked by
-# trace id. Dashboards and alerts are delivered with the observability package (step 9.4).
+# Grafana data sources of the local environment: metrics, logs and traces linked by
+# trace id.
 apiVersion: 1
 datasources:
   - name: Prometheus

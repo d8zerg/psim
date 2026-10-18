@@ -1,4 +1,4 @@
-# Editor settings shared by all IDEs (step 1.2). C++ formatting itself is defined by .clang-format.
+# Editor settings shared by all IDEs. C++ formatting itself is defined by .clang-format.
 root = true
 
 [*]

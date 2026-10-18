@@ -5,4 +5,4 @@ source:
 signal:
   namespace: c8b07c6e-a8aa-5eb0-9744-705b51f8c211
   components: [tenant_id, rule_id, rule_version, event_id]
-  scope: single-event rule of step 3.1
+  scope: single-event correlation rule

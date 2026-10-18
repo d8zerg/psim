@@ -1,4 +1,4 @@
-# psim::platform_async - execution model of the services (step 2.2, ADR-016, ADR-040): shards
+# psim::platform_async - execution model of the services (ADR-016, ADR-040): shards
 # (thread per core), deadlines and cancellation, backpressure (bounded queue, credits, semaphore),
 # pool for blocking calls, Clock port with a manual clock for deterministic tests.
 find_package(Boost REQUIRED CONFIG)
