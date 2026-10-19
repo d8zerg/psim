@@ -5,9 +5,9 @@ umask 077
 target=${1:-.cache/event-flow}
 mkdir -p "$target"
 chmod 755 "$target"
-if [ ! -f "$target/server.pem" ] || ! openssl x509 -checkhost toxiproxy -noout -in "$target/server.pem" >/dev/null 2>&1 || ! openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then
+if [ ! -f "$target/server.pem" ] || ! openssl x509 -in "$target/ca.pem" -noout -ext keyUsage 2>/dev/null | grep -q 'Certificate Sign' || ! openssl x509 -checkhost toxiproxy -noout -in "$target/server.pem" >/dev/null 2>&1 || ! openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then
   chmod u+w "$target"/*.key 2>/dev/null || true
-  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -days 7 -subj /CN=psim-event-flow-ca -keyout "$target/ca.key" -out "$target/ca.pem" >/dev/null 2>&1
+  openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -days 7 -subj /CN=psim-event-flow-ca -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' -keyout "$target/ca.key" -out "$target/ca.pem" >/dev/null 2>&1
   for identity in server client admin; do
     openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -subj "/CN=psim-event-flow-$identity" -keyout "$target/$identity.key" -out "$target/$identity.csr" >/dev/null 2>&1
     if [ "$identity" = server ]; then
@@ -25,10 +25,17 @@ if [ ! -f "$target/admin.pem" ]; then
   printf '%s\n' 'subjectAltName=URI:psim://service/gateway-admin' 'extendedKeyUsage=clientAuth' > "$target/admin.ext"
   openssl x509 -req -days 7 -in "$target/admin.csr" -CA "$target/ca.pem" -CAkey "$target/ca.key" -CAcreateserial -extfile "$target/admin.ext" -out "$target/admin.pem" >/dev/null 2>&1
 fi
-chmod u+w "$target/postgres.secret" 2>/dev/null || true
-printf %s psim-dev-psim > "$target/postgres.secret"
-chmod u+w "$target/redis.secret" 2>/dev/null || true
-printf %s psim-dev-valkey > "$target/redis.secret"
-chmod 400 "$target/redis.secret"
-chmod 644 "$target"/*.pem
-chmod 400 "$target"/*.key "$target/postgres.secret"
+if ! printf %s psim-dev-psim | cmp -s - "$target/postgres.secret"; then
+  chmod u+w "$target/postgres.secret" 2>/dev/null || true
+  printf %s psim-dev-psim > "$target/postgres.secret"
+fi
+if ! printf %s psim-dev-valkey | cmp -s - "$target/redis.secret"; then
+  chmod u+w "$target/redis.secret" 2>/dev/null || true
+  printf %s psim-dev-valkey > "$target/redis.secret"
+fi
+for file in "$target"/*.pem; do
+  [ "$(stat -c %a "$file")" = 644 ] || chmod 644 "$file"
+done
+for file in "$target"/*.key "$target/postgres.secret" "$target/redis.secret"; do
+  [ "$(stat -c %a "$file")" = 400 ] || chmod 400 "$file"
+done

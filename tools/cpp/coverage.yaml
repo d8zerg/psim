@@ -15,6 +15,10 @@ groups:
     modules: ['services/connector-gateway', 'services/normalizer', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway']
     lines: 75
     measured_by: component
+  - name: connectors
+    modules: ['connectors/simulator', 'connectors/webhook']
+    lines: 75
+    measured_by: component
   - name: domain
     modules: ['libs/domain/*']
     lines: 90

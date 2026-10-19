@@ -44,6 +44,7 @@ tasks:
           for binary in {{.IMAGES}}; do
             case "$binary" in psimctl) "$binary" version ;; *) "$binary" --version ;; esac;
           done;
+          psim-simulator --version; psim-webhook --version;
           status=0; psim-pg-migrate >/dev/null 2>&1 || status=$?; [ "$status" = 2 ];
           package_names=$(for archive in /packages/*.deb; do dpkg-deb -f "$archive" Package; done);
           dpkg -r $package_names >/dev/null;

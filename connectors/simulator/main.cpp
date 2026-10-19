@@ -1,174 +1,170 @@
 #include <google/protobuf/util/time_util.h>
-#include <grpcpp/grpcpp.h>
-#include <grpcpp/security/credentials.h>
 #include <nlohmann/json.hpp>
 #include <psim/connector/v1/connector.pb.h>
 
 #include <algorithm>
 #include <chrono>
-#include <cstdint>
+#include <cstddef>
 #include <exception>
 #include <fstream>
 #include <iostream>
-#include <iterator>
 #include <ratio>
 #include <stdexcept>
 #include <string>
 #include <thread>
+#include <utility>
+#include <vector>
 
-#include "psim/connector/v1/connector.grpc.pb.h"
-#include "psim/platform/kafka/client.hpp"
-#include "psim/platform/kafka/trace_context.hpp"
-#include "psim/platform/security/secret.hpp"
-#include "psim/platform/stream/grpc_process.hpp"
-#include "psim/platform/stream/runtime.hpp"
-#include "psim/platform/tracing.hpp"
-
-namespace {
-std::string pem(const std::string& path) {
-  std::ifstream input(path);
-  return {(std::istreambuf_iterator<char>(input)), {}};
-}
-}  // namespace
+#include "../common/settings.hpp"
+#include "model.hpp"
+#include "psim/platform/connector/client.hpp"
+#include "psim/platform/connector/grpc_process.hpp"
 
 int main(int argc, char** argv) {
   try {
-    const psim::platform::stream::GrpcProcess grpc;
-    std::string endpoint = "connector-gateway:8080";
-    std::string directory = "/repo/.cache/event-flow";
-    std::string code = "ALARM";
-    std::string source = "door-1";
-    int count = 1;
-    int interval = 100;
-    int repeat = 1;
-    for (int i = 1; i + 1 < argc; i += 2) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): argc guards argv access
+    if (argc == 2 && std::string(argv[1]) == "--version") {
+      std::cout << "psim-simulator " << PSIM_CONNECTOR_VERSION << '\n';
+      return 0;
+    }
+    namespace sdk = psim::platform::connector;
+    namespace sim = psim::connectors::simulator;
+    using psim::connectors::require;
+    std::string manifest_path;
+    sim::Profile profile;
+    auto options = psim::connectors::options("simulator-2");
+    for (int index = 1; index < argc; ++index) {
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): bounded command-line argument index
-      const std::string option = argv[i];
+      const std::string option = argv[index];
+      if (option == "--conformance") {
+        profile.conformance = true;
+        profile.count = 20;
+        profile.batch = 1;
+        profile.devices = 1;
+        profile.rate = 20;
+        continue;
+      }
+      require(index + 1 < argc, "simulator option requires a value");
       // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): bounded command-line argument index
-      const std::string value = argv[i + 1];
-      if (option == "--endpoint") {
-        endpoint = value;
-      } else if (option == "--tls") {
-        directory = value;
-      } else if (option == "--count") {
-        count = std::stoi(value);
-      } else if (option == "--interval-ms") {
-        interval = std::stoi(value);
-      } else if (option == "--repeat") {
-        repeat = std::stoi(value);
-      } else if (option == "--code") {
-        code = value;
-      } else if (option == "--source") {
-        source = value;
+      const std::string value = argv[++index];
+      if (option == "--count") {
+        profile.count = std::stoull(value);
+      } else if (option == "--devices") {
+        profile.devices = std::stoull(value);
+      } else if (option == "--batch") {
+        profile.batch = std::stoull(value);
+      } else if (option == "--rate") {
+        profile.rate = std::stoull(value);
+      } else if (option == "--scenario") {
+        profile.scenario = value;
+      } else if (option == "--run-id") {
+        profile.run_id = value;
+      } else if (option == "--burst-every") {
+        profile.burst_every = std::stoull(value);
+      } else if (option == "--burst-size") {
+        profile.burst_size = std::stoull(value);
+      } else if (option == "--source-prefix") {
+        profile.source_prefix = value;
+      } else if (option == "--endpoint") {
+        options.endpoint = value;
+      } else if (option == "--manifest") {
+        manifest_path = value;
+      } else if (option == "--buffer") {
+        options.buffer_directory = value;
       } else {
-        throw std::runtime_error("unknown simulator option");
+        throw std::invalid_argument("unknown simulator option");
       }
     }
-    if (count < 1 || count > 1000 || interval < 0 || interval > 60000 || repeat < 1 || repeat > 2) {
-      throw std::runtime_error("invalid simulator bounds");
+    require(!options.buffer_directory.empty(), "simulator requires a persistent buffer directory");
+    options.max_batch_events = 1000;
+    options.max_batch_bytes = 250000;
+    options.max_buffer_bytes = 512ULL * 1024 * 1024;
+    options.max_pending_events = 1000000;
+    sim::Model model(profile);
+    std::ofstream manifest;
+    if (!manifest_path.empty()) {
+      manifest.open(manifest_path, std::ios::out | std::ios::trunc);
+      require(manifest.is_open(), "simulator manifest unavailable");
     }
-    using namespace psim;
-    auto key = platform::security::read_secret(directory + "/client.key");
-    if (!key) {
-      throw std::runtime_error("client key unavailable");
-    }
-    grpc::SslCredentialsOptions const tls{pem(directory + "/ca.pem"), std::string(key->view()),
-                                          pem(directory + "/client.pem")};
-    auto channel = grpc::CreateChannel(endpoint, grpc::SslCredentials(tls));
-    auto stub = connector::v1::ConnectorGatewayService::NewStub(channel);
-    grpc::ClientContext rpc;
-    rpc.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(30)
-                     + std::chrono::milliseconds(count * interval));
-    auto session = stub->Session(&rpc);
-    connector::v1::SessionRequest request;
-    connector::v1::SessionResponse response;
-    request.mutable_register_()->add_protocol_versions("1.0");
-    request.mutable_register_()->set_connector_version("simulator-1");
-    request.mutable_register_()->set_instance_id(platform::stream::uuid7());
-    if (!session->Write(request) || !session->Read(&response) || !response.has_registered()) {
-      throw std::runtime_error("registration failed");
-    }
-    platform::observability::Tracing tracing({.service = "simulator",
-                                              .version = "0.1.0",
-                                              .instance = "simulator",
-                                              .otlp_endpoint = "otel-collector:4317",
-                                              .sampling_ratio = 1,
-                                              .otlp_tls = false});
-    const auto next = [&](connector::v1::SessionResponse::MessageCase type) {
-      while (session->Read(&response)) {
-        if (response.message_case() == type) {
-          return true;
-        }
-        if (!response.has_heartbeat()) {
-          return false;
-        }
-      }
-      return false;
-    };
+    const sdk::GrpcProcess grpc;
+    sdk::Client client(
+        options,
+        {.command = [&](const auto& command, const auto& stop) { return model.command(command, stop); },
+         .snapshot = [&](const auto&, const auto& stop) { return model.snapshot(stop); },
+         .rejection =
+             [](const auto& rejection) {
+               std::cerr << nlohmann::json{{"rejected_event", rejection.event_id()}, {"code", rejection.code()}}.dump()
+                         << '\n';
+             }});
+    const auto recovered = client.diagnostics().pending_events;
+    require(client.start().has_value(), "simulator SDK startup failed");
     const auto started = std::chrono::steady_clock::now();
-    auto heartbeat_at = started + std::chrono::seconds(2);
-    const auto heartbeat = [&] {
-      connector::v1::SessionRequest pulse;
-      *pulse.mutable_heartbeat()->mutable_sent_at() = google::protobuf::util::TimeUtil::GetCurrentTime();
-      if (!session->Write(pulse) || !next(connector::v1::SessionResponse::kHeartbeat)) {
-        throw std::runtime_error("heartbeat failed");
+    const auto wall = std::chrono::system_clock::now();
+    double max_lateness_ms = 0;
+    for (std::size_t index = 0; index < profile.count;) {
+      const auto offset = std::chrono::nanoseconds(model.scheduled_nanoseconds(index));
+      std::this_thread::sleep_until(started + offset);
+      max_lateness_ms =
+          profile.rate == 0
+              ? 0
+              : std::max(max_lateness_ms,
+                         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - started - offset)
+                             .count());
+      const auto count = std::min(profile.rate == 0 ? profile.batch : std::size_t{1}, profile.count - index);
+      std::vector<sim::wire::ConnectorEvent> batch;
+      for (std::size_t item = 0; item < count; ++item) {
+        auto event = model.event(index + item);
+        const auto at =
+            profile.rate == 0
+                ? std::chrono::system_clock::now().time_since_epoch()
+                : (wall + std::chrono::nanoseconds(model.scheduled_nanoseconds(index + item))).time_since_epoch();
+        *event.mutable_occurred_at() = google::protobuf::util::TimeUtil::NanosecondsToTimestamp(
+            std::chrono::duration_cast<std::chrono::nanoseconds>(at).count());
+        batch.push_back(std::move(event));
       }
-      heartbeat_at = std::chrono::steady_clock::now() + std::chrono::seconds(2);
-    };
-    for (int i = 0; i < count; ++i) {
-      // Open-loop schedule: source time is the intended send time, including generator lateness.
-      const auto scheduled = started + std::chrono::milliseconds(i * interval);
-      while (std::chrono::steady_clock::now() < scheduled) {
-        std::this_thread::sleep_until(std::min(scheduled, heartbeat_at));
-        if (std::chrono::steady_clock::now() >= heartbeat_at) {
-          heartbeat();
+      const auto stored = client.publish_batch(std::move(batch), sdk::Observation::kCurrent);
+      require(stored.has_value(), "simulator durable admission failed");
+      if (manifest.is_open()) {
+        for (const auto& event : *stored) {
+          manifest << event.event_id() << '\n';
         }
+        require(manifest.good(), "simulator manifest write failed");
       }
-      if (std::chrono::steady_clock::now() >= heartbeat_at) {
-        heartbeat();
-      }
-      const auto late = std::chrono::steady_clock::now() - scheduled;
-      const auto wall = std::chrono::system_clock::now() - late;
-      const auto nanos = std::chrono::duration_cast<std::chrono::nanoseconds>(wall.time_since_epoch()).count();
-      auto trace = tracing.tracer("psim.simulator")->StartSpan("simulate alarm");
-      platform::kafka::Headers headers;
-      platform::kafka::inject(*trace, headers);
-      request.Clear();
-      auto* batch = request.mutable_event_batch();
-      auto* event = batch->add_events();
-      event->set_event_id(platform::stream::uuid7());
-      event->set_source_ref(source);
-      event->set_source_epoch(1);
-      event->set_source_seq(static_cast<std::uint64_t>(i) + 1);
-      *event->mutable_occurred_at() = google::protobuf::util::TimeUtil::NanosecondsToTimestamp(nanos);
-      event->set_raw_code(code);
-      event->set_traceparent(headers.at(0).second);
-      for (int attempt = 0; attempt < repeat; ++attempt) {
-        batch->set_batch_seq(static_cast<std::uint64_t>((i * repeat) + attempt) + 1);
-        if (!session->Write(request) || !next(connector::v1::SessionResponse::kBatchAck)
-            || response.batch_ack().accepted() != 1) {
-          throw std::runtime_error("event was not acknowledged");
-        }
-        if (!next(connector::v1::SessionResponse::kCredits)) {
-          throw std::runtime_error("missing credits");
-        }
-      }
-      trace->End();
-      std::cout << nlohmann::json{{"event_id", event->event_id()},
-                                  {"occurred_ns", nanos},
-                                  {"trace_id", event->traceparent().substr(3, 32)},
-                                  {"late_ms", std::chrono::duration<double, std::milli>(late).count()}}
-                       .dump()
-                << '\n';
+      index += count;
     }
-    session->WritesDone();
-    while (session->Read(&response)) {
+    if (manifest.is_open()) {
+      manifest.flush();
+      require(manifest.good(), "simulator manifest flush failed");
     }
-    if (!session->Finish().ok()) {
-      throw std::runtime_error("session failed");
+    const auto generated = std::chrono::steady_clock::now();
+    const auto timeout = std::stoi(psim::connectors::setting("PSIM_CONNECTOR_FLUSH_TIMEOUT_SECONDS", "120"));
+    require(client.flush(std::chrono::seconds(timeout)), "simulator buffer did not drain");
+    const auto drained = std::chrono::steady_clock::now();
+    if (profile.conformance) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(300));
     }
-    (void)tracing.flush();
-    return 0;
+    client.stop();
+    const auto data = client.diagnostics();
+    const auto generation_seconds = std::chrono::duration<double>(generated - started).count();
+    const auto delivery_seconds = std::chrono::duration<double>(drained - started).count();
+    std::cout << nlohmann::json{{"run_id", profile.run_id},
+                                {"recovered", recovered},
+                                {"generated", profile.count},
+                                {"devices", profile.devices},
+                                {"generation_seconds", generation_seconds},
+                                {"generation_events_per_second",
+                                 static_cast<double>(profile.count) / generation_seconds},
+                                {"delivery_seconds", delivery_seconds},
+                                {"acknowledged", data.acknowledged},
+                                {"rejected", data.rejected},
+                                {"pending", data.pending_events},
+                                {"max_lateness_ms", max_lateness_ms}}
+                     .dump()
+              << '\n';
+    return data.pending_events == 0 && data.acknowledged + data.rejected == profile.count + recovered
+                   && data.rejected == (profile.conformance ? 1U : 0U)
+               ? 0
+               : 1;
   } catch (const std::exception& error) {
     std::cerr << error.what() << '\n';
     return 1;

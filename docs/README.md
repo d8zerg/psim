@@ -21,6 +21,7 @@
 
 - [Сквозной стенд M1](engineering/event-flow.md)
 - [Разработка коннектора и набор соответствия](engineering/connector-sdk.md)
+- [Эталонные коннекторы: симулятор и Webhook/HTTP](engineering/reference-connectors.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 
 ## Архитектура

@@ -37,6 +37,7 @@ add_subdirectory(tools/pg-migrate)
 add_subdirectory(tools/service-template)
 add_subdirectory(services)
 add_subdirectory(connectors/simulator)
+add_subdirectory(connectors/webhook)
 
 psim_finalize_packaging()
 add_subdirectory(tools/event-flow)

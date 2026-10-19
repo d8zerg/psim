@@ -16,12 +16,13 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--preset", default="debug")
     parser.add_argument("--outage-seconds", type=int, default=600)
+    parser.add_argument("--name", default="example")
     parser.add_argument("client", nargs=argparse.REMAINDER, help="connector executable and arguments")
     args = parser.parse_args()
     if not 1 <= args.outage_seconds <= 600:
         parser.error("outage duration must be between 1 and 600 seconds")
     build = ROOT / "build/debian13" / args.preset
-    report = ROOT / "build/connector-conformance" / args.preset
+    report = ROOT / "build/connector-conformance" / args.preset / args.name
     report.mkdir(parents=True, exist_ok=True)
     for name in ("ready.json", "report.json"):
         (report / name).unlink(missing_ok=True)
@@ -55,8 +56,18 @@ def main():
             client = subprocess.Popen(command, cwd=ROOT, env=env, stdout=client_log, stderr=subprocess.STDOUT)
             deadline = time.monotonic() + args.outage_seconds + 50
             while peer.poll() is None:
-                if client.poll() is not None or time.monotonic() >= deadline:
-                    raise RuntimeError("connector exited early or exceeded conformance budget; see logs")
+                client_status = client.poll()
+                if client_status is not None:
+                    if client_status != 0:
+                        raise RuntimeError("connector failed before the peer completed; see client.log")
+                    # A successful client may exit while the peer flushes its final report.
+                    try:
+                        peer.wait(timeout=5)
+                    except subprocess.TimeoutExpired as error:
+                        raise RuntimeError("connector exited before completing the protocol fixture") from error
+                    break
+                if time.monotonic() >= deadline:
+                    raise RuntimeError("connector exceeded conformance budget; see logs")
                 time.sleep(.1)
             assert peer.returncode == 0, (report / "report.json").read_text()
             assert client.wait(timeout=10) == 0, "connector failed; see client.log"

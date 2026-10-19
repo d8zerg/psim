@@ -10,7 +10,65 @@ tasks:
         vars: {PRESET: '{{.PRESET}}'}
       - task: :cpp:_run
         vars:
+          RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
           CMD: >-
             build/{{.PLATFORM}}/{{.PRESET}}/libs/platform/connector/psim_connector_test &&
             sh tools/env/event_flow_tls.sh .cache/connector-conformance &&
-            python3 -I tools/connectors/conformance.py --preset {{.PRESET}} --outage-seconds {{.OUTAGE_SECONDS}}
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/{{.PRESET}}/profiles/%p-%m.profraw
+            python3 -I tools/connectors/suite.py --preset {{.PRESET}} --outage-seconds {{.OUTAGE_SECONDS}}
+
+  bench:
+    desc: Reconcile simulator output over mTLS and require at least 75000 generated events per second
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            sh tools/env/event_flow_tls.sh .cache/connector-conformance &&
+            python3 -I tools/connectors/load.py
+  integration:
+    desc: Run both reference connectors through the real registered gateway and reconcile Kafka
+    vars:
+      PROJECT: '{{.PROJECT | default "psim-platform"}}'
+    cmds:
+      - task: :gateway:prepare
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}', FIXTURES: 'false'}
+      - defer: {task: ':gateway:down', vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}'}}
+      - task: :cpp:_run_env
+        vars:
+          PROJECT: '{{.PROJECT}}'
+          PRESET: '{{.PRESET}}'
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/{{.PRESET}}/profiles/%p-%m.profraw
+            python3 -I tools/connectors/integration.py --preset {{.PRESET}}
+  coverage:
+    desc: Connector unit and real HTTPS/mTLS process coverage
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            rm -rf build/{{.PLATFORM}}/coverage/profiles &&
+            mkdir -p build/{{.PLATFORM}}/coverage/profiles &&
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            ctest --preset coverage -L 'psim_(connector|simulator|webhook)_test' --output-on-failure
+      - task: conformance
+        vars: {PRESET: coverage, OUTAGE_SECONDS: '1'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            python3 -I tools/connectors/load.py --preset coverage --count 10000 --minimum-rate 0 &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+            'libs/platform/connector' &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+            'connectors/simulator connectors/webhook' --component
+
+  sanitizers:
+    desc: Real simulator and HTTPS connector fixtures under ASan/UBSan and TSan
+    cmds:
+      - for: [asan, tsan]
+        task: conformance
+        vars: {PRESET: '{{.ITEM}}', OUTAGE_SECONDS: '1'}

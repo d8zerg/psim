@@ -4,13 +4,15 @@ vars:
   PRESET: '{{.PRESET | default "debug"}}'
 tasks:
   prepare:
+    vars:
+      FIXTURES: '{{.FIXTURES | default "true"}}'
     desc: Build and start two authenticated gateway instances with synthetic identities
     cmds:
       - task: :cpp:build
         vars: {PRESET: '{{.PRESET}}'}
       - mkdir -p build/{{.PLATFORM}}/{{.PRESET}}/profiles
       - task: :cpp:_run
-        vars: {CMD: sh tools/env/event_flow_tls.sh && python3 -I tools/env/gateway_fixtures.py}
+        vars: {CMD: 'sh tools/env/event_flow_tls.sh{{if eq .FIXTURES "true"}} && python3 -I tools/env/gateway_fixtures.py{{end}}'}
       - task: :contracts:registry:register
         vars: {PROJECT: '{{.PROJECT}}'}
       - task: :cpp:_run_env

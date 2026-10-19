@@ -29,6 +29,9 @@ struct Options {
   std::size_t max_buffer_bytes = std::size_t{64} * 1024 * 1024;
   std::size_t max_pending_events = 100000;
   std::size_t max_commands = 10000;
+  std::size_t max_idempotency_keys = 100000;
+  std::size_t max_batch_events = 32;
+  std::size_t max_batch_bytes = 65536;
   std::chrono::milliseconds reconnect_min{100};
   std::chrono::milliseconds reconnect_max{10000};
   std::chrono::milliseconds registration_timeout{10000};
@@ -75,6 +78,12 @@ class Client final {
   /// SDK assigns UUIDv7 and a durable sequence; source_epoch defaults to 1 and must never decrease.
   [[nodiscard]] Result<wire::ConnectorEvent> publish(wire::ConnectorEvent event,
                                                      Observation observation = Observation::kHistorical);
+  /// Atomically persist up to 1000 events with one fsync; no partial admission.
+  [[nodiscard]] Result<std::vector<wire::ConnectorEvent>> publish_batch(
+      std::vector<wire::ConnectorEvent> events, Observation observation = Observation::kHistorical);
+  /// Durable upstream deduplication, including after acknowledgement and restart.
+  /// Reusing a key with a different payload fails; keys are bounded and never evicted.
+  [[nodiscard]] Result<wire::ConnectorEvent> publish_once(wire::ConnectorEvent event, const std::string& key);
   /// Current equipment connectivity/values; only accepted while state.v1 is negotiated.
   [[nodiscard]] Result<void> report(wire::StateObservation observation);
   [[nodiscard]] bool flush(std::chrono::milliseconds timeout);

@@ -114,6 +114,9 @@ tasks:
       - task: cpp:test
       - task: cpp:test:sanitizers
       - task: connectors:conformance         # TS-06
+      - task: connectors:sanitizers
+      - task: connectors:coverage
+      - task: connectors:bench                # B-06
       - task: cpp:coverage
       - task: cpp:runtime-test
       - task: web:check
@@ -174,6 +177,12 @@ tasks:
         vars: {NIGHTLY: '{{.NIGHTLY}}'}
         if: '[ "{{.ENV}}" = true ]'
       - task: connectors:conformance         # TS-06: real outage and an external connector fixture
+        if: '[ "{{.CONNECTORS}}" = true ]'
+      - task: connectors:sanitizers
+        if: '[ "{{.CONNECTORS}}" = true ]'
+      - task: connectors:coverage
+        if: '[ "{{.CONNECTORS}}" = true ]'
+      - task: connectors:bench                # B-06
         if: '[ "{{.CONNECTORS}}" = true ]'
       - task: web:check                       # format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'

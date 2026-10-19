@@ -22,6 +22,7 @@
 #include <exception>
 #include <filesystem>
 #include <limits>
+#include <map>
 #include <mutex>
 #include <span>
 #include <stdexcept>
@@ -53,6 +54,50 @@ std::string frame(const nlohmann::json& value) {
   const auto text = value.dump();
   return digest(text) + " " + text + "\n";
 }
+
+// NOLINTBEGIN(cppcoreguidelines-pro-type-reinterpret-cast): OpenSSL Base64 requires unsigned byte buffers
+nlohmann::json event_operation(const wire::ConnectorEvent& event) {
+  const auto bytes = event.SerializeAsString();
+  std::string encoded((4 * ((bytes.size() + 2) / 3)) + 1, '\0');
+  const auto length =
+      EVP_EncodeBlock(reinterpret_cast<unsigned char*>(encoded.data()),
+                      reinterpret_cast<const unsigned char*>(bytes.data()), static_cast<int>(bytes.size()));
+  if (length < 0) {
+    throw std::runtime_error("event encoding failed");
+  }
+  encoded.resize(static_cast<std::size_t>(length));
+  return {{"event_wire", std::move(encoded)}};
+}
+
+wire::ConnectorEvent decode_event(const nlohmann::json& operation) {
+  wire::ConnectorEvent event;
+  if (operation.contains("event")) {
+    decode(operation.at("event"), &event);
+    return event;
+  }
+  const auto& encoded = operation.at("event_wire").get_ref<const std::string&>();
+  if (encoded.empty() || encoded.size() > 88000 || encoded.size() % 4 != 0) {
+    throw std::runtime_error("invalid encoded event size");
+  }
+  std::string bytes(3 * (encoded.size() / 4), '\0');
+  const auto length =
+      EVP_DecodeBlock(reinterpret_cast<unsigned char*>(bytes.data()),
+                      reinterpret_cast<const unsigned char*>(encoded.data()), static_cast<int>(encoded.size()));
+  if (length < 0) {
+    throw std::runtime_error("invalid encoded event");
+  }
+  std::size_t padding = 0;
+  if (encoded.ends_with("=")) {
+    padding = encoded.ends_with("==") ? 2 : 1;
+  }
+  bytes.resize(static_cast<std::size_t>(length) - padding);
+  if (!event.ParseFromString(bytes)) {
+    throw std::runtime_error("invalid event protobuf");
+  }
+  return event;
+}
+
+// NOLINTEND(cppcoreguidelines-pro-type-reinterpret-cast)
 
 void write_all(int file, std::string_view data) {
   while (!data.empty()) {
@@ -217,7 +262,8 @@ void Store::recover() {
     sync(file_);
   }
   bytes_ = offset;
-  if (events_.size() > options_.max_pending_events || commands_.size() > options_.max_commands) {
+  if (events_.size() > options_.max_pending_events || commands_.size() > options_.max_commands
+      || idempotency_.size() > options_.max_idempotency_keys) {
     throw std::runtime_error("recovered buffer exceeds configured record bound");
   }
 }
@@ -228,12 +274,21 @@ void Store::apply(const nlohmann::json& operation) {
     order_.clear();
     cursors_.clear();
     commands_.clear();
+    idempotency_.clear();
     for (const auto& item : operation.at("snapshot")) {
       apply(item);
     }
-  } else if (operation.contains("event")) {
-    wire::ConnectorEvent event;
-    decode(operation.at("event"), &event);
+  } else if (operation.contains("batch")) {
+    for (const auto& item : operation.at("batch")) {
+      apply(item);
+    }
+  } else if (operation.contains("idempotency")) {
+    idempotency_[operation.at("idempotency").get<std::string>()] = operation;
+    if (operation.contains("event")) {
+      apply(nlohmann::json{{"event", operation.at("event")}});
+    }
+  } else if (operation.contains("event") || operation.contains("event_wire")) {
+    const auto event = decode_event(operation);
     events_[event.event_id()] = event;
     order_.push_back(event.event_id());
     auto& cursor = cursors_[event.source_ref()];
@@ -266,13 +321,18 @@ nlohmann::json Store::snapshot() const {
     if (!events_.contains(id)) {
       continue;
     }
-    items.push_back({{"event", encode(events_.at(id))}});
+    items.push_back(event_operation(events_.at(id)));
   }
   for (const auto& [source, cursor] : cursors_) {
     items.push_back({{"cursor", encode(cursor)}});
   }
   for (const auto& [id, command] : commands_) {
     items.push_back(command);
+  }
+  for (const auto& [key, saved] : idempotency_) {
+    auto item = saved;
+    item.erase("event");
+    items.push_back(std::move(item));
   }
   return {{"snapshot", items}};
 }
@@ -329,20 +389,19 @@ void Store::record(const nlohmann::json& operation, bool admission) {
   }
 }
 
-wire::ConnectorEvent Store::append(wire::ConnectorEvent event) {
-  const std::scoped_lock lock(mutex_);
-  if (events_.size() >= options_.max_pending_events || event.source_ref().empty() || event.source_ref().size() > 256
-      || event.raw_code().empty() || event.raw_code().size() > 128 || event.attributes_size() > 64) {
-    throw std::invalid_argument("invalid event or event buffer full");
+wire::ConnectorEvent Store::prepare(wire::ConnectorEvent event, std::map<std::string, wire::SourceCursor>& cursors) {
+  if (event.source_ref().empty() || event.source_ref().size() > 256 || event.raw_code().empty()
+      || event.raw_code().size() > 128 || event.attributes_size() > 64) {
+    throw std::invalid_argument("invalid event");
   }
-  const auto previous = cursors_.find(event.source_ref());
+  const auto previous = cursors.find(event.source_ref());
   if (event.source_epoch() == 0) {
-    event.set_source_epoch(previous == cursors_.end() ? 1 : previous->second.source_epoch());
+    event.set_source_epoch(previous == cursors.end() ? 1 : previous->second.source_epoch());
   }
-  if (previous != cursors_.end() && event.source_epoch() < previous->second.source_epoch()) {
+  if (previous != cursors.end() && event.source_epoch() < previous->second.source_epoch()) {
     throw std::invalid_argument("source epoch must not decrease");
   }
-  const auto sequence = previous != cursors_.end() && event.source_epoch() == previous->second.source_epoch()
+  const auto sequence = previous != cursors.end() && event.source_epoch() == previous->second.source_epoch()
                             ? previous->second.source_seq()
                             : 0;
   if (sequence == std::numeric_limits<std::uint64_t>::max()) {
@@ -359,7 +418,62 @@ wire::ConnectorEvent Store::append(wire::ConnectorEvent event) {
   if (!google::protobuf::util::TimeUtil::IsTimestampValid(event.occurred_at()) || event.ByteSizeLong() > 65500) {
     throw std::invalid_argument("invalid event timestamp or event too large");
   }
-  record({{"event", encode(event)}}, true);
+  auto& cursor = cursors[event.source_ref()];
+  cursor.set_source_ref(event.source_ref());
+  cursor.set_source_epoch(event.source_epoch());
+  cursor.set_source_seq(event.source_seq());
+  return event;
+}
+
+wire::ConnectorEvent Store::append(wire::ConnectorEvent event) {
+  auto result = append_batch({std::move(event)});
+  return std::move(result.front());
+}
+
+std::vector<wire::ConnectorEvent> Store::append_batch(std::vector<wire::ConnectorEvent> events) {
+  const std::scoped_lock lock(mutex_);
+  if (events.empty() || events.size() > 1000 || events_.size() + events.size() > options_.max_pending_events) {
+    throw std::invalid_argument("invalid event batch or event buffer full");
+  }
+  std::map<std::string, wire::SourceCursor> cursors;
+  for (const auto& event : events) {
+    if (const auto found = cursors_.find(event.source_ref()); found != cursors_.end()) {
+      cursors.emplace(found->first, found->second);
+    }
+  }
+  auto operations = nlohmann::json::array();
+  for (auto& event : events) {
+    event = prepare(std::move(event), cursors);
+    operations.push_back(event_operation(event));
+  }
+  record(events.size() == 1 ? operations.front() : nlohmann::json{{"batch", operations}}, true);
+  return events;
+}
+
+wire::ConnectorEvent Store::append_once(wire::ConnectorEvent event, const std::string& key) {
+  const std::scoped_lock lock(mutex_);
+  if (key.empty() || key.size() > 128) {
+    throw std::invalid_argument("invalid idempotency key");
+  }
+  const auto input = encode(event);
+  if (const auto found = idempotency_.find(key); found != idempotency_.end()) {
+    if (found->second.at("input") != input) {
+      throw std::invalid_argument("idempotency key reused with different payload");
+    }
+    wire::ConnectorEvent original;
+    decode(found->second.at("receipt"), &original);
+    return original;
+  }
+  if (idempotency_.size() >= options_.max_idempotency_keys || events_.size() >= options_.max_pending_events) {
+    throw std::runtime_error("idempotency ledger or event buffer full");
+  }
+  std::map<std::string, wire::SourceCursor> cursors;
+  if (const auto found = cursors_.find(event.source_ref()); found != cursors_.end()) {
+    cursors.emplace(found->first, found->second);
+  }
+  event = prepare(std::move(event), cursors);
+  const auto encoded = encode(event);
+  record({{"idempotency", key}, {"input", input}, {"receipt", encoded}, {"event", encoded}}, true);
   return event;
 }
 

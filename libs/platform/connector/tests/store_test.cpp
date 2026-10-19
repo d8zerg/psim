@@ -220,5 +220,47 @@ TEST_F(ConnectorStore, CommandLedgerRemainsBoundedAndSurvivesCompaction) {
   EXPECT_TRUE(duplicate.result.success());
 }
 
+TEST_F(ConnectorStore, BatchAdmissionIsAtomicAndPreservesSequenceAcrossRestart) {
+  {
+    detail::Store store(options());
+    auto invalid = event();
+    invalid.set_raw_code("");
+    EXPECT_THROW((void)store.append_batch({event(), invalid}), std::invalid_argument);
+    EXPECT_EQ(store.count(), 0);
+    const auto batch = store.append_batch({event(), event(), event()});
+    EXPECT_EQ(batch[0].source_seq(), 1);
+    EXPECT_EQ(batch[2].source_seq(), 3);
+  }
+  detail::Store store(options());
+  EXPECT_EQ(store.count(), 3);
+  EXPECT_EQ(store.append(event()).source_seq(), 4);
+}
+
+TEST_F(ConnectorStore, UpstreamIdempotencySurvivesAcknowledgementCompactionAndRestart) {
+  options().max_buffer_bytes = 16384;
+  options().max_idempotency_keys = 1;
+  std::string identity;
+  {
+    detail::Store store(options());
+    const auto first = store.append_once(event(), "external-1");
+    identity = first.event_id();
+    EXPECT_EQ(store.append_once(event(), "external-1").event_id(), identity);
+    store.acknowledge({identity});
+    for (int index = 0; index < 100; ++index) {
+      const auto value = store.append(event());
+      store.acknowledge({value.event_id()});
+    }
+    EXPECT_EQ(store.append_once(event(), "external-1").event_id(), identity);
+    EXPECT_EQ(store.count(), 0);
+  }
+  detail::Store store(options());
+  EXPECT_EQ(store.append_once(event(), "external-1").event_id(), identity);
+  EXPECT_EQ(store.count(), 0);
+  auto changed = event();
+  changed.set_raw_code("OTHER");
+  EXPECT_THROW((void)store.append_once(changed, "external-1"), std::invalid_argument);
+  EXPECT_THROW((void)store.append_once(event(), "external-2"), std::runtime_error);
+}
+
 }  // namespace
 }  // namespace psim::platform::connector

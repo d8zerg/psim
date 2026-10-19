@@ -1,11 +1,13 @@
 # Коннекторы
 
-[C++ Connector SDK и руководство интегратора](../docs/engineering/connector-sdk.md) реализованы в `libs/platform/connector`. Публичная CMake-цель - `psim::platform_connector`; [пример](../libs/platform/connector/examples/basic.cpp) использует только публичный API. Самостоятельный TLS-сервер набора соответствия находится в `tools/connector-conformance`, запуск внешнего клиента - в `tools/connectors/conformance.py`.
+- [SDK и руководство интегратора](../docs/engineering/connector-sdk.md): публичная цель `psim::platform_connector`, пример и набор соответствия.
+- [Эталонные коннекторы](../docs/engineering/reference-connectors.md): `simulator/` - виртуальные устройства, нагрузка, команды и снимки; `webhook/` - HTTPS-приём событий с долговечными повторами.
 
 ```bash
 task connectors:conformance
-# Короткий режим для отладки:
 task connectors:conformance OUTAGE_SECONDS=1
+task connectors:bench
+task connectors:coverage
 ```
 
-`simulator/` содержит минимальный прямой gRPC-клиент [стенда M1](../docs/engineering/event-flow.md), включая намеренную двойную отправку для проверки идемпотентности конвейера. Полный генератор нагрузки и эталонный Webhook/HTTP-коннектор относятся к шагу 4.3; `libs/sim` остаётся отдельным ручным модельным стендом.
+Прямой gRPC-клиент сквозной проверки находится в `tools/event-flow/psim-flow-simulator`; `libs/sim` - отдельный ручной модельный стенд.

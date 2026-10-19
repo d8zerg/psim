@@ -41,7 +41,7 @@ task flow:sanitizers
 
 | Процесс | Минимальная реализация |
 |---|---|
-| simulator | Настоящий gRPC-клиент, PKI fixture, открытое расписание и повтор идентичных событий |
+| simulator | `tools/event-flow/psim-flow-simulator`: настоящий gRPC-клиент, PKI fixture, открытое расписание и повтор идентичных событий |
 | connector-gateway | URI SAN известного коннектора, Register, событие, BatchAck после Kafka, Credits |
 | normalizer | Один источник в fixture-каталоге, ALARM/RESTORE, типизированный EventRecord |
 | correlation-engine | Однособытийное правило тревоги, детерминированный signal_id |

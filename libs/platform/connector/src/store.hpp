@@ -34,6 +34,8 @@ class Store final {
   Store(Store&&) = delete;
   Store& operator=(Store&&) = delete;
   wire::ConnectorEvent append(wire::ConnectorEvent event);
+  std::vector<wire::ConnectorEvent> append_batch(std::vector<wire::ConnectorEvent> events);
+  wire::ConnectorEvent append_once(wire::ConnectorEvent event, const std::string& key);
   [[nodiscard]] std::vector<wire::ConnectorEvent> pending(std::size_t count, std::size_t bytes) const;
   void acknowledge(const std::vector<std::string>& ids);
   [[nodiscard]] std::vector<wire::SourceCursor> cursors() const;
@@ -43,6 +45,7 @@ class Store final {
   [[nodiscard]] std::size_t bytes() const;
 
  private:
+  static wire::ConnectorEvent prepare(wire::ConnectorEvent event, std::map<std::string, wire::SourceCursor>& cursors);
   void record(const nlohmann::json& operation, bool admission = false);
   void apply(const nlohmann::json& operation);
   void compact();
@@ -59,5 +62,6 @@ class Store final {
   std::deque<std::string> order_;
   std::map<std::string, wire::SourceCursor> cursors_;
   std::map<std::string, nlohmann::json> commands_;
+  std::map<std::string, nlohmann::json> idempotency_;
 };
 }  // namespace psim::platform::connector::detail

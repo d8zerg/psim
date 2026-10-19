@@ -9,6 +9,7 @@
 #include <cstdio>
 #include <exception>
 #include <filesystem>
+#include <fstream>
 #include <mutex>
 #include <print>
 #include <set>
@@ -206,6 +207,19 @@ int main(int argc, char** argv) {
       psim::connector_gateway::testing::bench(argc > 2 ? std::stoull(args[2]) : 25000);
     } else if (std::string_view(args[1]) == "failover") {
       psim::connector_gateway::testing::failover();
+    } else if (std::string_view(args[1]) == "verify" && argc == 3) {
+      std::ifstream input(args[2]);
+      std::set<std::string> ids;
+      std::string id;
+      while (std::getline(input, id)) {
+        if (id.size() != 36 || ids.size() >= 100000 || !ids.insert(id).second) {
+          throw std::runtime_error("invalid reconciliation manifest");
+        }
+      }
+      if (ids.empty() || !input.eof()) {
+        throw std::runtime_error("reconciliation manifest unavailable");
+      }
+      psim::connector_gateway::testing::run(psim::connector_gateway::testing::verify(std::move(ids)));
     } else {
       throw std::runtime_error("unknown gateway probe");
     }

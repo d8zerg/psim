@@ -126,7 +126,9 @@ class Client::Impl {
         || options_.acknowledgement_timeout < std::chrono::milliseconds(10)
         || options_.registration_timeout > std::chrono::minutes(10)
         || options_.acknowledgement_timeout > std::chrono::minutes(10)
-        || options_.reconnect_max > std::chrono::minutes(10) || options_.connector_version.empty()) {
+        || options_.reconnect_max > std::chrono::minutes(10) || options_.connector_version.empty()
+        || options_.max_batch_events == 0 || options_.max_batch_events > 1000 || options_.max_batch_bytes < 128
+        || options_.max_batch_bytes > static_cast<std::size_t>(256 * 1024)) {
       throw std::invalid_argument("invalid connector timing or version");
     }
   }
@@ -173,15 +175,43 @@ class Client::Impl {
   }
 
   Result<wire::ConnectorEvent> publish(wire::ConnectorEvent event, Observation observation) {
+    auto result = publish_batch({std::move(event)}, observation);
+    if (!result) {
+      return std::unexpected(result.error());
+    }
+    return std::move(result->front());
+  }
+
+  Result<std::vector<wire::ConnectorEvent>> publish_batch(std::vector<wire::ConnectorEvent> events,
+                                                          Observation observation) {
     try {
       {
         const std::scoped_lock lock(mutex_);
-        event.set_observation_session_id(session_);
-        event.set_live_observation(observation == Observation::kCurrent && !session_.empty());
+        for (auto& event : events) {
+          event.set_observation_session_id(session_);
+          event.set_live_observation(observation == Observation::kCurrent && !session_.empty());
+        }
       }
-      auto result = store_.append(std::move(event));
+      auto result = store_.append_batch(std::move(events));
       changed_.notify_all();
       return result;
+    } catch (const std::exception& error) {
+      set_error(error.what());
+      return fail(ErrorCode::kCommonUnavailable,
+                  "event batch not confirmed by local durable buffer; inspect diagnostics");
+    }
+  }
+
+  Result<wire::ConnectorEvent> publish_once(wire::ConnectorEvent event, const std::string& key) {
+    try {
+      event.set_live_observation(false);
+      event.clear_observation_session_id();
+      auto result = store_.append_once(std::move(event), key);
+      changed_.notify_all();
+      return result;
+    } catch (const std::invalid_argument& error) {
+      set_error(error.what());
+      return fail(ErrorCode::kCommonIdempotencyKeyReused, "idempotency key conflicts with a previous request");
     } catch (const std::exception& error) {
       set_error(error.what());
       return fail(ErrorCode::kCommonUnavailable, "event not confirmed by local durable buffer; inspect diagnostics");
@@ -474,7 +504,8 @@ class Client::Impl {
         std::deque<wire::SessionResponse> responses;
         {
           std::unique_lock lock(mutex_);
-          changed_.wait_for(lock, std::chrono::milliseconds(5));
+          changed_.wait_for(lock, std::chrono::milliseconds(5),
+                            [this, stop] { return !incoming_.empty() || !outgoing_.empty() || stop.stop_requested(); });
           responses.swap(incoming_);
         }
         for (const auto& response : responses) {
@@ -596,9 +627,9 @@ class Client::Impl {
           }
         }
         if (!inflight && credits != 0) {
-          auto events = store_.pending(
-              static_cast<std::size_t>(std::min<std::uint64_t>({credits, parameters.max_batch_events(), 32})),
-              std::min<std::size_t>(parameters.max_batch_bytes(), 65536));
+          auto events = store_.pending(static_cast<std::size_t>(std::min<std::uint64_t>(
+                                           {credits, parameters.max_batch_events(), options_.max_batch_events})),
+                                       std::min<std::size_t>(parameters.max_batch_bytes(), options_.max_batch_bytes));
           if (events.empty()) {
             if (store_.count() != 0) {
               set_error("first pending event exceeds negotiated batch size");
@@ -690,6 +721,15 @@ void Client::stop() {
 
 Result<wire::ConnectorEvent> Client::publish(wire::ConnectorEvent event, Observation observation) {
   return impl_->publish(std::move(event), observation);
+}
+
+Result<std::vector<wire::ConnectorEvent>> Client::publish_batch(std::vector<wire::ConnectorEvent> events,
+                                                                Observation observation) {
+  return impl_->publish_batch(std::move(events), observation);
+}
+
+Result<wire::ConnectorEvent> Client::publish_once(wire::ConnectorEvent event, const std::string& key) {
+  return impl_->publish_once(std::move(event), key);
 }
 
 Result<void> Client::report(wire::StateObservation observation) {

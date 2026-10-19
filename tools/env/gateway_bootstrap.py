@@ -6,7 +6,20 @@ from pathlib import Path
 import runpy
 import subprocess
 import sys
+import tempfile
 import uuid
+
+
+def private_file(path, content):
+    descriptor, temporary = tempfile.mkstemp(prefix=".gateway-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w") as output:
+            output.write(content)
+            output.flush()
+            os.fchmod(output.fileno(), 0o400)
+        os.replace(temporary, path)
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def token(base, directory):
@@ -37,24 +50,18 @@ def token(base, directory):
     access = request(base, "/realms/psim/protocol/openid-connect/token", data={
         "grant_type": "client_credentials", "client_id": client_id, "client_secret": "psim-dev-gateway-bootstrap"}, form=True)["access_token"]
     path = directory / "operator.token"
-    if path.exists():
-        path.chmod(0o600)
-    path.write_text(access)
-    path.chmod(0o400)
+    private_file(path, access)
     technical = request(base, "/realms/psim/protocol/openid-connect/token", data={
         "grant_type": "client_credentials", "client_id": "psim-services", "client_secret": "psim-dev-services-secret"}, form=True)["access_token"]
     path = directory / "technical.token"
-    if path.exists():
-        path.chmod(0o600)
-    path.write_text(technical)
-    path.chmod(0o400)
+    private_file(path, technical)
     return directory / "operator.token"
 
 
 def manage(target, binary, directory, token_file, body, required=True):
     path = directory / "management-request.json"
     body = {"requestId": str(uuid.uuid4()), **body}
-    path.write_text(json.dumps(body))
+    private_file(path, json.dumps(body))
     result = subprocess.run([str(binary), target, str(directory), str(path), str(token_file)], text=True, capture_output=True, timeout=35)
     if result.returncode:
         if required:

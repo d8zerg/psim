@@ -48,7 +48,7 @@ services:
   simulator:
     <<: *event-flow
     profiles: [simulator]
-    entrypoint: ["/repo/build/debian13/${PSIM_PRESET:-debug}/connectors/simulator/psim-simulator"]
+    entrypoint: ["/repo/build/debian13/${PSIM_PRESET:-debug}/tools/event-flow/psim-flow-simulator"]
   console:
     profiles: [event-flow]
     image: node:24.21.0-trixie@sha256:1278a37eb510ec1606fba0e80f554bcc941ae0b44f35ae373c4822ae7717c64d
