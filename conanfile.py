@@ -62,6 +62,8 @@ class PsimConan(ConanFile):
         # ClickHouse layer (ADR-045): native protocol with TLS.
         self.requires("clickhouse-cpp/2.6.1")
         self.requires("aws-sdk-cpp/1.11.692")
+        self.requires("libpng/1.6.58")
+        self.requires("libjpeg-turbo/3.2.0")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

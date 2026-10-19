@@ -5,11 +5,11 @@ umask 077
 target=.cache/s3-tls
 mkdir -p "$target"
 chmod 755 "$target"
-if [ -f "$target/server.pem" ] && openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then
+if [ -f "$target/server.pem" ] && openssl x509 -in "$target/ca.pem" -noout -ext keyUsage 2>/dev/null | grep -q "Certificate Sign" && openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then
   exit 0
 fi
 chmod u+w "$target"/* 2>/dev/null || true
-openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -days 7 -subj /CN=psim-s3-fixture-ca \
+openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -days 7 -subj /CN=psim-s3-fixture-ca -addext "basicConstraints=critical,CA:TRUE" -addext "keyUsage=critical,keyCertSign,cRLSign" \
   -keyout "$target/ca.key" -out "$target/ca.pem" >/dev/null 2>&1
 openssl req -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -subj /CN=psim-s3-fixture \
   -keyout "$target/server.key" -out "$target/server.csr" >/dev/null 2>&1

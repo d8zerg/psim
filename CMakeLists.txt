@@ -43,3 +43,5 @@ psim_finalize_packaging()
 add_subdirectory(tools/event-flow)
 add_subdirectory(tools/connector-conformance)
 add_subdirectory(tools/gateway-admin)
+
+add_subdirectory(tools/catalog)

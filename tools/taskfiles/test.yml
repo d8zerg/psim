@@ -208,9 +208,16 @@ tasks:
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :flow:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :catalog:test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :connectors:conformance
+        vars: {PRESET: coverage, OUTAGE_SECONDS: '1'}
       - task: :cpp:_run
         vars:
-          CMD: python3 -I tools/cpp/coverage.py {{.BUILD}} tools/cpp/coverage.yaml '' --component
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/{{.BUILD}}/profiles/%p-%m.profraw
+            python3 -I tools/connectors/load.py --preset coverage --count 10000 --minimum-rate 0 &&
+            python3 -I tools/cpp/coverage.py {{.BUILD}} tools/cpp/coverage.yaml '' --component
 
   observability:
     desc: 'Every service exports /health/live, /health/ready, /metrics, JSON logs and traces and drains on SIGTERM (FF-06)'

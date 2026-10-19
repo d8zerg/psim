@@ -454,6 +454,14 @@ paths:
       - CatalogService
       description: RegisterConnector registers a connector and binds its certificate.
       operationId: CatalogService_RegisterConnector
+      parameters:
+      - name: certificatePem
+        in: query
+        description: Public client certificate; its fingerprint and validity are verified by the gateway.
+        schema:
+          type: string
+      - *id011
+      - *id012
       requestBody:
         content:
           application/json:
@@ -476,8 +484,34 @@ paths:
         '503': *id007
         '409': *id008
         '412': *id009
-      parameters: *id010
       summary: RegisterConnector registers a connector and binds its certificate
+  /v1/connectors/{connectorId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetConnector returns the latest projected registration.
+      operationId: CatalogService_GetConnector
+      parameters:
+      - name: connectorId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetConnectorResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetConnector returns the latest projected registration
   /v1/connectors/{connectorId}:revoke:
     post:
       tags:
@@ -613,6 +647,32 @@ paths:
       parameters: *id010
       summary: CreateDeviceType creates a device type
   /v1/device-types/{deviceTypeId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetDeviceType returns one device type.
+      operationId: CatalogService_GetDeviceType
+      parameters:
+      - name: deviceTypeId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetDeviceTypeResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetDeviceType returns one device type
     put:
       tags:
       - CatalogService
@@ -2075,6 +2135,11 @@ paths:
         required: true
         schema:
           type: string
+      - name: version
+        in: query
+        description: Zero selects the currently linked version.
+        schema:
+          type: string
       responses:
         '200':
           description: OK
@@ -2125,10 +2190,6 @@ paths:
             schema:
               type: string
               format: binary
-          image/svg+xml:
-            schema:
-              type: string
-              format: binary
       responses:
         '200':
           description: OK
@@ -2146,6 +2207,42 @@ paths:
         '409': *id014
         '412': *id015
       summary: UploadFloorPlan uploads the floor plan image of a floor
+  /v1/locations/{locationId}/floor-plan/versions:
+    get:
+      tags:
+      - CatalogService
+      description: ListFloorPlanVersions returns immutable metadata for a floor's previous images.
+      operationId: CatalogService_ListFloorPlanVersions
+      parameters:
+      - name: locationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListFloorPlanVersionsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListFloorPlanVersions returns immutable metadata for a floor's previous images
   /v1/locations/{locationId}:archive:
     post:
       tags:
@@ -2183,6 +2280,169 @@ paths:
         '409': *id008
         '412': *id009
       summary: ArchiveLocation archives a location without children and devices (L3)
+  /v1/maintenance-windows:
+    get:
+      tags:
+      - CatalogService
+      description: ListMaintenanceWindows lists intervals in the caller's scope.
+      operationId: CatalogService_ListMaintenanceWindows
+      parameters:
+      - name: siteId
+        in: query
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ListMaintenanceWindowsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: ListMaintenanceWindows lists intervals in the caller's scope
+    post:
+      tags:
+      - CatalogService
+      description: CreateMaintenanceWindow schedules a one-off interval.
+      operationId: CatalogService_CreateMaintenanceWindow
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateMaintenanceWindowResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: CreateMaintenanceWindow schedules a one-off interval
+  /v1/maintenance-windows/{maintenanceId}:
+    get:
+      tags:
+      - CatalogService
+      description: GetMaintenanceWindow returns one interval, including completed intervals.
+      operationId: CatalogService_GetMaintenanceWindow
+      parameters:
+      - name: maintenanceId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetMaintenanceWindowResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetMaintenanceWindow returns one interval, including completed intervals
+    put:
+      tags:
+      - CatalogService
+      description: UpdateMaintenanceWindow replaces a scheduled or active interval (If-Match required).
+      operationId: CatalogService_UpdateMaintenanceWindow
+      parameters:
+      - name: maintenanceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateMaintenanceWindowResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: UpdateMaintenanceWindow replaces a scheduled or active interval (If-Match required)
+  /v1/maintenance-windows/{maintenanceId}:cancel:
+    post:
+      tags:
+      - CatalogService
+      description: CancelMaintenanceWindow ends an interval explicitly (If-Match required).
+      operationId: CatalogService_CancelMaintenanceWindow
+      parameters:
+      - name: maintenanceId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.CancelMaintenanceWindowRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CancelMaintenanceWindowResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: CancelMaintenanceWindow ends an interval explicitly (If-Match required)
   /v1/mappings:
     get:
       tags:
@@ -3359,6 +3619,18 @@ components:
         command:
           $ref: '#/components/schemas/psim.response.v1.Command'
       description: CancelCommandResponse is the response of CancelCommand.
+    psim.api.v1.CancelMaintenanceWindowRequest:
+      type: object
+      properties:
+        maintenanceId:
+          type: string
+      description: CancelMaintenanceWindowRequest identifies an interval.
+    psim.api.v1.CancelMaintenanceWindowResponse:
+      type: object
+      properties:
+        maintenanceWindow:
+          $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+      description: CancelMaintenanceWindowResponse includes the terminal version.
     psim.api.v1.CloseIncidentRequest:
       type: object
       properties:
@@ -3435,6 +3707,12 @@ components:
         location:
           $ref: '#/components/schemas/psim.catalog.v1.Location'
       description: CreateLocationResponse is the response of CreateLocation.
+    psim.api.v1.CreateMaintenanceWindowResponse:
+      type: object
+      properties:
+        maintenanceWindow:
+          $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+      description: CreateMaintenanceWindowResponse includes the assigned version.
     psim.api.v1.DeviceStatus:
       type: object
       properties:
@@ -3512,12 +3790,24 @@ components:
         command:
           $ref: '#/components/schemas/psim.response.v1.Command'
       description: GetCommandResponse is the response of GetCommand.
+    psim.api.v1.GetConnectorResponse:
+      type: object
+      properties:
+        connector:
+          $ref: '#/components/schemas/psim.catalog.v1.Connector'
+      description: GetConnectorResponse contains its latest projected version.
     psim.api.v1.GetDeviceResponse:
       type: object
       properties:
         device:
           $ref: '#/components/schemas/psim.catalog.v1.Device'
       description: GetDeviceResponse is the response of GetDevice.
+    psim.api.v1.GetDeviceTypeResponse:
+      type: object
+      properties:
+        deviceType:
+          $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+      description: GetDeviceTypeResponse contains its current version.
     psim.api.v1.GetDryRunResponse:
       type: object
       properties:
@@ -3604,6 +3894,12 @@ components:
           items:
             $ref: '#/components/schemas/psim.api.v1.DeviceStatus'
       description: GetLocationStatusResponse is the response of GetLocationStatus.
+    psim.api.v1.GetMaintenanceWindowResponse:
+      type: object
+      properties:
+        maintenanceWindow:
+          $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+      description: GetMaintenanceWindowResponse includes the current version.
     psim.api.v1.GetMappingRuleSetResponse:
       type: object
       properties:
@@ -3809,6 +4105,16 @@ components:
         nextPageToken:
           type: string
       description: ListEscalationPoliciesResponse is the response of ListEscalationPolicies.
+    psim.api.v1.ListFloorPlanVersionsResponse:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.StoredFile'
+        nextPageToken:
+          type: string
+      description: ListFloorPlanVersionsResponse contains immutable image metadata.
     psim.api.v1.ListIncidentEventsResponse:
       type: object
       properties:
@@ -3859,6 +4165,16 @@ components:
         nextPageToken:
           type: string
       description: ListLocationsResponse is the response of ListLocations.
+    psim.api.v1.ListMaintenanceWindowsResponse:
+      type: object
+      properties:
+        maintenanceWindows:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+        nextPageToken:
+          type: string
+      description: ListMaintenanceWindowsResponse is the scoped interval list.
     psim.api.v1.ListMappingRuleSetsResponse:
       type: object
       properties:
@@ -4080,6 +4396,9 @@ components:
           type: string
         reason:
           type: string
+        fingerprint:
+          type: string
+          description: Empty disables the connector; otherwise revokes only the selected fingerprint.
       description: RevokeConnectorRequest is the request of RevokeConnector.
     psim.api.v1.RevokeConnectorResponse:
       type: object
@@ -4098,6 +4417,8 @@ components:
           type: string
           description: Expiry of the previous certificate.
           format: date-time
+        certificatePem:
+          type: string
       description: RotateConnectorCertificateRequest is the request of RotateConnectorCertificate.
     psim.api.v1.RotateConnectorCertificateResponse:
       type: object
@@ -4271,6 +4592,12 @@ components:
         location:
           $ref: '#/components/schemas/psim.catalog.v1.Location'
       description: UpdateLocationResponse is the response of UpdateLocation.
+    psim.api.v1.UpdateMaintenanceWindowResponse:
+      type: object
+      properties:
+        maintenanceWindow:
+          $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+      description: UpdateMaintenanceWindowResponse includes the assigned version.
     psim.api.v1.UpdateProcessingSettingsResponse:
       type: object
       properties:
@@ -4586,6 +4913,8 @@ components:
         height:
           type: number
           format: double
+        file:
+          $ref: '#/components/schemas/psim.catalog.v1.StoredFile'
       description: FloorPlan is an image of a floor with a coordinate system for device positions.
     psim.catalog.v1.Location:
       type: object
@@ -4632,6 +4961,51 @@ components:
           type: string
           format: date-time
       description: Location is a site, building, floor or zone.
+    psim.catalog.v1.MaintenanceWindow:
+      type: object
+      properties:
+        maintenanceId:
+          type: string
+        siteId:
+          type: string
+        deviceId:
+          type: string
+        zoneId:
+          type: string
+        startsAt:
+          type: string
+          format: date-time
+        endsAt:
+          type: string
+          format: date-time
+        reason:
+          type: string
+        responsible:
+          type: string
+        suppression:
+          $ref: '#/components/schemas/psim.catalog.v1.SuppressionPolicy'
+        state:
+          enum:
+          - MAINTENANCE_STATE_UNSPECIFIED
+          - MAINTENANCE_STATE_SCHEDULED
+          - MAINTENANCE_STATE_ACTIVE
+          - MAINTENANCE_STATE_COMPLETED
+          - MAINTENANCE_STATE_CANCELLED
+          type: string
+          format: enum
+        version:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        activatedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+      description: "MaintenanceWindow is a one-off interval, evaluated using event receipt time.\n Fire events and P1 signals\
+        \ are never suppressed; history and open incidents are preserved."
     psim.catalog.v1.ParameterSpec:
       type: object
       properties:
@@ -4676,6 +5050,48 @@ components:
         name:
           type: string
       description: SourceTemplate describes a source every device of the type has.
+    psim.catalog.v1.StoredFile:
+      type: object
+      properties:
+        fileId:
+          type: string
+        siteId:
+          type: string
+        ownerId:
+          type: string
+        version:
+          type: string
+        size:
+          type: string
+        contentType:
+          type: string
+        sha256:
+          type: string
+        objectKey:
+          type: string
+          description: Internal storage identity; clients download through the authorized floor endpoint.
+        createdAt:
+          type: string
+          format: date-time
+        pixelWidth:
+          type: integer
+          format: uint32
+        pixelHeight:
+          type: integer
+          format: uint32
+      description: StoredFile describes an immutable private object owned by a floor.
+    psim.catalog.v1.SuppressionPolicy:
+      type: object
+      properties:
+        eventTypes:
+          type: array
+          items:
+            type: string
+        ruleIds:
+          type: array
+          items:
+            type: string
+      description: SuppressionPolicy explicitly selects event types or rules for new signal suppression.
     psim.common.v1.Actor:
       type: object
       properties:

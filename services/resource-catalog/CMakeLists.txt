@@ -1,0 +1,8 @@
+find_package(PNG REQUIRED CONFIG)
+find_package(libjpeg-turbo REQUIRED CONFIG)
+add_library(psim_catalog_core STATIC application/model.cpp adapters/image.cpp adapters/repository.cpp adapters/imports.cpp adapters/files.cpp adapters/s3_files.cpp)
+psim_target_defaults(psim_catalog_core)
+target_include_directories(psim_catalog_core PUBLIC application adapters)
+target_link_libraries(psim_catalog_core PUBLIC psim::platform_stream psim::platform_s3 PRIVATE PNG::PNG libjpeg-turbo::turbojpeg-static)
+psim_add_service(resource-catalog SOURCES src/main.cpp adapters/http.cpp adapters/connector_admin.cpp LIBS psim_catalog_core SUMMARY "PSIM Resource Catalog")
+psim_add_test(psim_catalog_test SOURCES tests/model_test.cpp LIBS psim_catalog_core PNG::PNG libjpeg-turbo::turbojpeg-static)

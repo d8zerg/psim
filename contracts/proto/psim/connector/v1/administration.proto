@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package psim.connector.v1;
 
+import "google/protobuf/timestamp.proto";
 import "psim/catalog/v1/catalog.proto";
 
 // ConnectorAdministrationService manages registrations over mTLS and delegated operator JWTs.
@@ -32,6 +33,12 @@ message ManageRequest {
   string certificate_pem = 5;
   // Required for revocation, ignored for other actions.
   string fingerprint = 6;
+  // Optional shortened validity of previous certificates during rotation.
+  google.protobuf.Timestamp previous_not_after = 7;
+  // Operator explanation, included in audit when supplied.
+  string reason = 8;
+  // Optional assertion binding the public certificate to an expected fingerprint.
+  string expected_fingerprint = 9;
 }
 
 // ManageResponse returns the committed registration and global enforcement revision.

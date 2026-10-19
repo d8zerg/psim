@@ -1,0 +1,28 @@
+service:
+  instance: resource-catalog
+runtime:
+  shards: 1
+shutdown:
+  drain_timeout_ms: 30000
+telemetry:
+  otlp_endpoint: otel-collector:4317
+  otlp_tls: false
+  sampling_ratio: 0.01
+settings:
+  allow_plaintext: true
+  issuer: http://keycloak:8080/realms/psim
+  listen_port: 8443
+  pg_max_result_bytes: 134217728
+  pg_password_file: /repo/.cache/event-flow/postgres.secret
+  tls_ca_file: /repo/.cache/event-flow/ca.pem
+  tls_certificate_file: /repo/.cache/event-flow/catalog-server.pem
+  tls_private_key_file: /repo/.cache/event-flow/catalog-server.key
+  s3_endpoint: https://s3:8443
+  s3_bucket: psim-plans
+  s3_ca_file: /repo/.cache/s3-tls/ca.pem
+  s3_access_key_file: /repo/.cache/s3-tls/filestore.access
+  s3_secret_key_file: /repo/.cache/s3-tls/filestore.secret
+  management_endpoint: connector-gateway:8080
+  management_ca_file: /repo/.cache/event-flow/ca.pem
+  management_certificate_file: /repo/.cache/event-flow/catalog-client.pem
+  management_key_file: /repo/.cache/event-flow/catalog-client.key

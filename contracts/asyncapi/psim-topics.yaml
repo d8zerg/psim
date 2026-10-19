@@ -314,6 +314,27 @@ channels:
       cluster: 6
       single: 2
     x-psim-semantics: ALO+ID
+  dlqCatalogV1:
+    address: psim.dlq.catalog.v1
+    title: Dead letters of stage catalog
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.catalog.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
   dlqNormalizerV1:
     address: psim.dlq.normalizer.v1
     title: Dead letters of stage normalizer
@@ -744,6 +765,20 @@ operations:
     x-psim-service: command-service
   resourceCatalogSendCatalogV1:
     action: send
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: resource-catalog
+  connectorGatewaySendCatalogV1:
+    action: send
+    channel:
+      $ref: '#/channels/catalogV1'
+    messages:
+    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
+    x-psim-service: connector-gateway
+  resourceCatalogReceiveCatalogV1:
+    action: receive
     channel:
       $ref: '#/channels/catalogV1'
     messages:

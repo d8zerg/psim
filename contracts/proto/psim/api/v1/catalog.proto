@@ -7,10 +7,52 @@ import "google/api/annotations.proto";
 import "google/api/httpbody.proto";
 import "google/protobuf/timestamp.proto";
 import "psim/catalog/v1/catalog.proto";
+import "psim/catalog/v1/maintenance.proto";
 
 // CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.
 // Owner: Resource Catalog. Scenarios S1, S2.
 service CatalogService {
+  // GetDeviceType returns one device type.
+  rpc GetDeviceType(GetDeviceTypeRequest) returns (GetDeviceTypeResponse) {
+    option (google.api.http) = {get: "/v1/device-types/{device_type_id}"};
+  }
+  // GetConnector returns the latest projected registration.
+  rpc GetConnector(GetConnectorRequest) returns (GetConnectorResponse) {
+    option (google.api.http) = {get: "/v1/connectors/{connector_id}"};
+  }
+  // ListMaintenanceWindows lists intervals in the caller's scope.
+  rpc ListMaintenanceWindows(ListMaintenanceWindowsRequest) returns (ListMaintenanceWindowsResponse) {
+    option (google.api.http) = {get: "/v1/maintenance-windows"};
+  }
+  // GetMaintenanceWindow returns one interval, including completed intervals.
+  rpc GetMaintenanceWindow(GetMaintenanceWindowRequest) returns (GetMaintenanceWindowResponse) {
+    option (google.api.http) = {get: "/v1/maintenance-windows/{maintenance_id}"};
+  }
+  // CreateMaintenanceWindow schedules a one-off interval.
+  rpc CreateMaintenanceWindow(CreateMaintenanceWindowRequest) returns (CreateMaintenanceWindowResponse) {
+    option (google.api.http) = {
+      post: "/v1/maintenance-windows"
+      body: "maintenance_window"
+    };
+  }
+  // UpdateMaintenanceWindow replaces a scheduled or active interval (If-Match required).
+  rpc UpdateMaintenanceWindow(UpdateMaintenanceWindowRequest) returns (UpdateMaintenanceWindowResponse) {
+    option (google.api.http) = {
+      put: "/v1/maintenance-windows/{maintenance_id}"
+      body: "maintenance_window"
+    };
+  }
+  // CancelMaintenanceWindow ends an interval explicitly (If-Match required).
+  rpc CancelMaintenanceWindow(CancelMaintenanceWindowRequest) returns (CancelMaintenanceWindowResponse) {
+    option (google.api.http) = {
+      post: "/v1/maintenance-windows/{maintenance_id}:cancel"
+      body: "*"
+    };
+  }
+  // ListFloorPlanVersions returns immutable metadata for a floor's previous images.
+  rpc ListFloorPlanVersions(ListFloorPlanVersionsRequest) returns (ListFloorPlanVersionsResponse) {
+    option (google.api.http) = {get: "/v1/locations/{location_id}/floor-plan/versions"};
+  }
   // ListLocations lists locations, filtered by parent or kind.
   rpc ListLocations(ListLocationsRequest) returns (ListLocationsResponse) {
     option (google.api.http) = {get: "/v1/locations"};
@@ -225,6 +267,8 @@ message UploadFloorPlanResponse {
 // GetFloorPlanRequest is the request of GetFloorPlan.
 message GetFloorPlanRequest {
   string location_id = 1 [(buf.validate.field).string.uuid = true];
+  // Zero selects the currently linked version.
+  uint64 version = 2;
 }
 
 // GetFloorPlanResponse is the response of GetFloorPlan; the body is the image.
@@ -404,6 +448,8 @@ message ListConnectorsResponse {
 // RegisterConnectorRequest is the request of RegisterConnector.
 message RegisterConnectorRequest {
   psim.catalog.v1.Connector connector = 1 [(buf.validate.field).required = true];
+  // Public client certificate; its fingerprint and validity are verified by the gateway.
+  string certificate_pem = 2;
 }
 
 // RegisterConnectorResponse is the response of RegisterConnector.
@@ -417,6 +463,7 @@ message RotateConnectorCertificateRequest {
   psim.catalog.v1.CertificateFingerprint new_certificate = 2 [(buf.validate.field).required = true];
   // Expiry of the previous certificate.
   google.protobuf.Timestamp previous_not_after = 3;
+  string certificate_pem = 4;
 }
 
 // RotateConnectorCertificateResponse is the response of RotateConnectorCertificate.
@@ -428,9 +475,84 @@ message RotateConnectorCertificateResponse {
 message RevokeConnectorRequest {
   string connector_id = 1 [(buf.validate.field).string.uuid = true];
   string reason = 2;
+  // Empty disables the connector; otherwise revokes only the selected fingerprint.
+  string fingerprint = 3;
+}
+
+// ListMaintenanceWindowsRequest selects intervals and uses cursor pagination.
+message ListMaintenanceWindowsRequest {
+  string site_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+// ListMaintenanceWindowsResponse is the scoped interval list.
+message ListMaintenanceWindowsResponse {
+  repeated psim.catalog.v1.MaintenanceWindow maintenance_windows = 1;
+  string next_page_token = 2;
+}
+// GetMaintenanceWindowRequest identifies an interval.
+message GetMaintenanceWindowRequest {
+  string maintenance_id = 1;
+}
+// GetMaintenanceWindowResponse includes the current version.
+message GetMaintenanceWindowResponse {
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 1;
+}
+// CreateMaintenanceWindowRequest carries the desired interval.
+message CreateMaintenanceWindowRequest {
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 1;
+}
+// CreateMaintenanceWindowResponse includes the assigned version.
+message CreateMaintenanceWindowResponse {
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 1;
+}
+// UpdateMaintenanceWindowRequest carries the path identity and replacement.
+message UpdateMaintenanceWindowRequest {
+  string maintenance_id = 1;
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 2;
+}
+// UpdateMaintenanceWindowResponse includes the assigned version.
+message UpdateMaintenanceWindowResponse {
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 1;
+}
+// CancelMaintenanceWindowRequest identifies an interval.
+message CancelMaintenanceWindowRequest {
+  string maintenance_id = 1;
+}
+// CancelMaintenanceWindowResponse includes the terminal version.
+message CancelMaintenanceWindowResponse {
+  psim.catalog.v1.MaintenanceWindow maintenance_window = 1;
+}
+// ListFloorPlanVersionsRequest identifies a floor and a page.
+message ListFloorPlanVersionsRequest {
+  string location_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+// ListFloorPlanVersionsResponse contains immutable image metadata.
+message ListFloorPlanVersionsResponse {
+  repeated psim.catalog.v1.StoredFile files = 1;
+  string next_page_token = 2;
 }
 
 // RevokeConnectorResponse is the response of RevokeConnector.
 message RevokeConnectorResponse {
+  psim.catalog.v1.Connector connector = 1;
+}
+
+// GetDeviceTypeRequest identifies a device type.
+message GetDeviceTypeRequest {
+  string device_type_id = 1 [(buf.validate.field).string.uuid = true];
+}
+// GetDeviceTypeResponse contains its current version.
+message GetDeviceTypeResponse {
+  psim.catalog.v1.DeviceType device_type = 1;
+}
+// GetConnectorRequest identifies a registration.
+message GetConnectorRequest {
+  string connector_id = 1 [(buf.validate.field).string.uuid = true];
+}
+// GetConnectorResponse contains its latest projected version.
+message GetConnectorResponse {
   psim.catalog.v1.Connector connector = 1;
 }

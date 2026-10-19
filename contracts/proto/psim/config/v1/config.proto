@@ -4,6 +4,7 @@ package psim.config.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/duration.proto";
+import "psim/catalog/v1/maintenance.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
 import "psim/processing/v1/mapping.proto";
@@ -23,6 +24,8 @@ message ConfigRecord {
     RetentionSettings retention = 4;
     // Key "processing/<tenant_id>".
     ProcessingSettings processing = 5;
+    // Key "maintenance/<tenant_id>/<maintenance_id>"; terminal versions remain for replay.
+    psim.catalog.v1.MaintenanceWindow maintenance_window = 6;
   }
 }
 

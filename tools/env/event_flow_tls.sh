@@ -25,6 +25,18 @@ if [ ! -f "$target/admin.pem" ]; then
   printf '%s\n' 'subjectAltName=URI:psim://service/gateway-admin' 'extendedKeyUsage=clientAuth' > "$target/admin.ext"
   openssl x509 -req -days 7 -in "$target/admin.csr" -CA "$target/ca.pem" -CAkey "$target/ca.key" -CAcreateserial -extfile "$target/admin.ext" -out "$target/admin.pem" >/dev/null 2>&1
 fi
+for identity in catalog-server catalog-client; do
+  if [ ! -f "$target/$identity.pem" ] || ! openssl verify -CAfile "$target/ca.pem" "$target/$identity.pem" >/dev/null 2>&1 || ! openssl x509 -checkend 86400 -noout -in "$target/$identity.pem" >/dev/null 2>&1; then
+    chmod u+w "$target/$identity.key" 2>/dev/null || true
+    openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -subj /CN=psim-resource-catalog -keyout "$target/$identity.key" -out "$target/$identity.csr" >/dev/null 2>&1
+    if [ "$identity" = catalog-server ]; then
+      printf '%s\n' 'subjectAltName=DNS:resource-catalog,DNS:catalog-2,DNS:localhost,URI:psim://service/resource-catalog' 'extendedKeyUsage=serverAuth' > "$target/$identity.ext"
+    else
+      printf '%s\n' 'subjectAltName=URI:psim://service/resource-catalog' 'extendedKeyUsage=clientAuth' > "$target/$identity.ext"
+    fi
+    openssl x509 -req -days 7 -in "$target/$identity.csr" -CA "$target/ca.pem" -CAkey "$target/ca.key" -CAcreateserial -extfile "$target/$identity.ext" -out "$target/$identity.pem" >/dev/null 2>&1
+  fi
+done
 if ! printf %s psim-dev-psim | cmp -s - "$target/postgres.secret"; then
   chmod u+w "$target/postgres.secret" 2>/dev/null || true
   printf %s psim-dev-psim > "$target/postgres.secret"

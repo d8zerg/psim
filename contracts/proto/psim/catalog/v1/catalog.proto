@@ -17,6 +17,7 @@ message CatalogRecord {
     DeviceType device_type = 3;
     Device device = 4;
     Connector connector = 5;
+    StoredFile stored_file = 6;
   }
 }
 
@@ -72,6 +73,23 @@ message FloorPlan {
   string content_type = 2;
   double width = 3 [(buf.validate.field).double.gt = 0];
   double height = 4 [(buf.validate.field).double.gt = 0];
+  StoredFile file = 5;
+}
+
+// StoredFile describes an immutable private object owned by a floor.
+message StoredFile {
+  string file_id = 1 [(buf.validate.field).string.uuid = true];
+  string site_id = 2 [(buf.validate.field).string.uuid = true];
+  string owner_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 version = 4;
+  uint64 size = 5;
+  string content_type = 6;
+  string sha256 = 7;
+  // Internal storage identity; clients download through the authorized floor endpoint.
+  string object_key = 8;
+  google.protobuf.Timestamp created_at = 9;
+  uint32 pixel_width = 10;
+  uint32 pixel_height = 11;
 }
 
 // DeviceType describes a class of devices, its sources and capabilities.

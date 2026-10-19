@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package psim.catalog.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// MaintenanceWindow is a one-off interval, evaluated using event receipt time.
+// Fire events and P1 signals are never suppressed; history and open incidents are preserved.
+message MaintenanceWindow {
+  string maintenance_id = 1 [(buf.validate.field).string.uuid = true];
+  string site_id = 2 [(buf.validate.field).string.uuid = true];
+  oneof target {
+    option (buf.validate.oneof).required = true;
+    string device_id = 3 [(buf.validate.field).string.uuid = true];
+    string zone_id = 4 [(buf.validate.field).string.uuid = true];
+  }
+  google.protobuf.Timestamp starts_at = 5 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp ends_at = 6 [(buf.validate.field).required = true];
+  string reason = 7 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 2000
+  }];
+  string responsible = 8 [(buf.validate.field).string = {
+    min_len: 1
+    max_len: 256
+  }];
+  SuppressionPolicy suppression = 9 [(buf.validate.field).required = true];
+  MaintenanceState state = 10;
+  uint64 version = 11;
+  google.protobuf.Timestamp updated_at = 12;
+  google.protobuf.Timestamp activated_at = 13;
+  google.protobuf.Timestamp completed_at = 14;
+}
+
+// SuppressionPolicy explicitly selects event types or rules for new signal suppression.
+message SuppressionPolicy {
+  repeated string event_types = 1 [(buf.validate.field).repeated.max_items = 100];
+  repeated string rule_ids = 2 [(buf.validate.field).repeated.max_items = 100];
+}
+
+// MaintenanceState is persisted, versioned and published for every transition.
+enum MaintenanceState {
+  MAINTENANCE_STATE_UNSPECIFIED = 0;
+  MAINTENANCE_STATE_SCHEDULED = 1;
+  MAINTENANCE_STATE_ACTIVE = 2;
+  MAINTENANCE_STATE_COMPLETED = 3;
+  MAINTENANCE_STATE_CANCELLED = 4;
+}

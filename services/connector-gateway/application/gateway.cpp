@@ -372,7 +372,7 @@ asio::awaitable<p::Result<void>> Gateway::initialize() {
   const auto& config = context().config();
   ca_file_ = config.get<std::string>("settings.tls_directory") + "/ca.pem";
   for (const auto* topic :
-       {"psim.ingest.raw.v1", "psim.ingest.state.v1", "psim.commands.results.v1", "psim.audit.v1"}) {
+       {"psim.ingest.raw.v1", "psim.ingest.state.v1", "psim.commands.results.v1", "psim.audit.v1", "psim.catalog.v1"}) {
     auto value = co_await schema(topic);
     if (!value) {
       co_return value;
@@ -1026,7 +1026,8 @@ asio::awaitable<void> Gateway::commands() {
 grpc::Status Gateway::Manage(grpc::ServerContext* call, const connector::v1::ManageRequest* request,
                              connector::v1::ManageResponse* response) {
   auto peer = certificate(*call->auth_context(), ca_file_);
-  if (!peer || peer->identity != "psim://service/gateway-admin") {
+  if (!peer
+      || (peer->identity != "psim://service/gateway-admin" && peer->identity != "psim://service/resource-catalog")) {
     return {grpc::StatusCode::UNAUTHENTICATED, "management service identity required"};
   }
   const auto auth = call->client_metadata().find("authorization");

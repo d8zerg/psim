@@ -415,6 +415,8 @@ def observe(env, binary, image):
     service = executable[len("psim-"):]
     container = f"{env.project}-{executable}"
     subprocess.run(["docker", "rm", "-f", container], capture_output=True)
+    config = next((f"deploy/local/config/{directory}/{service}.yaml" for directory in ("event-flow", "catalog")
+                   if os.path.isfile(os.path.join(ROOT, "deploy/local/config", directory, service + ".yaml"))), None)
     subprocess.run(["docker", "run", "-d", "--name", container, "--network", f"{env.project}_default",
                     "-u", f"{os.getuid()}:{os.getgid()}",
                     "-v", f"{ROOT}:/repo:ro",
@@ -424,8 +426,7 @@ def observe(env, binary, image):
                     "-e", f"PSIM__SERVICE__INSTANCE={service}-ff06",
                     "-e", "PSIM__ADMIN__LISTEN=0.0.0.0:9100",
                     image, f"/repo/{binary}",
-                    *(["--config", f"/repo/deploy/local/config/event-flow/{service}.yaml"]
-                      if os.path.isfile(os.path.join(ROOT, "deploy/local/config/event-flow", service + ".yaml")) else [])], check=True, capture_output=True)
+                    *(["--config", "/repo/" + config] if config else [])], check=True, capture_output=True)
     base = f"http://{container}:9100"
     try:
         assert until(lambda: env.http("GET", f"{base}/health/live")[0] == 200, 30, 0.5), "/health/live"

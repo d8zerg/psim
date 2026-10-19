@@ -4,6 +4,10 @@ services:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   gateway-2:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
+  resource-catalog:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  catalog-2:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
   normalizer:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   correlation-engine:

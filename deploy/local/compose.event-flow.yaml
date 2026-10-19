@@ -29,6 +29,17 @@ services:
       PSIM__SERVICE__INSTANCE: gateway-2
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
+  resource-catalog:
+    <<: *event-flow
+    profiles: [catalog-test]
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/resource-catalog/psim-resource-catalog", "--config", "/repo/deploy/local/config/catalog/resource-catalog.yaml"]
+  catalog-2:
+    <<: *event-flow
+    profiles: [catalog-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: catalog-2
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/resource-catalog/psim-resource-catalog", "--config", "/repo/deploy/local/config/catalog/resource-catalog.yaml"]
   normalizer:
     <<: *event-flow
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]

@@ -624,6 +624,8 @@
 
 ### Шаг 4.4 Resource Catalog
 
+Реализация: [ADR-051](adr/0051-resource-catalog.md), [руководство](engineering/resource-catalog.md), `services/resource-catalog`.
+
 - **Цель:** модель защищаемых объектов и устройств.
 - **Вход:** 0.2, 2.4, 2.9.
 - **Работы:**

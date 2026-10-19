@@ -166,7 +166,7 @@
 
 | Свойство | Значение |
 |---|---|
-| Производитель | Resource Catalog (outbox) |
+| Производитель | Resource Catalog (ресурсы) и Connector Gateway (регистрации); outbox каждого владельца |
 | Потребители | Normalizer, Connector Gateway, Correlation Engine, Response Engine, Command Service, Projection Service, API Gateway (ABAC: принадлежность зон площадкам) |
 | Ключ | `resource_type + ":" + resource_id` |
 | Семантика | Compacted; запись - полное актуальное состояние ресурса с версией |

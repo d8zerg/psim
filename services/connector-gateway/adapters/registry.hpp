@@ -42,6 +42,8 @@ class Registry {
   [[nodiscard]] platform::pg::MessageStore messages() const { return messages_; }
 
  private:
+  boost::asio::awaitable<platform::Result<void>> publish_catalog(platform::pg::Transaction* tx, std::string tenant,
+                                                                 catalog::v1::Connector connector, std::string actor);
   boost::asio::awaitable<platform::Result<void>> append(platform::pg::Transaction* tx,
                                                         const ingest::v1::GatewayStateRecord* state);
   platform::pg::Pool* pool_;

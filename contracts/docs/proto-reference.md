@@ -50,14 +50,23 @@
     - [ParameterSpec](#psim-catalog-v1-ParameterSpec)
     - [Source](#psim-catalog-v1-Source)
     - [SourceTemplate](#psim-catalog-v1-SourceTemplate)
+    - [StoredFile](#psim-catalog-v1-StoredFile)
 
     - [LocationKind](#psim-catalog-v1-LocationKind)
     - [ParameterType](#psim-catalog-v1-ParameterType)
     - [ResourceState](#psim-catalog-v1-ResourceState)
 
+- [psim/catalog/v1/maintenance.proto](#psim_catalog_v1_maintenance-proto)
+    - [MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow)
+    - [SuppressionPolicy](#psim-catalog-v1-SuppressionPolicy)
+
+    - [MaintenanceState](#psim-catalog-v1-MaintenanceState)
+
 - [psim/api/v1/catalog.proto](#psim_api_v1_catalog-proto)
     - [ArchiveLocationRequest](#psim-api-v1-ArchiveLocationRequest)
     - [ArchiveLocationResponse](#psim-api-v1-ArchiveLocationResponse)
+    - [CancelMaintenanceWindowRequest](#psim-api-v1-CancelMaintenanceWindowRequest)
+    - [CancelMaintenanceWindowResponse](#psim-api-v1-CancelMaintenanceWindowResponse)
     - [ConnectorStatus](#psim-api-v1-ConnectorStatus)
     - [CreateDeviceRequest](#psim-api-v1-CreateDeviceRequest)
     - [CreateDeviceResponse](#psim-api-v1-CreateDeviceResponse)
@@ -65,16 +74,24 @@
     - [CreateDeviceTypeResponse](#psim-api-v1-CreateDeviceTypeResponse)
     - [CreateLocationRequest](#psim-api-v1-CreateLocationRequest)
     - [CreateLocationResponse](#psim-api-v1-CreateLocationResponse)
+    - [CreateMaintenanceWindowRequest](#psim-api-v1-CreateMaintenanceWindowRequest)
+    - [CreateMaintenanceWindowResponse](#psim-api-v1-CreateMaintenanceWindowResponse)
     - [ExportDevicesRequest](#psim-api-v1-ExportDevicesRequest)
     - [ExportDevicesResponse](#psim-api-v1-ExportDevicesResponse)
+    - [GetConnectorRequest](#psim-api-v1-GetConnectorRequest)
+    - [GetConnectorResponse](#psim-api-v1-GetConnectorResponse)
     - [GetDeviceRequest](#psim-api-v1-GetDeviceRequest)
     - [GetDeviceResponse](#psim-api-v1-GetDeviceResponse)
+    - [GetDeviceTypeRequest](#psim-api-v1-GetDeviceTypeRequest)
+    - [GetDeviceTypeResponse](#psim-api-v1-GetDeviceTypeResponse)
     - [GetFloorPlanRequest](#psim-api-v1-GetFloorPlanRequest)
     - [GetFloorPlanResponse](#psim-api-v1-GetFloorPlanResponse)
     - [GetImportRequest](#psim-api-v1-GetImportRequest)
     - [GetImportResponse](#psim-api-v1-GetImportResponse)
     - [GetLocationRequest](#psim-api-v1-GetLocationRequest)
     - [GetLocationResponse](#psim-api-v1-GetLocationResponse)
+    - [GetMaintenanceWindowRequest](#psim-api-v1-GetMaintenanceWindowRequest)
+    - [GetMaintenanceWindowResponse](#psim-api-v1-GetMaintenanceWindowResponse)
     - [ImportJob](#psim-api-v1-ImportJob)
     - [ImportRowError](#psim-api-v1-ImportRowError)
     - [ListConnectorsRequest](#psim-api-v1-ListConnectorsRequest)
@@ -83,8 +100,12 @@
     - [ListDeviceTypesResponse](#psim-api-v1-ListDeviceTypesResponse)
     - [ListDevicesRequest](#psim-api-v1-ListDevicesRequest)
     - [ListDevicesResponse](#psim-api-v1-ListDevicesResponse)
+    - [ListFloorPlanVersionsRequest](#psim-api-v1-ListFloorPlanVersionsRequest)
+    - [ListFloorPlanVersionsResponse](#psim-api-v1-ListFloorPlanVersionsResponse)
     - [ListLocationsRequest](#psim-api-v1-ListLocationsRequest)
     - [ListLocationsResponse](#psim-api-v1-ListLocationsResponse)
+    - [ListMaintenanceWindowsRequest](#psim-api-v1-ListMaintenanceWindowsRequest)
+    - [ListMaintenanceWindowsResponse](#psim-api-v1-ListMaintenanceWindowsResponse)
     - [RegisterConnectorRequest](#psim-api-v1-RegisterConnectorRequest)
     - [RegisterConnectorResponse](#psim-api-v1-RegisterConnectorResponse)
     - [RevokeConnectorRequest](#psim-api-v1-RevokeConnectorRequest)
@@ -99,6 +120,8 @@
     - [UpdateDeviceTypeResponse](#psim-api-v1-UpdateDeviceTypeResponse)
     - [UpdateLocationRequest](#psim-api-v1-UpdateLocationRequest)
     - [UpdateLocationResponse](#psim-api-v1-UpdateLocationResponse)
+    - [UpdateMaintenanceWindowRequest](#psim-api-v1-UpdateMaintenanceWindowRequest)
+    - [UpdateMaintenanceWindowResponse](#psim-api-v1-UpdateMaintenanceWindowResponse)
     - [UploadFloorPlanRequest](#psim-api-v1-UploadFloorPlanRequest)
     - [UploadFloorPlanResponse](#psim-api-v1-UploadFloorPlanResponse)
 
@@ -973,6 +996,7 @@ CatalogRecord is the value of compacted topic psim.catalog.v1
 | device_type | [DeviceType](#psim-catalog-v1-DeviceType) |  |  |
 | device | [Device](#psim-catalog-v1-Device) |  |  |
 | connector | [Connector](#psim-catalog-v1-Connector) |  |  |
+| stored_file | [StoredFile](#psim-catalog-v1-StoredFile) |  |  |
 
 
 
@@ -1092,6 +1116,7 @@ FloorPlan is an image of a floor with a coordinate system for device positions.
 | content_type | [string](#string) |  |  |
 | width | [double](#double) |  |  |
 | height | [double](#double) |  |  |
+| file | [StoredFile](#psim-catalog-v1-StoredFile) |  |  |
 
 
 
@@ -1175,6 +1200,31 @@ SourceTemplate describes a source every device of the type has.
 
 
 
+<a name="psim-catalog-v1-StoredFile"></a>
+
+### StoredFile
+StoredFile describes an immutable private object owned by a floor.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| file_id | [string](#string) |  |  |
+| site_id | [string](#string) |  |  |
+| owner_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+| size | [uint64](#uint64) |  |  |
+| content_type | [string](#string) |  |  |
+| sha256 | [string](#string) |  |  |
+| object_key | [string](#string) |  | Internal storage identity; clients download through the authorized floor endpoint. |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| pixel_width | [uint32](#uint32) |  |  |
+| pixel_height | [uint32](#uint32) |  |  |
+
+
+
+
+
+
 
 
 <a name="psim-catalog-v1-LocationKind"></a>
@@ -1229,6 +1279,82 @@ ResourceState is the lifecycle state shared by catalog resources.
 
 
 
+<a name="psim_catalog_v1_maintenance-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/catalog/v1/maintenance.proto
+
+
+
+<a name="psim-catalog-v1-MaintenanceWindow"></a>
+
+### MaintenanceWindow
+MaintenanceWindow is a one-off interval, evaluated using event receipt time.
+Fire events and P1 signals are never suppressed; history and open incidents are preserved.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_id | [string](#string) |  |  |
+| site_id | [string](#string) |  |  |
+| device_id | [string](#string) |  |  |
+| zone_id | [string](#string) |  |  |
+| starts_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| ends_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| reason | [string](#string) |  |  |
+| responsible | [string](#string) |  |  |
+| suppression | [SuppressionPolicy](#psim-catalog-v1-SuppressionPolicy) |  |  |
+| state | [MaintenanceState](#psim-catalog-v1-MaintenanceState) |  |  |
+| version | [uint64](#uint64) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| activated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| completed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-catalog-v1-SuppressionPolicy"></a>
+
+### SuppressionPolicy
+SuppressionPolicy explicitly selects event types or rules for new signal suppression.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| event_types | [string](#string) | repeated |  |
+| rule_ids | [string](#string) | repeated |  |
+
+
+
+
+
+
+
+
+<a name="psim-catalog-v1-MaintenanceState"></a>
+
+### MaintenanceState
+MaintenanceState is persisted, versioned and published for every transition.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| MAINTENANCE_STATE_UNSPECIFIED | 0 |  |
+| MAINTENANCE_STATE_SCHEDULED | 1 |  |
+| MAINTENANCE_STATE_ACTIVE | 2 |  |
+| MAINTENANCE_STATE_COMPLETED | 3 |  |
+| MAINTENANCE_STATE_CANCELLED | 4 |  |
+
+
+
+
+
+
+
+
+
+
 <a name="psim_api_v1_catalog-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -1260,6 +1386,36 @@ ArchiveLocationResponse is the response of ArchiveLocation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | location | [psim.catalog.v1.Location](#psim-catalog-v1-Location) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CancelMaintenanceWindowRequest"></a>
+
+### CancelMaintenanceWindowRequest
+CancelMaintenanceWindowRequest identifies an interval.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CancelMaintenanceWindowResponse"></a>
+
+### CancelMaintenanceWindowResponse
+CancelMaintenanceWindowResponse includes the terminal version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
 
 
 
@@ -1376,6 +1532,36 @@ CreateLocationResponse is the response of CreateLocation.
 
 
 
+<a name="psim-api-v1-CreateMaintenanceWindowRequest"></a>
+
+### CreateMaintenanceWindowRequest
+CreateMaintenanceWindowRequest carries the desired interval.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CreateMaintenanceWindowResponse"></a>
+
+### CreateMaintenanceWindowResponse
+CreateMaintenanceWindowResponse includes the assigned version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-ExportDevicesRequest"></a>
 
 ### ExportDevicesRequest
@@ -1401,6 +1587,36 @@ ExportDevicesResponse is the response of ExportDevices; the body is the file.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | file | [google.api.HttpBody](#google-api-HttpBody) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetConnectorRequest"></a>
+
+### GetConnectorRequest
+GetConnectorRequest identifies a registration.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connector_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetConnectorResponse"></a>
+
+### GetConnectorResponse
+GetConnectorResponse contains its latest projected version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connector | [psim.catalog.v1.Connector](#psim-catalog-v1-Connector) |  |  |
 
 
 
@@ -1437,6 +1653,36 @@ GetDeviceResponse is the response of GetDevice.
 
 
 
+<a name="psim-api-v1-GetDeviceTypeRequest"></a>
+
+### GetDeviceTypeRequest
+GetDeviceTypeRequest identifies a device type.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| device_type_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetDeviceTypeResponse"></a>
+
+### GetDeviceTypeResponse
+GetDeviceTypeResponse contains its current version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| device_type | [psim.catalog.v1.DeviceType](#psim-catalog-v1-DeviceType) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-GetFloorPlanRequest"></a>
 
 ### GetFloorPlanRequest
@@ -1446,6 +1692,7 @@ GetFloorPlanRequest is the request of GetFloorPlan.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | location_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  | Zero selects the currently linked version. |
 
 
 
@@ -1521,6 +1768,36 @@ GetLocationResponse is the response of GetLocation.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | location | [psim.catalog.v1.Location](#psim-catalog-v1-Location) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetMaintenanceWindowRequest"></a>
+
+### GetMaintenanceWindowRequest
+GetMaintenanceWindowRequest identifies an interval.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetMaintenanceWindowResponse"></a>
+
+### GetMaintenanceWindowResponse
+GetMaintenanceWindowResponse includes the current version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
 
 
 
@@ -1667,6 +1944,39 @@ ListDevicesResponse is the response of ListDevices.
 
 
 
+<a name="psim-api-v1-ListFloorPlanVersionsRequest"></a>
+
+### ListFloorPlanVersionsRequest
+ListFloorPlanVersionsRequest identifies a floor and a page.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| location_id | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListFloorPlanVersionsResponse"></a>
+
+### ListFloorPlanVersionsResponse
+ListFloorPlanVersionsResponse contains immutable image metadata.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| files | [psim.catalog.v1.StoredFile](#psim-catalog-v1-StoredFile) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-ListLocationsRequest"></a>
 
 ### ListLocationsRequest
@@ -1702,6 +2012,39 @@ ListLocationsResponse is the response of ListLocations.
 
 
 
+<a name="psim-api-v1-ListMaintenanceWindowsRequest"></a>
+
+### ListMaintenanceWindowsRequest
+ListMaintenanceWindowsRequest selects intervals and uses cursor pagination.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListMaintenanceWindowsResponse"></a>
+
+### ListMaintenanceWindowsResponse
+ListMaintenanceWindowsResponse is the scoped interval list.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_windows | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-RegisterConnectorRequest"></a>
 
 ### RegisterConnectorRequest
@@ -1711,6 +2054,7 @@ RegisterConnectorRequest is the request of RegisterConnector.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | connector | [psim.catalog.v1.Connector](#psim-catalog-v1-Connector) |  |  |
+| certificate_pem | [string](#string) |  | Public client certificate; its fingerprint and validity are verified by the gateway. |
 
 
 
@@ -1742,6 +2086,7 @@ RevokeConnectorRequest is the request of RevokeConnector.
 | ----- | ---- | ----- | ----------- |
 | connector_id | [string](#string) |  |  |
 | reason | [string](#string) |  |  |
+| fingerprint | [string](#string) |  | Empty disables the connector; otherwise revokes only the selected fingerprint. |
 
 
 
@@ -1774,6 +2119,7 @@ RotateConnectorCertificateRequest is the request of RotateConnectorCertificate.
 | connector_id | [string](#string) |  |  |
 | new_certificate | [psim.catalog.v1.CertificateFingerprint](#psim-catalog-v1-CertificateFingerprint) |  |  |
 | previous_not_after | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Expiry of the previous certificate. |
+| certificate_pem | [string](#string) |  |  |
 
 
 
@@ -1920,6 +2266,37 @@ UpdateLocationResponse is the response of UpdateLocation.
 
 
 
+<a name="psim-api-v1-UpdateMaintenanceWindowRequest"></a>
+
+### UpdateMaintenanceWindowRequest
+UpdateMaintenanceWindowRequest carries the path identity and replacement.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_id | [string](#string) |  |  |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-UpdateMaintenanceWindowResponse"></a>
+
+### UpdateMaintenanceWindowResponse
+UpdateMaintenanceWindowResponse includes the assigned version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-UploadFloorPlanRequest"></a>
 
 ### UploadFloorPlanRequest
@@ -1981,6 +2358,14 @@ Owner: Resource Catalog. Scenarios S1, S2.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
+| GetDeviceType | [GetDeviceTypeRequest](#psim-api-v1-GetDeviceTypeRequest) | [GetDeviceTypeResponse](#psim-api-v1-GetDeviceTypeResponse) | GetDeviceType returns one device type. |
+| GetConnector | [GetConnectorRequest](#psim-api-v1-GetConnectorRequest) | [GetConnectorResponse](#psim-api-v1-GetConnectorResponse) | GetConnector returns the latest projected registration. |
+| ListMaintenanceWindows | [ListMaintenanceWindowsRequest](#psim-api-v1-ListMaintenanceWindowsRequest) | [ListMaintenanceWindowsResponse](#psim-api-v1-ListMaintenanceWindowsResponse) | ListMaintenanceWindows lists intervals in the caller&#39;s scope. |
+| GetMaintenanceWindow | [GetMaintenanceWindowRequest](#psim-api-v1-GetMaintenanceWindowRequest) | [GetMaintenanceWindowResponse](#psim-api-v1-GetMaintenanceWindowResponse) | GetMaintenanceWindow returns one interval, including completed intervals. |
+| CreateMaintenanceWindow | [CreateMaintenanceWindowRequest](#psim-api-v1-CreateMaintenanceWindowRequest) | [CreateMaintenanceWindowResponse](#psim-api-v1-CreateMaintenanceWindowResponse) | CreateMaintenanceWindow schedules a one-off interval. |
+| UpdateMaintenanceWindow | [UpdateMaintenanceWindowRequest](#psim-api-v1-UpdateMaintenanceWindowRequest) | [UpdateMaintenanceWindowResponse](#psim-api-v1-UpdateMaintenanceWindowResponse) | UpdateMaintenanceWindow replaces a scheduled or active interval (If-Match required). |
+| CancelMaintenanceWindow | [CancelMaintenanceWindowRequest](#psim-api-v1-CancelMaintenanceWindowRequest) | [CancelMaintenanceWindowResponse](#psim-api-v1-CancelMaintenanceWindowResponse) | CancelMaintenanceWindow ends an interval explicitly (If-Match required). |
+| ListFloorPlanVersions | [ListFloorPlanVersionsRequest](#psim-api-v1-ListFloorPlanVersionsRequest) | [ListFloorPlanVersionsResponse](#psim-api-v1-ListFloorPlanVersionsResponse) | ListFloorPlanVersions returns immutable metadata for a floor&#39;s previous images. |
 | ListLocations | [ListLocationsRequest](#psim-api-v1-ListLocationsRequest) | [ListLocationsResponse](#psim-api-v1-ListLocationsResponse) | ListLocations lists locations, filtered by parent or kind. |
 | GetLocation | [GetLocationRequest](#psim-api-v1-GetLocationRequest) | [GetLocationResponse](#psim-api-v1-GetLocationResponse) | GetLocation returns one location. |
 | CreateLocation | [CreateLocationRequest](#psim-api-v1-CreateLocationRequest) | [CreateLocationResponse](#psim-api-v1-CreateLocationResponse) | CreateLocation creates a site, building, floor or zone. |
@@ -5878,6 +6263,7 @@ Each record is the full active object; consumers apply it atomically between inp
 | mapping_rule_set | [psim.processing.v1.MappingRuleSet](#psim-processing-v1-MappingRuleSet) |  | Key &#34;mapping/&lt;tenant_id&gt;/&lt;connector_type&gt;&#34;. |
 | retention | [RetentionSettings](#psim-config-v1-RetentionSettings) |  | Key &#34;retention/&lt;tenant_id&gt;&#34;. |
 | processing | [ProcessingSettings](#psim-config-v1-ProcessingSettings) |  | Key &#34;processing/&lt;tenant_id&gt;&#34;. |
+| maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  | Key &#34;maintenance/&lt;tenant_id&gt;/&lt;maintenance_id&gt;&#34;; terminal versions remain for replay. |
 
 
 
@@ -6067,6 +6453,9 @@ ManageRequest is idempotent per tenant, operator and request_id.
 | expected_version | [uint64](#uint64) |  |  |
 | certificate_pem | [string](#string) |  | Public certificate only; the private key never leaves the connector. |
 | fingerprint | [string](#string) |  | Required for revocation, ignored for other actions. |
+| previous_not_after | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Optional shortened validity of previous certificates during rotation. |
+| reason | [string](#string) |  | Operator explanation, included in audit when supplied. |
+| expected_fingerprint | [string](#string) |  | Optional assertion binding the public certificate to an expected fingerprint. |
 
 
 

@@ -12,7 +12,7 @@ groups:
     lines: 75
     measured_by: component
   - name: pipeline
-    modules: ['services/connector-gateway', 'services/normalizer', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway']
+    modules: ['services/connector-gateway', 'services/normalizer', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway', 'services/resource-catalog']
     lines: 75
     measured_by: component
   - name: connectors

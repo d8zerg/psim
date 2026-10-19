@@ -30,7 +30,7 @@ stages:
   # The environment also hosts the component tests of adapters (TS-03) and the registry check (FF-04).
   env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'tools/taskfiles/test.yml', 'tools/taskfiles/flow.yml', 'tools/taskfiles/gateway.yml', 'tools/gateway-admin/*', 'tools/event-flow/*', 'web/apps/console/*', 'web/packages/realtime-client/*', 'libs/platform/stream/*', 'connectors/*', 'contracts/topics/*',
         'contracts/proto/*', 'tools/contracts/registry.py', 'libs/platform/kafka/*', 'libs/platform/pg/*', 'libs/platform/redis/*', 'libs/platform/security/*', 'libs/platform/clickhouse/*', 'libs/platform/s3/*',
-        'libs/domain/processing/*', 'services/connector-gateway/*', 'services/normalizer/*', 'services/correlation-engine/*', 'services/incident-service/*', 'services/api-gateway/*']
+        'libs/domain/processing/*', 'services/connector-gateway/*', 'services/normalizer/*', 'services/correlation-engine/*', 'services/incident-service/*', 'services/api-gateway/*', 'services/resource-catalog/*', 'tools/catalog/*', 'tools/taskfiles/catalog.yml']
   connectors: ['connectors/*', 'libs/platform/connector/*', 'libs/platform/security/*', 'contracts/proto/psim/connector/*', 'tools/connector-conformance/*', 'tools/connectors/*', 'tools/taskfiles/connectors.yml', 'tools/env/event_flow_tls.sh']
   web: ['web/*', 'contracts/openapi/*', 'contracts/proto/*', 'tools/taskfiles/web.yml']
   bench: ['tools/bench/*', 'tools/taskfiles/bench.yml']

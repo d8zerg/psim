@@ -5,3 +5,5 @@ add_subdirectory(correlation-engine)
 add_subdirectory(incident-service)
 add_subdirectory(connector-gateway)
 add_subdirectory(api-gateway)
+
+add_subdirectory(resource-catalog)

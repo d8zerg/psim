@@ -9,6 +9,7 @@
 #include <prometheus/counter.h>
 
 #include <chrono>
+#include <cstddef>
 #include <expected>
 #include <memory>
 #include <string>
@@ -52,9 +53,12 @@ Worker::Worker(const runtime::Context& context, std::string stage, std::string i
 
 asio::awaitable<Result<void>> Worker::schema(std::string topic) {
   const auto& config = context_.config();
-  auto registry =
-      kafka::SchemaRegistry::create({.url = config.get<std::string>("settings.registry"),
-                                     .http = {.allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
+  auto registry = kafka::SchemaRegistry::create(
+      {.url = config.get<std::string>("settings.registry"),
+       .http = {.tls = {.ca_file = config.get<std::string>("settings.registry_ca_file"),
+                        .certificate_file = config.get<std::string>("settings.registry_certificate_file"),
+                        .private_key_file = config.get<std::string>("settings.registry_private_key_file")},
+                .allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
   if (!registry) {
     co_return std::unexpected(registry.error());
   }
@@ -84,6 +88,10 @@ asio::awaitable<Result<std::unique_ptr<pg::Pool>>> Worker::database() {
   pg::PoolOptions options;
   options.size = 4;
   options.connection.host = config.get<std::string>("settings.pg_host");
+  options.connection.port = config.get<std::string>("settings.pg_port");
+  options.connection.database = config.get<std::string>("settings.pg_database");
+  options.connection.user = config.get<std::string>("settings.pg_user");
+  options.connection.max_result_bytes = config.get<std::size_t>("settings.pg_max_result_bytes");
   options.connection.password = std::string(*password);
   if (config.get<bool>("settings.allow_plaintext")) {
     options.connection.properties["sslmode"] = "disable";

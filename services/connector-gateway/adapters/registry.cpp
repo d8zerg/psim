@@ -55,7 +55,7 @@ asio::awaitable<p::Result<void>> Registry::initialize() {
   if (!initialized) {
     co_return initialized;
   }
-  co_return co_await pg::Migrator("ingest").apply(
+  auto migrated = co_await pg::Migrator("ingest").apply(
       &**lease,
       {{.version = 1,
         .name = "connector registrations and sessions",
@@ -75,12 +75,46 @@ asio::awaitable<p::Result<void>> Registry::initialize() {
              "CREATE INDEX ingest_session_expiry ON ingest.sessions(expires_at) WHERE online"}},
        {.version = 2,
         .name = "connector connection versions",
-        .expand = {"ALTER TABLE ingest.sessions ADD COLUMN version bigint NOT NULL DEFAULT 0"}}});
+        .expand = {"ALTER TABLE ingest.sessions ADD COLUMN version bigint NOT NULL DEFAULT 0"}},
+       {.version = 3,
+        .name = "connector catalog publication",
+        .expand = {"ALTER TABLE ingest.registrations ADD COLUMN catalog_version bigint NOT NULL DEFAULT 0"}}});
+  if (!migrated) {
+    co_return migrated;
+  }
+  co_return co_await pg::in_transaction<void>(
+      pool_,
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
+      [this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+        auto locked =
+            co_await tx->connection().query({.sql = "SELECT revision FROM ingest.control WHERE id=1 FOR UPDATE"});
+        if (!locked) {
+          co_return std::unexpected(locked.error());
+        }
+        auto rows = co_await tx->connection().query(
+            {.sql = "SELECT tenant_id::text,body::text FROM ingest.registrations WHERE "
+                    "catalog_version<(body->>'version')::bigint ORDER BY connector_id"});
+        if (!rows) {
+          co_return std::unexpected(rows.error());
+        }
+        for (std::size_t row = 0; row < rows->size(); ++row) {
+          catalog::v1::Connector value;
+          if (!google::protobuf::util::JsonStringToMessage(*rows->value(row, 1), &value).ok()) {
+            co_return p::fail(p::ErrorCode::kCommonInternal, "invalid persisted connector");
+          }
+          auto result = co_await publish_catalog(tx, std::string(*rows->value(row, 0)), value, "connector-gateway");
+          if (!result) {
+            co_return result;
+          }
+        }
+        co_return p::Result<void>{};
+      });
 }
 
 asio::awaitable<p::Result<Snapshot>> Registry::snapshot() {
   co_return co_await pg::in_transaction<Snapshot>(
       pool_,
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
       [](pg::Transaction* tx) -> asio::awaitable<p::Result<Snapshot>> {
         auto revision = co_await tx->connection().query({.sql = "SELECT revision FROM ingest.control WHERE id=1"});
         if (!revision) {
@@ -243,6 +277,29 @@ asio::awaitable<p::Result<connector::v1::ManageResponse>> Registry::manage(conne
               || cert->expires_at <= std::chrono::system_clock::now()) {
             co_return p::fail(p::ErrorCode::kAuthUnauthenticated, "certificate identity differs from connector");
           }
+          if ((!request.expected_fingerprint().empty() && request.expected_fingerprint() != cert->fingerprint)
+              || request.reason().size() > 2000) {
+            co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "certificate fingerprint or reason is invalid");
+          }
+          if (request.has_previous_not_after()) {
+            const auto& until = request.previous_not_after();
+            const auto current = Util::GetCurrentTime();
+            if (request.action() != REGISTRATION_ACTION_ROTATE || until.seconds() < current.seconds()
+                || (until.seconds() == current.seconds() && until.nanos() <= current.nanos()) || until.nanos() < 0
+                || until.nanos() >= 1000000000) {
+              co_return p::fail(p::ErrorCode::kCommonInvalidArgument,
+                                "previous certificate expiry must be in the future");
+            }
+            for (auto& prior_certificate : *value.mutable_certificates()) {
+              if (until.seconds() > prior_certificate.not_after().seconds()
+                  || (until.seconds() == prior_certificate.not_after().seconds()
+                      && until.nanos() > prior_certificate.not_after().nanos())) {
+                co_return p::fail(p::ErrorCode::kCommonInvalidArgument,
+                                  "previous certificate validity cannot be extended");
+              }
+              *prior_certificate.mutable_not_after() = until;
+            }
+          }
           auto used = co_await db.query(
               {.sql = "SELECT fingerprint FROM ingest.revoked WHERE connector_id=$1::uuid AND fingerprint=$2",
                .parameters = {Param::text(id), Param::text(cert->fingerprint)}});
@@ -321,13 +378,45 @@ asio::awaitable<p::Result<connector::v1::ManageResponse>> Registry::manage(conne
         entry->set_outcome(audit::v1::AUDIT_OUTCOME_SUCCESS);
         (*entry->mutable_details())["version"] = std::to_string(value.version());
         (*entry->mutable_details())["request_id"] = request.request_id();
+        if (!request.reason().empty()) {
+          (*entry->mutable_details())["reason"] = request.reason();
+        }
         auto appended = co_await messages_.append(
             tx, {audit.envelope().message_id(), encode_("psim.audit.v1", principal.tenant, audit)});
         if (!appended) {
           co_return std::unexpected(appended.error());
         }
+        auto catalogued = co_await publish_catalog(tx, principal.tenant, value, principal.subject);
+        if (!catalogued) {
+          co_return std::unexpected(catalogued.error());
+        }
         co_return response;
       });
+}
+
+asio::awaitable<p::Result<void>> Registry::publish_catalog(pg::Transaction* tx, std::string tenant,
+                                                           catalog::v1::Connector connector, std::string actor) {
+  catalog::v1::CatalogRecord record;
+  envelope(record.mutable_envelope(), tenant, connector.connector_id());
+  record.mutable_envelope()->set_sequence(connector.version());
+  record.mutable_envelope()->mutable_actor()->set_kind(actor == "connector-gateway" ? common::v1::ACTOR_KIND_SERVICE
+                                                                                    : common::v1::ACTOR_KIND_USER);
+  record.mutable_envelope()->mutable_actor()->set_id(std::move(actor));
+  *record.mutable_connector() = connector;
+  auto appended = co_await messages_.append(
+      tx,
+      {record.envelope().message_id(), encode_("psim.catalog.v1", "connector:" + connector.connector_id(), record)});
+  if (!appended) {
+    co_return appended;
+  }
+  auto updated = co_await tx->connection().query(
+      {.sql = "UPDATE ingest.registrations SET catalog_version=$2::bigint WHERE connector_id=$1::uuid",
+       .parameters = {Param::text(connector.connector_id()),
+                      Param::integer(static_cast<std::int64_t>(connector.version()))}});
+  if (!updated) {
+    co_return std::unexpected(updated.error());
+  }
+  co_return p::Result<void>{};
 }
 
 asio::awaitable<p::Result<void>> Registry::acknowledge(std::string boot, std::uint64_t revision) {
@@ -516,32 +605,36 @@ asio::awaitable<p::Result<void>> Registry::disconnected(std::string session, std
 
 asio::awaitable<p::Result<void>> Registry::expire() {
   // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): closure is owned by in_transaction
-  co_return co_await pg::in_transaction<void>(pool_, [this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
-    auto rows = co_await tx->connection().query({.sql = "UPDATE ingest.sessions SET online=false,version=version+1 "
-                                                        "WHERE online AND expires_at<=clock_timestamp() RETURNING "
-                                                        "tenant_id::text,connector_id::text,session_id::text,version"});
-    if (!rows) {
-      co_return std::unexpected(rows.error());
-    }
-    for (std::size_t i = 0; i < rows->size(); ++i) {
-      ingest::v1::GatewayStateRecord state;
-      envelope(state.mutable_envelope(), std::string(*rows->value(i, 0)), std::string(*rows->value(i, 1)));
-      auto version = rows->integer(i, 3);
-      if (!version) {
-        co_return std::unexpected(version.error());
-      }
-      state.mutable_envelope()->set_sequence(static_cast<std::uint64_t>(*version));
-      state.set_connector_id(std::string(*rows->value(i, 1)));
-      state.set_session_id(std::string(*rows->value(i, 2)));
-      state.mutable_connection()->set_online(false);
-      state.mutable_connection()->set_quality("stale");
-      state.mutable_connection()->set_reason("lease_expired");
-      auto saved = co_await append(tx, &state);
-      if (!saved) {
-        co_return saved;
-      }
-    }
-    co_return p::Result<void>{};
-  });
+  co_return co_await pg::in_transaction<void>(
+      pool_,
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
+      [this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+        auto rows =
+            co_await tx->connection().query({.sql = "UPDATE ingest.sessions SET online=false,version=version+1 "
+                                                    "WHERE online AND expires_at<=clock_timestamp() RETURNING "
+                                                    "tenant_id::text,connector_id::text,session_id::text,version"});
+        if (!rows) {
+          co_return std::unexpected(rows.error());
+        }
+        for (std::size_t i = 0; i < rows->size(); ++i) {
+          ingest::v1::GatewayStateRecord state;
+          envelope(state.mutable_envelope(), std::string(*rows->value(i, 0)), std::string(*rows->value(i, 1)));
+          auto version = rows->integer(i, 3);
+          if (!version) {
+            co_return std::unexpected(version.error());
+          }
+          state.mutable_envelope()->set_sequence(static_cast<std::uint64_t>(*version));
+          state.set_connector_id(std::string(*rows->value(i, 1)));
+          state.set_session_id(std::string(*rows->value(i, 2)));
+          state.mutable_connection()->set_online(false);
+          state.mutable_connection()->set_quality("stale");
+          state.mutable_connection()->set_reason("lease_expired");
+          auto saved = co_await append(tx, &state);
+          if (!saved) {
+            co_return saved;
+          }
+        }
+        co_return p::Result<void>{};
+      });
 }
 }  // namespace psim::connector_gateway

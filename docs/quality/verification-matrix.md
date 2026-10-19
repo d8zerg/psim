@@ -7,7 +7,7 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 8 | 13 | 0 | 2 | 23 |
+| Наборы тестов | 9 | 13 | 0 | 2 | 24 |
 | Нагрузка | 0 | 3 | 6 | 0 | 9 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 9 | 0 | 14 |
@@ -15,7 +15,7 @@
 | Fitness functions | 18 | 1 | 2 | 0 | 21 |
 | Безопасность | 3 | 2 | 3 | 0 | 8 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 34 | 25 | 26 | 2 | **87** |
+| **Всего** | 35 | 25 | 26 | 2 | **88** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -50,8 +50,8 @@
 
 | Сценарий | Методы |
 |---|---|
-| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly) |
-| [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), L-07 (nightly), TS-18 (nightly) |
+| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly), TS-24 (pr) |
+| [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), L-07 (nightly), TS-18 (nightly), TS-24 (pr) |
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
 | [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
 | [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly) |
@@ -59,8 +59,8 @@
 | [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly) |
 | [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly) |
 | [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly) |
-| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly) |
-| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly) |
+| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr) |
+| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
 | [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-10 (nightly), TS-11 (nightly), M-05 (release) |
 
@@ -93,6 +93,7 @@
 | TS-21 | Передача ответственности и дежурство | Подтверждение получателя, проверка версии и области, идемпотентность; прежняя ответственность до принятия; SLA и сценарий сохранены; актуальный дежурный либо резервный контакт; аудит. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 5.3, 6.3, 8.3 |
 | TS-22 | Жизненный цикл сертификатов | Первоначальная регистрация по CSR; продление с перекрытием без потери событий; отзыв закрывает сессию и блокирует повтор; после восстановления отозванный сертификат не получает доступ. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 2.6, 4.2, 9.1, 9.3, 9.5 |
 | TS-23 | Изоляция диагностического replay | История с командами, email и webhook даёт 0 изменений рабочих сигналов, инцидентов, команд и уведомлений и 0 внешних вызовов; попытки рабочей записи отклонены ACL; область и параметры запуска в аудите. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 5.1, 6.1, 9.5 |
+| TS-24 | Resource Catalog: ресурсы, планы и обслуживание | Иерархия и источники сохраняют инварианты; версии и повторы запросов согласованы; чужая область отклонена; PNG/JPEG до 20 МиБ и версии планов сохраняются при отказах S3 и БД; orphan очищен; обслуживание завершается ≤ 1 с, включая восстановление при запуске; все изменения и отказы доступа получены потребителем аудита. Назначение: Два настоящих экземпляра, PostgreSQL, Kafka и S3; резервное копирование и применение подавления проверяются отдельно. | E-CI | pr | `task catalog:test` | 4.4 |
 
 ### Нагрузка
 
@@ -103,7 +104,7 @@
 | L-04 | Пик ×1,5 (75 000 событий/с), 10 мин | 0 потерь; лаг возвращается к норме ≤ 5 мин после пика. | E-CLUSTER | release | `task load:peak` | 10.1 |
 | L-05 | Консоли и REST под нагрузкой | 500 консолей; REST чтение p99 ≤ 200 мс; доставка realtime p99 ≤ 200 мс; событие -> отрисовка p99 ≤ 1 с при LOAD-50K. | E-CLUSTER | release | `task load:consoles` | 7.2, 10.1 |
 | L-06 | Ввод через два экземпляра шлюза | 50 000 событий/с через 2 экземпляра Connector Gateway; падение экземпляра без потерь. | E-CLUSTER | release | `task gateway:verify` | 4.2 |
-| L-07 | Импорт 50 000 устройств | Импорт ≤ 5 мин; изменения каталога у потребителей ≤ 2 с. | E-LOCAL | nightly | `task load:catalog-import` | 4.4 |
+| L-07 | Импорт 50 000 устройств | Импорт ≤ 5 мин; изменения каталога у потребителей ≤ 2 с. | E-LOCAL | nightly | `task catalog:bench` | 4.4 |
 | L-08 | Поиск по истории событий под нагрузкой записи | Поиск за сутки по зоне ≤ 500 мс при записи 50 000 событий/с в ClickHouse. | E-CLUSTER | release | `task load:history-search` | 5.4 |
 | L-09 | Отчёт за 30 суток | Отчёт строится ≤ 3 с; значения совпадают с эталоном. | E-LOCAL | nightly | `task load:report` | 6.5 |
 | L-10 | Нагрузка одной машины LOAD-10K | 10 000 событий/с на эталонном сервере с SLO задержек кластера. Назначение: Целевая нагрузка топологии «одна машина» (scaling.md, 5.4). | E-LOCAL | release | `task load:single-node` | 10.1 |
@@ -220,7 +221,7 @@
 | 4.1 | TS-06, C-10, TS-19 |
 | 4.2 | L-06, SEC-04, TS-19, TS-22 |
 | 4.3 | TS-06, B-06 |
-| 4.4 | L-07, TS-18, TS-20 |
+| 4.4 | L-07, TS-18, TS-20, TS-24 |
 | 4.5 | B-03, TS-19 |
 | 5.1 | SEC-04, SEC-05, TS-20, TS-23 |
 | 5.2 | TS-07, TS-08, C-14, B-04, TS-20 |

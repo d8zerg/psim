@@ -141,8 +141,6 @@ actions:
           schema: {type: string, format: binary}
         image/jpeg:
           schema: {type: string, format: binary}
-        image/svg+xml:
-          schema: {type: string, format: binary}
   - target: $.paths['/v1/locations/{locationId}/floor-plan'].get.responses['200'].content
     remove: true
   - target: $.paths['/v1/locations/{locationId}/floor-plan'].get.responses['200']
