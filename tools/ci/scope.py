@@ -9,7 +9,7 @@
   get <scope.json> <key>
       print one value for Taskfile variables: lists space-separated, booleans true/false
 
-Keys: full, cpp, contracts, docs, deps, release, bench, env, web, connectors (booleans); labels (ctest label regex, empty
+Keys: full, cpp, contracts, docs, deps, release, bench, env, web, connectors, fuzz_rules (booleans); labels (ctest label regex, empty
 for all), tidy (translation units, empty for all), modules (coverage modules, empty for all),
 benches (benchmark executables, empty for all); base, changed, targets for the report.
 """
@@ -75,6 +75,7 @@ def compute(root, build_dir, force_full):
 
     stages = {name: full or any(matches(f, patterns) for f in changed) for name, patterns in config["stages"].items()}
     affected = set(targets) if full else affected_targets(targets, changed, rules)
+    stages["fuzz_rules"] = stages["fuzz_rules"] or "psim_correlation_rules" in affected
     modules = sorted({arch_check.classify(targets[t]["dir"], rules)[1] for t in affected} - {None})
     tidy = sorted(s for t in affected for s in targets[t]["sources"] if s.endswith((".cpp", ".cc")))
     benches = sorted(t for t in affected if t.endswith("_bench"))
@@ -102,7 +103,7 @@ def main(argv):
         with open(argv[4], "w", encoding="utf-8") as f:
             json.dump(scope, f, indent=2)
         what = "full scope" if scope["full"] else f"{len(scope['targets'])} targets"
-        stages = ", ".join(k for k in ("contracts", "docs", "deps", "release", "bench", "env", "web", "connectors") if scope[k]) or "none"
+        stages = ", ".join(k for k in ("contracts", "docs", "deps", "release", "bench", "env", "web", "connectors", "fuzz_rules") if scope[k]) or "none"
         print(f"ci scope: {what} ({scope['reason']}); {len(scope['changed'])} changed files; optional stages: {stages}")
         return 0
     if len(argv) == 4 and argv[1] == "get":

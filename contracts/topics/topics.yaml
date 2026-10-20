@@ -165,7 +165,7 @@ topics:
     cleanup: delete
     semantics: ALO+ID
     producers: [all-services]
-    consumers: [audit-service]
+    consumers: [audit-service, correlation-engine]
 
 dlq:
   # psim.dlq.<stage>.v1: original bytes and key, error in headers.

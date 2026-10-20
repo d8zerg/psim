@@ -19,6 +19,11 @@ message SignalRecord {
 // Signal is the result of a correlation rule firing or of an external producer (ADR-025).
 // envelope.message_id is the deterministic signal_id (ADR-005).
 message Signal {
+  option (buf.validate.message).cel = {
+    id: "signal.evidence"
+    message: "signal requires events or an absence deadline"
+    expression: "this.event_ids.size() > 0 || has(this.absence_deadline)"
+  };
   SignalOrigin origin = 1 [(buf.validate.field).required = true];
   string correlation_key = 2 [(buf.validate.field).string.min_len = 1];
   // Key used by Incident Service to attach the signal to an open incident.
@@ -31,15 +36,14 @@ message Signal {
   string site_id = 6 [(buf.validate.field).string.uuid = true];
   // Empty for signals of rules wider than a zone.
   string zone_id = 7;
-  repeated string event_ids = 8 [(buf.validate.field).repeated = {
-    min_items: 1
-    max_items: 1000
-  }];
+  repeated string event_ids = 8 [(buf.validate.field).repeated = {max_items: 1000}];
   google.protobuf.Timestamp first_event_at = 9;
   google.protobuf.Timestamp last_event_at = 10;
   string summary = 11 [(buf.validate.field).string.max_len = 1024];
   // Optional reference to an explanation produced by an external module.
   string explanation_ref = 12;
+  // Timer-driven absence may have no input events. The deadline is its evidence.
+  google.protobuf.Timestamp absence_deadline = 13;
 }
 
 // SignalOrigin identifies what produced a signal.

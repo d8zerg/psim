@@ -2,10 +2,12 @@
 #include <psim/common/v1/envelope.pb.h>
 #include <psim/common/v1/types.pb.h>
 
+#include <expected>
 #include <memory>
 #include <string>
 #include <utility>
 
+#include "management.hpp"
 #include "psim/domain/processing/alarm.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
@@ -78,11 +80,19 @@ class Worker final : public p::stream::Worker {
 int main(int argc, char** argv) {
   return psim::platform::runtime::run(argc, argv,
                                       {.name = "correlation-engine",
-                                       .settings_schema = std::string(psim::platform::stream::kSettings),
+                                       .settings_schema = psim::correlation::management::settings(),
                                        .create = [](psim::platform::runtime::Context& context)
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
-                                         result.push_back(std::make_unique<psim::correlation::Worker>(context));
+                                         if (context.config().get<std::string>("settings.role") == "management") {
+                                           auto manager = psim::correlation::management::create(context);
+                                           if (!manager) {
+                                             return std::unexpected(manager.error());
+                                           }
+                                           result.push_back(std::move(*manager));
+                                         } else {
+                                           result.push_back(std::make_unique<psim::correlation::Worker>(context));
+                                         }
                                          return result;
                                        }});
 }

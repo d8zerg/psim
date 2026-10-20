@@ -1,0 +1,28 @@
+service:
+  instance: rule-management
+runtime:
+  shards: 1
+telemetry:
+  otlp_endpoint: otel-collector:4317
+  otlp_tls: false
+  sampling_ratio: 0.01
+settings:
+  role: management
+  allow_plaintext: true
+  brokers: kafka-tls:19096
+  replay_brokers: kafka-tls:19092
+  kafka_ca_file: /repo/.cache/security-tls/ca.pem
+  replay_kafka_certificate_file: /repo/.cache/rules/replay.pem
+  replay_kafka_private_key_file: /repo/.cache/rules/replay.key
+  issuer: http://keycloak:8080/realms/psim
+  listen_port: 8443
+  taxonomy_file: /repo/contracts/taxonomy/v1/taxonomy.yaml
+  pg_user: rule_management
+  pg_password_file: /repo/.cache/rules/pg.secret
+  tls_ca_file: /repo/.cache/event-flow/ca.pem
+  tls_certificate_file: /repo/.cache/rules/server.pem
+  tls_private_key_file: /repo/.cache/rules/server.key
+  clickhouse_host: clickhouse
+  clickhouse_port: 9000
+  clickhouse_user: rule_replay
+  clickhouse_password_file: /repo/.cache/rules/clickhouse.secret

@@ -78,6 +78,12 @@ includes:
   connectors:
     taskfile: ./tools/taskfiles/connectors.yml
     dir: .
+  fuzz:
+    taskfile: ./tools/taskfiles/fuzz.yml
+    dir: .
+  rules:
+    taskfile: ./tools/taskfiles/rules.yml
+    dir: .
   processing:
     taskfile: ./tools/taskfiles/processing.yml
     dir: .
@@ -152,6 +158,7 @@ tasks:
       BENCH: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} bench'}
       ENV: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} env'}
       CONNECTORS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} connectors'}
+      FUZZ_RULES: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} fuzz_rules'}
       WEB: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} web'}
       LABELS: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} labels'}
       TIDY: {sh: '{{.PYTHON}} tools/ci/scope.py get {{.CI_SCOPE}} tidy'}
@@ -174,6 +181,8 @@ tasks:
       - task: cpp:coverage                    # FF-12 (affected modules)
         vars: {LABELS: '{{.LABELS}}', MODULES: '{{.MODULES}}'}
         if: '[ "{{.CPP}}" = true ]'
+      - task: fuzz:rules
+        if: '[ "{{.FUZZ_RULES}}" = true ]'
       - task: cpp:runtime-test                # FF-15
         if: '[ "{{.CPP}}" = true ]'
       - task: bench:compare                   # B-05; before the environment loads the machine

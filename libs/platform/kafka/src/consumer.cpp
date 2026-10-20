@@ -390,12 +390,20 @@ const Offsets& Consumer::positions() const noexcept {
 }
 
 asio::awaitable<Result<Offsets>> Consumer::end_offsets(Duration timeout) {
+  auto bounds = co_await offset_bounds(timeout);
+  if (!bounds) {
+    co_return std::unexpected(bounds.error());
+  }
+  co_return std::move(bounds->end);
+}
+
+asio::awaitable<Result<OffsetBounds>> Consumer::offset_bounds(Duration timeout) {
   auto state = state_;
   if (state->deps.blocking == nullptr || timeout.count() <= 0 || timeout.count() > 3600000) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "replay bounds require a blocking pool and bounded timeout");
   }
-  co_return co_await state->deps.blocking->run([state, timeout]() -> Result<Offsets> {
-    Offsets offsets;
+  co_return co_await state->deps.blocking->run([state, timeout]() -> Result<OffsetBounds> {
+    OffsetBounds offsets;
     for (const auto& topic : state->options.topics) {
       using Topic = std::unique_ptr<rd_kafka_topic_t, decltype(&rd_kafka_topic_destroy)>;
       const Topic handle(rd_kafka_topic_new(state->handle.get(), topic.c_str(), nullptr), rd_kafka_topic_destroy);
@@ -423,7 +431,8 @@ asio::awaitable<Result<Offsets>> Consumer::end_offsets(Duration timeout) {
               error) {
             return std::unexpected(detail::to_error(error, "read replay watermark"));
           }
-          offsets[{topic, id}] = high;
+          offsets.begin[{topic, id}] = low;
+          offsets.end[{topic, id}] = high;
         }
       }
     }

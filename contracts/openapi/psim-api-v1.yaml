@@ -3766,7 +3766,35 @@ components:
         finishedAt:
           type: string
           format: date-time
+        failure:
+          type: string
+          description: Safe diagnostic message for failed runs; no credentials or input payloads.
+        source:
+          enum:
+          - DRY_RUN_SOURCE_UNSPECIFIED
+          - DRY_RUN_SOURCE_KAFKA
+          - DRY_RUN_SOURCE_CLICKHOUSE
+          type: string
+          format: enum
       description: DryRun is a dry run of a rule over history.
+    psim.api.v1.DryRunDecision:
+      type: object
+      properties:
+        signalId:
+          type: string
+        signal:
+          $ref: '#/components/schemas/psim.processing.v1.Signal'
+        suppressed:
+          type: boolean
+        maintenanceIds:
+          type: array
+          items:
+            type: string
+        maintenanceVersions:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.MaintenanceVersionRef'
+      description: DryRunDecision preserves suppressed results and the reason for suppression.
     psim.api.v1.FieldViolation:
       type: object
       properties:
@@ -3819,6 +3847,10 @@ components:
             $ref: '#/components/schemas/psim.processing.v1.Signal'
         nextPageToken:
           type: string
+        decisions:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.DryRunDecision'
       description: GetDryRunResponse is the response of GetDryRun.
     psim.api.v1.GetEventResponse:
       type: object
@@ -4226,6 +4258,14 @@ components:
         nextPageToken:
           type: string
       description: ListTimelineResponse is the response of ListTimeline.
+    psim.api.v1.MaintenanceVersionRef:
+      type: object
+      properties:
+        maintenanceId:
+          type: string
+        version:
+          type: string
+      description: MaintenanceVersionRef identifies an exact policy version used for a decision.
     psim.api.v1.MarkNotificationReadRequest:
       type: object
       properties:
@@ -4521,6 +4561,13 @@ components:
         to:
           type: string
           format: date-time
+        source:
+          enum:
+          - DRY_RUN_SOURCE_UNSPECIFIED
+          - DRY_RUN_SOURCE_KAFKA
+          - DRY_RUN_SOURCE_CLICKHOUSE
+          type: string
+          format: enum
       description: StartDryRunRequest is the request of StartDryRun.
     psim.api.v1.StartDryRunResponse:
       type: object
@@ -5682,6 +5729,10 @@ components:
         explanationRef:
           type: string
           description: Optional reference to an explanation produced by an external module.
+        absenceDeadline:
+          type: string
+          description: Timer-driven absence may have no input events. The deadline is its evidence.
+          format: date-time
       description: "Signal is the result of a correlation rule firing or of an external producer (ADR-025).\n envelope.message_id\
         \ is the deterministic signal_id (ADR-005)."
     psim.processing.v1.SignalOrigin:

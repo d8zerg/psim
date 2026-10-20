@@ -70,6 +70,11 @@ struct TopicPartition {
 /// Next offset to read per partition: what a commit stores (the last processed offset + 1).
 using Offsets = std::map<TopicPartition, std::int64_t>;
 
+struct OffsetBounds {
+  Offsets begin;
+  Offsets end;
+};
+
 /// An outgoing message.
 struct Record {
   std::string topic{};

@@ -47,3 +47,5 @@ add_subdirectory(tools/gateway-admin)
 add_subdirectory(tools/catalog)
 
 add_subdirectory(tools/processing)
+
+add_subdirectory(tools/rules)

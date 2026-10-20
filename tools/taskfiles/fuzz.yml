@@ -1,0 +1,17 @@
+version: '3'
+tasks:
+  rules:
+    desc: Fuzz the rule parser and validator with ASan/UBSan for 10 minutes
+    vars:
+      SECONDS: '{{.SECONDS | default "600"}}'
+    cmds:
+      - task: :cpp:configure
+        vars: {PRESET: asan}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            cmake --preset asan -DPSIM_RULE_FUZZING=ON >/dev/null &&
+            cmake --build --preset asan -j {{.JOBS}} --target psim-rules-fuzz &&
+            python3 -I -m unittest discover -s tools/rules -t tools/rules &&
+            python3 -I tools/rules/fuzz.py build/{{.PLATFORM}}/asan/services/correlation-engine/psim-rules-fuzz
+            --seconds {{.SECONDS}}

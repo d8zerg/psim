@@ -22,6 +22,7 @@ full:
 # Optional stages and the paths that enable them; C++ stages run for changed modules and every
 # target that depends on them (CMake code model).
 stages:
+  fuzz_rules: ['libs/domain/processing/*', 'services/correlation-engine/*', 'contracts/proto/psim/processing/v1/rules.proto', 'tools/rules/*', 'tools/taskfiles/fuzz.yml']
   contracts: ['contracts/*', 'tools/contracts/*']
   # The portal (docs:portal) is built from the documents and from the contracts.
   docs: ['docs/*', '*.md', 'contracts/*', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
@@ -30,7 +31,7 @@ stages:
   # The environment also hosts the component tests of adapters (TS-03) and the registry check (FF-04).
   env: ['deploy/local/*', 'tools/env/*', 'tools/taskfiles/env.yml', 'tools/taskfiles/test.yml', 'tools/taskfiles/flow.yml', 'tools/taskfiles/gateway.yml', 'tools/gateway-admin/*', 'tools/event-flow/*', 'web/apps/console/*', 'web/packages/realtime-client/*', 'libs/platform/stream/*', 'connectors/*', 'contracts/topics/*',
         'contracts/proto/*', 'tools/contracts/registry.py', 'libs/platform/kafka/*', 'libs/platform/pg/*', 'libs/platform/redis/*', 'libs/platform/security/*', 'libs/platform/clickhouse/*', 'libs/platform/s3/*',
-        'libs/domain/processing/*', 'services/connector-gateway/*', 'services/normalizer/*', 'services/correlation-engine/*', 'services/incident-service/*', 'services/api-gateway/*', 'services/resource-catalog/*', 'tools/catalog/*', 'tools/taskfiles/catalog.yml', 'services/event-history/*', 'tools/processing/*', 'tools/taskfiles/processing.yml']
+        'libs/domain/processing/*', 'services/connector-gateway/*', 'services/normalizer/*', 'services/correlation-engine/*', 'services/incident-service/*', 'services/api-gateway/*', 'services/resource-catalog/*', 'tools/catalog/*', 'tools/taskfiles/catalog.yml', 'services/event-history/*', 'tools/processing/*', 'tools/taskfiles/processing.yml', 'tools/rules/*', 'tools/taskfiles/rules.yml']
   connectors: ['connectors/*', 'libs/platform/connector/*', 'libs/platform/security/*', 'contracts/proto/psim/connector/*', 'tools/connector-conformance/*', 'tools/connectors/*', 'tools/taskfiles/connectors.yml', 'tools/env/event_flow_tls.sh']
   web: ['web/*', 'contracts/openapi/*', 'contracts/proto/*', 'tools/taskfiles/web.yml']
   bench: ['tools/bench/*', 'tools/taskfiles/bench.yml']

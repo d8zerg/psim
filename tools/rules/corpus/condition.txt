@@ -1,0 +1,1 @@
+has(event.attributes['loop']) && event.attributes['loop'] == '1'

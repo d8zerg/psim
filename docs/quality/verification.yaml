@@ -688,7 +688,7 @@ methods:
     gate: nightly
     barrier: automated
     task: task fuzz:nightly
-    steps: ['4.2', '5.1']
+    steps: ['4.2', '10.3']
   - id: SEC-05
     kind: security
     name: Фаззинг, 24 ч
@@ -697,7 +697,16 @@ methods:
     gate: release
     barrier: automated
     task: task fuzz:release
-    steps: ['5.1', '10.3']
+    steps: ['10.3']
+  - id: SEC-09
+    kind: security
+    name: Фаззинг парсера и валидатора правил, 10 мин
+    criteria: Парсер и валидатор DSL правил проходят 10 минут без падений и ошибок санитайзеров; корпус и отчёт сохранены
+    env: E-LOCAL
+    gate: pr
+    barrier: automated
+    task: task fuzz:rules
+    steps: ['5.1']
   - id: SEC-06
     kind: security
     name: DAST REST и WebSocket
@@ -874,6 +883,20 @@ methods:
     - '9.5'
     purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
 
+  - id: TS-25
+    kind: test
+    name: "Правила: жизненный цикл и изолированный исторический прогон"
+    criteria: Два экземпляра согласуют версии, повторы и аудит; невалидное правило не активируется; все пять видов
+      правил дают одинаковые решения из Kafka и ClickHouse; обслуживание сохраняет объяснение и версии,
+      пожарные события и P1 проходят; задание восстанавливается после SIGKILL; чужая область отклонена;
+      рабочие топики не меняются, записи и фиксация смещений запрещены настоящими ACL
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task rules:test
+    steps: ['5.1']
+    purpose: Настоящие PostgreSQL, Kafka, Schema Registry, ClickHouse, Keycloak и два экземпляра Correlation Engine
+
   - id: TS-24
     kind: test
     name: "Resource Catalog: ресурсы, планы и обслуживание"
@@ -904,7 +927,7 @@ goals:
   - {id: G-12, source: '1.4', attribute: 'Санитайзеры (ASan, UBSan, TSan)', methods: [FF-11]}
   - {id: G-13, source: '1.4', attribute: 'Покрытие доменного ядра', methods: [FF-12, TS-01, TS-02]}
   - {id: G-14, source: '1.4', attribute: 'Покрытие инфраструктурного кода', methods: [FF-12, TS-03]}
-  - {id: G-15, source: '1.4', attribute: 'Фаззинг', methods: [SEC-04, SEC-05]}
+  - {id: G-15, source: '1.4', attribute: 'Фаззинг', methods: [SEC-09, SEC-04, SEC-05]}
   - {id: G-16, source: '1.4', attribute: 'Совместимость контрактов', methods: [TS-04, FF-04, TS-05]}
   - {id: G-17, source: '1.4', attribute: 'Регрессия производительности', methods: [B-05, B-02, FF-05, L-01]}
   - {id: G-18, source: '1.4', attribute: 'Сборки', methods: [FF-13, FF-14, FF-15, SEC-02]}

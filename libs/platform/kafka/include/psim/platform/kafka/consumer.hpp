@@ -91,6 +91,8 @@ class Consumer {
   Result<void> assign(const Offsets& offsets);
   /// Broker high watermarks, including transaction markers. Used as a bounded replay target.
   asio::awaitable<Result<Offsets>> end_offsets(Duration timeout);
+  /// Retained starts and captured broker ends for bounded, read-only historical replay.
+  asio::awaitable<Result<OffsetBounds>> offset_bounds(Duration timeout);
   [[nodiscard]] const Offsets& positions() const noexcept;
   /// Wait for the fetch position to change in the blocking pool; on success no old fetched
   /// records can escape. Dependencies::blocking is required, as for commit().

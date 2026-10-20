@@ -6,6 +6,7 @@ Run: task arch:selftest (python3 -m unittest discover -s tools/ci).
 import os
 import sys
 import unittest
+from unittest.mock import patch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "arch"))
 import arch_check  # noqa: E402
@@ -60,6 +61,20 @@ class Patterns(unittest.TestCase):
             self.assertTrue(scope.matches(path, config["full"]), path)
         for path in ("libs/platform/core/src/build_info.cpp", "docs/progress.md", "contracts/proto/x.proto"):
             self.assertFalse(scope.matches(path, config["full"]), path)
+
+    def test_rule_fuzzing_follows_contract_dependencies(self):
+        targets = {
+            "contracts": target("contracts"),
+            "psim_correlation_rules": target("services/correlation-engine", ["contracts"]),
+        }
+        with (patch.object(scope, "git", return_value="base"),
+              patch.object(scope.arch_check, "load_codemodel", return_value=(None, targets)),
+              patch.object(scope, "changed_files", return_value=["contracts/proto/psim/common/v1/types.proto"])):
+            self.assertTrue(scope.compute(".", "unused", False)["fuzz_rules"])
+        with (patch.object(scope, "git", return_value="base"),
+              patch.object(scope.arch_check, "load_codemodel", return_value=(None, targets)),
+              patch.object(scope, "changed_files", return_value=["docs/progress.md"])):
+            self.assertFalse(scope.compute(".", "unused", False)["fuzz_rules"])
 
 
 if __name__ == "__main__":

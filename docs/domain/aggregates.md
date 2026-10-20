@@ -172,11 +172,11 @@ Resource Catalog хранит `file_id`, владельца ресурса, пл
 | `rule_id`, `version` | Каждое изменение - новая версия |
 | `state` | `draft`, `testing`, `active`, `archived` |
 | `kind` | `single` (одно событие), `sequence`, `conjunction` (несколько источников в окне), `threshold` (N событий за окно), `absence` (ожидаемое событие не пришло) |
-| `correlation_key` | Выражение: `zone_id`, `site_id`, `device_id` или их сочетание |
+| `correlation_key` | Декларативная область: источник, устройство, зона, этаж, здание или площадка |
 | `window`, `allowed_lateness` | Длительность окна и допустимое опоздание |
 | `conditions` | Фильтры по типу таксономии, критичности, локации, атрибутам |
 | `suppression` | Подавление повторных сигналов на интервал |
-| `output` | Тип инцидента, правило вычисления приоритета, выражение ключа группировки |
+| `output` | Тип инцидента, выражение приоритета и текста, область группировки не уже области корреляции; ключ включает тип инцидента |
 
 **Инварианты:**
 - R1. Правило активируется только после успешной валидации; невалидное правило не может перейти в `testing` или `active`.
@@ -199,7 +199,9 @@ Resource Catalog хранит `file_id`, владельца ресурса, пл
 
 ### 3.5 Значение `Signal`
 
-`signal_id`, `origin` (правило или внешний источник, [ADR-025](../adr/0025-ai-extension-points.md)), `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`, `explanation_ref` (необязательно).
+`signal_id`, `origin` (правило или внешний источник, [ADR-025](../adr/0025-ai-extension-points.md)), `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`, `explanation_ref` (необязательно), `absence_deadline` (для отсутствия ожидаемого события).
+
+Обычный сигнал содержит хотя бы одно событие. Периодическая проверка отсутствия по активным ресурсам каталога может дать сигнал без событий; тогда `absence_deadline` обязателен. При группировке шире зоны поле `zone_id` не заполняется, чтобы не приписывать всему сигналу зону одного участника.
 
 **Правила:** SG1. `signal_id` детерминирован (раздел 0.1). SG2. Сигнал публикуется в одной транзакции Kafka с фиксацией смещения входного топика и записью changelog - exactly-once.
 

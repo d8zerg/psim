@@ -889,6 +889,13 @@ operations:
     messages:
     - $ref: '#/channels/auditV1/messages/AuditEventRecord'
     x-psim-service: audit-service
+  correlationEngineReceiveAuditV1:
+    action: receive
+    channel:
+      $ref: '#/channels/auditV1'
+    messages:
+    - $ref: '#/channels/auditV1/messages/AuditEventRecord'
+    x-psim-service: correlation-engine
 components:
   messages:
     RawEventRecord:

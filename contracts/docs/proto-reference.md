@@ -370,6 +370,7 @@
     - [ArchiveRuleRequest](#psim-api-v1-ArchiveRuleRequest)
     - [ArchiveRuleResponse](#psim-api-v1-ArchiveRuleResponse)
     - [DryRun](#psim-api-v1-DryRun)
+    - [DryRunDecision](#psim-api-v1-DryRunDecision)
     - [GetActiveRuleSetRequest](#psim-api-v1-GetActiveRuleSetRequest)
     - [GetActiveRuleSetResponse](#psim-api-v1-GetActiveRuleSetResponse)
     - [GetDryRunRequest](#psim-api-v1-GetDryRunRequest)
@@ -382,6 +383,7 @@
     - [ListMappingRuleSetsResponse](#psim-api-v1-ListMappingRuleSetsResponse)
     - [ListRulesRequest](#psim-api-v1-ListRulesRequest)
     - [ListRulesResponse](#psim-api-v1-ListRulesResponse)
+    - [MaintenanceVersionRef](#psim-api-v1-MaintenanceVersionRef)
     - [PublishMappingRuleSetRequest](#psim-api-v1-PublishMappingRuleSetRequest)
     - [PublishMappingRuleSetResponse](#psim-api-v1-PublishMappingRuleSetResponse)
     - [RuleVersionRef](#psim-api-v1-RuleVersionRef)
@@ -392,6 +394,7 @@
     - [ValidateRuleRequest](#psim-api-v1-ValidateRuleRequest)
     - [ValidateRuleResponse](#psim-api-v1-ValidateRuleResponse)
 
+    - [DryRunSource](#psim-api-v1-DryRunSource)
     - [DryRunState](#psim-api-v1-DryRunState)
 
     - [CorrelationRuleService](#psim-api-v1-CorrelationRuleService)
@@ -3467,6 +3470,7 @@ envelope.message_id is the deterministic signal_id (ADR-005).
 | last_event_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | summary | [string](#string) |  |  |
 | explanation_ref | [string](#string) |  | Optional reference to an explanation produced by an external module. |
+| absence_deadline | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Timer-driven absence may have no input events. The deadline is its evidence. |
 
 
 
@@ -5865,6 +5869,27 @@ DryRun is a dry run of a rule over history.
 | signals_produced | [uint64](#uint64) |  |  |
 | started_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | finished_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| failure | [string](#string) |  | Safe diagnostic message for failed runs; no credentials or input payloads. |
+| source | [DryRunSource](#psim-api-v1-DryRunSource) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-DryRunDecision"></a>
+
+### DryRunDecision
+DryRunDecision preserves suppressed results and the reason for suppression.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| signal_id | [string](#string) |  |  |
+| signal | [psim.processing.v1.Signal](#psim-processing-v1-Signal) |  |  |
+| suppressed | [bool](#bool) |  |  |
+| maintenance_ids | [string](#string) | repeated |  |
+| maintenance_versions | [MaintenanceVersionRef](#psim-api-v1-MaintenanceVersionRef) | repeated |  |
 
 
 
@@ -5924,6 +5949,7 @@ GetDryRunResponse is the response of GetDryRun.
 | dry_run | [DryRun](#psim-api-v1-DryRun) |  |  |
 | signals | [psim.processing.v1.Signal](#psim-processing-v1-Signal) | repeated |  |
 | next_page_token | [string](#string) |  |  |
+| decisions | [DryRunDecision](#psim-api-v1-DryRunDecision) | repeated |  |
 
 
 
@@ -6049,6 +6075,22 @@ ListRulesResponse is the response of ListRules.
 
 
 
+<a name="psim-api-v1-MaintenanceVersionRef"></a>
+
+### MaintenanceVersionRef
+MaintenanceVersionRef identifies an exact policy version used for a decision.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| maintenance_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-PublishMappingRuleSetRequest"></a>
 
 ### PublishMappingRuleSetRequest
@@ -6138,6 +6180,7 @@ StartDryRunRequest is the request of StartDryRun.
 | version | [uint32](#uint32) |  |  |
 | from | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Range of event time, limited by the retention of normalized events. |
 | to | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| source | [DryRunSource](#psim-api-v1-DryRunSource) |  |  |
 
 
 
@@ -6191,6 +6234,19 @@ ValidateRuleResponse is the response of ValidateRule.
 
 
 
+
+
+
+<a name="psim-api-v1-DryRunSource"></a>
+
+### DryRunSource
+DryRunSource selects the read-only historical input. Unspecified uses Kafka.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DRY_RUN_SOURCE_UNSPECIFIED | 0 |  |
+| DRY_RUN_SOURCE_KAFKA | 1 |  |
+| DRY_RUN_SOURCE_CLICKHOUSE | 2 |  |
 
 
 

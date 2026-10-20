@@ -1,0 +1,33 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-rules-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Validate rule lifecycle, historical replay and real storage and broker ACL
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/rules/check.py {{.PROJECT}} {{.PRESET}}
+  sanitizers:
+    desc: Rule unit and real management checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: psim_rules_test}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Measure rule parser, validator, replay and management coverage
+    cmds:
+      - task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            ctest --test-dir build/{{.PLATFORM}}/coverage -L psim_rules_test --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+            'services/correlation-engine' --component &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml
+            'libs/domain/processing'

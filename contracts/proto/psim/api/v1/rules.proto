@@ -139,6 +139,14 @@ message StartDryRunRequest {
   // Range of event time, limited by the retention of normalized events.
   google.protobuf.Timestamp from = 3 [(buf.validate.field).required = true];
   google.protobuf.Timestamp to = 4 [(buf.validate.field).required = true];
+  DryRunSource source = 5;
+}
+
+// DryRunSource selects the read-only historical input. Unspecified uses Kafka.
+enum DryRunSource {
+  DRY_RUN_SOURCE_UNSPECIFIED = 0;
+  DRY_RUN_SOURCE_KAFKA = 1;
+  DRY_RUN_SOURCE_CLICKHOUSE = 2;
 }
 
 // StartDryRunResponse is the response of StartDryRun.
@@ -158,6 +166,22 @@ message GetDryRunResponse {
   DryRun dry_run = 1;
   repeated psim.processing.v1.Signal signals = 2;
   string next_page_token = 3;
+  repeated DryRunDecision decisions = 4;
+}
+
+// DryRunDecision preserves suppressed results and the reason for suppression.
+message DryRunDecision {
+  string signal_id = 1;
+  psim.processing.v1.Signal signal = 2;
+  bool suppressed = 3;
+  repeated string maintenance_ids = 4;
+  repeated MaintenanceVersionRef maintenance_versions = 5;
+}
+
+// MaintenanceVersionRef identifies an exact policy version used for a decision.
+message MaintenanceVersionRef {
+  string maintenance_id = 1;
+  uint64 version = 2;
 }
 
 // DryRun is a dry run of a rule over history.
@@ -170,6 +194,9 @@ message DryRun {
   uint64 signals_produced = 6;
   google.protobuf.Timestamp started_at = 7;
   google.protobuf.Timestamp finished_at = 8;
+  // Safe diagnostic message for failed runs; no credentials or input payloads.
+  string failure = 9;
+  DryRunSource source = 10;
 }
 
 // DryRunState is the state of a dry run.
