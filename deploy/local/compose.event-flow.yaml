@@ -43,6 +43,33 @@ services:
   normalizer:
     <<: *event-flow
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
+  normalizer-2:
+    <<: *event-flow
+    profiles: [processing-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: normalizer-2
+      PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
+  normalizer-3:
+    <<: *event-flow
+    profiles: [processing-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: normalizer-3
+      PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
+  event-history:
+    <<: *event-flow
+    profiles: [processing-test]
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/event-history/psim-event-history", "--config", "/repo/deploy/local/config/processing/event-history.yaml"]
+  history-2:
+    <<: *event-flow
+    profiles: [processing-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: history-2
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/event-history/psim-event-history", "--config", "/repo/deploy/local/config/processing/event-history.yaml"]
   correlation-engine:
     <<: *event-flow
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]

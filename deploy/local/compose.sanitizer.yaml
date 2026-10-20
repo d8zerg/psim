@@ -10,6 +10,14 @@ services:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   normalizer:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
+  normalizer-2:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  normalizer-3:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  event-history:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
+  history-2:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
   correlation-engine:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   incident-service:

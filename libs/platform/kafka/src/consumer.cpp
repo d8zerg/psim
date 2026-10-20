@@ -61,6 +61,7 @@ struct Consumer::State {
   std::unique_ptr<detail::QueueEvents> events;
   RebalanceListener* listener = nullptr;
   std::set<TopicPartition> assignment;
+  Offsets positions;
   std::map<std::string, std::pair<prometheus::Counter*, prometheus::Counter*>, std::less<>> series;
   bool closed = false;
   bool fatal = false;
@@ -193,6 +194,9 @@ struct Consumer::State {
       Message message(raw[static_cast<std::size_t>(i)]);
       const auto* view = raw[static_cast<std::size_t>(i)];
       if (view->err != RD_KAFKA_RESP_ERR_NO_ERROR) {
+        if (view->err == RD_KAFKA_RESP_ERR__PARTITION_EOF) {
+          positions[message.topic_partition()] = message.offset();
+        }
         if (view->err != RD_KAFKA_RESP_ERR__PARTITION_EOF) {
           log_warn("kafka consumer error", {{"error", rd_kafka_err2name(view->err)}});
         }
@@ -202,6 +206,7 @@ struct Consumer::State {
         continue;
       }
       count(view);
+      positions[message.topic_partition()] = message.offset() + 1;
       out.push_back(std::move(message));
     }
   }
@@ -224,6 +229,7 @@ Result<std::unique_ptr<Consumer>> Consumer::create(const asio::any_io_executor& 
       {"auto.offset.reset", options.auto_offset_reset},
       {"statistics.interval.ms", "5000"},
       {"fetch.wait.max.ms", "100"},
+      {"enable.partition.eof", "true"},
   };
   // Offsets move only when the layer commits them (ADR-041).
   detail::Properties fixed{
@@ -269,7 +275,9 @@ Result<std::unique_ptr<Consumer>> Consumer::create(const asio::any_io_executor& 
   for (const auto& topic : state->options.topics) {
     rd_kafka_topic_partition_list_add(topics.get(), topic.c_str(), RD_KAFKA_PARTITION_UA);
   }
-  if (const auto err = rd_kafka_subscribe(state->handle.get(), topics.get()); err) {
+  if (const auto err =
+          state->options.manual ? RD_KAFKA_RESP_ERR_NO_ERROR : rd_kafka_subscribe(state->handle.get(), topics.get());
+      err) {
     return std::unexpected(detail::to_error(err, "subscribe"));
   }
   return std::unique_ptr<Consumer>(new Consumer(std::move(state)));
@@ -359,6 +367,68 @@ Result<void> Consumer::seek(const Offsets& offsets) {
     }
   }
   return {};
+}
+
+Result<void> Consumer::assign(const Offsets& offsets) {
+  if (!state_->options.manual) {
+    return fail(ErrorCode::kCommonInvalidArgument, "manual assignment requires a manual consumer");
+  }
+  const auto list = detail::to_list(offsets);
+  if (const auto error = rd_kafka_assign(state_->handle.get(), list.get()); error) {
+    return std::unexpected(detail::to_error(error, "assign replay partitions"));
+  }
+  state_->assignment.clear();
+  state_->positions = offsets;
+  for (const auto& [partition, offset] : offsets) {
+    state_->assignment.insert(partition);
+  }
+  return {};
+}
+
+const Offsets& Consumer::positions() const noexcept {
+  return state_->positions;
+}
+
+asio::awaitable<Result<Offsets>> Consumer::end_offsets(Duration timeout) {
+  auto state = state_;
+  if (state->deps.blocking == nullptr || timeout.count() <= 0 || timeout.count() > 3600000) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "replay bounds require a blocking pool and bounded timeout");
+  }
+  co_return co_await state->deps.blocking->run([state, timeout]() -> Result<Offsets> {
+    Offsets offsets;
+    for (const auto& topic : state->options.topics) {
+      using Topic = std::unique_ptr<rd_kafka_topic_t, decltype(&rd_kafka_topic_destroy)>;
+      const Topic handle(rd_kafka_topic_new(state->handle.get(), topic.c_str(), nullptr), rd_kafka_topic_destroy);
+      const rd_kafka_metadata_t* metadata = nullptr;
+      if (const auto error =
+              rd_kafka_metadata(state->handle.get(), 0, handle.get(), &metadata, static_cast<int>(timeout.count()));
+          error) {
+        return std::unexpected(detail::to_error(error, "read replay metadata"));
+      }
+      const std::unique_ptr<const rd_kafka_metadata_t, decltype(&rd_kafka_metadata_destroy)> owned(
+          metadata, rd_kafka_metadata_destroy);
+      for (int index = 0; index < metadata->topic_cnt; ++index) {
+        // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): librdkafka C array
+        const auto& entry = metadata->topics[index];
+        if (entry.err) {
+          return std::unexpected(detail::to_error(entry.err, "read replay topic"));
+        }
+        for (int part = 0; part < entry.partition_cnt; ++part) {
+          // NOLINTNEXTLINE(cppcoreguidelines-pro-bounds-pointer-arithmetic): librdkafka C array
+          const auto id = entry.partitions[part].id;
+          std::int64_t low = 0;
+          std::int64_t high = 0;
+          if (const auto error = rd_kafka_query_watermark_offsets(state->handle.get(), topic.c_str(), id, &low, &high,
+                                                                  static_cast<int>(timeout.count()));
+              error) {
+            return std::unexpected(detail::to_error(error, "read replay watermark"));
+          }
+          offsets[{topic, id}] = high;
+        }
+      }
+    }
+    return offsets;
+  });
 }
 
 asio::awaitable<Result<void>> Consumer::seek_and_wait(Offsets offsets, Duration timeout) {

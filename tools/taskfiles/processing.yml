@@ -1,0 +1,37 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-processing-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Normalization, source deduplication, restart recovery and ClickHouse history reconciliation
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/processing/check.py {{.PROJECT}} {{.PRESET}} 1000
+  bench:
+    desc: Measure three normalizers and two history loaders at 50000 events per second
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/processing/check.py {{.PROJECT}} release 100000
+      - python3 -I tools/processing/measure.py {{.PROJECT}} 100000 scale
+  sanitizers:
+    desc: Unit and real pipeline checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_normalizer_test|psim_event_history_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Measure normalization and event history unit and service coverage
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_normalizer_test|psim_event_history_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/normalizer services/event-history' --component

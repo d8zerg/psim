@@ -1,0 +1,6 @@
+add_library(psim_event_history_core STATIC application/events.cpp)
+psim_target_defaults(psim_event_history_core)
+target_include_directories(psim_event_history_core PUBLIC application)
+target_link_libraries(psim_event_history_core PUBLIC psim::platform_stream psim::platform_clickhouse)
+psim_add_service(event-history SOURCES src/main.cpp LIBS psim_event_history_core SUMMARY "PSIM Event History")
+psim_add_test(psim_event_history_test SOURCES tests/events_test.cpp LIBS psim_event_history_core)

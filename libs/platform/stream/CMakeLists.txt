@@ -1,5 +1,5 @@
 find_package(OpenSSL REQUIRED CONFIG)
-add_library(psim_platform_stream STATIC src/ids.cpp src/runtime.cpp)
+add_library(psim_platform_stream STATIC src/ids.cpp src/runtime.cpp src/replica.cpp)
 add_library(psim::platform_stream ALIAS psim_platform_stream)
 target_include_directories(psim_platform_stream PUBLIC include)
 target_link_libraries(psim_platform_stream PUBLIC psim::platform_connector psim::platform_runtime psim::platform_kafka psim::platform_pg psim::contracts PRIVATE OpenSSL::Crypto OpenSSL::SSL)

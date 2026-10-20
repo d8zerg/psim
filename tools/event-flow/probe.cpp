@@ -50,8 +50,8 @@ boost::asio::awaitable<int> probe(Json inputs) {
   Json latencies = Json::object();
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
   while (std::chrono::steady_clock::now() < deadline
-         && (counts["raw"] < expected.size() * 2 || counts["normalized"] < expected.size() * 2
-             || counts["signal"] < expected.size() * 2 || counts["incident"] < expected.size())) {
+         && (counts["raw"] < expected.size() * 2 || counts["normalized"] < expected.size()
+             || counts["signal"] < expected.size() || counts["incident"] < expected.size())) {
     auto batch = co_await (*consumer)->poll(128, std::chrono::milliseconds(100));
     if (!batch) {
       throw std::runtime_error("probe poll failed");
@@ -113,8 +113,8 @@ boost::asio::awaitable<int> probe(Json inputs) {
     }
   }
   co_await (*consumer)->close();
-  if (counts["raw"] != expected.size() * 2 || counts["normalized"] != expected.size() * 2
-      || counts["signal"] != expected.size() * 2 || counts["incident"] != expected.size()) {
+  if (counts["raw"] != expected.size() * 2 || counts["normalized"] != expected.size()
+      || counts["signal"] != expected.size() || counts["incident"] != expected.size()) {
     throw std::runtime_error("pipeline accounting mismatch: " + Json(counts).dump());
   }
   std::cout << Json{{"counts", counts}, {"signal_ms", latencies}}.dump() << '\n';

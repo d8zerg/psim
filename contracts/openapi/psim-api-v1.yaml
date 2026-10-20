@@ -5485,6 +5485,17 @@ components:
         clockSkewCorrected:
           type: boolean
           description: Event time was corrected because of source clock skew (ADR-010).
+        deviceTypeId:
+          type: string
+        gatewaySessionId:
+          type: string
+          description: Authenticated receiving session; historical events never advance equipment freshness.
+        liveObservation:
+          type: boolean
+        stateObservedAt:
+          type: string
+          description: Present only for a newer, recent observation from the receiving session.
+          format: date-time
       description: "Event is a normalized event. envelope.message_id equals the raw event_id,\n envelope.sequence equals the\
         \ source sequence number."
     psim.processing.v1.EventFilter:

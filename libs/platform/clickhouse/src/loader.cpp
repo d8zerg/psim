@@ -121,6 +121,15 @@ asio::awaitable<Result<void>> Loader::initialize(pg::Pool* journal) {
   if (!lease) {
     co_return std::unexpected(lease.error());
   }
+  auto bootstrap = co_await pg::Transaction::begin(&**lease);
+  if (!bootstrap) {
+    co_return std::unexpected(bootstrap.error());
+  }
+  auto locked_bootstrap = co_await (*lease)->query(
+      {.sql = "SELECT pg_advisory_xact_lock(hashtextextended('psim-clickhouse-bootstrap', 0))"});
+  if (!locked_bootstrap) {
+    co_return std::unexpected(locked_bootstrap.error());
+  }
   auto schema = co_await (*lease)->query({.sql = "CREATE SCHEMA IF NOT EXISTS psim_clickhouse"});
   if (!schema) {
     co_return std::unexpected(schema.error());
@@ -134,7 +143,7 @@ asio::awaitable<Result<void>> Loader::initialize(pg::Pool* journal) {
   if (!table) {
     co_return std::unexpected(table.error());
   }
-  co_return Result<void>{};
+  co_return co_await bootstrap->commit();
 }
 
 asio::awaitable<Result<void>> Loader::deliver(kafka::TopicPartition partition) {
@@ -360,18 +369,29 @@ asio::awaitable<Result<std::size_t>> Loader::run_once() {
   }
   std::size_t processed = 0;
   for (const auto& [partition, records] : groups) {
-    auto converted = converter_(records);
+    auto count = records.size();
+    auto selected = std::span<const kafka::Message* const>(records).first(count);
+    auto converted = converter_(selected);
     if (!converted) {
       co_return std::unexpected(converted.error());
     }
-    auto payload = pack(*converted, records, options_);
+    auto payload = pack(*converted, selected, options_);
+    while (!payload && payload.error().code() == ErrorCode::kCommonRateLimited && count > 1) {
+      count = (count + 1) / 2;
+      selected = std::span<const kafka::Message* const>(records).first(count);
+      converted = converter_(selected);
+      if (!converted) {
+        co_return std::unexpected(converted.error());
+      }
+      payload = pack(*converted, selected, options_);
+    }
     if (!payload) {
       co_return std::unexpected(payload.error());
     }
-    if (records.back()->offset() == std::numeric_limits<std::int64_t>::max()) {
+    if (records[count - 1]->offset() == std::numeric_limits<std::int64_t>::max()) {
       co_return fail(ErrorCode::kCommonInvalidArgument, "Kafka source offset overflows");
     }
-    const auto next = records.back()->offset() + 1;
+    const auto next = records[count - 1]->offset() + 1;
     const auto name = source_->group() + "/" + options_.name;
     const auto token = detail::fingerprint(name + "/" + partition.topic + "/" + std::to_string(partition.partition)
                                            + "/" + std::to_string(records.front()->offset()) + "/"
@@ -400,10 +420,10 @@ asio::awaitable<Result<std::size_t>> Loader::run_once() {
     if (!delivered) {
       co_return std::unexpected(delivered.error());
     }
-    processed += records.size();
-    if (metrics_ != nullptr && records.back()->timestamp()) {
+    processed += count;
+    if (metrics_ != nullptr && records[count - 1]->timestamp()) {
       const auto lag =
-          std::chrono::system_clock::now() - records.back()->timestamp().value_or(std::chrono::system_clock::now());
+          std::chrono::system_clock::now() - records[count - 1]->timestamp().value_or(std::chrono::system_clock::now());
       metrics_->lag(std::max(0.0, std::chrono::duration<double>(lag).count()));
     }
   }

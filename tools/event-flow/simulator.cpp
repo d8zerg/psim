@@ -105,6 +105,7 @@ int main(int argc, char** argv) {
       }
       return false;
     };
+    const auto epoch = static_cast<std::uint32_t>(std::stoul(platform::stream::uuid7().substr(28), nullptr, 16));
     const auto started = std::chrono::steady_clock::now();
     auto heartbeat_at = started + std::chrono::seconds(2);
     const auto heartbeat = [&] {
@@ -138,7 +139,7 @@ int main(int argc, char** argv) {
       auto* event = batch->add_events();
       event->set_event_id(platform::stream::uuid7());
       event->set_source_ref(source);
-      event->set_source_epoch(1);
+      event->set_source_epoch(epoch);
       event->set_source_seq(static_cast<std::uint64_t>(i) + 1);
       *event->mutable_occurred_at() = google::protobuf::util::TimeUtil::NanosecondsToTimestamp(nanos);
       event->set_raw_code(code);

@@ -3,6 +3,7 @@ syntax = "proto3";
 package psim.processing.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
 
@@ -38,4 +39,10 @@ message Event {
   bool significant = 13;
   // Event time was corrected because of source clock skew (ADR-010).
   bool clock_skew_corrected = 14;
+  string device_type_id = 15;
+  // Authenticated receiving session; historical events never advance equipment freshness.
+  string gateway_session_id = 16;
+  bool live_observation = 17;
+  // Present only for a newer, recent observation from the receiving session.
+  google.protobuf.Timestamp state_observed_at = 18;
 }

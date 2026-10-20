@@ -44,8 +44,10 @@ struct ProcessorOptions {
   std::string stage{};
   Semantics semantics = Semantics::kAtLeastOnce;
   std::size_t max_batch = 500;
-  /// How often offsets (ALO) or transactions (EOS-K: 20-50 ms, ADR-006) are committed.
+  /// The transaction interval is part of the EOS-K stage latency budget (ADR-006).
   std::chrono::milliseconds commit_interval{1000};
+  /// Give the coordinator time to finish markers before the next AddPartitionsToTxn.
+  std::chrono::milliseconds transaction_gap{0};
   RetryPolicy retry{};
   /// Program errors (exceptions) in a row that stop a partition.
   std::uint32_t circuit_breaker = 5;
@@ -79,6 +81,24 @@ class Handler {
   virtual ~Handler() = default;
 
   virtual asio::awaitable<Result<void>> handle(const Message* message, Output* output) = 0;
+
+  virtual void before_poll() {}
+
+  /// Apply control updates and restore newly assigned state before opening a transaction.
+  virtual asio::awaitable<Result<void>> before_batch() { co_return Result<void>{}; }
+
+  virtual void assigned(const std::vector<TopicPartition>& /*partitions*/) {}
+
+  virtual void revoked(const std::vector<TopicPartition>& /*partitions*/) {}
+
+  /// Coalesce local changelog records before committing outputs and input offsets.
+  virtual asio::awaitable<Result<void>> before_commit(Output* /*output*/) { co_return Result<void>{}; }
+
+  virtual bool commit_on_revoke() const { return true; }
+
+  virtual void committed() {}
+
+  virtual void aborted() {}
 };
 
 /// Consume - handle - produce loop of a pipeline stage on one shard (ADR-041). The consumer and the
@@ -112,7 +132,7 @@ class Processor final : public RebalanceListener {
     std::optional<async::SteadyTime> resume_at;
     bool stopped = false;
   };
-  enum class Step : std::uint8_t { kNext, kSkipPartition };
+  enum class Step : std::uint8_t { kNext, kSkipPartition, kAbortBatch };
 
   asio::awaitable<Result<Step>> process(Handler* handler, const Message* message, Partition* partition);
   asio::awaitable<Result<void>> dead_letter(const Message* message, Error error);
@@ -133,10 +153,13 @@ class Processor final : public RebalanceListener {
   ProcessorOptions options_;
   Dependencies deps_;
   Output sink_;
+  Handler* handler_ = nullptr;
+  std::uint64_t rewind_generation_ = 0;
   std::string dead_letter_topic_;
   std::map<TopicPartition, Partition> partitions_;
   async::SteadyTime last_commit_{};
   async::SteadyTime transaction_started_{};
+  std::optional<async::SteadyTime> transaction_finished_;
   bool dirty_ = false;
   bool stopping_ = false;
   bool initialized_ = false;

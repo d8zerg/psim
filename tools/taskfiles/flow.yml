@@ -43,6 +43,8 @@ tasks:
           PRESET: '{{.PRESET}}'
           RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
           CMD: python3 -I tools/env/gateway_bootstrap.py http://keycloak:8080 connector-gateway:8080 build/{{.PLATFORM}}/{{.PRESET}}/tools/gateway-admin/psim-gateway-admin .cache/event-flow
+      - task: :cpp:_run_env
+        vars: {PROJECT: '{{.PROJECT}}', CMD: 'build/{{.PLATFORM}}/{{.PRESET}}/tools/processing/psim-processing-probe seed 100'}
       - python3 -I tools/env/event_flow.py ready {{.PROJECT}}
   emit:
     desc: Emit synthetic alarms over the real mTLS connector protocol (COUNT=1)

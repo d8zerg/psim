@@ -8,3 +8,4 @@ telemetry:
   sampling_ratio: 1
 settings:
   allow_plaintext: true
+  taxonomy_file: /repo/contracts/taxonomy/v1/taxonomy.yaml

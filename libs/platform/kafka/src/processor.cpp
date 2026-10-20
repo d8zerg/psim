@@ -58,6 +58,7 @@ Processor::~Processor() {
 }
 
 asio::awaitable<Result<void>> Processor::run(Handler* handler) {
+  handler_ = handler;
   const bool exactly_once = options_.semantics == Semantics::kExactlyOnce;
   input_->set_listener(this);
   if (exactly_once && !initialized_) {
@@ -72,9 +73,13 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
     if (auto committed = co_await commit(false); !committed) {
       co_return committed;
     }
+    handler->before_poll();
     auto batch = co_await input_->poll(options_.max_batch, poll_wait());
     if (!batch) {
       co_return std::unexpected(std::move(batch.error()));
+    }
+    if (auto prepared = co_await handler->before_batch(); !prepared) {
+      co_return std::unexpected(prepared.error());
     }
     std::vector<TopicPartition> skipped;
     for (const auto& message : *batch) {
@@ -90,6 +95,12 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
         partition.committed = message.offset();  // the group resumed here
       }
       if (exactly_once && !output_->in_transaction()) {
+        if (transaction_finished_) {
+          const auto due = *transaction_finished_ + options_.transaction_gap;
+          if (clock_->steady() < due) {
+            (void)co_await clock_->sleep_until(due);
+          }
+        }
         if (auto begun = output_->begin_transaction(); !begun) {
           co_return begun;
         }
@@ -104,6 +115,16 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
       }
       if (*step == Step::kSkipPartition) {
         skipped.push_back(id);
+      }
+      if (*step == Step::kAbortBatch) {
+        break;
+      }
+      const auto generation = rewind_generation_;
+      if (auto committed = co_await commit(false); !committed) {
+        co_return committed;
+      }
+      if (generation != rewind_generation_) {
+        break;
       }
     }
   }
@@ -139,6 +160,18 @@ asio::awaitable<Result<Processor::Step>> Processor::process(Handler* handler, co
   if (!result) {
     if (result.error().retryable()) {
       retry_later(*message, *partition, result.error());
+      if (options_.semantics == Semantics::kExactlyOnce) {
+        auto aborted = co_await output_->abort_transaction(options_.timeout);
+        if (aborted) {
+          transaction_finished_ = clock_->steady();
+        }
+        handler->aborted();
+        rewind(true);
+        if (!aborted) {
+          co_return std::unexpected(aborted.error());
+        }
+        co_return Step::kAbortBatch;
+      }
       co_return Step::kSkipPartition;
     }
     if (auto sent = co_await dead_letter(message, result.error()); !sent) {
@@ -306,9 +339,27 @@ asio::awaitable<Result<void>> Processor::commit_offsets() {
 // EOS-K: outputs and offsets commit atomically; on failure the transaction is aborted and its
 // partitions rewound to where it started.
 asio::awaitable<Result<void>> Processor::commit_transaction() {
+  auto prepared = co_await handler_->before_commit(&sink_);
+  if (!prepared) {
+    auto aborted = co_await output_->abort_transaction(options_.timeout);
+    if (aborted) {
+      transaction_finished_ = clock_->steady();
+    }
+    handler_->aborted();
+    rewind(true);
+    if (!aborted) {
+      co_return aborted;
+    }
+    if (!prepared.error().retryable()) {
+      co_return prepared;
+    }
+    co_return Result<void>{};
+  }
   const auto offsets = pending_offsets(true);
   auto committed = co_await output_->commit_transaction(input_, offsets, options_.timeout);
   if (committed) {
+    transaction_finished_ = clock_->steady();
+    handler_->committed();
     if (deps_.metrics != nullptr) {
       deps_.metrics->transactions("commit").Increment();
     }
@@ -327,17 +378,22 @@ asio::awaitable<Result<void>> Processor::commit_transaction() {
   if (deps_.logger != nullptr) {
     deps_.logger->warn("transaction aborted", {{"stage", options_.stage}, {"error", committed.error().message()}});
   }
-  if (auto aborted = co_await output_->abort_transaction(options_.timeout); !aborted && output_->fatal()) {
+  auto aborted = co_await output_->abort_transaction(options_.timeout);
+  if (!aborted) {
+    handler_->aborted();
     co_return std::unexpected(std::move(aborted.error()).context("processor " + options_.stage));
   }
+  transaction_finished_ = clock_->steady();
   if (deps_.metrics != nullptr) {
     deps_.metrics->transactions("abort").Increment();
   }
   rewind(true);
+  handler_->aborted();
   co_return Result<void>{};
 }
 
 void Processor::rewind(bool transaction_only) {
+  ++rewind_generation_;
   Offsets offsets;
   for (auto& [id, partition] : partitions_) {
     const std::int64_t to = transaction_only ? partition.transaction_start : partition.committed;
@@ -354,6 +410,9 @@ void Processor::rewind(bool transaction_only) {
 }
 
 void Processor::on_assigned(const std::vector<TopicPartition>& partitions) {
+  if (handler_ != nullptr) {
+    handler_->assigned(partitions);
+  }
   for (const auto& id : partitions) {
     forget(id);  // a fresh start from the committed offset
   }
@@ -364,10 +423,12 @@ void Processor::on_revoked(const std::vector<TopicPartition>& partitions, bool l
   if (options_.semantics == Semantics::kExactlyOnce) {
     if (output_->in_transaction()) {
       Result<void> committed = fail(ErrorCode::kCommonUnavailable, "partitions lost");
-      if (!lost) {
+      if (!lost && handler_->commit_on_revoke()) {
         committed = output_->commit_transaction_now(input_, pending_offsets(true), options_.timeout);
       }
       if (committed) {
+        transaction_finished_ = clock_->steady();
+        handler_->committed();
         for (auto& [id, partition] : partitions_) {
           if (partition.transaction_start >= 0) {
             partition.committed = partition.next;
@@ -375,8 +436,14 @@ void Processor::on_revoked(const std::vector<TopicPartition>& partitions, bool l
           }
         }
       } else if (!output_->fatal()) {
-        std::ignore = output_->abort_transaction_now(options_.timeout);
+        const auto aborted = output_->abort_transaction_now(options_.timeout);
+        if (aborted) {
+          transaction_finished_ = clock_->steady();
+        } else {
+          stopping_ = true;
+        }
         rewind(true);
+        handler_->aborted();
       }
       if (deps_.metrics != nullptr) {
         deps_.metrics->transactions(committed ? "commit" : "abort").Increment();
@@ -396,6 +463,9 @@ void Processor::on_revoked(const std::vector<TopicPartition>& partitions, bool l
   }
   for (const auto& id : partitions) {
     forget(id);
+  }
+  if (handler_ != nullptr) {
+    handler_->revoked(partitions);
   }
 }
 

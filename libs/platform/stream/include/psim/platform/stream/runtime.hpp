@@ -5,6 +5,7 @@
 #include <opentelemetry/trace/span.h>
 
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -92,6 +93,14 @@ class Worker : public runtime::Component, public kafka::Handler {
   }
 
   kafka::Producer* producer() const { return producer_.get(); }
+
+  virtual std::string consumer_group() const { return {}; }
+
+  virtual std::size_t batch_size() const { return 32; }
+
+  virtual std::chrono::milliseconds transaction_gap() const { return std::chrono::milliseconds(0); }
+
+  virtual std::chrono::milliseconds commit_interval() const { return std::chrono::milliseconds(20); }
 
  private:
   const runtime::Context& context_;

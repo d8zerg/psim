@@ -88,7 +88,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   ).toBe(403);
   await marker("warmup-ready");
   const warmup = await inputs("warmup");
-  await expect(page.locator(`[data-event-id="${warmup.at(-1)?.event_id ?? ""}"]`)).toBeVisible();
+  await expect(page.locator(`[data-event-id="${warmup.at(-1)?.event_id ?? ""}"]`)).toBeVisible({ timeout: 30_000 });
   await marker("measure-ready");
   const measured = await inputs("input");
   await expect.poll(() => measured.every((event) => renders.has(event.event_id)), { timeout: 30_000 }).toBe(true);

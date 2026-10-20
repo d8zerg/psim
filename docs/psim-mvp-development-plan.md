@@ -645,6 +645,8 @@
 
 ### Шаг 4.5 Normalizer
 
+Реализация: [ADR-052](adr/0052-normalization-and-event-history.md), [руководство](engineering/normalization-and-history.md), `services/normalizer`, `services/event-history`.
+
 - **Цель:** единое представление событий от любых источников.
 - **Вход:** таксономия (0.2), 4.4.
 - **Работы:**

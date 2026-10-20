@@ -415,7 +415,7 @@ def observe(env, binary, image):
     service = executable[len("psim-"):]
     container = f"{env.project}-{executable}"
     subprocess.run(["docker", "rm", "-f", container], capture_output=True)
-    config = next((f"deploy/local/config/{directory}/{service}.yaml" for directory in ("event-flow", "catalog")
+    config = next((f"deploy/local/config/{directory}/{service}.yaml" for directory in ("event-flow", "catalog", "processing")
                    if os.path.isfile(os.path.join(ROOT, "deploy/local/config", directory, service + ".yaml"))), None)
     subprocess.run(["docker", "run", "-d", "--name", container, "--network", f"{env.project}_default",
                     "-u", f"{os.getuid()}:{os.getgid()}",

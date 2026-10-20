@@ -109,10 +109,11 @@ asio::awaitable<Result<std::unique_ptr<pg::Pool>>> Worker::database() {
 
 kafka::ClientOptions Worker::kafka_options(std::string client_id) const {
   const auto& config = context_.config();
-  kafka::ClientOptions options{.bootstrap = config.get<std::string>("settings.brokers"),
-                               .client_id = std::move(client_id),
-                               .properties = {{"linger.ms", "1"}},
-                               .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
+  kafka::ClientOptions options{
+      .bootstrap = config.get<std::string>("settings.brokers"),
+      .client_id = std::move(client_id),
+      .properties = {{"linger.ms", "1"}, {"fetch.wait.max.ms", "1"}, {"socket.nagle.disable", "true"}},
+      .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
   if (!options.allow_plaintext) {
     options.security = kafka::TransportSecurity{
         .tls = {.ca_file = config.get<std::string>("settings.kafka_ca_file"),
@@ -142,7 +143,10 @@ asio::awaitable<Result<void>> Worker::open() {
   if (!input_.empty()) {
     auto consumer = kafka::Consumer::create(
         executor_,
-        {.client = options, .group_id = options.client_id + (broadcast_ ? "-" + uuid7() : ""), .topics = {input_}},
+        {.client = options,
+         .group_id =
+             consumer_group().empty() ? options.client_id + (broadcast_ ? "-" + uuid7() : "") : consumer_group(),
+         .topics = {input_}},
         {.blocking = &context_.blocking(), .logger = &context_.logger()});
     if (!consumer) {
       co_return std::unexpected(consumer.error());
@@ -152,8 +156,9 @@ asio::awaitable<Result<void>> Worker::open() {
         consumer_.get(), producer_.get(), &context_.clock(),
         kafka::ProcessorOptions{.stage = stage_,
                                 .semantics = semantics_,
-                                .max_batch = 32,
-                                .commit_interval = std::chrono::milliseconds(20),
+                                .max_batch = batch_size(),
+                                .commit_interval = commit_interval(),
+                                .transaction_gap = transaction_gap(),
                                 .timeout = std::chrono::milliseconds(10000)},
         kafka::Dependencies{.blocking = &context_.blocking(), .logger = &context_.logger()});
     running_ = true;

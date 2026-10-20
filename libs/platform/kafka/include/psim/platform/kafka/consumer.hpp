@@ -30,6 +30,8 @@ struct ConsumerOptions {
   std::string group_protocol = "consumer";
   /// Where a group without a committed offset starts.
   std::string auto_offset_reset = "earliest";
+  /// Manual assignment for compacted replicas; never joins a consumer group.
+  bool manual = false;
 };
 
 /// Called inside Consumer::poll(), so between batches: nothing of the consumer is in progress.
@@ -86,6 +88,10 @@ class Consumer {
 
   /// Continue reading the partitions from the given offsets.
   Result<void> seek(const Offsets& offsets);
+  Result<void> assign(const Offsets& offsets);
+  /// Broker high watermarks, including transaction markers. Used as a bounded replay target.
+  asio::awaitable<Result<Offsets>> end_offsets(Duration timeout);
+  [[nodiscard]] const Offsets& positions() const noexcept;
   /// Wait for the fetch position to change in the blocking pool; on success no old fetched
   /// records can escape. Dependencies::blocking is required, as for commit().
   asio::awaitable<Result<void>> seek_and_wait(Offsets offsets, Duration timeout);

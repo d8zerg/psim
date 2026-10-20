@@ -86,7 +86,7 @@ channels:
   normalizerStateV1:
     address: psim.normalizer.state.v1
     title: Normalizer source sequence trackers (internal)
-    description: 'Key: source_id:epoch. Semantics: EOS-K. Internal topic.'
+    description: 'Key: tenant_id/source_id:epoch. Semantics: EOS-K. Internal topic.'
     messages:
       NormalizerStateRecord:
         $ref: '#/components/messages/NormalizerStateRecord'
@@ -955,7 +955,7 @@ components:
         kafka:
           key:
             type: string
-            description: source_id:epoch
+            description: tenant_id/source_id:epoch
           schemaIdLocation: payload
           schemaIdPayloadEncoding: confluent
           bindingVersion: 0.5.0

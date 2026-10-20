@@ -35,6 +35,15 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
   if (!lease) {
     co_return std::unexpected(lease.error());
   }
+  auto bootstrap = co_await pg::Transaction::begin(&**lease);
+  if (!bootstrap) {
+    co_return std::unexpected(bootstrap.error());
+  }
+  auto locked_bootstrap = co_await (*lease)->query(
+      {.sql = "SELECT pg_advisory_xact_lock(hashtextextended('psim-clickhouse-bootstrap', 0))"});
+  if (!locked_bootstrap) {
+    co_return std::unexpected(locked_bootstrap.error());
+  }
   for (const auto* ddl :
        {"CREATE SCHEMA IF NOT EXISTS psim_clickhouse",
         "CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations (target text NOT NULL, version bigint NOT NULL, "
@@ -44,6 +53,10 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
     if (!created) {
       co_return std::unexpected(created.error());
     }
+  }
+  auto bootstrap_committed = co_await bootstrap->commit();
+  if (!bootstrap_committed) {
+    co_return bootstrap_committed;
   }
   auto history = co_await (*lease)->query(
       {.sql = "SELECT version, phase, name, checksum FROM psim_clickhouse.schema_migrations WHERE target=$1",

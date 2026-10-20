@@ -7,3 +7,5 @@ add_subdirectory(connector-gateway)
 add_subdirectory(api-gateway)
 
 add_subdirectory(resource-catalog)
+
+add_subdirectory(event-history)

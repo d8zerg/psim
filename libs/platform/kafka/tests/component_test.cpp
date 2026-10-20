@@ -386,6 +386,71 @@ TEST(KafkaComponent, ProcessorRetriesTransientErrorsAndSendsOthersToTheDeadLette
   EXPECT_EQ(again.count(), 0);
 }
 
+class TransactionalState final : public Handler {
+ public:
+  explicit TransactionalState(std::string output) : output_(std::move(output)) {}
+
+  asio::awaitable<Result<void>> handle(const Message* message, Output* output) override {
+    const auto value = std::string(message->value());
+    auto sent = co_await output->send({.topic = output_, .key = std::string(message->key()), .value = value});
+    if (!sent) {
+      co_return sent;
+    }
+    ++pending_;
+    if (value == "5" && !failed_) {
+      failed_ = true;
+      co_return fail(ErrorCode::kCommonUnavailable, "injected failure after output");
+    }
+    co_return Result<void>{};
+  }
+
+  void committed() override {
+    committed_ += pending_;
+    pending_ = 0;
+  }
+
+  void aborted() override {
+    pending_ = 0;
+    ++aborts_;
+  }
+
+  [[nodiscard]] int committed_count() const { return committed_; }
+
+  [[nodiscard]] int aborts() const { return aborts_; }
+
+ private:
+  std::string output_;
+  int pending_ = 0;
+  bool failed_ = false;
+  std::atomic<int> committed_{0}, aborts_{0};
+};
+
+TEST(KafkaComponent, TransactionAbortRollsBackHandlerStateAndPartialOutputs) {
+  Topics topics;
+  const auto input = topics.create("state-in", 1);
+  const auto output = topics.create("state-out", 1);
+  produce_numbers(input, 100);
+  TransactionalState handler(output);
+  {
+    Stage processor(consumer(input, unique("state-group")),
+                    {.stage = stage_name(),
+                     .semantics = Semantics::kExactlyOnce,
+                     .max_batch = 100,
+                     .commit_interval = milliseconds(20),
+                     .retry = {.initial = milliseconds(10)}},
+                    nullptr, &handler);
+    ASSERT_TRUE(wait_until([&] { return handler.committed_count() >= 100; }, milliseconds(60000)));
+    ASSERT_TRUE(processor.result());
+  }
+  EXPECT_GE(handler.aborts(), 1);
+  EXPECT_EQ(handler.committed_count(), 100);
+  const auto values = histogram(read_all(output, 100, seconds(20)));
+  ASSERT_EQ(values.size(), 100U);
+  for (const auto& [value, count] : values) {
+    EXPECT_EQ(count, 1) << value;
+  }
+}
+
 TEST(KafkaComponent, CircuitBreakerStopsAPartitionAfterRepeatedProgramErrors) {
   Topics topics;
   const auto input = topics.create("breaker-in", 1);

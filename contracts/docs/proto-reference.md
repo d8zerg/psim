@@ -2847,6 +2847,10 @@ envelope.sequence equals the source sequence number.
 | attributes | [Event.AttributesEntry](#psim-processing-v1-Event-AttributesEntry) | repeated | Standard taxonomy attributes and connector attributes prefixed with &#34;x.&#34;. |
 | significant | [bool](#bool) |  | Significant events are stored long-term in Event History (ADR-028). |
 | clock_skew_corrected | [bool](#bool) |  | Event time was corrected because of source clock skew (ADR-010). |
+| device_type_id | [string](#string) |  |  |
+| gateway_session_id | [string](#string) |  | Authenticated receiving session; historical events never advance equipment freshness. |
+| live_observation | [bool](#bool) |  |  |
+| state_observed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Present only for a newer, recent observation from the receiving session. |
 
 
 
@@ -7393,7 +7397,7 @@ CorrelationStateEntry is the opaque state of one rule for one correlation key.
 
 ### NormalizerStateRecord
 NormalizerStateRecord is the value of internal compacted topic psim.normalizer.state.v1
-(key: source_id:epoch). Not a public contract.
+(key: tenant_id/source_id:epoch). Not a public contract.
 
 
 | Field | Type | Label | Description |
@@ -7453,6 +7457,7 @@ SourceSequenceState is the deduplication tracker of one source epoch.
 | source_epoch | [uint32](#uint32) |  |  |
 | max_sequence | [uint64](#uint64) |  |  |
 | window | [bytes](#bytes) |  | Bitmap of the last 4096 sequence numbers below max_sequence; bit i set = max_sequence - i seen. |
+| last_confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 

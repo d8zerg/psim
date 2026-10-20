@@ -3,11 +3,12 @@ syntax = "proto3";
 package psim.processing.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/processing/v1/event.proto";
 
 // NormalizerStateRecord is the value of internal compacted topic psim.normalizer.state.v1
-// (key: source_id:epoch). Not a public contract.
+// (key: tenant_id/source_id:epoch). Not a public contract.
 message NormalizerStateRecord {
   psim.common.v1.Envelope envelope = 1 [(buf.validate.field).required = true];
   oneof payload {
@@ -23,6 +24,7 @@ message SourceSequenceState {
   uint64 max_sequence = 3;
   // Bitmap of the last 4096 sequence numbers below max_sequence; bit i set = max_sequence - i seen.
   bytes window = 4;
+  google.protobuf.Timestamp last_confirmed_at = 5;
 }
 
 // CorrelationChangelogRecord is the value of internal compacted topic

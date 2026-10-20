@@ -14,6 +14,11 @@ vars:
   CURRENT: build/{{.PLATFORM}}/release/bench.json
 
 tasks:
+  normalizer:
+    desc: Normalization throughput, visible transaction latency and scaling baseline
+    cmds:
+      - task: :processing:bench
+        vars: {PROJECT: '{{.PROJECT | default "psim-processing-test"}}'}
   run:
     desc: Build the release preset and run every benchmark (results in build/<platform>/release/bench.json)
     cmds:

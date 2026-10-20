@@ -210,6 +210,8 @@ tasks:
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :catalog:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :processing:test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :connectors:conformance
         vars: {PRESET: coverage, OUTAGE_SECONDS: '1'}
       - task: :cpp:_run

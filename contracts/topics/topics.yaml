@@ -46,7 +46,7 @@ topics:
   - name: psim.normalizer.state.v1
     title: Normalizer source sequence trackers (internal)
     record: psim.processing.v1.NormalizerStateRecord
-    key: source_id:epoch
+    key: tenant_id/source_id:epoch
     partitions: {copartitioned_with: psim.ingest.raw.v1}
     retention: infinite
     cleanup: compact
