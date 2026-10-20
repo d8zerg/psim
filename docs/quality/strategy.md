@@ -58,8 +58,8 @@
 
 | Стенд | Состав | Назначение |
 |---|---|---|
-| `E-DEV` | Машина разработчика: Docker Compose (шаг 1.4), Kafka 1 брокер | Unit, component, integration, отладка |
-| `E-CI` | Стенд разработчика (Docker Desktop), на котором выполняются конвейеры `task ci`, `task ci:nightly`, `task release` ([ADR-034](../adr/0034-local-ci-and-supply-chain.md)); тот же Compose | Барьеры PR и ночные прогоны в сокращённом профиле |
+| `E-DEV` | Linux-машина разработчика: нативный Docker Engine и плагин Docker Compose (шаг 1.4), Kafka 1 брокер | Unit, component, integration, отладка |
+| `E-CI` | Linux-стенд разработчика с нативным Docker Engine, на котором выполняются конвейеры `task ci`, `task ci:nightly`, `task release` ([ADR-034](../adr/0034-local-ci-and-supply-chain.md)); тот же Compose | Барьеры PR и ночные прогоны в сокращённом профиле |
 | `E-LOCAL` | Эталонный сервер «одна машина» ([scaling.md](../architecture/scaling.md#54-эталонные-стенды)) | Функциональные E2E, нагрузка профиля одной машины |
 | `E-CLUSTER` | Эталонный кластер на VM: 3 узла инфраструктуры, 2 узла приложений, узел наблюдаемости | Полная нагрузка, soak, chaos, обновление |
 

@@ -12,7 +12,7 @@
 
 ## Разработка и проверка
 
-Официально поддерживаемая ОС - Debian 13 x86_64. Сборка выполняется закреплёнными контейнерными инструментами; установка описана в [README](README.md#разработка). Доступен [dev container](.devcontainer/devcontainer.json).
+Официально поддерживаемая ОС - Debian 13 x86_64. Разработка, сборка, тестирование и локальные конвейеры используют нативный Docker Engine на Linux с плагином Docker Compose. Сборка выполняется закреплёнными контейнерными инструментами; установка описана в [README](README.md#разработка). Доступен [dev container](.devcontainer/devcontainer.json), использующий тот же Docker Engine хоста.
 
 1. Создайте ветку от актуальной основной ветки и внесите изменение.
 2. Соблюдайте [стандарт C++](docs/engineering/cpp-coding-standard.md) и [стандарт TypeScript](docs/engineering/typescript-coding-standard.md).
