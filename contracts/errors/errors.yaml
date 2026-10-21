@@ -309,6 +309,13 @@ codes:
     ru: Интервал пробного прогона вне retention нормализованных событий
 
   # --- INCIDENT -------------------------------------------------------------
+  - code: INCIDENT_TYPE_EXISTS
+    http: 409
+    grpc: ALREADY_EXISTS
+    retryable: false
+    used_in: [rest]
+    title: Incident type already exists
+    ru: Тип инцидента с таким идентификатором уже существует
   - code: INCIDENT_INVALID_STATE_TRANSITION
     http: 409
     grpc: FAILED_PRECONDITION

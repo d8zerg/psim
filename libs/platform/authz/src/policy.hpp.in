@@ -1,0 +1,5 @@
+#pragma once
+#include <string_view>
+namespace psim::platform::authz {
+inline constexpr std::string_view kPolicy = R"policy(@PSIM_AUTHZ_POLICY@)policy";
+}

@@ -51,3 +51,5 @@ add_subdirectory(tools/processing)
 add_subdirectory(tools/rules)
 
 add_subdirectory(tools/correlation)
+
+add_subdirectory(tools/incidents)

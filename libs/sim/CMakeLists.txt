@@ -13,3 +13,7 @@ psim_target_defaults(psim_sim_checks)
 add_executable(psim-sim src/main.cpp)
 target_link_libraries(psim-sim PRIVATE psim::sim)
 psim_target_defaults(psim-sim)
+
+add_executable(psim_incident_sim tests/incident_test.cpp)
+psim_target_defaults(psim_incident_sim)
+target_link_libraries(psim_incident_sim PRIVATE psim::sim psim::domain_incident GTest::gtest_main)

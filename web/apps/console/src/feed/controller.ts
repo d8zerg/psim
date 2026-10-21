@@ -103,7 +103,7 @@ export class FeedController {
       return;
     }
     const payload = change.value.payload;
-    if (payload.case !== "incidentCreated" && payload.case !== "signalAttached") {
+    if (payload.value === undefined || !("incident" in payload.value)) {
       return;
     }
     const incident = payload.value.incident;
@@ -114,7 +114,15 @@ export class FeedController {
       id: incident.incidentId,
       version: incident.version.toString(),
       title: incident.title,
-      state: "INCIDENT_STATE_NEW",
+      state:
+        [
+          "INCIDENT_STATE_UNSPECIFIED",
+          "INCIDENT_STATE_NEW",
+          "INCIDENT_STATE_ACKNOWLEDGED",
+          "INCIDENT_STATE_IN_PROGRESS",
+          "INCIDENT_STATE_RESOLVED",
+          "INCIDENT_STATE_CLOSED",
+        ][incident.state] ?? "INCIDENT_STATE_UNSPECIFIED",
       priority: `PRIORITY_P${String(incident.priority)}`,
       eventId: change.value.envelope?.correlationId ?? "",
     });

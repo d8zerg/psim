@@ -1982,6 +1982,36 @@ paths:
         '409': *id008
         '412': *id009
       summary: StartIncidentWork moves an incident to in_progress
+  /v1/incidents:transfer:
+    post:
+      tags:
+      - IncidentService
+      description: TransferIncidents applies independent, version-checked transfer requests or confirmations.
+      operationId: IncidentService_TransferIncidents
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.TransferIncidentsRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.TransferIncidentsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      parameters: *id010
+      summary: TransferIncidents applies independent, version-checked transfer requests or confirmations
   /v1/locations:
     get:
       tags:
@@ -4609,6 +4639,47 @@ components:
         event:
           $ref: '#/components/schemas/psim.processing.v1.Event'
       description: StoredEvent is a normalized event with its envelope times.
+    psim.api.v1.TransferIncidentItem:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        expectedVersion:
+          type: string
+        recipientId:
+          type: string
+        comment:
+          type: string
+        transferId:
+          type: string
+          description: Nonempty confirms an existing transfer; caller must be its recipient.
+      description: TransferIncidentItem is one atomic operation in a transfer batch.
+    psim.api.v1.TransferIncidentResult:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+        errorCode:
+          type: string
+      description: TransferIncidentResult carries one incident or a stable error code.
+    psim.api.v1.TransferIncidentsRequest:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.TransferIncidentItem'
+      description: TransferIncidentsRequest limits batch size and does not promise all-or-nothing semantics.
+    psim.api.v1.TransferIncidentsResponse:
+      type: object
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.TransferIncidentResult'
+      description: TransferIncidentsResponse preserves input order and reports each atomic result.
     psim.api.v1.UpdateDeviceResponse:
       type: object
       properties:
@@ -5257,6 +5328,7 @@ components:
           type: array
           items:
             type: string
+          description: Bounded preview of attached identities; ListIncidentSignals returns the complete list.
         title:
           type: string
         assigneeId:
@@ -5303,7 +5375,38 @@ components:
         version:
           type: string
           description: Aggregate version, used as ETag.
+        incidentTypeVersion:
+          type: string
+          description: Incident type configuration fixed when the incident is created.
+        pendingTransfer:
+          allOf:
+          - $ref: '#/components/schemas/psim.incident.v1.IncidentTransfer'
+          description: Pending transfer keeps the current assignee until recipient confirmation.
+        autoCloseAt:
+          type: string
+          description: Durable deadline used by automatic close after resolution.
+          format: date-time
+        signalCount:
+          type: string
+          description: Total identities in the paginated signal collection.
+        signalIdsTruncated:
+          type: boolean
+          description: The preview is bounded to 1000 identities.
       description: Incident groups signals and tracks the response lifecycle (ADR-027).
+    psim.incident.v1.IncidentTransfer:
+      type: object
+      properties:
+        transferId:
+          type: string
+        requestedBy:
+          type: string
+        recipientId:
+          type: string
+        comment:
+          type: string
+        requestedVersion:
+          type: string
+      description: IncidentTransfer is the pending request tied to an aggregate version.
     psim.incident.v1.IncidentType:
       type: object
       properties:
@@ -5336,6 +5439,18 @@ components:
           description: Delay between resolved and automatic close.
         version:
           type: string
+        priorityMatrix:
+          type: object
+          additionalProperties:
+            enum:
+            - PRIORITY_UNSPECIFIED
+            - PRIORITY_P1
+            - PRIORITY_P2
+            - PRIORITY_P3
+            - PRIORITY_P4
+            type: string
+            format: enum
+          description: Optional priority mapping, keyed by the numeric input priority (1-4).
       description: IncidentType is a class of situations that defines response plan and SLA.
     psim.incident.v1.Link:
       type: object

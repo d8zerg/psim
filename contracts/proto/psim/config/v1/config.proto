@@ -7,6 +7,7 @@ import "google/protobuf/duration.proto";
 import "psim/catalog/v1/maintenance.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/common/v1/types.proto";
+import "psim/incident/v1/incident.proto";
 import "psim/processing/v1/mapping.proto";
 import "psim/processing/v1/rules.proto";
 
@@ -26,6 +27,8 @@ message ConfigRecord {
     ProcessingSettings processing = 5;
     // Key "maintenance/<tenant_id>/<maintenance_id>"; terminal versions remain for replay.
     psim.catalog.v1.MaintenanceWindow maintenance_window = 6;
+    // Key "incident-type/<tenant_id>/<incident_type_id>".
+    psim.incident.v1.IncidentType incident_type = 7;
   }
 }
 

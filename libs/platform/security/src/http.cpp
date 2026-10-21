@@ -91,6 +91,9 @@ asio::awaitable<Result<HttpResponse>> exchange(Stream* stream, const Url* url, c
   request.set(http::field::host, url->authority);
   request.set(http::field::accept, "application/json");
   request.set(http::field::connection, "close");
+  if (!options->bearer_token.empty()) {
+    request.set(http::field::authorization, "Bearer " + options->bearer_token);
+  }
   if (!body.empty()) {
     request.set(http::field::content_type, content_type);
     request.body() = std::move(body);
@@ -164,6 +167,7 @@ asio::awaitable<Result<HttpResponse>> http_request(std::string url, HttpOptions 
   }
   if (options.timeout <= std::chrono::milliseconds::zero() || options.timeout > std::chrono::seconds(60)
       || options.max_body_bytes == 0 || options.max_body_bytes > std::size_t{4} * 1024 * 1024
+      || options.bearer_token.size() > 16384 || options.bearer_token.find_first_of("\r\n") != std::string::npos
       || body.size() > std::size_t{1024} * 1024 || content_type.find_first_of("\r\n") != std::string::npos) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "invalid HTTP request limits");
   }

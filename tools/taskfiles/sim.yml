@@ -40,6 +40,9 @@ tasks:
       - task: :correlation:sim
         vars: {PRESET: '{{.PRESET}}', SEED: '{{.SEED}}', RUNS: '200'}
 
+      - task: :incidents:sim
+        vars: {PRESET: '{{.PRESET}}', RUNS: '200'}
+
   long:
     desc: Manually run 10000 seeded delivery and correlation simulations (TS-08)
     cmds:
@@ -47,6 +50,9 @@ tasks:
         vars: {RUNS: '10000'}
       - task: :correlation:sim
         vars: {PRESET: '{{.PRESET}}', SEED: '{{.SEED}}', RUNS: '10000'}
+
+      - task: :incidents:sim
+        vars: {PRESET: '{{.PRESET}}', RUNS: '10000'}
 
   replay:
     desc: Reproduce one simulation by SEED and save its complete trace

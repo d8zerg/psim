@@ -90,6 +90,13 @@ service IncidentService {
       body: "*"
     };
   }
+  // TransferIncidents applies independent, version-checked transfer requests or confirmations.
+  rpc TransferIncidents(TransferIncidentsRequest) returns (TransferIncidentsResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents:transfer"
+      body: "*"
+    };
+  }
   // ListIncidentTypes lists incident types.
   rpc ListIncidentTypes(ListIncidentTypesRequest) returns (ListIncidentTypesResponse) {
     option (google.api.http) = {get: "/v1/incident-types"};
@@ -319,4 +326,34 @@ message UpdateIncidentTypeRequest {
 // UpdateIncidentTypeResponse is the response of UpdateIncidentType.
 message UpdateIncidentTypeResponse {
   psim.incident.v1.IncidentType incident_type = 1;
+}
+
+// TransferIncidentItem is one atomic operation in a transfer batch.
+message TransferIncidentItem {
+  string incident_id = 1 [(buf.validate.field).string.uuid = true];
+  uint64 expected_version = 2 [(buf.validate.field).uint64.gt = 0];
+  string recipient_id = 3;
+  string comment = 4 [(buf.validate.field).string.max_len = 8000];
+  // Nonempty confirms an existing transfer; caller must be its recipient.
+  string transfer_id = 5;
+}
+
+// TransferIncidentsRequest limits batch size and does not promise all-or-nothing semantics.
+message TransferIncidentsRequest {
+  repeated TransferIncidentItem items = 1 [(buf.validate.field).repeated = {
+    min_items: 1
+    max_items: 100
+  }];
+}
+
+// TransferIncidentResult carries one incident or a stable error code.
+message TransferIncidentResult {
+  string incident_id = 1;
+  psim.incident.v1.Incident incident = 2;
+  string error_code = 3;
+}
+
+// TransferIncidentsResponse preserves input order and reports each atomic result.
+message TransferIncidentsResponse {
+  repeated TransferIncidentResult results = 1;
 }

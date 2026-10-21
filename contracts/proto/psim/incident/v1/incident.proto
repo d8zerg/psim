@@ -22,6 +22,7 @@ message Incident {
   PrioritySource priority_source = 7;
   string grouping_key = 8;
   google.protobuf.Timestamp group_until = 9;
+  // Bounded preview of attached identities; ListIncidentSignals returns the complete list.
   repeated string signal_ids = 10;
   string title = 11;
   // User id of the responsible operator.
@@ -42,6 +43,16 @@ message Incident {
   google.protobuf.Timestamp closed_at = 22;
   // Aggregate version, used as ETag.
   uint64 version = 23;
+  // Incident type configuration fixed when the incident is created.
+  uint64 incident_type_version = 24;
+  // Pending transfer keeps the current assignee until recipient confirmation.
+  IncidentTransfer pending_transfer = 25;
+  // Durable deadline used by automatic close after resolution.
+  google.protobuf.Timestamp auto_close_at = 26;
+  // Total identities in the paginated signal collection.
+  uint64 signal_count = 27;
+  // The preview is bounded to 1000 identities.
+  bool signal_ids_truncated = 28;
 }
 
 // IncidentState is the lifecycle state of an incident.
@@ -90,6 +101,8 @@ message IncidentType {
   // Delay between resolved and automatic close.
   google.protobuf.Duration auto_close_after = 8;
   uint64 version = 9;
+  // Optional priority mapping, keyed by the numeric input priority (1-4).
+  map<int32, psim.common.v1.Priority> priority_matrix = 10;
 }
 
 // TimelineEntry is one record of an incident timeline.
@@ -125,4 +138,13 @@ message Link {
   string link_id = 1;
   string url = 2 [(buf.validate.field).string.uri = true];
   string title = 3;
+}
+
+// IncidentTransfer is the pending request tied to an aggregate version.
+message IncidentTransfer {
+  string transfer_id = 1 [(buf.validate.field).string.uuid = true];
+  string requested_by = 2;
+  string recipient_id = 3;
+  string comment = 4;
+  uint64 requested_version = 5;
 }

@@ -1,4 +1,4 @@
-import { Priority } from "@psim/realtime-client";
+import { IncidentState, Priority } from "@psim/realtime-client";
 import { createApiClient } from "@psim/api-client";
 import type { Delta, RealtimeClientOptions } from "@psim/realtime-client";
 import { describe, expect, it, vi } from "vitest";
@@ -87,6 +87,31 @@ describe("incident feed", () => {
     unsubscribe();
     controller.stop();
     expect(channel.stop).toHaveBeenCalledOnce();
+  });
+  it("applies lifecycle events using their state and version", async () => {
+    const { controller } = fixture();
+    await controller.start();
+    controller.delta({
+      change: {
+        case: "incidentEvent",
+        value: {
+          payload: {
+            case: "incidentResolved",
+            value: {
+              incident: {
+                incidentId: "incident",
+                version: 3n,
+                title: "Resolved alarm",
+                priority: Priority.P2,
+                state: IncidentState.RESOLVED,
+              },
+            },
+          },
+        },
+      },
+    } as Delta);
+    expect(controller.getSnapshot().rows[0]?.state).toBe("INCIDENT_STATE_RESOLVED");
+    expect(controller.getSnapshot().rows[0]?.version).toBe("3");
   });
   it("reloads a snapshot after a gap and reports a failed reload", async () => {
     const { controller, handlers, fetch } = fixture();

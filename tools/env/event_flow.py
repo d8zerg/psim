@@ -93,6 +93,7 @@ def main(project):
             emit(project, "offline", 2)
             checkpoint("restart-ready")
             compose(project, "kill", "-s", "SIGKILL", "api-gateway")
+            wait(lambda: compose(project, "ps", "--all", "--format", "{{.State}}", "api-gateway").stdout.strip() == "exited")
             compose(project, "start", "api-gateway")
             checkpoint("after-restart-ready")
             emit(project, "after-restart", 1)

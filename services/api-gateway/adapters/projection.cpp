@@ -9,6 +9,7 @@
 #include <expected>
 #include <string>
 
+#include "psim/incident/v1/incident.pb.h"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
@@ -54,8 +55,18 @@ boost::asio::awaitable<p::Result<void>> Projection::apply(incident::v1::Incident
         }
         auto& connection = transaction->connection();
         if (*accepted) {
-          const auto& value =
-              event.has_incident_created() ? event.incident_created().incident() : event.signal_attached().incident();
+          const auto* payload = incident::v1::IncidentEventRecord::GetReflection()->GetOneofFieldDescriptor(
+              event, incident::v1::IncidentEventRecord::descriptor()->FindOneofByName("payload"));
+          if (payload == nullptr) {
+            co_return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "incident event payload required");
+          }
+          const auto& change = incident::v1::IncidentEventRecord::GetReflection()->GetMessage(event, payload);
+          const auto* field = change.GetDescriptor()->FindFieldByName("incident");
+          if (field == nullptr) {
+            co_return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "incident event snapshot required");
+          }
+          incident::v1::Incident value;
+          value.CopyFrom(change.GetReflection()->GetMessage(change, field));
           auto updated = co_await connection.query(
               {.sql =
                    "INSERT INTO access.incident_feed(replica,tenant_id,incident_id,version,body) "

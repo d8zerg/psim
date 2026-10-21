@@ -1,0 +1,13 @@
+{
+  "schema": "incident",
+  "migrations": [
+    {
+      "version": 1,
+      "name": "minimal incident aggregate",
+      "expand": [
+        "CREATE TABLE incident.incidents (tenant_id uuid NOT NULL, incident_id uuid PRIMARY KEY, grouping_key text NOT NULL, group_until_ns bigint NOT NULL, body jsonb NOT NULL)",
+        "CREATE INDEX incident_group ON incident.incidents(tenant_id, grouping_key, group_until_ns)"
+      ]
+    }
+  ]
+}

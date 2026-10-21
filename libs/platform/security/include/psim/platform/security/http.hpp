@@ -17,6 +17,8 @@ struct HttpOptions {
   std::size_t max_body_bytes = std::size_t{1024} * 1024;
   /// Explicit opt-in for isolated development fixtures; production uses HTTPS.
   bool allow_plaintext = false;
+  /// Explicit credentials for the configured endpoint; redirects are never followed.
+  std::string bearer_token{};
 };
 
 struct HttpResponse {

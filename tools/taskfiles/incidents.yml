@@ -1,0 +1,49 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-incident-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Incident lifecycle, grouping, transfers, access, durable outbox and process failures
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/incidents/check.py {{.PROJECT}} {{.PRESET}} 100
+  bench:
+    desc: Measure signal persistence latency on two service instances with complete identity reconciliation
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/incidents/check.py {{.PROJECT}}-bench release 10000
+  sanitizers:
+    desc: Incident domain, authorization and real service checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_(domain_incident|platform_authz|incident)_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Incident unit and component coverage
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_(domain_incident|platform_authz|incident)_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/incident-service' --component &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/incident libs/platform/authz'
+  sim:
+    desc: Manually simulate grouping, crashes, repeated delivery and durable inbox/outbox
+    vars:
+      RUNS: '{{.RUNS | default "200"}}'
+    cmds:
+      - task: :cpp:configure
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            cmake --build --preset {{.PRESET}} --target psim_incident_sim -j {{.JOBS}} &&
+            PSIM_INCIDENT_SIM_RUNS={{.RUNS}} build/{{.PLATFORM}}/{{.PRESET}}/libs/sim/psim_incident_sim

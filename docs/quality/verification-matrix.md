@@ -7,7 +7,7 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 10 | 15 | 0 | 2 | 27 |
+| Наборы тестов | 11 | 15 | 0 | 2 | 28 |
 | Нагрузка | 0 | 3 | 8 | 0 | 11 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
@@ -15,7 +15,7 @@
 | Fitness functions | 18 | 1 | 2 | 0 | 21 |
 | Безопасность | 4 | 2 | 3 | 0 | 9 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 37 | 27 | 29 | 2 | **95** |
+| **Всего** | 38 | 27 | 29 | 2 | **96** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -25,8 +25,8 @@
 | G-02 | Задержка событие -> сигнал | p99 ≤ 300 мс | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
 | G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (nightly), FF-05 (release) |
 | G-04 | Задержка отклика REST API | p99 ≤ 200 мс для операций чтения консоли | L-05 (release) |
-| G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
-| G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), C-11 (release) |
+| G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
+| G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
 | G-07 | RTO, кластерная топология | ≤ 60 с при отказе любого одного узла | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release), C-15 (release) |
 | G-08 | RPO для инцидентов | 0 в кластерной топологии | C-03 (release), C-11 (release) |
 | G-09 | Обновление | Без простоя обработки в кластерной топологии | C-12 (release) |
@@ -50,16 +50,16 @@
 
 | Сценарий | Методы |
 |---|---|
-| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly), TS-24 (pr) |
+| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly), TS-24 (pr), TS-28 (pr) |
 | [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), L-07 (nightly), TS-18 (nightly), TS-24 (pr) |
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
 | [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
-| [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly) |
+| [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), TS-28 (pr) |
 | [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly) |
-| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly) |
+| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr) |
 | [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly) |
-| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly) |
-| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr) |
+| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr) |
+| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr) |
 | [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
 | [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-10 (nightly), TS-11 (nightly), M-05 (release) |
@@ -97,6 +97,7 @@
 | TS-24 | Resource Catalog: ресурсы, планы и обслуживание | Иерархия и источники сохраняют инварианты; версии и повторы запросов согласованы; чужая область отклонена; PNG/JPEG до 20 МиБ и версии планов сохраняются при отказах S3 и БД; orphan очищен; обслуживание завершается ≤ 1 с, включая восстановление при запуске; все изменения и отказы доступа получены потребителем аудита. Назначение: Два настоящих экземпляра, PostgreSQL, Kafka и S3; резервное копирование и применение подавления проверяются отдельно. | E-CI | pr | `task catalog:test` | 4.4 |
 | TS-26 | Перестроение проекций из Kafka | Проекции, перестроенные проигрыванием Kafka, совпадают с рабочими; старые события не дают ложного online или actual; сквозной сценарий M1 проходит после переноса проекции API Gateway. Назначение: Воспроизводимость read-моделей (принцип 6 плана, DoD шага 7.3). | E-CI | nightly | `task test:projections` | 7.3 |
 | TS-27 | Доставка уведомлений и защита webhook | Email и webhook доставляются через тестовые SMTP и приёмник; отказ и восстановление получателя не теряют и не дублируют уведомления; запрещённые и внутренние адреса webhook отклоняются; доставка фиксируется в аудите. Назначение: DoD шага 6.3 и защита от SSRF. | E-CI | nightly | `task test:notifications` | 6.3 |
+| TS-28 | Incident Service и авторизация | Два HTTPS-экземпляра, настоящие Kafka, PostgreSQL и Keycloak; переходы, версии, повторы, окно группировки, история, область доступа и подтверждённая передача сохраняют инварианты; SIGKILL и повтор сигналов не теряют и не дублируют эффекты. Назначение: Жизненный цикл инцидентов, общая авторизация и сохранение ответственности. | E-CI | pr | `task incidents:test` | 5.3 |
 
 ### Нагрузка
 
@@ -111,7 +112,7 @@
 | L-08 | Поиск по истории событий под нагрузкой записи | Поиск за сутки по зоне ≤ 500 мс при записи 50 000 событий/с в ClickHouse. | E-CLUSTER | release | `task load:history-search` | 5.4 |
 | L-09 | Отчёт за 30 суток | Отчёт строится ≤ 3 с; значения совпадают с эталоном. | E-LOCAL | nightly | `task load:report` | 6.5 |
 | L-10 | Нагрузка одной машины LOAD-10K | 10 000 событий/с на эталонном сервере с SLO задержек кластера. Назначение: Целевая нагрузка топологии «одна машина» (scaling.md, 5.4). | E-LOCAL | release | `task load:single-node` | 10.1 |
-| L-11 | Обработка сигналов Incident Service | Два экземпляра; p99 обработки сигнала ≤ 50 мс; сверка сигналов и инцидентов без потерь и дубликатов после SIGKILL экземпляра. Назначение: Бюджет задержки этапа инцидентов (DoD шага 5.3). | E-LOCAL | release | `task load:incidents` | 5.3, 10.1 |
+| L-11 | Обработка сигналов Incident Service | Два экземпляра; p99 обработки сигнала ≤ 50 мс; сверка сигналов и инцидентов без потерь и дубликатов после SIGKILL экземпляра. Назначение: Бюджет задержки этапа инцидентов (DoD шага 5.3). | E-LOCAL | release | `task incidents:bench` | 5.3, 10.1 |
 | L-12 | Доставка команд коннектору | p99 от запроса команды до доставки коннектору ≤ 200 мс; каждая команда получает финальный статус. Назначение: Бюджет задержки команд (DoD шага 6.2). | E-LOCAL | release | `task load:commands` | 6.2, 10.1 |
 
 ### Длительная нагрузка
@@ -232,7 +233,7 @@
 | 4.5 | B-03, TS-19 |
 | 5.1 | SEC-09, TS-20, TS-23, TS-25 |
 | 5.2 | TS-07, TS-08, C-14, B-04, TS-20 |
-| 5.3 | TS-01, TS-02, L-11, TS-21 |
+| 5.3 | TS-01, TS-02, L-11, TS-21, TS-28 |
 | 5.4 | L-08 |
 | 6.1 | TS-01, TS-02, TS-17, TS-23 |
 | 6.2 | TS-01, TS-02, L-12 |

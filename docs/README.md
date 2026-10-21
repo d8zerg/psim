@@ -26,6 +26,7 @@
 - [Правила и исторический прогон](engineering/correlation-rules.md)
 - [Рабочая корреляция и восстановление состояния](engineering/live-correlation.md)
 - [Resource Catalog: ресурсы, планы и обслуживание](engineering/resource-catalog.md)
+- [Incident Service](engineering/incident-service.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 
 ## Архитектура

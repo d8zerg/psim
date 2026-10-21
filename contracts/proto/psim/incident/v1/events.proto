@@ -26,6 +26,8 @@ message IncidentEventRecord {
     IncidentReopened incident_reopened = 12;
     IncidentClosed incident_closed = 13;
     IncidentBlockingStepsChanged incident_blocking_steps_changed = 14;
+    IncidentTransferRequested incident_transfer_requested = 15;
+    IncidentTransferConfirmed incident_transfer_confirmed = 16;
   }
 }
 
@@ -101,4 +103,16 @@ message IncidentClosed {
 // IncidentBlockingStepsChanged is published when blocking_steps changes from response events.
 message IncidentBlockingStepsChanged {
   Incident incident = 1;
+}
+
+// IncidentTransferRequested preserves the current assignee.
+message IncidentTransferRequested {
+  Incident incident = 1;
+}
+
+// IncidentTransferConfirmed changes responsibility after recipient confirmation.
+message IncidentTransferConfirmed {
+  Incident incident = 1;
+  string previous_assignee_id = 2;
+  string transfer_id = 3;
 }

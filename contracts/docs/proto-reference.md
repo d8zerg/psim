@@ -176,7 +176,9 @@
 
 - [psim/incident/v1/incident.proto](#psim_incident_v1_incident-proto)
     - [Incident](#psim-incident-v1-Incident)
+    - [IncidentTransfer](#psim-incident-v1-IncidentTransfer)
     - [IncidentType](#psim-incident-v1-IncidentType)
+    - [IncidentType.PriorityMatrixEntry](#psim-incident-v1-IncidentType-PriorityMatrixEntry)
     - [Link](#psim-incident-v1-Link)
     - [StepRef](#psim-incident-v1-StepRef)
     - [TimelineEntry](#psim-incident-v1-TimelineEntry)
@@ -239,6 +241,10 @@
     - [SetIncidentPriorityResponse](#psim-api-v1-SetIncidentPriorityResponse)
     - [StartIncidentWorkRequest](#psim-api-v1-StartIncidentWorkRequest)
     - [StartIncidentWorkResponse](#psim-api-v1-StartIncidentWorkResponse)
+    - [TransferIncidentItem](#psim-api-v1-TransferIncidentItem)
+    - [TransferIncidentResult](#psim-api-v1-TransferIncidentResult)
+    - [TransferIncidentsRequest](#psim-api-v1-TransferIncidentsRequest)
+    - [TransferIncidentsResponse](#psim-api-v1-TransferIncidentsResponse)
     - [UpdateIncidentTypeRequest](#psim-api-v1-UpdateIncidentTypeRequest)
     - [UpdateIncidentTypeResponse](#psim-api-v1-UpdateIncidentTypeResponse)
 
@@ -465,6 +471,8 @@
     - [IncidentPriorityChanged](#psim-incident-v1-IncidentPriorityChanged)
     - [IncidentReopened](#psim-incident-v1-IncidentReopened)
     - [IncidentResolved](#psim-incident-v1-IncidentResolved)
+    - [IncidentTransferConfirmed](#psim-incident-v1-IncidentTransferConfirmed)
+    - [IncidentTransferRequested](#psim-incident-v1-IncidentTransferRequested)
     - [IncidentWorkStarted](#psim-incident-v1-IncidentWorkStarted)
     - [SignalAttached](#psim-incident-v1-SignalAttached)
 
@@ -3079,7 +3087,7 @@ Incident groups signals and tracks the response lifecycle (ADR-027).
 | priority_source | [PrioritySource](#psim-incident-v1-PrioritySource) |  |  |
 | grouping_key | [string](#string) |  |  |
 | group_until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| signal_ids | [string](#string) | repeated |  |
+| signal_ids | [string](#string) | repeated | Bounded preview of attached identities; ListIncidentSignals returns the complete list. |
 | title | [string](#string) |  |  |
 | assignee_id | [string](#string) |  | User id of the responsible operator. |
 | escalation_level | [uint32](#uint32) |  | 0 means not escalated. |
@@ -3093,6 +3101,30 @@ Incident groups signals and tracks the response lifecycle (ADR-027).
 | resolved_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | closed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | version | [uint64](#uint64) |  | Aggregate version, used as ETag. |
+| incident_type_version | [uint64](#uint64) |  | Incident type configuration fixed when the incident is created. |
+| pending_transfer | [IncidentTransfer](#psim-incident-v1-IncidentTransfer) |  | Pending transfer keeps the current assignee until recipient confirmation. |
+| auto_close_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Durable deadline used by automatic close after resolution. |
+| signal_count | [uint64](#uint64) |  | Total identities in the paginated signal collection. |
+| signal_ids_truncated | [bool](#bool) |  | The preview is bounded to 1000 identities. |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentTransfer"></a>
+
+### IncidentTransfer
+IncidentTransfer is the pending request tied to an aggregate version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| transfer_id | [string](#string) |  |  |
+| requested_by | [string](#string) |  |  |
+| recipient_id | [string](#string) |  |  |
+| comment | [string](#string) |  |  |
+| requested_version | [uint64](#uint64) |  |  |
 
 
 
@@ -3116,6 +3148,23 @@ IncidentType is a class of situations that defines response plan and SLA.
 | response_required | [bool](#bool) |  | When set, an incident without a matching response plan is flagged. |
 | auto_close_after | [google.protobuf.Duration](#google-protobuf-Duration) |  | Delay between resolved and automatic close. |
 | version | [uint64](#uint64) |  |  |
+| priority_matrix | [IncidentType.PriorityMatrixEntry](#psim-incident-v1-IncidentType-PriorityMatrixEntry) | repeated | Optional priority mapping, keyed by the numeric input priority (1-4). |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentType-PriorityMatrixEntry"></a>
+
+### IncidentType.PriorityMatrixEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [int32](#int32) |  |  |
+| value | [psim.common.v1.Priority](#psim-common-v1-Priority) |  |  |
 
 
 
@@ -4041,6 +4090,72 @@ StartIncidentWorkResponse is the response of StartIncidentWork.
 
 
 
+<a name="psim-api-v1-TransferIncidentItem"></a>
+
+### TransferIncidentItem
+TransferIncidentItem is one atomic operation in a transfer batch.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| expected_version | [uint64](#uint64) |  |  |
+| recipient_id | [string](#string) |  |  |
+| comment | [string](#string) |  |  |
+| transfer_id | [string](#string) |  | Nonempty confirms an existing transfer; caller must be its recipient. |
+
+
+
+
+
+
+<a name="psim-api-v1-TransferIncidentResult"></a>
+
+### TransferIncidentResult
+TransferIncidentResult carries one incident or a stable error code.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+| error_code | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-TransferIncidentsRequest"></a>
+
+### TransferIncidentsRequest
+TransferIncidentsRequest limits batch size and does not promise all-or-nothing semantics.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [TransferIncidentItem](#psim-api-v1-TransferIncidentItem) | repeated |  |
+
+
+
+
+
+
+<a name="psim-api-v1-TransferIncidentsResponse"></a>
+
+### TransferIncidentsResponse
+TransferIncidentsResponse preserves input order and reports each atomic result.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| results | [TransferIncidentResult](#psim-api-v1-TransferIncidentResult) | repeated |  |
+
+
+
+
+
+
 <a name="psim-api-v1-UpdateIncidentTypeRequest"></a>
 
 ### UpdateIncidentTypeRequest
@@ -4098,6 +4213,7 @@ IncidentService manages incidents and incident types. Owner: Incident Service.
 | ResolveIncident | [ResolveIncidentRequest](#psim-api-v1-ResolveIncidentRequest) | [ResolveIncidentResponse](#psim-api-v1-ResolveIncidentResponse) | ResolveIncident resolves an incident; fails while mandatory steps are pending (I7). |
 | ReopenIncident | [ReopenIncidentRequest](#psim-api-v1-ReopenIncidentRequest) | [ReopenIncidentResponse](#psim-api-v1-ReopenIncidentResponse) | ReopenIncident reopens a resolved incident (I10). |
 | CloseIncident | [CloseIncidentRequest](#psim-api-v1-CloseIncidentRequest) | [CloseIncidentResponse](#psim-api-v1-CloseIncidentResponse) | CloseIncident closes a resolved incident before the auto-close timer (supervisor). |
+| TransferIncidents | [TransferIncidentsRequest](#psim-api-v1-TransferIncidentsRequest) | [TransferIncidentsResponse](#psim-api-v1-TransferIncidentsResponse) | TransferIncidents applies independent, version-checked transfer requests or confirmations. |
 | ListIncidentTypes | [ListIncidentTypesRequest](#psim-api-v1-ListIncidentTypesRequest) | [ListIncidentTypesResponse](#psim-api-v1-ListIncidentTypesResponse) | ListIncidentTypes lists incident types. |
 | CreateIncidentType | [CreateIncidentTypeRequest](#psim-api-v1-CreateIncidentTypeRequest) | [CreateIncidentTypeResponse](#psim-api-v1-CreateIncidentTypeResponse) | CreateIncidentType creates an incident type. |
 | UpdateIncidentType | [UpdateIncidentTypeRequest](#psim-api-v1-UpdateIncidentTypeRequest) | [UpdateIncidentTypeResponse](#psim-api-v1-UpdateIncidentTypeResponse) | UpdateIncidentType replaces an incident type (If-Match required). |
@@ -6328,6 +6444,7 @@ Each record is the full active object; consumers apply it atomically between inp
 | retention | [RetentionSettings](#psim-config-v1-RetentionSettings) |  | Key &#34;retention/&lt;tenant_id&gt;&#34;. |
 | processing | [ProcessingSettings](#psim-config-v1-ProcessingSettings) |  | Key &#34;processing/&lt;tenant_id&gt;&#34;. |
 | maintenance_window | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) |  | Key &#34;maintenance/&lt;tenant_id&gt;/&lt;maintenance_id&gt;&#34;; terminal versions remain for replay. |
+| incident_type | [psim.incident.v1.IncidentType](#psim-incident-v1-IncidentType) |  | Key &#34;incident-type/&lt;tenant_id&gt;/&lt;incident_type_id&gt;&#34;. |
 
 
 
@@ -7173,6 +7290,8 @@ Every event carries the incident state after the change; envelope.sequence = inc
 | incident_reopened | [IncidentReopened](#psim-incident-v1-IncidentReopened) |  |  |
 | incident_closed | [IncidentClosed](#psim-incident-v1-IncidentClosed) |  |  |
 | incident_blocking_steps_changed | [IncidentBlockingStepsChanged](#psim-incident-v1-IncidentBlockingStepsChanged) |  |  |
+| incident_transfer_requested | [IncidentTransferRequested](#psim-incident-v1-IncidentTransferRequested) |  |  |
+| incident_transfer_confirmed | [IncidentTransferConfirmed](#psim-incident-v1-IncidentTransferConfirmed) |  |  |
 
 
 
@@ -7231,6 +7350,38 @@ IncidentReopened is published on transition from resolved back to in_progress.
 
 ### IncidentResolved
 IncidentResolved is published on transition to resolved.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [Incident](#psim-incident-v1-Incident) |  |  |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentTransferConfirmed"></a>
+
+### IncidentTransferConfirmed
+IncidentTransferConfirmed changes responsibility after recipient confirmation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [Incident](#psim-incident-v1-Incident) |  |  |
+| previous_assignee_id | [string](#string) |  |  |
+| transfer_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentTransferRequested"></a>
+
+### IncidentTransferRequested
+IncidentTransferRequested preserves the current assignee.
 
 
 | Field | Type | Label | Description |

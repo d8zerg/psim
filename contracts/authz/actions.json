@@ -1,0 +1,65 @@
+{
+  "incident.read": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "incident.types.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "auditor"
+  ],
+  "incident.types.write": [
+    "admin"
+  ],
+  "incident.acknowledge": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.start-work": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.assign": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.comment": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.link": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.resolve": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.reopen": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.request-transfer": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.confirm-transfer": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.close": [
+    "supervisor"
+  ],
+  "incident.set-priority": [
+    "supervisor"
+  ],
+  "command.request": [
+    "operator",
+    "supervisor"
+  ],
+  "command.confirm": [
+    "supervisor"
+  ]
+}
