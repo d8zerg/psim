@@ -168,6 +168,9 @@
     - [GetEventResponse](#psim-api-v1-GetEventResponse)
     - [ListIncidentEventsRequest](#psim-api-v1-ListIncidentEventsRequest)
     - [ListIncidentEventsResponse](#psim-api-v1-ListIncidentEventsResponse)
+    - [RuleStatistic](#psim-api-v1-RuleStatistic)
+    - [RuleStatisticsRequest](#psim-api-v1-RuleStatisticsRequest)
+    - [RuleStatisticsResponse](#psim-api-v1-RuleStatisticsResponse)
     - [SearchEventsRequest](#psim-api-v1-SearchEventsRequest)
     - [SearchEventsResponse](#psim-api-v1-SearchEventsResponse)
     - [StoredEvent](#psim-api-v1-StoredEvent)
@@ -2929,6 +2932,8 @@ GetEventRequest is the request of GetEvent.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | event_id | [string](#string) |  |  |
+| from | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Optional explicit interval; the default covers the last 90 days. |
+| to | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -2961,6 +2966,8 @@ ListIncidentEventsRequest is the request of ListIncidentEvents.
 | incident_id | [string](#string) |  |  |
 | page_size | [int32](#int32) |  |  |
 | page_token | [string](#string) |  |  |
+| from | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| to | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -2976,6 +2983,64 @@ ListIncidentEventsResponse is the response of ListIncidentEvents.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | events | [StoredEvent](#psim-api-v1-StoredEvent) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+| unavailable_event_ids | [string](#string) | repeated | References whose event body has not arrived or has expired; no body is fabricated. |
+
+
+
+
+
+
+<a name="psim-api-v1-RuleStatistic"></a>
+
+### RuleStatistic
+RuleStatistic counts each deterministic signal identity once.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| rule_id | [string](#string) |  |  |
+| rule_version | [uint32](#uint32) |  |  |
+| signal_count | [uint64](#uint64) |  |  |
+| event_reference_count | [uint64](#uint64) |  |  |
+| first_fired_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| last_fired_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-RuleStatisticsRequest"></a>
+
+### RuleStatisticsRequest
+RuleStatisticsRequest selects rule versions in a bounded interval.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| from | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| to | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| site_ids | [string](#string) | repeated |  |
+| zone_ids | [string](#string) | repeated |  |
+| rule_ids | [string](#string) | repeated |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-RuleStatisticsResponse"></a>
+
+### RuleStatisticsResponse
+RuleStatisticsResponse groups firings by immutable rule version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| statistics | [RuleStatistic](#psim-api-v1-RuleStatistic) | repeated |  |
 | next_page_token | [string](#string) |  |  |
 
 
@@ -3056,6 +3121,7 @@ EventHistoryService searches stored events (ADR-028). Owner: Event History. Scen
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
 | SearchEvents | [SearchEventsRequest](#psim-api-v1-SearchEventsRequest) | [SearchEventsResponse](#psim-api-v1-SearchEventsResponse) | SearchEvents searches events by location, device, type and time; newest first. |
+| RuleStatistics | [RuleStatisticsRequest](#psim-api-v1-RuleStatisticsRequest) | [RuleStatisticsResponse](#psim-api-v1-RuleStatisticsResponse) | RuleStatistics aggregates firings within the caller&#39;s tenant, scope and interval. |
 | GetEvent | [GetEventRequest](#psim-api-v1-GetEventRequest) | [GetEventResponse](#psim-api-v1-GetEventResponse) | GetEvent returns one event. |
 | ListIncidentEvents | [ListIncidentEventsRequest](#psim-api-v1-ListIncidentEventsRequest) | [ListIncidentEventsResponse](#psim-api-v1-ListIncidentEventsResponse) | ListIncidentEvents returns source events of all signals of an incident. |
 

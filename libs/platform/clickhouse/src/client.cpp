@@ -189,9 +189,22 @@ asio::awaitable<Result<ResultSet>> Pool::select(Select query) {
   if (!native) {
     co_return std::unexpected(native.error());
   }
+  co_return co_await query_native(*native);
+}
+
+asio::awaitable<Result<ResultSet>> Pool::read(Read query) {
+  auto native = detail::read_query(query, state_->options);
+  if (!native) {
+    co_return std::unexpected(native.error());
+  }
+  co_return co_await query_native(*native);
+}
+
+asio::awaitable<Result<ResultSet>> Pool::query_native(::clickhouse::Query query) {
+  auto state = state_;
   const auto started = std::chrono::steady_clock::now();
   auto result = co_await state->run<ResultSet>(
-      [statement = *native, config = state->options](::clickhouse::Client& client) mutable -> Result<ResultSet> {
+      [statement = query, config = state->options](::clickhouse::Client& client) mutable -> Result<ResultSet> {
         ResultSet rows;
         std::optional<Error> failure;
         const auto deadline = std::chrono::steady_clock::now() + config.query_timeout;

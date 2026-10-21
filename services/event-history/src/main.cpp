@@ -14,8 +14,10 @@
 #include <memory>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "events.hpp"
+#include "facts.hpp"
 #include "psim/config/v1/config.pb.h"
 #include "psim/platform/clickhouse/client.hpp"
 #include "psim/platform/clickhouse/loader.hpp"
@@ -29,6 +31,7 @@
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/stream/replica.hpp"
 #include "psim/platform/stream/runtime.hpp"
+#include "workers.hpp"
 
 namespace psim::event_history {
 namespace asio = boost::asio;
@@ -49,6 +52,13 @@ std::string settings() {
                                                                   {"clickhouse_private_key_file", ""}}) {
     fields[name] = {{"type", "string"}, {"default", value}};
   }
+  for (const auto* name : {"tls_certificate_file", "tls_private_key_file", "tls_ca_file", "jwks_ca_file",
+                           "history_read_user", "history_read_password_file"}) {
+    fields[name] = {{"type", "string"}, {"default", ""}};
+  }
+  fields["history_batch_messages"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 50000}, {"default", 5000}};
+  fields["history_batch_wait_ms"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 1000}, {"default", 100}};
+  fields["history_api"] = {{"type", "boolean"}, {"default", false}};
   fields["clickhouse_cluster"]["pattern"] = "^[A-Za-z0-9_]{1,64}$";
   fields["clickhouse_port"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 65535}, {"default", 9440}};
   return schema.dump();
@@ -57,8 +67,11 @@ std::string settings() {
 
 class Worker final : public p::stream::Worker {
  public:
-  explicit Worker(const p::runtime::Context& context)
-      : p::stream::Worker(context, "event-history", ""), retry_(executor()), done_(executor()) {}
+  explicit Worker(const p::runtime::Context& context, bool facts = false)
+      : p::stream::Worker(context, facts ? "history-facts" : "event-history", ""),
+        facts_mode_(facts),
+        retry_(executor()),
+        done_(executor()) {}
 
   bool ready() const override { return p::stream::Worker::ready() && healthy_.load(); }
 
@@ -77,7 +90,9 @@ class Worker final : public p::stream::Worker {
       co_return initialized;
     }
     const auto& config = context().config();
-    metrics_ = std::make_unique<p::clickhouse::Metrics>(context().metrics().registry());
+    if (!facts_mode_) {
+      metrics_ = std::make_unique<p::clickhouse::Metrics>(context().metrics().registry());
+    }
     destination_ = std::make_unique<p::clickhouse::Pool>(
         &context().blocking(),
         p::clickhouse::PoolOptions{
@@ -92,7 +107,7 @@ class Worker final : public p::stream::Worker {
         metrics_.get());
     const auto cluster = config.get<std::string>("settings.clickhouse_cluster");
     p::clickhouse::Migrator migrator(destination_.get(), journal_.get(), "event_history_" + cluster);
-    auto migrated = co_await migrator.apply({migration(cluster)});
+    auto migrated = co_await migrator.apply({migration(cluster), facts_migration(cluster)});
     if (!migrated) {
       co_return migrated;
     }
@@ -101,15 +116,23 @@ class Worker final : public p::stream::Worker {
         co_await p::stream::Replica::open(executor(), kafka_options("history-control"), deps, {"psim.config.v1"},
                                           [this](const p::kafka::Message& message) -> p::Result<void> {
                                             auto record = decode<config::v1::ConfigRecord>(message);
-                                            return record ? events_.config(*record) : std::unexpected(record.error());
+                                            if (!record) {
+                                              return std::unexpected(record.error());
+                                            }
+                                            return facts_mode_ ? facts_.config(*record) : events_.config(*record);
                                           });
     if (!control) {
       co_return std::unexpected(control.error());
     }
     control_ = std::move(*control);
-    auto options = kafka_options("event-history-" + config.get<std::string>("service.instance"));
+    auto options = kafka_options(std::string(facts_mode_ ? "history-facts-" : "event-history-")
+                                 + config.get<std::string>("service.instance"));
     auto consumer = p::kafka::Consumer::create(
-        executor(), {.client = options, .group_id = "psim-event-history", .topics = {"psim.events.normalized.v1"}},
+        executor(),
+        {.client = options,
+         .group_id = facts_mode_ ? "psim-history-facts" : "psim-event-history",
+         .topics = facts_mode_ ? std::vector<std::string>{"psim.signals.v1", "psim.incidents.events.v1"}
+                               : std::vector<std::string>{"psim.events.normalized.v1"}},
         deps);
     if (!consumer) {
       co_return std::unexpected(consumer.error());
@@ -128,13 +151,15 @@ class Worker final : public p::stream::Worker {
     loader_ = std::make_unique<p::clickhouse::Loader>(
         destination_.get(), journal_.get(), consumer_.get(), output_.get(),
         p::clickhouse::LoaderOptions{
-            .name = "events_v1",
-            .table = "events",
+            .name = facts_mode_ ? "history_facts_v1" : "events_v1",
+            .table = facts_mode_ ? "history_facts" : "events",
             .dlq = "psim.dlq.event-history.v1",
-            .max_messages = 5000,
+            .max_messages = config.get<std::size_t>("settings.history_batch_messages"),
             .max_bytes = std::min<std::size_t>(std::size_t{8} * 1024 * 1024,
-                                               (config.get<std::size_t>("settings.pg_max_result_bytes") - 65536) / 2)},
-        [this](auto messages) { return events_.convert(messages); }, metrics_.get());
+                                               (config.get<std::size_t>("settings.pg_max_result_bytes") - 65536) / 2),
+            .flush_after = std::chrono::milliseconds(config.get<int>("settings.history_batch_wait_ms"))},
+        [this](auto messages) { return facts_mode_ ? facts_.convert(messages) : events_.convert(messages); },
+        metrics_.get());
     running_ = true;
     healthy_.store(true);
     asio::co_spawn(executor(), run(), [this](const std::exception_ptr& error) {
@@ -201,6 +226,8 @@ class Worker final : public p::stream::Worker {
   }
 
  private:
+  bool facts_mode_ = false;
+  Facts facts_;
   Events events_;
   asio::steady_timer retry_, done_;
   std::atomic_bool healthy_{false};
@@ -223,6 +250,11 @@ int main(int argc, char** argv) {
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
                                          result.push_back(std::make_unique<psim::event_history::Worker>(context));
+                                         result.push_back(std::make_unique<psim::event_history::Worker>(context, true));
+                                         result.push_back(psim::event_history::history_retention(context));
+                                         if (context.config().get<bool>("settings.history_api")) {
+                                           result.push_back(psim::event_history::history_http(context));
+                                         }
                                          return result;
                                        }});
 }

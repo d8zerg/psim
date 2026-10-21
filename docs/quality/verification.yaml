@@ -238,7 +238,7 @@ methods:
     env: E-CLUSTER
     gate: release
     barrier: automated
-    task: task load:history-search
+    task: task history:bench
     steps: ['5.4']
   - id: L-09
     kind: load
@@ -975,6 +975,17 @@ methods:
     steps: ['5.3']
     purpose: Жизненный цикл инцидентов, общая авторизация и сохранение ответственности
 
+  - id: TS-29
+    kind: test
+    name: История событий и связи инцидентов
+    criteria: Реальные загрузчики, Kafka, ClickHouse и PostgreSQL; поиск и статистика ограничены областью; сигналы продлевают TTL; SIGKILL и повторы сохраняют полное множество связей без логических дубликатов
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task history:test
+    steps: ['5.4']
+    purpose: Полный контекст инцидента, поиск и долговечное продление хранения
+
 goals:
   # --- Plan 1.3: SLO --------------------------------------------------------
   - {id: G-01, source: '1.3', attribute: 'Пропускная способность', methods: [L-01, L-02, L-03, L-04, L-06, B-01, B-03]}
@@ -999,14 +1010,14 @@ goals:
   - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09]}
 
 scenarios:
-  - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28]}
-  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24]}
+  - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29]}
+  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29]}
   - {id: S3, methods: [TS-09, TS-10, L-02]}
   - {id: S4, methods: [TS-07, TS-10, L-02, TS-20, TS-23]}
-  - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28]}
+  - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28, TS-29]}
   - {id: S6, methods: [L-05, TS-11, TS-12, TS-19]}
-  - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28]}
-  - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23]}
+  - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29]}
+  - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29]}
   - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21, TS-28]}
   - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28]}
   - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24]}

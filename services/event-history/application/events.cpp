@@ -54,6 +54,10 @@ p::Result<void> Events::config(const config::v1::ConfigRecord& record) {
                      "event retention must be whole seconds between one second and ten years");
     }
   }
+  if (value.event_history_significant().seconds() < value.event_history_all().seconds()) {
+    return p::fail(p::ErrorCode::kProcessingPayloadInvalid,
+                   "significant retention cannot be shorter than ordinary retention");
+  }
   const auto& tenant = record.envelope().tenant_id();
   if (!p::stream::uuid(tenant) || (!retention_.contains(tenant) && retention_.size() >= 100000)) {
     return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "invalid retention tenant or replica capacity exceeded");

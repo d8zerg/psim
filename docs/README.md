@@ -27,6 +27,7 @@
 - [Рабочая корреляция и восстановление состояния](engineering/live-correlation.md)
 - [Resource Catalog: ресурсы, планы и обслуживание](engineering/resource-catalog.md)
 - [Incident Service](engineering/incident-service.md)
+- [Поиск истории и связь с инцидентами](engineering/event-history.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 
 ## Архитектура

@@ -50,6 +50,7 @@ using LoadObserver = std::function<void(LoadStage)>;
 /// A bounded batch at a time. PostgreSQL stores only unfinished native blocks/DLQ records,
 /// fixing boundaries before insertion. The same bytes/token survive crashes and rebalances.
 /// A transactionally initialized Kafka producer atomically publishes DLQ and commits offsets.
+/// Without rejected records, a regular offset commit follows the durable insert confirmation.
 /// Call run_once repeatedly, stop on errors and retry with backoff. Caller owns dependencies.
 class Loader {
  public:

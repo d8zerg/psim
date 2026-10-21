@@ -419,6 +419,48 @@ channels:
       cluster: 3
       single: 1
     x-psim-semantics: ALO
+  dlqEventHistoryV1:
+    address: psim.dlq.event-history.v1
+    title: Dead letters of stage event-history
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.event-history.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqHistoryRetentionV1:
+    address: psim.dlq.history-retention.v1
+    title: Dead letters of stage history-retention
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.history-retention.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
   dlqIncidentV1:
     address: psim.dlq.incident.v1
     title: Dead letters of stage incident
@@ -429,6 +471,27 @@ channels:
     bindings:
       kafka:
         topic: psim.dlq.incident.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqIncidentResponseV1:
+    address: psim.dlq.incident-response.v1
+    title: Dead letters of stage incident-response
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.incident-response.v1
         partitions: 3
         replicas: 3
         topicConfiguration:

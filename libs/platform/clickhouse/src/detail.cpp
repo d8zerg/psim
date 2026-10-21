@@ -109,6 +109,38 @@ Result<::clickhouse::Query> select_query(const Select& query, const PoolOptions&
   return native;
 }
 
+Result<::clickhouse::Query> read_query(const Read& query, const PoolOptions& options) {
+  if (!query.statement.starts_with("SELECT ") || query.statement.size() > 32768
+      || query.statement.find(';') != std::string::npos || query.tenant.empty() || query.tenant.size() > 256
+      || query.from_ms < 0 || query.from_ms >= query.to_ms || query.parameters.size() > 64
+      || query.statement.find("{psim_tenant:String}") == std::string::npos
+      || query.statement.find("{psim_from:Int64}") == std::string::npos
+      || query.statement.find("{psim_to:Int64}") == std::string::npos) {
+    return fail(ErrorCode::kCommonInvalidArgument, "invalid scoped ClickHouse read");
+  }
+  ::clickhouse::QueryParams parameters;
+  for (const auto& [name, value] : query.parameters) {
+    if (!identifier(name) || name.starts_with("psim_") || value.size() > 131072) {
+      return fail(ErrorCode::kCommonInvalidArgument, "invalid ClickHouse read parameter");
+    }
+    parameters.emplace(name, value);
+  }
+  parameters.emplace("psim_tenant", query.tenant);
+  parameters.emplace("psim_from", std::to_string(query.from_ms));
+  parameters.emplace("psim_to", std::to_string(query.to_ms));
+  ::clickhouse::Query native(query.statement);
+  native.SetParams(std::move(parameters));
+  native.SetSetting("readonly", {"1", 1});
+  native.SetSetting("max_execution_time",
+                    {std::to_string(std::max<std::int64_t>(1, (options.query_timeout.count() + 999) / 1000)), 1});
+  native.SetSetting("max_result_rows", {std::to_string(options.max_result_rows), 1});
+  native.SetSetting("max_result_bytes", {std::to_string(options.max_result_bytes), 1});
+  native.SetSetting("result_overflow_mode", {"throw", 1});
+  native.SetSetting("max_threads", {"2", 1});
+  native.SetSetting("max_block_size", {"8192", 1});
+  return native;
+}
+
 std::string fingerprint(std::string_view value) {
   std::array<unsigned char, EVP_MAX_MD_SIZE> digest{};
   unsigned int size = 0;

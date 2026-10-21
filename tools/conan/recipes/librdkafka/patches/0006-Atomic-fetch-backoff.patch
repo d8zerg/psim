@@ -1,0 +1,13 @@
+diff --git a/src/rdkafka_partition.h b/src/rdkafka_partition.h
+--- a/src/rdkafka_partition.h
++++ b/src/rdkafka_partition.h
+@@ -313,7 +313,8 @@ struct rd_kafka_toppar_s {
+                                            * Locality: broker thread
+                                            */
+ 
+-        rd_ts_t rktp_ts_fetch_backoff; /* Back off fetcher for
++        /* Updated by both broker fetch errors and main-thread seek handling. */
++        _Atomic rd_ts_t rktp_ts_fetch_backoff; /* Back off fetcher for
+                                         * this partition until this
+                                         * absolute timestamp
+                                         * expires. */

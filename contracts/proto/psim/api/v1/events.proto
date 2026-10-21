@@ -14,6 +14,10 @@ service EventHistoryService {
   rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse) {
     option (google.api.http) = {get: "/v1/events"};
   }
+  // RuleStatistics aggregates firings within the caller's tenant, scope and interval.
+  rpc RuleStatistics(RuleStatisticsRequest) returns (RuleStatisticsResponse) {
+    option (google.api.http) = {get: "/v1/events/rule-statistics"};
+  }
   // GetEvent returns one event.
   rpc GetEvent(GetEventRequest) returns (GetEventResponse) {
     option (google.api.http) = {get: "/v1/events/{event_id}"};
@@ -60,6 +64,9 @@ message SearchEventsResponse {
 // GetEventRequest is the request of GetEvent.
 message GetEventRequest {
   string event_id = 1 [(buf.validate.field).string.uuid = true];
+  // Optional explicit interval; the default covers the last 90 days.
+  google.protobuf.Timestamp from = 2;
+  google.protobuf.Timestamp to = 3;
 }
 
 // GetEventResponse is the response of GetEvent.
@@ -72,10 +79,41 @@ message ListIncidentEventsRequest {
   string incident_id = 1 [(buf.validate.field).string.uuid = true];
   int32 page_size = 2;
   string page_token = 3;
+  google.protobuf.Timestamp from = 4;
+  google.protobuf.Timestamp to = 5;
 }
 
 // ListIncidentEventsResponse is the response of ListIncidentEvents.
 message ListIncidentEventsResponse {
   repeated StoredEvent events = 1;
+  string next_page_token = 2;
+  // References whose event body has not arrived or has expired; no body is fabricated.
+  repeated string unavailable_event_ids = 3;
+}
+
+// RuleStatisticsRequest selects rule versions in a bounded interval.
+message RuleStatisticsRequest {
+  google.protobuf.Timestamp from = 1 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp to = 2 [(buf.validate.field).required = true];
+  repeated string site_ids = 3;
+  repeated string zone_ids = 4;
+  repeated string rule_ids = 5;
+  int32 page_size = 6;
+  string page_token = 7;
+}
+
+// RuleStatistic counts each deterministic signal identity once.
+message RuleStatistic {
+  string rule_id = 1;
+  uint32 rule_version = 2;
+  uint64 signal_count = 3;
+  uint64 event_reference_count = 4;
+  google.protobuf.Timestamp first_fired_at = 5;
+  google.protobuf.Timestamp last_fired_at = 6;
+}
+
+// RuleStatisticsResponse groups firings by immutable rule version.
+message RuleStatisticsResponse {
+  repeated RuleStatistic statistics = 1;
   string next_page_token = 2;
 }

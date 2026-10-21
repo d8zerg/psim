@@ -55,7 +55,7 @@ asio::awaitable<void> work(std::string table, std::string topic, std::string dlq
                      .max_messages = stage < 0 ? 3U : 26U,
                      .flush_after = ch::Duration(500)},
                     ch_testing::convert, nullptr, [stage](ch::LoadStage point) {
-                      if (static_cast<int>(point) == stage) {
+                      if (stage >= 0 && static_cast<int>(point) == stage % 4) {
                         (void)std::raise(SIGSTOP);  // NOLINT(misc-include-cleaner): POSIX checkpoint signal
                       }
                     });
@@ -66,7 +66,8 @@ asio::awaitable<void> work(std::string table, std::string topic, std::string dlq
       continue;
     }
     const auto committed = ch_testing::take(co_await consumer->committed({{topic, 0}}, ch::Duration(5000)));
-    if (committed.contains({topic, 0}) && committed.at({topic, 0}) == 26) {
+    const auto expected = stage >= 4 || stage == -2 ? 25 : 26;
+    if (committed.contains({topic, 0}) && committed.at({topic, 0}) == expected) {
       auto lease = ch_testing::take(co_await journal.acquire());
       auto rows = ch_testing::take(
           co_await lease->query({.sql = "SELECT count(*) FROM psim_clickhouse.pending_batches WHERE loader=$1",

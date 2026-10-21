@@ -2,6 +2,7 @@
 
 #include <boost/asio/awaitable.hpp>
 #include <clickhouse/block.h>
+#include <clickhouse/query.h>
 
 #include <chrono>
 #include <cstddef>
@@ -57,6 +58,16 @@ struct Select {
   bool final = true;
 };
 
+/// Fixed, reviewed SELECT text with native parameters. Scope values are reserved and supplied
+/// separately; request data must never become statement text.
+struct Read {
+  std::string statement;
+  std::string tenant;
+  std::int64_t from_ms = 0;
+  std::int64_t to_ms = 0;
+  std::map<std::string, std::string> parameters{};
+};
+
 struct ResultSet {
   std::vector<::clickhouse::Block> blocks{};
   std::size_t rows = 0;
@@ -76,12 +87,14 @@ class Pool {
   ~Pool();
 
   asio::awaitable<Result<ResultSet>> select(Select query);
+  asio::awaitable<Result<ResultSet>> read(Read query);
   asio::awaitable<Result<void>> insert(std::string table, ::clickhouse::Block block, std::string token);
   /// Trusted deployment/migration SQL only. Never pass request data to this administrative API.
   asio::awaitable<Result<void>> execute_ddl(std::string statement);
   void close();
 
  private:
+  asio::awaitable<Result<ResultSet>> query_native(::clickhouse::Query query);
   struct State;
   std::shared_ptr<State> state_;
 };

@@ -108,6 +108,9 @@ includes:
   contracts:
     taskfile: ./contracts/Taskfile.yml
     dir: ./contracts
+  history:
+    taskfile: ./tools/taskfiles/history.yml
+    dir: .
   incidents:
     taskfile: ./tools/taskfiles/incidents.yml
     dir: .

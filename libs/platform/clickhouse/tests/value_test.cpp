@@ -57,6 +57,30 @@ TEST(ClickHouseValues, NativeParametersKeepBinaryAndSqlInjectionOutOfText) {
   EXPECT_TRUE(detail::identifier("_event_1"));
 }
 
+TEST(ClickHouseValues, ScopedReadReservesScopeParametersAndRestrictsStatements) {
+  Read query{.statement =
+                 // psim-arch: allow-sql (negative test of statement validation)
+             "SELECT tenant_id FROM events WHERE tenant_id={psim_tenant:String} AND "
+             "occurred_at>=fromUnixTimestamp64Milli({psim_from:Int64}) AND "
+             "occurred_at<fromUnixTimestamp64Milli({psim_to:Int64}) AND event_id={id:String}",
+             .tenant = "tenant",
+             .from_ms = 1,
+             .to_ms = 2,
+             .parameters = {{"id", "' OR 1=1 --"}}};
+  auto native = detail::read_query(query, {});
+  ASSERT_TRUE(native);
+  EXPECT_EQ(native->GetText().find("' OR 1=1"), std::string::npos);
+  EXPECT_EQ(native->GetParams().at("psim_tenant"), "tenant");
+  query.parameters["psim_tenant"] = "other";
+  EXPECT_FALSE(detail::read_query(query, {}));
+  query.parameters.erase("psim_tenant");
+  query.statement += "; DROP TABLE events";
+  EXPECT_FALSE(detail::read_query(query, {}));
+  // psim-arch: allow-sql (negative test of missing mandatory scope)
+  query.statement = "SELECT 1";
+  EXPECT_FALSE(detail::read_query(query, {}));
+}
+
 TEST(ClickHouseValues, NativeJournalRoundTripAndCorruptionBounds) {
   const auto data = block();
   const auto bytes = take(detail::encode(data, 4096));

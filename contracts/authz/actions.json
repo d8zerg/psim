@@ -61,5 +61,16 @@
   ],
   "command.confirm": [
     "supervisor"
+  ],
+  "event.read": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "rule.statistics.read": [
+    "supervisor",
+    "integrator",
+    "admin",
+    "auditor"
   ]
 }

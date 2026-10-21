@@ -218,31 +218,39 @@ asio::awaitable<Result<void>> Loader::deliver(kafka::TopicPartition partition) {
     if (observer_) {
       observer_(LoadStage::kApplied);
     }
-    auto begun = dlq_->begin_transaction();
-    if (!begun) {
-      co_return std::unexpected(begun.error());
-    }
-    for (const auto& record : document.at("rejected")) {
-      kafka::Headers headers;
-      for (const auto& header : record.at("headers")) {
-        headers.emplace_back(unbinary(header.at(0)), unbinary(header.at(1)));
+    if (document.at("rejected").empty()) {
+      // The journal already confirms the insert; no Kafka output needs an atomic offset commit.
+      auto offset_commit = co_await source_->commit({{partition, *next}});
+      if (!offset_commit) {
+        co_return std::unexpected(offset_commit.error());
       }
-      auto sent = co_await dlq_->enqueue({.topic = options_.dlq,
-                                          .key = unbinary(record.at("key")),
-                                          .value = unbinary(record.at("value")),
-                                          .headers = std::move(headers)});
-      if (!sent) {
+    } else {
+      auto begun = dlq_->begin_transaction();
+      if (!begun) {
+        co_return std::unexpected(begun.error());
+      }
+      for (const auto& record : document.at("rejected")) {
+        kafka::Headers headers;
+        for (const auto& header : record.at("headers")) {
+          headers.emplace_back(unbinary(header.at(0)), unbinary(header.at(1)));
+        }
+        auto sent = co_await dlq_->enqueue({.topic = options_.dlq,
+                                            .key = unbinary(record.at("key")),
+                                            .value = unbinary(record.at("value")),
+                                            .headers = std::move(headers)});
+        if (!sent) {
+          (void)co_await dlq_->abort_transaction(options_.kafka_timeout);
+          co_return std::unexpected(sent.error());
+        }
+        if (metrics_ != nullptr) {
+          metrics_->dead_letter();
+        }
+      }
+      auto offset_commit = co_await dlq_->commit_transaction(source_, {{partition, *next}}, options_.kafka_timeout);
+      if (!offset_commit) {
         (void)co_await dlq_->abort_transaction(options_.kafka_timeout);
-        co_return std::unexpected(sent.error());
+        co_return std::unexpected(offset_commit.error());
       }
-      if (metrics_ != nullptr) {
-        metrics_->dead_letter();
-      }
-    }
-    auto offset_commit = co_await dlq_->commit_transaction(source_, {{partition, *next}}, options_.kafka_timeout);
-    if (!offset_commit) {
-      (void)co_await dlq_->abort_transaction(options_.kafka_timeout);
-      co_return std::unexpected(offset_commit.error());
     }
     if (observer_) {
       observer_(LoadStage::kCommitted);
@@ -291,21 +299,16 @@ asio::awaitable<Result<std::size_t>> Loader::run_once() {
   while (messages.size() < options_.max_messages && bytes < options_.max_bytes) {
     const auto left =
         std::max(Duration(1), std::chrono::duration_cast<Duration>(deadline - std::chrono::steady_clock::now()));
-    auto batch = co_await source_->poll(1, left);
+    auto batch = co_await source_->poll(std::min<std::size_t>(512, options_.max_messages - messages.size()), left);
     if (!batch) {
       co_return std::unexpected(batch.error());
     }
     for (auto& message : *batch) {
       retry_offsets_.try_emplace(message.topic_partition(), message.offset());
       const auto size = message.value().size() + message.key().size();
-      if (!messages.empty() && size > options_.max_bytes - bytes) {
-        auto rewind_extra =
-            co_await source_->seek_and_wait({{message.topic_partition(), message.offset()}}, options_.kafka_timeout);
-        if (!rewind_extra) {
-          co_return std::unexpected(rewind_extra.error());
-        }
-        bytes = options_.max_bytes;
-        break;
+      if (bytes >= options_.max_bytes || (!messages.empty() && size > options_.max_bytes - bytes)) {
+        bytes = std::max(bytes, options_.max_bytes);
+        continue;
       }
       bytes += size;
       messages.push_back(std::move(message));
@@ -316,6 +319,11 @@ asio::awaitable<Result<std::size_t>> Loader::run_once() {
   }
   // Rewind immediately: any conversion/insert/commit error is retryable in the same process.
   kafka::Offsets first;
+  for (const auto& [partition, offset] : retry_offsets_) {
+    if (source_->assignment().contains(partition)) {
+      first.emplace(partition, offset);
+    }
+  }
   std::map<kafka::TopicPartition, std::vector<const kafka::Message*>> groups;
   for (const auto& message : messages) {
     if (!source_->assignment().contains(message.topic_partition())) {

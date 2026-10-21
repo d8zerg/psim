@@ -1,0 +1,36 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-history-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Event history, causal links, scope, retention and crash recovery on two real instances
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/history/check.py {{.PROJECT}} {{.PRESET}} 1000
+  bench:
+    desc: Release history search over one day during at least 50000 persisted events per second
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/history/check.py {{.PROJECT}}-bench release 1000 bench
+  sanitizers:
+    desc: Unit and real history checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_event_history_test|psim_platform_clickhouse_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Combine history conversion, API, retention and service coverage
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_event_history_test|psim_platform_clickhouse_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/event-history' --component

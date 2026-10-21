@@ -67,14 +67,14 @@ void worker(const std::string& table, const std::string& topic, const std::strin
 }  // namespace
 
 TEST(ClickHouseCrashRecovery, SigkillAtEveryBoundaryReplaysExactBatchAndCommitsDlqOnce) {
-  for (int stage = 0; stage < 4; ++stage) {
+  for (int stage = 0; stage < 8; ++stage) {
     SCOPED_TRACE(stage);
     kafka::testing::Topics topics;
     const auto topic = topics.create("ch.crash.input", 1);
     const auto dlq = topics.create("ch.crash.dlq", 1);
     const auto group = kafka::testing::unique("ch.crash.group");
     const auto table = "chcrash_" + detail::fingerprint(group).substr(0, 20);
-    auto setup = [](std::string table, std::string topic) -> asio::awaitable<void> {
+    auto setup = [](std::string table, std::string topic, bool rejected) -> asio::awaitable<void> {
       async::BlockingPool blocking(2, 8);
       Pool pool(&blocking, options());
       pg::Pool journal(journal_options());
@@ -92,12 +92,14 @@ TEST(ClickHouseCrashRecovery, SigkillAtEveryBoundaryReplaysExactBatchAndCommitsD
         check(co_await producer->enqueue(
             {.topic = topic, .key = std::to_string(index), .value = serde.serialize(record), .partition = 0}));
       }
-      check(co_await producer->enqueue({.topic = topic, .key = "bad", .value = "invalid-protobuf", .partition = 0}));
+      if (rejected) {
+        check(co_await producer->enqueue({.topic = topic, .key = "bad", .value = "invalid-protobuf", .partition = 0}));
+      }
       check(co_await producer->flush(Duration(30000)));
     };
-    run(setup(table, topic));
+    run(setup(table, topic, stage < 4));
     worker(table, topic, dlq, group, stage);
-    worker(table, topic, dlq, group, -1);
+    worker(table, topic, dlq, group, stage < 4 ? -1 : -2);
     auto verify = [](std::string table) -> asio::awaitable<void> {
       async::BlockingPool blocking(2, 8);
       Pool pool(&blocking, options());
@@ -114,8 +116,10 @@ TEST(ClickHouseCrashRecovery, SigkillAtEveryBoundaryReplaysExactBatchAndCommitsD
     };
     run(verify(table));
     const auto rejected = kafka::testing::read_all(dlq, 2, std::chrono::seconds(5), true);
-    ASSERT_EQ(rejected.size(), 1);
-    EXPECT_EQ(rejected[0].second, "invalid-protobuf");
+    ASSERT_EQ(rejected.size(), stage < 4 ? 1 : 0);
+    if (!rejected.empty()) {
+      EXPECT_EQ(rejected[0].second, "invalid-protobuf");
+    }
   }
 }
 }  // namespace psim::platform::clickhouse::testing

@@ -1105,6 +1105,65 @@ paths:
         '500': *id006
         '503': *id007
       summary: SearchEvents searches events by location, device, type and time; newest first
+  /v1/events/rule-statistics:
+    get:
+      tags:
+      - EventHistoryService
+      description: RuleStatistics aggregates firings within the caller's tenant, scope and interval.
+      operationId: EventHistoryService_RuleStatistics
+      parameters:
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: zoneIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: ruleIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: int32
+      - name: pageToken
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.RuleStatisticsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: RuleStatistics aggregates firings within the caller's tenant, scope and interval
   /v1/events/{eventId}:
     get:
       tags:
@@ -1117,6 +1176,17 @@ paths:
         required: true
         schema:
           type: string
+      - name: from
+        in: query
+        description: Optional explicit interval; the default covers the last 90 days.
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
       responses:
         '200':
           description: OK
@@ -1572,6 +1642,16 @@ paths:
         in: query
         schema:
           type: string
+      - name: from
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: to
+        in: query
+        schema:
+          type: string
+          format: date-time
       responses:
         '200':
           description: OK
@@ -4186,6 +4266,11 @@ components:
             $ref: '#/components/schemas/psim.api.v1.StoredEvent'
         nextPageToken:
           type: string
+        unavailableEventIds:
+          type: array
+          items:
+            type: string
+          description: References whose event body has not arrived or has expired; no body is fabricated.
       description: ListIncidentEventsResponse is the response of ListIncidentEvents.
     psim.api.v1.ListIncidentSignalsResponse:
       type: object
@@ -4496,6 +4581,35 @@ components:
         connector:
           $ref: '#/components/schemas/psim.catalog.v1.Connector'
       description: RotateConnectorCertificateResponse is the response of RotateConnectorCertificate.
+    psim.api.v1.RuleStatistic:
+      type: object
+      properties:
+        ruleId:
+          type: string
+        ruleVersion:
+          type: integer
+          format: uint32
+        signalCount:
+          type: string
+        eventReferenceCount:
+          type: string
+        firstFiredAt:
+          type: string
+          format: date-time
+        lastFiredAt:
+          type: string
+          format: date-time
+      description: RuleStatistic counts each deterministic signal identity once.
+    psim.api.v1.RuleStatisticsResponse:
+      type: object
+      properties:
+        statistics:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.RuleStatistic'
+        nextPageToken:
+          type: string
+      description: RuleStatisticsResponse groups firings by immutable rule version.
     psim.api.v1.RuleVersionRef:
       type: object
       properties:

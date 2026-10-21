@@ -12,6 +12,7 @@
 namespace psim::platform::clickhouse::detail {
 [[nodiscard]] bool identifier(std::string_view value);
 [[nodiscard]] Result<::clickhouse::Query> select_query(const Select& query, const PoolOptions& options);
+[[nodiscard]] Result<::clickhouse::Query> read_query(const Read& query, const PoolOptions& options);
 [[nodiscard]] std::string fingerprint(std::string_view value);
 [[nodiscard]] Result<std::string> encode(const ::clickhouse::Block& block, std::size_t limit);
 [[nodiscard]] Result<::clickhouse::Block> decode(std::string_view bytes, std::size_t limit);

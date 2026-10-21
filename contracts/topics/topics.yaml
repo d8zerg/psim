@@ -169,7 +169,7 @@ topics:
 
 dlq:
   # psim.dlq.<stage>.v1: original bytes and key, error in headers.
-  stages: [catalog, normalizer, correlation-router, correlation, history, incident, response, command, notification, audit, projection]
+  stages: [catalog, normalizer, correlation-router, correlation, history, event-history, history-retention, incident, incident-response, response, command, notification, audit, projection]
   partitions: {cluster: 3, single: 1}
   retention: P14D
   headers: [psim-dlq-stage, psim-dlq-error-code, psim-dlq-error, psim-dlq-source-topic, psim-dlq-source-partition, psim-dlq-source-offset, psim-dlq-at]

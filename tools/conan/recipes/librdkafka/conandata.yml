@@ -1,5 +1,8 @@
 patches:
   2.14.2:
+  - patch_file: patches/0006-Atomic-fetch-backoff.patch
+    patch_description: Synchronize broker fetch backoff with main-thread seek handling
+    patch_type: portability
   - patch_file: patches/0005-Atomic-consumer-group-flags.patch
     patch_description: Synchronize shared heartbeat flags with application polling
     patch_type: portability

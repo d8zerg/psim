@@ -1,5 +1,5 @@
 # Derived from Conan Center Index (MIT); see LICENSE.upstream.
-# Atomic consumer-group flags fix the heartbeat/poll data race.
+# Atomic consumer-group flags and fetch backoff synchronize Kafka worker threads.
 from conan import ConanFile
 from conan.tools.cmake import CMake, CMakeDeps, CMakeToolchain, cmake_layout
 from conan.tools.env import VirtualBuildEnv
