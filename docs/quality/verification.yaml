@@ -221,7 +221,7 @@ methods:
     gate: release
     barrier: automated
     task: task gateway:verify
-    steps: ['4.2']
+    steps: ['4.2', '9.1']
   - id: L-07
     kind: load
     name: Импорт 50 000 устройств
@@ -259,6 +259,26 @@ methods:
     task: task load:single-node
     steps: ['10.1']
     purpose: Целевая нагрузка топологии «одна машина» (scaling.md, 5.4)
+  - id: L-11
+    kind: load
+    name: Обработка сигналов Incident Service
+    criteria: Два экземпляра; p99 обработки сигнала ≤ 50 мс; сверка сигналов и инцидентов без потерь и дубликатов после SIGKILL экземпляра
+    env: E-LOCAL
+    gate: release
+    barrier: automated
+    task: task load:incidents
+    steps: ['5.3', '10.1']
+    purpose: Бюджет задержки этапа инцидентов (DoD шага 5.3)
+  - id: L-12
+    kind: load
+    name: Доставка команд коннектору
+    criteria: p99 от запроса команды до доставки коннектору ≤ 200 мс; каждая команда получает финальный статус
+    env: E-LOCAL
+    gate: release
+    barrier: automated
+    task: task load:commands
+    steps: ['6.2', '10.1']
+    purpose: Бюджет задержки команд (DoD шага 6.2)
 
   # --- Chaos ----------------------------------------------------------------
   - id: C-01
@@ -388,6 +408,17 @@ methods:
     barrier: automated
     task: task chaos:correlation-restore
     steps: ['5.2', '10.2']
+  - id: C-15
+    kind: chaos
+    name: Отказ узлов файлового хранилища
+    criteria: Остановка volume-сервера, filer, S3 gateway и master-лидера SeaweedFS под чтением и загрузкой планов; текущие планы читаются,
+      отказ загрузки сохраняет прежнюю версию, после восстановления реплики томов восстановлены и SHA-256 всех версий совпадают
+    env: E-CLUSTER
+    gate: release
+    barrier: automated
+    task: task chaos:filestore
+    steps: ['9.1', '10.2']
+    purpose: Отказоустойчивость хранения планов в кластере (ADR-042, ADR-046)
 
   # --- Benchmarks -----------------------------------------------------------
   - id: B-01
@@ -909,6 +940,28 @@ methods:
     task: task catalog:test
     steps: ['4.4']
     purpose: Два настоящих экземпляра, PostgreSQL, Kafka и S3; резервное копирование и применение подавления проверяются отдельно
+  - id: TS-26
+    kind: test
+    name: Перестроение проекций из Kafka
+    criteria: Проекции, перестроенные проигрыванием Kafka, совпадают с рабочими; старые события не дают ложного online или actual;
+      сквозной сценарий M1 проходит после переноса проекции API Gateway
+    env: E-CI
+    gate: nightly
+    barrier: automated
+    task: task test:projections
+    steps: ['7.3']
+    purpose: Воспроизводимость read-моделей (принцип 6 плана, DoD шага 7.3)
+  - id: TS-27
+    kind: test
+    name: Доставка уведомлений и защита webhook
+    criteria: Email и webhook доставляются через тестовые SMTP и приёмник; отказ и восстановление получателя не теряют и не дублируют
+      уведомления; запрещённые и внутренние адреса webhook отклоняются; доставка фиксируется в аудите
+    env: E-CI
+    gate: nightly
+    barrier: automated
+    task: task test:notifications
+    steps: ['6.3']
+    purpose: DoD шага 6.3 и защита от SSRF
 
 goals:
   # --- Plan 1.3: SLO --------------------------------------------------------
@@ -918,7 +971,7 @@ goals:
   - {id: G-04, source: '1.3', attribute: 'Задержка отклика REST API', methods: [L-05]}
   - {id: G-05, source: '1.3', attribute: 'Потери данных', methods: [TS-07, TS-08, L-03, C-01, C-02, C-06, C-07, C-08, C-10, C-11]}
   - {id: G-06, source: '1.3', attribute: 'Дубликаты инцидентов', methods: [TS-02, TS-07, TS-08, C-02, C-11]}
-  - {id: G-07, source: '1.3', attribute: 'RTO, кластерная топология', methods: [C-01, C-02, C-03, C-11, C-14]}
+  - {id: G-07, source: '1.3', attribute: 'RTO, кластерная топология', methods: [C-01, C-02, C-03, C-11, C-14, C-15]}
   - {id: G-08, source: '1.3', attribute: 'RPO для инцидентов', methods: [C-03, C-11]}
   - {id: G-09, source: '1.3', attribute: 'Обновление', methods: [C-12]}
   - {id: G-10, source: '1.3', attribute: 'Консоль', methods: [TS-15, TS-14]}
@@ -944,6 +997,6 @@ scenarios:
   - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23]}
   - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21]}
   - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24]}
-  - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, TS-14, TS-18, TS-19, TS-22, TS-24]}
+  - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24]}
   - {id: S12, methods: [C-12]}
   - {id: S13, methods: [L-09, TS-10, TS-11, M-05]}

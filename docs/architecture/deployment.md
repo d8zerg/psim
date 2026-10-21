@@ -16,7 +16,7 @@
 | Установщик | Проверка предусловий, генерация конфигурации по профилю топологии, создание топиков и схем БД, загрузка realm Keycloak |
 | Пакет наблюдаемости | Конфигурация Collector, Prometheus, дашборды Grafana, правила алертов, runbook |
 | CLI администратора | `psimctl` |
-| Файловое хранилище | Закрытое S3-совместимое хранилище планов с версиями и независимым резервным копированием; реализация выбирается на шаге 4.4 ([ADR-042](../adr/0042-operational-capabilities.md)) |
+| Файловое хранилище | SeaweedFS с закрытым bucket `psim-plans`; версии планов ведёт Resource Catalog, независимая резервная копия - вне рабочего кластера ([ADR-042](../adr/0042-operational-capabilities.md), [ADR-046](../adr/0046-s3-object-storage.md)) |
 
 Сервисы одинаковы во всех топологиях; различаются конфигурация, число экземпляров и параметры инфраструктуры. Первоначальная настройка включает внешнюю PKI, доверие mTLS и Keycloak по [эксплуатационному регламенту](operational-capabilities.md#6-сертификаты-секреты-и-восстановление-доступа).
 
@@ -33,7 +33,7 @@ flowchart TB
             R[(Redis-совместимое хранилище)]
             CH[(ClickHouse + Keeper)]
             KC[Keycloak]
-            FS[(Файловое хранилище планов)]
+            FS[(SeaweedFS: планы)]
         end
         subgraph APP [Сервисы PSIM: по 1 экземпляру]
             S1[Connector Gateway]
@@ -75,6 +75,7 @@ flowchart TB
         E1[etcd]
         R1[(Redis master/replica)]
         C1[(ClickHouse реплика + Keeper)]
+        F1[(SeaweedFS master, volume, filer, S3)]
     end
     subgraph I2 [infra-2]
         K2[Kafka broker+controller]
@@ -82,6 +83,7 @@ flowchart TB
         E2[etcd]
         R2[(Redis master/replica)]
         C2[(ClickHouse реплика + Keeper)]
+        F2[(SeaweedFS master, volume, filer, S3)]
     end
     subgraph I3 [infra-3]
         K3[Kafka broker+controller]
@@ -89,6 +91,7 @@ flowchart TB
         E3[etcd]
         R3[(Redis master/replica)]
         C3[ClickHouse Keeper]
+        F3[SeaweedFS master]
     end
     subgraph A1 [app-1]
         SA[Экземпляры сервисов PSIM, Keycloak]
@@ -114,7 +117,7 @@ flowchart TB
 | Keycloak | 2 экземпляра, база в PostgreSQL кластера | Уже выданные токены проверяются по кэшу JWKS; новый вход - через оставшийся экземпляр |
 | HAProxy | 2 экземпляра с общим VIP (keepalived) | Переключение VIP за секунды |
 | ClickHouse | 1 шард × 2 реплики (ReplicatedMergeTree) на infra-1 и infra-2; ClickHouse Keeper на трёх узлах инфраструктуры ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) | Чтение и запись переходят на вторую реплику; после восстановления реплика догоняет; загрузчики Kafka догружают накопившееся |
-| Файловое хранилище | S3-совместимый endpoint; выбранная реализация проверяется на отказ узла и восстановление версий на 4.4 и 9.1 | Текущие планы читаются при отказе одного узла; незавершённая замена сохраняет прежнюю версию |
+| Файловое хранилище | SeaweedFS: 3 master (Raft), volume-серверы с репликацией томов на разных узлах, 2 filer и 2 S3 gateway за HAProxy; хранилище метаданных filer и шифрование томов фиксируются ADR шага 9.1 | Текущие планы читаются при отказе одного узла; незавершённая замена сохраняет прежнюю версию |
 | Наблюдаемость | Отдельный узел; не влияет на обработку | Потеря телеметрии на время отказа; сервисы не блокируются экспортом |
 
 Минимальная конфигурация - 3 узла, на которых совмещены инфраструктура и сервисы; эталонная для 50 000 событий/с - 3 узла инфраструктуры + 2 узла приложений + узел наблюдаемости.
@@ -144,6 +147,8 @@ flowchart TB
 | 9234, 9281 | ClickHouse Keeper: межузловой протокол, клиентский протокол TLS | Только узлы ClickHouse |
 | 5432 | PostgreSQL (через HAProxy: 5000 - лидер, 5001 - реплики) | Только сервисы платформы |
 | 6379 | Redis-совместимое хранилище (TLS) | Только сервисы платформы |
+| S3 HTTPS (порт фиксируется на 9.1 без пересечения с 8443) | SeaweedFS S3 gateway | Только сервисы платформы |
+| 9333, 8080, 8888 и gRPC-порты +10000 | SeaweedFS master, volume, filer | Только узлы SeaweedFS |
 | 8081 | Schema Registry | Только сервисы платформы |
 | 4317 | OTel Collector (OTLP gRPC) | Только сервисы платформы |
 | 9090, 3000 | Prometheus, Grafana | Эксплуатация |
