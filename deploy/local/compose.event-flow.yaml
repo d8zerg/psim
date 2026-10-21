@@ -73,6 +73,22 @@ services:
   correlation-engine:
     <<: *event-flow
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
+  correlation-2:
+    <<: *event-flow
+    profiles: [correlation-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: correlation-2
+      PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
+  correlation-3:
+    <<: *event-flow
+    profiles: [correlation-test]
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SERVICE__INSTANCE: correlation-3
+      PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
   rule-management:
     <<: *event-flow
     profiles: [rules-test]

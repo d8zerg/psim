@@ -81,6 +81,9 @@ includes:
   fuzz:
     taskfile: ./tools/taskfiles/fuzz.yml
     dir: .
+  correlation:
+    taskfile: ./tools/taskfiles/correlation.yml
+    dir: .
   rules:
     taskfile: ./tools/taskfiles/rules.yml
     dir: .

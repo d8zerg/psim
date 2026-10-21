@@ -18,8 +18,11 @@ tasks:
         task: test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
   coverage:
-    desc: Measure rule parser, validator, replay and management coverage
+    desc: Measure rule parser, replay, live engine and management coverage
     cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: :correlation:test
+        vars: {PROJECT: '{{.PROJECT}}-live', PRESET: coverage}
       - task: test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :cpp:_run

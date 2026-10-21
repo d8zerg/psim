@@ -42,13 +42,14 @@ void stamp(kafka::Headers& headers, std::string_view stage) {
 }
 
 Worker::Worker(const runtime::Context& context, std::string stage, std::string input, kafka::Semantics semantics,
-               bool broadcast)
+               bool broadcast, std::size_t shard)
     : context_(context),
-      executor_(context.shards().executor(0)),
+      executor_(context.shards().executor(shard)),
       stage_(std::move(stage)),
       input_(std::move(input)),
       semantics_(semantics),
       broadcast_(broadcast),
+      shard_(shard),
       stopped_(executor_) {}
 
 asio::awaitable<Result<void>> Worker::schema(std::string topic) {
@@ -127,11 +128,13 @@ asio::awaitable<Result<void>> Worker::open() {
   const auto& config = context_.config();
   const auto options = kafka_options(stage_ + "-" + config.get<std::string>("service.instance"));
   const auto transactional = semantics_ == kafka::Semantics::kExactlyOnce && !input_.empty();
-  auto producer = kafka::Producer::create(executor_,
-                                          {.client = options,
-                                           .transactional_id = transactional ? options.client_id + "-0" : "",
-                                           .delivery_timeout = std::chrono::milliseconds(10000)},
-                                          {.blocking = &context_.blocking(), .logger = &context_.logger()});
+  auto producer = kafka::Producer::create(
+      executor_,
+      {.client = options,
+       .transactional_id = transactional ? options.client_id + "-" + std::to_string(shard_) : "",
+       .delivery_timeout = std::chrono::milliseconds(10000),
+       .transaction_timeout = transaction_timeout()},
+      {.blocking = &context_.blocking(), .logger = &context_.logger()});
   if (!producer) {
     co_return std::unexpected(producer.error());
   }

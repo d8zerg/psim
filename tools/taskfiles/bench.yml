@@ -118,3 +118,9 @@ tasks:
         vars:
           PROJECT: '{{.PROJECT}}'
           CMD: build/{{.PLATFORM}}/release/libs/platform/clickhouse/psim_clickhouse_throughput {{.ROWS}} 100000
+
+  rules:
+    desc: Rule evaluation of all five kinds with typed expressions (B-04)
+    cmds:
+      - task: compare
+        vars: {BENCHES: psim_correlation_bench}

@@ -6,6 +6,8 @@
 #include <boost/asio/use_future.hpp>
 #include <google/protobuf/util/time_util.h>
 #include <nlohmann/json.hpp>
+#include <psim/common/v1/types.pb.h>
+#include <psim/processing/v1/rules.pb.h>
 
 #include <algorithm>
 #include <chrono>
@@ -163,6 +165,23 @@ asio::awaitable<int> run(std::string mode, std::size_t count, std::string seed) 
     }
     check(
         co_await producer->enqueue(record("psim.config.v1", "mapping/" + std::string(kTenant) + "/simulator", config)));
+    config.clear_mapping_rule_set();
+    auto* rules = config.mutable_rule_set();
+    rules->set_rule_set_id(kType);
+    rules->set_version(1);
+    *rules->mutable_activated_at() = Time::SecondsToTimestamp(1);
+    auto* active = rules->add_rules();
+    active->set_rule_id("66666666-6666-4666-8666-666666666666");
+    active->set_version(1);
+    active->set_name("Intrusion alarm");
+    active->set_state(psim::processing::v1::RULE_STATE_ACTIVE);
+    active->set_correlation_scope(psim::processing::v1::CORRELATION_SCOPE_ZONE);
+    active->mutable_filter()->add_types("intrusion.zone.alarm");
+    active->mutable_single();
+    active->mutable_output()->set_incident_type_id(kType);
+    active->mutable_output()->set_priority(psim::common::v1::PRIORITY_P2);
+    active->mutable_output()->set_summary_template("Intrusion alarm at Main entrance");
+    check(co_await producer->enqueue(record("psim.config.v1", "ruleset/" + std::string(kTenant), config)));
     check(co_await producer->flush(std::chrono::seconds(30)));
     co_return 0;
   }

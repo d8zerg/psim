@@ -1,6 +1,7 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/io/zero_copy_stream_impl_lite.h>
 #include <google/protobuf/util/time_util.h>
+#include <psim/processing/v1/internal.pb.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -293,6 +294,78 @@ class Replay {
     return std::move(result_);
   }
 
+  p::Result<std::vector<Decision>> step(processing::v1::LiveKeyState& saved, const std::vector<Event>& events,
+                                        std::int64_t until, const Event* inventory) {
+    live_watermark_ = until;
+    State state;
+    for (const auto& candidate : saved.candidates()) {
+      state.events.push_back({&candidate.event(), candidate.mask()});
+    }
+    for (const auto& pending : saved.pending()) {
+      state.pending.push_back({&pending.trigger(), pending.deadline_ms()});
+    }
+    state.subject = saved.has_subject() ? &saved.subject() : nullptr;
+    state.next = saved.next_deadline_ms();
+    state.last_signal = saved.has_last_signal_ms() ? saved.last_signal_ms() : std::numeric_limits<std::int64_t>::min();
+    state.seen = saved.seen();
+    if (inventory != nullptr && state.subject == nullptr) {
+      state.subject = inventory;
+      state.next = occurred(*inventory) + window_;
+    }
+    for (const auto& event : events) {
+      auto selected = matches(rule_->filter, event, *rule_, *context_);
+      if (!selected) {
+        return std::unexpected(selected.error());
+      }
+      if (!*selected) {
+        continue;
+      }
+      if (rule_->rule.has_absence()) {
+        auto timers = due(state, occurred(event), true);
+        if (!timers) {
+          return std::unexpected(timers.error());
+        }
+      }
+      auto consumed = consume(state, event);
+      if (!consumed) {
+        return std::unexpected(consumed.error());
+      }
+      if (state.events.size() + state.pending.size() > limits_.max_events) {
+        return p::fail(kRuleInvalid, "live key event limit exceeded");
+      }
+    }
+    if (auto timers = due(state, until, true); !timers) {
+      return std::unexpected(timers.error());
+    }
+    processing::v1::LiveKeyState next = saved;
+    next.clear_candidates();
+    next.clear_pending();
+    for (const auto& candidate : state.events) {
+      // Closed windows cannot contribute to a later match.
+      if (occurred(*candidate.event) <= until - window_) {
+        continue;
+      }
+      auto* value = next.add_candidates();
+      *value->mutable_event() = *candidate.event;
+      value->set_mask(candidate.mask);
+    }
+    for (const auto& pending : state.pending) {
+      auto* value = next.add_pending();
+      *value->mutable_trigger() = *pending.trigger;
+      value->set_deadline_ms(pending.deadline);
+    }
+    if (state.subject != nullptr) {
+      *next.mutable_subject() = *state.subject;
+    }
+    next.set_next_deadline_ms(state.next);
+    if (state.last_signal != std::numeric_limits<std::int64_t>::min()) {
+      next.set_last_signal_ms(state.last_signal);
+    }
+    next.set_seen(state.seen);
+    saved = std::move(next);
+    return std::move(result_.decisions);
+  }
+
  private:
   std::string key(const Event& event, Scope scope) const {
     const auto id = scope_id(event, *context_, scope);
@@ -333,7 +406,8 @@ class Replay {
 
   p::Result<void> emit(State& state, const Event& latest, std::vector<const Event*> evidence, std::int64_t at,
                        bool absence = false) {
-    if (state.last_signal != std::numeric_limits<std::int64_t>::min() && at - state.last_signal < suppression_) {
+    if (suppression_ > 0 && state.last_signal != std::numeric_limits<std::int64_t>::min()
+        && at - state.last_signal < suppression_) {
       return {};
     }
     if (result_.decisions.size() >= limits_.max_signals) {
@@ -463,7 +537,7 @@ class Replay {
     decision.maintenance_ids.erase(ids_end.begin(), ids_end.end());
     decision.suppressed = !decision.maintenance_ids.empty();
     if (!decision.suppressed) {
-      state.last_signal = at;
+      state.last_signal = std::max(state.last_signal, at);
     }
     result_.decisions.push_back(std::move(decision));
     return {};
@@ -513,8 +587,12 @@ class Replay {
         return std::unexpected(expected.error());
       }
       if (*expected) {
-        state.pending.clear();
-        state.seen = true;
+        std::erase_if(state.pending, [now](const auto& pending) {
+          return occurred(*pending.trigger) <= now && now < pending.deadline;
+        });
+        if (state.subject == nullptr || (now >= state.next - window_ && now < state.next)) {
+          state.seen = true;
+        }
       }
       if (rule_->trigger) {
         auto trigger = matches(*rule_->trigger, event, *rule_, *context_);
@@ -527,7 +605,9 @@ class Replay {
       }
       return {};
     }
-    while (!state.events.empty() && occurred(*state.events.front().event) <= now - window_) {
+    // Buffered thresholds must consume their ordered input before the final watermark expires it.
+    const auto closed_before = (rule_->rule.has_threshold() ? now : live_watermark_.value_or(now)) - window_;
+    while (!state.events.empty() && occurred(*state.events.front().event) <= closed_before) {
       state.events.pop_front();
     }
     std::uint32_t mask = 0;
@@ -540,12 +620,51 @@ class Replay {
         mask |= 1U << i;
       }
     }
+    if (!rule_->rule.has_threshold() && mask == 0) {
+      return {};
+    }
     state.events.push_back({&event, mask});
+    std::ranges::sort(state.events, [](const auto& lhs, const auto& rhs) {
+      return occurred(*lhs.event) != occurred(*rhs.event)
+                 ? occurred(*lhs.event) < occurred(*rhs.event)
+                 : lhs.event->envelope().message_id() < rhs.event->envelope().message_id();
+    });
+    std::optional<std::int64_t> previous_anchor;
+    for (const auto& candidate : state.events) {
+      const auto anchor = occurred(*candidate.event);
+      if (anchor < now || (previous_anchor && *previous_anchor == anchor)) {
+        continue;
+      }
+      previous_anchor = anchor;
+      if (rule_->rule.has_threshold() && anchor != occurred(*state.events.back().event)) {
+        continue;
+      }
+      auto selected = choose(state, anchor);
+      if (!selected) {
+        return std::unexpected(selected.error());
+      }
+      if (selected->empty()) {
+        continue;
+      }
+      const auto* latest = *std::ranges::max_element(*selected, {}, [](const auto* value) { return occurred(*value); });
+      const std::set<const Event*> consumed(selected->begin(), selected->end());
+      auto result = emit(state, *latest, std::move(*selected), occurred(*latest));
+      std::erase_if(state.events, [&consumed](const auto& value) { return consumed.contains(value.event); });
+      return result;
+    }
+    return {};
+  }
+
+  p::Result<std::vector<const Event*>> choose(const State& state, std::int64_t anchor) {
     std::vector<const Event*> chosen;
     if (rule_->rule.has_threshold()) {
       std::set<std::string> distinct;
       const auto& field = rule_->rule.threshold().distinct_by();
       for (const auto& candidate : state.events) {
+        const auto at = occurred(*candidate.event);
+        if (at > anchor || at <= anchor - window_) {
+          continue;
+        }
         if (++work_ > 50000000) {
           return p::fail(kRuleInvalid, "replay operation limit exceeded");
         }
@@ -565,7 +684,7 @@ class Replay {
         }
       }
       if (chosen.size() < rule_->rule.threshold().count()) {
-        return {};
+        return std::vector<const Event*>{};
       }
     } else if (rule_->rule.has_sequence()) {
       std::size_t step = rule_->parts.size();
@@ -574,14 +693,15 @@ class Replay {
         if (++work_ > 50000000) {
           return p::fail(kRuleInvalid, "replay operation limit exceeded");
         }
-        if ((it->mask & (1U << (step - 1))) != 0 && occurred(*it->event) < next_time) {
+        if ((it->mask & (1U << (step - 1))) != 0 && occurred(*it->event) < next_time && occurred(*it->event) <= anchor
+            && occurred(*it->event) > anchor - window_) {
           chosen.push_back(it->event);
           --step;
           next_time = occurred(*it->event);
         }
       }
       if (step != 0) {
-        return {};
+        return std::vector<const Event*>{};
       }
     } else {
       std::vector<int> owner(state.events.size(), -1);
@@ -592,7 +712,8 @@ class Replay {
             exhausted = true;
             return false;
           }
-          if (visited[i] || (state.events[i].mask & (1U << part)) == 0) {
+          const auto at = occurred(*state.events[i].event);
+          if (visited[i] || (state.events[i].mask & (1U << part)) == 0 || at > anchor || at <= anchor - window_) {
             continue;
           }
           visited[i] = true;
@@ -609,7 +730,7 @@ class Replay {
           if (exhausted) {
             return p::fail(kRuleInvalid, "replay operation limit exceeded");
           }
-          return {};
+          return std::vector<const Event*>{};
         }
       }
       for (std::size_t i = 0; i < owner.size(); ++i) {
@@ -618,9 +739,7 @@ class Replay {
         }
       }
     }
-    auto result = emit(state, event, std::move(chosen), now);
-    state.events.clear();
-    return result;
+    return chosen;
   }
 
   const CompiledRule* rule_;
@@ -629,11 +748,30 @@ class Replay {
   Limits limits_;
   std::int64_t window_;
   std::int64_t suppression_;
+  std::optional<std::int64_t> live_watermark_{};
   std::map<std::string, State> states_{};
   ReplayResult result_{};
   std::size_t work_ = 0;
 };
 }  // namespace
+
+std::string correlation_key(const Event& event, const Context& context, processing::v1::CorrelationScope scope) {
+  const auto id = scope_id(event, context, scope);
+  return id.empty() || event.event().site_id().empty()
+             ? std::string{}
+             : event.envelope().tenant_id() + ":" + event.event().site_id() + ":" + std::to_string(scope) + ":" + id;
+}
+
+p::Result<bool> selects(const CompiledRule& rule, const Event& event, const Context& context, bool inventory) {
+  return matches(rule.filter, event, rule, context, inventory);
+}
+
+p::Result<std::vector<Decision>> live_step(const CompiledRule& rule, processing::v1::LiveKeyState& state,
+                                           const std::vector<Event>& events, const Context& context,
+                                           const std::string& tenant, std::int64_t until_ms, const Event* inventory,
+                                           Limits limits) {
+  return Replay(rule, context, tenant, limits).step(state, events, until_ms, inventory);
+}
 
 p::Result<ReplayResult> replay(const CompiledRule& rule, std::vector<Event> events, const Context& context,
                                std::string tenant, std::int64_t from_ms, std::int64_t to_ms, Limits limits) {

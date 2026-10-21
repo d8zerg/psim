@@ -33,16 +33,20 @@ tasks:
             python3 -I tools/sim/test_cli.py {{.SIM_BUILD}}/psim-sim
 
   short:
-    desc: Manually run 200 seeded delivery simulations (TS-07)
+    desc: Manually run 200 seeded delivery and correlation simulations (TS-07)
     cmds:
       - task: _run
         vars: {RUNS: '200'}
+      - task: :correlation:sim
+        vars: {PRESET: '{{.PRESET}}', SEED: '{{.SEED}}', RUNS: '200'}
 
   long:
-    desc: Manually run 10000 seeded delivery simulations (TS-08)
+    desc: Manually run 10000 seeded delivery and correlation simulations (TS-08)
     cmds:
       - task: _run
         vars: {RUNS: '10000'}
+      - task: :correlation:sim
+        vars: {PRESET: '{{.PRESET}}', SEED: '{{.SEED}}', RUNS: '10000'}
 
   replay:
     desc: Reproduce one simulation by SEED and save its complete trace

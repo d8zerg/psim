@@ -1,0 +1,44 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-correlation-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Live rules, cross-zone correlation, Kafka transactions, RocksDB recovery and rebalance
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/correlation/check.py {{.PROJECT}} {{.PRESET}}
+  sanitizers:
+    desc: Live rule and real broker checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: psim_rules_test}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  sim:
+    desc: Manually simulate correlation crashes, restoration and partition reassignment
+    vars:
+      SEED: '{{.SEED | default "1"}}'
+      RUNS: '{{.RUNS | default "200"}}'
+      SAVE_TRACE: '{{.SAVE_TRACE | default "false"}}'
+    cmds:
+      - task: :cpp:configure
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            cmake --build --preset {{.PRESET}} --target psim_correlation_sim -j {{.JOBS}} &&
+            PSIM_CORRELATION_SIM_SEED={{.SEED}} PSIM_CORRELATION_SIM_RUNS={{.RUNS}}
+            PSIM_CORRELATION_SIM_TRACE={{.SAVE_TRACE}}
+            build/{{.PLATFORM}}/{{.PRESET}}/services/correlation-engine/psim_correlation_sim
+  bench:
+    desc: Measure 50000 events per second and committed p99 latency on three live instances
+    vars:
+      COUNT: '{{.COUNT | default "1500000"}}'
+      RATE: '{{.RATE | default "51000"}}'
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/correlation/bench.py {{.PROJECT}}-bench {{.COUNT}} {{.RATE}}

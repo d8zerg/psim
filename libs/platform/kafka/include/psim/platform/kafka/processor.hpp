@@ -87,6 +87,11 @@ class Handler {
   /// Apply control updates and restore newly assigned state before opening a transaction.
   virtual asio::awaitable<Result<void>> before_batch() { co_return Result<void>{}; }
 
+  // Timers may produce state and outputs even when no input arrived.
+  virtual bool has_pending_work() const { return false; }
+
+  virtual asio::awaitable<Result<void>> on_idle(Output* /*output*/) { co_return Result<void>{}; }
+
   virtual void assigned(const std::vector<TopicPartition>& /*partitions*/) {}
 
   virtual void revoked(const std::vector<TopicPartition>& /*partitions*/) {}

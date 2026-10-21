@@ -82,6 +82,15 @@ def app_sbom(graph_path, runtime_version, version, commit):
         refs[node_id] = purl
         component = {"type": "library", "bom-ref": purl, "name": node["name"], "version": str(node["version"]),
                      "purl": purl, "licenses": license_entry(node.get("license"))}
+        # RocksDB offers alternatives; the application selects Apache-2.0 (ADR-009).
+        if (node["name"] == "rocksdb" and str(node["version"]) == "10.10.1"
+                and isinstance(node.get("license"), (list, tuple))
+                and set(node["license"]) == {"GPL-2.0-only", "Apache-2.0"}):
+            component["licenses"] = license_entry("Apache-2.0")
+            component["properties"] = [
+                {"name": "psim:license-choice", "value": "Apache-2.0"},
+                {"name": "psim:upstream-licenses", "value": "GPL-2.0-only OR Apache-2.0"},
+            ]
         if node.get("homepage"):
             component["externalReferences"] = [{"type": "website", "url": node["homepage"]}]
         if node.get("description"):
@@ -182,7 +191,7 @@ def check_licenses(policy_path, sbom_paths):
             if not names:
                 problems.append(f"{os.path.basename(path)}: {ref}: no license")
             for n in names:
-                if n not in allowed:
+                if n not in allowed and not (isinstance(n, str) and all(term in allowed for term in n.split(" AND "))):
                     problems.append(f"{os.path.basename(path)}: {ref}: license {n!r} is not allowed")
     for p in sorted(set(problems)):
         print(p)

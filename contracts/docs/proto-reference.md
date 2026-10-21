@@ -480,6 +480,10 @@
 - [psim/processing/v1/internal.proto](#psim_processing_v1_internal-proto)
     - [CorrelationChangelogRecord](#psim-processing-v1-CorrelationChangelogRecord)
     - [CorrelationStateEntry](#psim-processing-v1-CorrelationStateEntry)
+    - [LiveCandidate](#psim-processing-v1-LiveCandidate)
+    - [LiveKeyState](#psim-processing-v1-LiveKeyState)
+    - [LivePending](#psim-processing-v1-LivePending)
+    - [LiveSource](#psim-processing-v1-LiveSource)
     - [NormalizerStateRecord](#psim-processing-v1-NormalizerStateRecord)
     - [RepartitionRecord](#psim-processing-v1-RepartitionRecord)
     - [RepartitionedEvent](#psim-processing-v1-RepartitionedEvent)
@@ -7449,6 +7453,82 @@ CorrelationStateEntry is the opaque state of one rule for one correlation key.
 
 
 
+<a name="psim-processing-v1-LiveCandidate"></a>
+
+### LiveCandidate
+LiveCandidate retains the evidence and matched parts of an open window.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| event | [EventRecord](#psim-processing-v1-EventRecord) |  |  |
+| mask | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="psim-processing-v1-LiveKeyState"></a>
+
+### LiveKeyState
+LiveKeyState is the versioned local and changelog encoding of a correlation key.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| candidates | [LiveCandidate](#psim-processing-v1-LiveCandidate) | repeated |  |
+| pending | [LivePending](#psim-processing-v1-LivePending) | repeated |  |
+| subject | [EventRecord](#psim-processing-v1-EventRecord) |  |  |
+| next_deadline_ms | [int64](#int64) |  |  |
+| last_signal_ms | [int64](#int64) | optional |  |
+| seen | [bool](#bool) |  |  |
+| buffered | [EventRecord](#psim-processing-v1-EventRecord) | repeated |  |
+| watermark_ms | [int64](#int64) |  |  |
+| sources | [LiveSource](#psim-processing-v1-LiveSource) | repeated |  |
+| rule | [CorrelationRule](#psim-processing-v1-CorrelationRule) |  |  |
+| rule_set_version | [uint64](#uint64) |  |  |
+| last_activity_ms | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="psim-processing-v1-LivePending"></a>
+
+### LivePending
+LivePending retains an absence trigger until its event-time deadline.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| trigger | [EventRecord](#psim-processing-v1-EventRecord) |  |  |
+| deadline_ms | [int64](#int64) |  |  |
+
+
+
+
+
+
+<a name="psim-processing-v1-LiveSource"></a>
+
+### LiveSource
+LiveSource tracks event time and the bounded sequence cursor of a source epoch.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| source_id | [string](#string) |  |  |
+| maximum_ms | [int64](#int64) |  |  |
+| received_ms | [int64](#int64) |  | Processing arrival time used only for idle detection. |
+| sequence | [SourceSequenceState](#psim-processing-v1-SourceSequenceState) |  |  |
+
+
+
+
+
+
 <a name="psim-processing-v1-NormalizerStateRecord"></a>
 
 ### NormalizerStateRecord
@@ -7486,7 +7566,7 @@ RepartitionRecord is the value of internal topic psim.correlation.repartition.v1
 <a name="psim-processing-v1-RepartitionedEvent"></a>
 
 ### RepartitionedEvent
-RepartitionedEvent carries an event already filtered by a rule wider than a zone.
+RepartitionedEvent carries one immutable rule and its selected event.
 
 
 | Field | Type | Label | Description |
@@ -7495,6 +7575,9 @@ RepartitionedEvent carries an event already filtered by a rule wider than a zone
 | rule_version | [uint32](#uint32) |  |  |
 | correlation_key | [string](#string) |  |  |
 | event | [Event](#psim-processing-v1-Event) |  |  |
+| rule | [CorrelationRule](#psim-processing-v1-CorrelationRule) |  | Immutable compiled input; a configuration change cannot reinterpret queued events. |
+| rule_set_version | [uint64](#uint64) |  |  |
+| inventory | [bool](#bool) |  | Inventory observations initialize periodic absence without fabricating an event. |
 
 
 

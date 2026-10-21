@@ -48,8 +48,10 @@ using Time = google::protobuf::util::TimeUtil;
 std::string settings() {
   auto schema = Json::parse(p::stream::kSettings);
   auto& fields = schema["properties"];
-  fields["role"] = {{"type", "string"}, {"enum", {"live", "management"}}, {"default", "live"}};
+  fields["role"] = {{"type", "string"}, {"enum", {"live", "management", "router", "engine"}}, {"default", "live"}};
   fields["pg_max_result_bytes"]["default"] = 33554432;
+  fields["state_directory"] = {{"type", "string"}, {"default", "/var/lib/psim/correlation"}};
+  fields["max_live_keys"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 1000000}, {"default", 100000}};
   for (const auto& [name, value] : std::initializer_list<std::pair<std::string, std::string>>{
            {"taxonomy_file", "/usr/share/psim/correlation-taxonomy.yaml"},
            {"tls_ca_file", ""},

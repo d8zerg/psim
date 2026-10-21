@@ -131,7 +131,8 @@ def topic_specs(profile):
     for t in reg["topics"]:
         specs.append((t["name"], contracts.topic_partitions(t, by_name, profile), rf, {
             "cleanup.policy": t["cleanup"], "retention.ms": contracts.duration_ms(t["retention"]),
-            "min.insync.replicas": isr, "compression.type": reg["defaults"]["compression"]}))
+            "min.insync.replicas": isr, "compression.type": reg["defaults"]["compression"],
+            **({"delete.retention.ms": 86400000} if "compact" in t["cleanup"] else {})}))
     dlq = reg["dlq"]
     for stage in dlq["stages"]:
         specs.append((f"psim.dlq.{stage}.v1", dlq["partitions"][profile], rf, {

@@ -25,6 +25,7 @@ struct ProducerOptions {
   std::string transactional_id{};
   /// How long librdkafka retries a message before reporting a delivery error.
   std::chrono::milliseconds delivery_timeout{120000};
+  std::chrono::milliseconds transaction_timeout{60000};
 };
 
 /// Idempotent producer: acks=all, no duplicates or reordering on retries (ADR-041). Bound to the

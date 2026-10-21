@@ -13,6 +13,8 @@ tasks:
     desc: Vulnerabilities (HIGH, CRITICAL) and licenses of dependencies - lock files and SBOM (SEC-02)
     cmds:
       - mkdir -p {{.CACHE}}/trivy
+      - task: :cpp:_run
+        vars: {CMD: 'python3 -I -m unittest discover -s tools/release -t tools/release'}
       - task: :release:sbom:app
       - '{{.TRIVY}} fs --cache-dir /cache --quiet --scanners vuln --severity HIGH,CRITICAL --exit-code 1 conan.lock'
       - '{{.TRIVY}} fs --cache-dir /cache --quiet --scanners vuln --severity HIGH,CRITICAL --exit-code 1 web/pnpm-lock.yaml'

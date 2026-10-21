@@ -31,6 +31,7 @@ class PsimConan(ConanFile):
         "librdkafka/*:sasl": False,
         "librdkafka/*:curl": False,
         "clickhouse-cpp/*:with_openssl": True,
+        "rocksdb/*:with_zstd": True,
         "aws-sdk-cpp/*:s3": True,
         "aws-sdk-cpp/*:access-management": False,
         "aws-sdk-cpp/*:identity-management": False,
@@ -64,6 +65,7 @@ class PsimConan(ConanFile):
         self.requires("aws-sdk-cpp/1.11.692")
         self.requires("libpng/1.6.58")
         self.requires("libjpeg-turbo/3.2.0")
+        self.requires("rocksdb/10.10.1")
 
     def build_requirements(self):
         # Test-only libraries: linked into tests and benchmarks, never shipped, not in the SBOM.

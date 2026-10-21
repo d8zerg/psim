@@ -332,9 +332,8 @@ Result<std::unique_ptr<Producer>> Producer::create(const asio::any_io_executor& 
   if (!options.transactional_id.empty()) {
     fixed.emplace("transactional.id", options.transactional_id);
     // librdkafka requires delivery.timeout.ms <= transaction.timeout.ms (at least 1 s).
-    constexpr std::chrono::milliseconds kTransactionTimeout{60000};
     defaults.emplace("transaction.timeout.ms",
-                     std::to_string(std::max(options.delivery_timeout, kTransactionTimeout).count()));
+                     std::to_string(std::max(options.delivery_timeout, options.transaction_timeout).count()));
   }
   auto conf = detail::make_conf(options.client, defaults, fixed);
   if (!conf) {

@@ -49,3 +49,5 @@ add_subdirectory(tools/catalog)
 add_subdirectory(tools/processing)
 
 add_subdirectory(tools/rules)
+
+add_subdirectory(tools/correlation)

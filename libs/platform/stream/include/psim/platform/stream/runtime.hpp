@@ -6,6 +6,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <memory>
@@ -63,7 +64,7 @@ void stamp(kafka::Headers& headers, std::string_view stage);
 class Worker : public runtime::Component, public kafka::Handler {
  public:
   Worker(const runtime::Context& context, std::string stage, std::string input,
-         kafka::Semantics semantics = kafka::Semantics::kExactlyOnce, bool broadcast = false);
+         kafka::Semantics semantics = kafka::Semantics::kExactlyOnce, bool broadcast = false, std::size_t shard = 0);
 
   [[nodiscard]] std::string_view name() const override { return stage_; }
 
@@ -94,6 +95,8 @@ class Worker : public runtime::Component, public kafka::Handler {
 
   kafka::Producer* producer() const { return producer_.get(); }
 
+  kafka::Consumer* consumer() const { return consumer_.get(); }
+
   virtual std::string consumer_group() const { return {}; }
 
   virtual std::size_t batch_size() const { return 32; }
@@ -101,6 +104,8 @@ class Worker : public runtime::Component, public kafka::Handler {
   virtual std::chrono::milliseconds transaction_gap() const { return std::chrono::milliseconds(0); }
 
   virtual std::chrono::milliseconds commit_interval() const { return std::chrono::milliseconds(20); }
+
+  virtual std::chrono::milliseconds transaction_timeout() const { return std::chrono::seconds(60); }
 
  private:
   const runtime::Context& context_;
@@ -113,6 +118,7 @@ class Worker : public runtime::Component, public kafka::Handler {
   std::string input_;
   kafka::Semantics semantics_;
   bool broadcast_;
+  std::size_t shard_;
   std::unique_ptr<kafka::Producer> producer_;
   std::unique_ptr<kafka::Consumer> consumer_;
   std::unique_ptr<kafka::Processor> processor_;

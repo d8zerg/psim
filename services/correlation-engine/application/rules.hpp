@@ -15,6 +15,7 @@
 #include "psim/domain/processing/expression.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/processing/v1/event.pb.h"
+#include "psim/processing/v1/internal.pb.h"
 #include "psim/processing/v1/rules.pb.h"
 #include "psim/processing/v1/signal.pb.h"
 
@@ -55,6 +56,7 @@ struct CompiledRule {
   std::optional<CompiledFilter> trigger{};
   std::optional<expr::Expression> priority{};
   std::vector<SummaryPart> summary{};
+  std::set<std::string> referenced_fields{};
 };
 
 struct Validation {
@@ -87,4 +89,12 @@ p::Result<std::set<std::string>> load_types(const std::string& file);
 Validation compile(const Rule& rule, const std::set<std::string>& taxonomy, Limits limits = {});
 p::Result<ReplayResult> replay(const CompiledRule& rule, std::vector<Event> events, const Context& context,
                                std::string tenant, std::int64_t from_ms, std::int64_t to_ms, Limits limits = {});
+
+std::string correlation_key(const Event& event, const Context& context, processing::v1::CorrelationScope scope);
+p::Result<bool> selects(const CompiledRule& rule, const Event& event, const Context& context, bool inventory = false);
+// Both entry points use the same matching and signal identity implementation.
+p::Result<std::vector<Decision>> live_step(const CompiledRule& rule, processing::v1::LiveKeyState& state,
+                                           const std::vector<Event>& events, const Context& context,
+                                           const std::string& tenant, std::int64_t until_ms,
+                                           const Event* inventory = nullptr, Limits limits = {});
 }  // namespace psim::correlation::rules

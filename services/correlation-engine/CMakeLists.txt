@@ -1,9 +1,10 @@
 find_package(yaml-cpp REQUIRED CONFIG)
-add_library(psim_correlation_rules STATIC application/validation.cpp application/replay.cpp adapters/repository.cpp adapters/jobs.cpp adapters/history.cpp adapters/http.cpp adapters/management.cpp)
+find_package(RocksDB REQUIRED CONFIG)
+add_library(psim_correlation_rules STATIC application/validation.cpp application/replay.cpp adapters/repository.cpp adapters/jobs.cpp adapters/history.cpp adapters/http.cpp adapters/management.cpp application/live.cpp adapters/state_store.cpp adapters/live_worker.cpp)
 psim_target_defaults(psim_correlation_rules)
 target_include_directories(psim_correlation_rules PUBLIC application adapters)
-target_link_libraries(psim_correlation_rules PUBLIC psim::domain_processing psim::platform_stream psim::platform_clickhouse yaml-cpp::yaml-cpp)
-psim_add_test(psim_rules_test SOURCES tests/expression_test.cpp tests/validation_test.cpp tests/replay_test.cpp tests/authorization_test.cpp LIBS psim_correlation_rules)
+target_link_libraries(psim_correlation_rules PUBLIC psim::domain_processing psim::platform_stream psim::platform_clickhouse yaml-cpp::yaml-cpp RocksDB::rocksdb)
+psim_add_test(psim_rules_test SOURCES tests/expression_test.cpp tests/validation_test.cpp tests/replay_test.cpp tests/authorization_test.cpp tests/live_test.cpp tests/state_store_test.cpp LIBS psim_correlation_rules)
 psim_add_service(correlation-engine SOURCES src/main.cpp LIBS psim_correlation_rules SUMMARY "PSIM correlation-engine")
 
 install(FILES ${PROJECT_SOURCE_DIR}/contracts/taxonomy/v1/taxonomy.yaml DESTINATION share/psim RENAME correlation-taxonomy.yaml COMPONENT correlation-engine)
@@ -25,3 +26,9 @@ if(PSIM_RULE_FUZZING)
   target_link_options(psim-rules-fuzz PRIVATE -fsanitize=fuzzer)
   target_link_libraries(psim-rules-fuzz PRIVATE psim_rules_fuzz_core)
 endif()
+
+add_executable(psim_correlation_sim EXCLUDE_FROM_ALL tests/simulation_test.cpp)
+psim_target_defaults(psim_correlation_sim)
+target_link_libraries(psim_correlation_sim PRIVATE psim_correlation_rules psim::sim GTest::gtest_main)
+
+psim_add_benchmark(psim_correlation_bench SOURCES benchmarks/rules_bench.cpp LIBS psim_correlation_rules)

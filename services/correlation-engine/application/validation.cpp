@@ -408,6 +408,28 @@ Validation compile(const Rule& rule, const std::set<std::string>& taxonomy, Limi
     }
   }
   if (errors.empty()) {
+    auto remember = [&](const expr::Expression& value) {
+      const auto fields = value.fields();
+      compiled.referenced_fields.insert(fields.begin(), fields.end());
+    };
+    remember(compiled.filter.condition);
+    for (const auto& part : compiled.parts) {
+      remember(part.condition);
+    }
+    if (compiled.trigger) {
+      remember(compiled.trigger->condition);
+    }
+    if (compiled.priority) {
+      remember(*compiled.priority);
+    }
+    for (const auto& part : compiled.summary) {
+      if (part.expression) {
+        remember(*part.expression);
+      }
+    }
+    if (rule.has_threshold() && !rule.threshold().distinct_by().empty()) {
+      compiled.referenced_fields.insert("event." + rule.threshold().distinct_by());
+    }
     result.compiled = std::move(compiled);
   }
   return result;

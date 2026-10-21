@@ -23,6 +23,8 @@
 - [Разработка коннектора и набор соответствия](engineering/connector-sdk.md)
 - [Эталонные коннекторы: симулятор и Webhook/HTTP](engineering/reference-connectors.md)
 - [Normalizer и Event History](engineering/normalization-and-history.md)
+- [Правила и исторический прогон](engineering/correlation-rules.md)
+- [Рабочая корреляция и восстановление состояния](engineering/live-correlation.md)
 - [Resource Catalog: ресурсы, планы и обслуживание](engineering/resource-catalog.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 

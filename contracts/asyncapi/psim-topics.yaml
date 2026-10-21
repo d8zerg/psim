@@ -128,7 +128,7 @@ channels:
   correlationChangelogV1:
     address: psim.correlation.changelog.v1
     title: Correlation state changelog (internal)
-    description: 'Key: rule_id:correlation_key. Semantics: EOS-K. Internal topic.'
+    description: 'Key: tenant_id/rule_id/rule_version/correlation_key. Semantics: EOS-K. Internal topic.'
     messages:
       CorrelationChangelogRecord:
         $ref: '#/components/messages/CorrelationChangelogRecord'
@@ -148,7 +148,7 @@ channels:
     x-psim-semantics: EOS-K
   correlationRepartitionV1:
     address: psim.correlation.repartition.v1
-    title: Events of rules wider than a zone (internal)
+    title: Events partitioned by correlation key (internal)
     description: 'Key: correlation_key. Semantics: EOS-K. Internal topic.'
     messages:
       RepartitionRecord:
@@ -156,7 +156,7 @@ channels:
     bindings:
       kafka:
         topic: psim.correlation.repartition.v1
-        partitions: 12
+        partitions: 48
         replicas: 3
         topicConfiguration:
           cleanup.policy:
@@ -164,8 +164,8 @@ channels:
           retention.ms: 21600000
         bindingVersion: 0.5.0
     x-psim-partitions:
-      cluster: 12
-      single: 4
+      cluster: 48
+      single: 12
     x-psim-semantics: EOS-K
   incidentsEventsV1:
     address: psim.incidents.events.v1
@@ -345,6 +345,27 @@ channels:
     bindings:
       kafka:
         topic: psim.dlq.normalizer.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqCorrelationRouterV1:
+    address: psim.dlq.correlation-router.v1
+    title: Dead letters of stage correlation-router
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.correlation-router.v1
         partitions: 3
         replicas: 3
         topicConfiguration:
@@ -996,7 +1017,7 @@ components:
         kafka:
           key:
             type: string
-            description: rule_id:correlation_key
+            description: tenant_id/rule_id/rule_version/correlation_key
           schemaIdLocation: payload
           schemaIdPayloadEncoding: confluent
           bindingVersion: 0.5.0

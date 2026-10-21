@@ -127,6 +127,54 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
         break;
       }
     }
+    if (handler->has_pending_work() && !input_->assignment().empty()) {
+      std::vector<TopicPartition> unknown;
+      for (const auto& id : input_->assignment()) {
+        if (partitions_[id].committed < 0) {
+          unknown.push_back(id);
+        }
+      }
+      if (!unknown.empty()) {
+        auto offsets = co_await input_->committed(unknown, options_.timeout);
+        if (!offsets) {
+          co_return std::unexpected(offsets.error());
+        }
+        for (const auto& id : unknown) {
+          auto& partition = partitions_[id];
+          const auto found = offsets->find(id);
+          partition.committed = found == offsets->end() ? 0 : found->second;
+          partition.next = partition.committed;
+        }
+      }
+      if (exactly_once && !output_->in_transaction()) {
+        if (transaction_finished_) {
+          const auto due = *transaction_finished_ + options_.transaction_gap;
+          if (clock_->steady() < due) {
+            (void)co_await clock_->sleep_until(due);
+          }
+        }
+        if (auto begun = output_->begin_transaction(); !begun) {
+          co_return begun;
+        }
+        transaction_started_ = clock_->steady();
+      }
+      // Include group offsets even for timer-only transactions to fence a revoked owner.
+      for (const auto& id : input_->assignment()) {
+        auto& partition = partitions_[id];
+        if (partition.transaction_start < 0) {
+          partition.transaction_start = partition.committed;
+        }
+      }
+      if (auto background = co_await handler->on_idle(&sink_); !background) {
+        if (exactly_once) {
+          (void)co_await output_->abort_transaction(options_.timeout);
+          handler->aborted();
+          rewind(true);
+        }
+        co_return background;
+      }
+      dirty_ = true;
+    }
   }
   co_return co_await commit(true);
 }

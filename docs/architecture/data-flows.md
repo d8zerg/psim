@@ -99,8 +99,8 @@
 
 | Топик | Ключ | Назначение |
 |---|---|---|
-| `psim.correlation.changelog.v1` | `state_key` = `rule_id + correlation_key` | Compacted; восстановление RocksDB. Партиции совпадают с входным топиком один к одному |
-| `psim.correlation.repartition.v1` | `correlation_key` | Отфильтрованные события для правил, чей ключ не выводится из зоны (например, площадка). Запись в той же транзакции; читается тем же сервисом |
+| `psim.correlation.changelog.v1` | `tenant_id/rule_id/rule_version/correlation_key` | Compacted; восстановление RocksDB. Партиции совпадают с топиком переразбиения один к одному |
+| `psim.correlation.repartition.v1` | `correlation_key` | События всех областей с неизменяемой версией правила. Маршрутизатор фиксирует выход и входные смещения одной транзакцией; вычислитель читает по ключу корреляции |
 
 **Время.** Правила работают по event time. Водяной знак партиции - минимум по источникам партиции из `max(occurred_at) - allowed_lateness`, с исключением неактивных источников по таймауту простоя. Правила `conjunction`, `sequence` и `single` срабатывают в момент прихода завершающего события, не дожидаясь водяного знака. Правила `threshold` и `absence` закрывают окно по водяному знаку. События позже допустимого опоздания не учитываются в закрытых окнах и подсчитываются в метрике. Подробности - ADR-010.
 
@@ -217,7 +217,7 @@
 | `psim.events.normalized.v1` | `site_id:zone_id` | EOS-K | 24 ч | EOS-K вместо at-least-once |
 | `psim.normalizer.state.v1` | `tenant_id/source_id:epoch` | compacted | ∞ | Новый внутренний топик |
 | `psim.signals.v1` | `grouping_key` | EOS-K | 7 сут | Ключ `grouping_key` вместо `correlation_key` |
-| `psim.correlation.changelog.v1` | `rule_id:correlation_key` | compacted | ∞ | - |
+| `psim.correlation.changelog.v1` | `tenant_id/rule_id/rule_version/correlation_key` | compacted | ∞ | - |
 | `psim.correlation.repartition.v1` | `correlation_key` | EOS-K | 6 ч | Новый внутренний топик |
 | `psim.incidents.events.v1` | `incident_id` | Outbox + версия | 30 сут | - |
 | `psim.response.events.v1` | `incident_id` | Outbox + версия | 30 сут | Включает жизненный цикл команд и уведомлений |
