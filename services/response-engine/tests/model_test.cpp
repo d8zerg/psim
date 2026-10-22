@@ -9,6 +9,7 @@
 #include <stdexcept>
 #include <utility>
 
+#include "escalation.hpp"
 #include "http.hpp"
 #include "psim/common/v1/types.pb.h"
 #include "psim/response/v1/plan.pb.h"
@@ -96,3 +97,33 @@ TEST(ResponseHttp, RejectsUnknownFieldsPathsAndPreconditions) {
 }
 }  // namespace
 }  // namespace psim::response_engine
+
+TEST(ResponseEscalation, RejectsAmbiguousPolicies) {
+  using namespace psim::response_engine;
+  psim::response::v1::EscalationPolicy policy;
+  policy.set_policy_id("018f0000-0000-7000-8000-000000000001");
+  policy.set_name("Site SLA");
+  auto* sla = policy.add_sla();
+  sla->set_priority(psim::common::v1::PRIORITY_P2);
+  sla->mutable_acknowledge_within()->set_seconds(60);
+  sla->mutable_resolve_within()->set_seconds(300);
+  auto* level = policy.add_levels();
+  level->set_level(1);
+  level->add_recipients()->set_current_duty(true);
+  level->add_channels(psim::response::v1::NOTIFICATION_CHANNEL_IN_APP);
+  ASSERT_TRUE(validate_policy(policy));
+  auto duplicate = policy;
+  *duplicate.add_sla() = policy.sla(0);
+  EXPECT_FALSE(validate_policy(duplicate));
+  duplicate = policy;
+  *duplicate.add_levels() = policy.levels(0);
+  duplicate.mutable_levels(1)->set_level(2);
+  EXPECT_FALSE(validate_policy(duplicate));
+  duplicate.mutable_levels(1)->mutable_delay()->set_seconds(10);
+  EXPECT_TRUE(validate_policy(duplicate));
+  duplicate.mutable_levels(1)->mutable_recipients(0)->set_current_duty(false);
+  EXPECT_FALSE(validate_policy(duplicate));
+  duplicate = policy;
+  duplicate.mutable_sla(0)->mutable_acknowledge_within()->set_nanos(-1);
+  EXPECT_FALSE(validate_policy(duplicate));
+}

@@ -62,7 +62,7 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
     const auto question = target.find('?');
     const auto path = target.substr(0, question);
     const bool read = request.method() == http::verb::get;
-    if (!read && request.method() != http::verb::post) {
+    if (!read && request.method() != http::verb::post && request.method() != http::verb::put) {
       co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown method");
     }
     Json body = Json::object();
@@ -115,7 +115,31 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
         throw std::invalid_argument("object required");
       }
     }
-    if (path == "/v1/plans") {
+    if (path == "/v1/escalation-policies") {
+      if (request.method() != http::verb::get && request.method() != http::verb::post) {
+        throw std::invalid_argument("method");
+      }
+      operation = read ? "policy.list" : "policy.create";
+    } else if (path.starts_with("/v1/escalation-policies/") && request.method() == http::verb::put) {
+      operation = "policy.update";
+      id = path.substr(24);
+      if (body.contains("policyId") && body.at("policyId") != id) {
+        throw std::invalid_argument("path identity");
+      }
+      body["policyId"] = id;
+    } else if (path.starts_with("/v1/sites/") && path.ends_with("/duty")) {
+      if (!read && request.method() != http::verb::put) {
+        throw std::invalid_argument("method");
+      }
+      operation = read ? "duty.get" : "duty.set";
+      id = path.substr(10, path.size() - 15);
+      if (body.contains("siteId") && body.at("siteId") != id) {
+        throw std::invalid_argument("path identity");
+      }
+      body["siteId"] = id;
+    } else if (request.method() == http::verb::put) {
+      throw std::invalid_argument("method");
+    } else if (path == "/v1/plans") {
       operation = read ? "list" : "draft";
     } else if (path == "/v1/plans:validate" && !read) {
       operation = "validate";
@@ -155,18 +179,34 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
         operation.clear();
       }
     }
-    const std::map<std::string, std::string> types = {
-        {"list", "ListPlansRequest"},      {"get", "GetPlanRequest"},        {"publish", "PublishPlanRequest"},
-        {"archive", "ArchivePlanRequest"}, {"run", "GetIncidentRunRequest"}, {"complete", "CompleteStepRequest"},
-        {"skip", "SkipStepRequest"},       {"retry", "RetryStepRequest"},    {"override", "OverrideStepRequest"}};
-    if (operation == "draft" || operation == "validate") {
+    const std::map<std::string, std::string> types = {{"policy.list", "ListEscalationPoliciesRequest"},
+                                                      {"duty.get", "GetSiteDutyRequest"},
+                                                      {"list", "ListPlansRequest"},
+                                                      {"get", "GetPlanRequest"},
+                                                      {"publish", "PublishPlanRequest"},
+                                                      {"archive", "ArchivePlanRequest"},
+                                                      {"run", "GetIncidentRunRequest"},
+                                                      {"complete", "CompleteStepRequest"},
+                                                      {"skip", "SkipStepRequest"},
+                                                      {"retry", "RetryStepRequest"},
+                                                      {"override", "OverrideStepRequest"}};
+    if (operation == "draft" || operation == "validate" || operation == "policy.create" || operation == "policy.update"
+        || operation == "duty.set") {
     } else if (!types.contains(operation)) {
       co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown endpoint");
     }
     (void)api::v1::GetIncidentRunRequest::descriptor();
-    const auto* descriptor = google::protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(
-        (operation == "draft" || operation == "validate") ? "psim.response.v1.ResponsePlan"
-                                                          : "psim.api.v1." + types.at(operation));
+    std::string message_type;
+    if (operation == "draft" || operation == "validate") {
+      message_type = "psim.response.v1.ResponsePlan";
+    } else if (operation == "policy.create" || operation == "policy.update") {
+      message_type = "psim.response.v1.EscalationPolicy";
+    } else if (operation == "duty.set") {
+      message_type = "psim.api.v1.SiteDuty";
+    } else {
+      message_type = "psim.api.v1." + types.at(operation);
+    }
+    const auto* descriptor = google::protobuf::DescriptorPool::generated_pool()->FindMessageTypeByName(message_type);
     const std::unique_ptr<google::protobuf::Message> parsed(
         google::protobuf::MessageFactory::generated_factory()->GetPrototype(descriptor)->New());
     if (!google::protobuf::util::JsonStringToMessage(body.dump(), parsed.get()).ok()) {
@@ -174,7 +214,8 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
     }
     body = Json::parse(p::stream::json(*parsed));
     std::optional<std::uint64_t> expected;
-    if (operation == "complete" || operation == "skip" || operation == "retry" || operation == "override") {
+    if (operation == "complete" || operation == "skip" || operation == "retry" || operation == "override"
+        || operation == "policy.update" || (operation == "duty.set" && !request[http::field::if_match].empty())) {
       const std::string text(request[http::field::if_match]);
       if (text.size() < 3 || text.front() != '"' || text.back() != '"') {
         co_return p::fail(p::ErrorCode::kCommonPreconditionRequired, "If-Match required");
@@ -183,13 +224,19 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       const auto result = std::from_chars(std::string_view(text).substr(1, text.size() - 2).begin(),
                                           std::string_view(text).substr(1, text.size() - 2).end(), version);
       if (result.ec != std::errc{} || result.ptr != std::string_view(text).substr(1, text.size() - 2).end()
-          || version == 0) {
+          || (version == 0 && operation != "duty.set")) {
         throw std::invalid_argument("version");
       }
       expected = version;
     }
-    auto result = co_await repository_->request(std::move(principal), operation, body,
-                                                std::string(request["Idempotency-Key"]), expected);
+    const bool escalation = operation.starts_with("policy.") || operation.starts_with("duty.");
+    if (escalation && !escalation_) {
+      co_return p::fail(p::ErrorCode::kCommonUnavailable, "SLA unavailable");
+    }
+    auto result = escalation ? co_await escalation_->request(principal, operation, body,
+                                                             std::string(request["Idempotency-Key"]), expected)
+                             : co_await repository_->request(std::move(principal), operation, body,
+                                                             std::string(request["Idempotency-Key"]), expected);
     if (!result) {
       co_return std::unexpected(result.error());
     }
@@ -198,6 +245,11 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
     response.body() = result->dump();
     if (result->contains("run")) {
       response.set(http::field::etag, '"' + result->at("run").at("version").get<std::string>() + '"');
+    }
+    for (const auto* field : {"policy", "duty"}) {
+      if (result->contains(field)) {
+        response.set(http::field::etag, '"' + result->at(field).at("version").get<std::string>() + '"');
+      }
     }
     co_return response;
   } catch (const std::exception&) {

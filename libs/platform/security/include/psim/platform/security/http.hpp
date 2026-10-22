@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstddef>
+#include <map>
 #include <string>
 #include <string_view>
 
@@ -19,6 +20,10 @@ struct HttpOptions {
   bool allow_plaintext = false;
   /// Explicit credentials for the configured endpoint; redirects are never followed.
   std::string bearer_token{};
+  /// Reject non-public addresses after DNS and connect only to the checked endpoints.
+  bool public_network_only = false;
+  /// Additional application headers; framing and authorization headers are reserved.
+  std::map<std::string, std::string> headers{};
 };
 
 struct HttpResponse {
@@ -28,6 +33,7 @@ struct HttpResponse {
 
 /// Fixed configured endpoint, bounded headers/body and one deadline including DNS; no redirects,
 /// URL userinfo, fragments, token-selected URLs, cookies or automatic retries.
+[[nodiscard]] bool public_address(std::string_view input);
 [[nodiscard]] Result<void> validate_url(std::string_view url, bool allow_plaintext = false);
 boost::asio::awaitable<Result<HttpResponse>> http_request(std::string url, HttpOptions options = {},
                                                           std::string body = {}, std::string content_type = {});

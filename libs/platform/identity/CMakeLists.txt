@@ -1,0 +1,5 @@
+add_library(psim_platform_identity STATIC src/directory.cpp)
+add_library(psim::platform_identity ALIAS psim_platform_identity)
+target_include_directories(psim_platform_identity PUBLIC include)
+target_link_libraries(psim_platform_identity PUBLIC psim::platform_stream)
+psim_target_defaults(psim_platform_identity)

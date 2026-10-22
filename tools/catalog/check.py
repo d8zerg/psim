@@ -133,7 +133,7 @@ class Check:
             headers["Authorization"] = "Bearer " + self.token(role)
         if data is not None:
             headers["Content-Type"] = content_type or "application/json"
-        if method == "POST":
+        if method in ("POST", "PUT", "PATCH", "DELETE"):
             headers["Idempotency-Key"] = key or uid()
         if version is not None:
             headers["If-Match"] = '"' + str(version) + '"'

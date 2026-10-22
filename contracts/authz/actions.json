@@ -102,5 +102,35 @@
   ],
   "response.step.override": [
     "supervisor"
+  ],
+  "response.policy.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "auditor"
+  ],
+  "response.policy.write": [
+    "admin"
+  ],
+  "response.duty.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "auditor"
+  ],
+  "response.duty.write": [
+    "supervisor"
+  ],
+  "notification.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "auditor"
+  ],
+  "notification.contact.write": [
+    "admin"
+  ],
+  "notification.delivery.resolve": [
+    "admin"
   ]
 }

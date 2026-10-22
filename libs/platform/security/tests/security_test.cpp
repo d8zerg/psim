@@ -627,3 +627,28 @@ TEST(SecurityJwks, FetchesOverVerifiedHttpsAndKeepsLastGoodKeysOnMalformedReplac
 }
 }  // namespace
 }  // namespace psim::platform::security
+
+namespace psim::platform::security {
+namespace {
+TEST(SecurityHttp, RejectsPrivateResolvedAddressesAndReservedApplicationHeaders) {
+  for (const auto* url : {"https://127.0.0.1:1/", "https://localhost:1/", "https://[::1]:1/"}) {
+    auto result = run(http_request(url, {.public_network_only = true}));
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code(), ErrorCode::kAuthForbidden);
+  }
+  for (const auto* header :
+       {"Host", "Authorization", "Content-Length", "Transfer-Encoding", "Connection", "Content-Type", "Bad\r\nName"}) {
+    HttpOptions options;
+    options.headers = {{header, "value"}};
+    auto result = run(http_request("https://127.0.0.1:1/", options));
+    ASSERT_FALSE(result);
+    EXPECT_EQ(result.error().code(), ErrorCode::kCommonInvalidArgument);
+  }
+  HttpOptions options;
+  options.headers = {{"X-PSIM-Signature", "bad\r\ninjection"}};
+  auto result = run(http_request("https://127.0.0.1:1/", options));
+  ASSERT_FALSE(result);
+  EXPECT_EQ(result.error().code(), ErrorCode::kCommonInvalidArgument);
+}
+}  // namespace
+}  // namespace psim::platform::security

@@ -111,7 +111,7 @@ sequenceDiagram
 
     K->>RE: IncidentCreated (P2)
     RE->>RE: взвести таймер ack = created_at + 60 с (PostgreSQL)
-    Note over RE: опрос таймеров каждые 200 мс экземпляром-владельцем партиции
+    Note over RE: опрос таймеров каждые 200 мс, блокировка агрегата PostgreSQL
     RE->>RE: таймер сработал, инцидент не принят
     RE->>K: outbox SlaBreached, EscalationLevelTriggered(1)
     K->>IS: ApplyEscalation -> escalation_level = 1, IncidentEscalated

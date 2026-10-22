@@ -140,6 +140,8 @@ message Recipient {
     option (buf.validate.oneof).required = true;
     string user_id = 1;
     string role = 2;
+    // Resolve the current site duty at escalation dispatch. Must be true.
+    bool current_duty = 3;
   }
 }
 

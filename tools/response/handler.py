@@ -2,11 +2,13 @@
 import json
 from pathlib import Path
 import ssl
+import signal
 import sys
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 DIRECTORY = Path(sys.argv[1])
+signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
 
 
 class Handler(BaseHTTPRequestHandler):

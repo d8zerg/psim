@@ -293,7 +293,13 @@
     - [ListMyNotificationsResponse](#psim-api-v1-ListMyNotificationsResponse)
     - [MarkNotificationReadRequest](#psim-api-v1-MarkNotificationReadRequest)
     - [MarkNotificationReadResponse](#psim-api-v1-MarkNotificationReadResponse)
+    - [NotificationContact](#psim-api-v1-NotificationContact)
+    - [ResolveUnknownDeliveryRequest](#psim-api-v1-ResolveUnknownDeliveryRequest)
+    - [ResolveUnknownDeliveryResponse](#psim-api-v1-ResolveUnknownDeliveryResponse)
+    - [SetNotificationContactRequest](#psim-api-v1-SetNotificationContactRequest)
+    - [SetNotificationContactResponse](#psim-api-v1-SetNotificationContactResponse)
 
+    - [NotificationContactService](#psim-api-v1-NotificationContactService)
     - [NotificationService](#psim-api-v1-NotificationService)
 
 - [psim/api/v1/problem.proto](#psim_api_v1_problem-proto)
@@ -331,6 +337,8 @@
     - [GetIncidentRunResponse](#psim-api-v1-GetIncidentRunResponse)
     - [GetPlanRequest](#psim-api-v1-GetPlanRequest)
     - [GetPlanResponse](#psim-api-v1-GetPlanResponse)
+    - [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest)
+    - [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse)
     - [ListEscalationPoliciesRequest](#psim-api-v1-ListEscalationPoliciesRequest)
     - [ListEscalationPoliciesResponse](#psim-api-v1-ListEscalationPoliciesResponse)
     - [ListPlansRequest](#psim-api-v1-ListPlansRequest)
@@ -343,6 +351,9 @@
     - [RetryStepResponse](#psim-api-v1-RetryStepResponse)
     - [SavePlanDraftRequest](#psim-api-v1-SavePlanDraftRequest)
     - [SavePlanDraftResponse](#psim-api-v1-SavePlanDraftResponse)
+    - [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest)
+    - [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse)
+    - [SiteDuty](#psim-api-v1-SiteDuty)
     - [SkipStepRequest](#psim-api-v1-SkipStepRequest)
     - [SkipStepResponse](#psim-api-v1-SkipStepResponse)
     - [UpdateEscalationPolicyRequest](#psim-api-v1-UpdateEscalationPolicyRequest)
@@ -353,6 +364,7 @@
     - [EscalationPolicyService](#psim-api-v1-EscalationPolicyService)
     - [ResponsePlanService](#psim-api-v1-ResponsePlanService)
     - [ResponseRunService](#psim-api-v1-ResponseRunService)
+    - [SiteDutyService](#psim-api-v1-SiteDutyService)
 
 - [psim/processing/v1/mapping.proto](#psim_processing_v1_mapping-proto)
     - [MappingRule](#psim-processing-v1-MappingRule)
@@ -472,6 +484,7 @@
     - [IncidentEscalated](#psim-incident-v1-IncidentEscalated)
     - [IncidentEventRecord](#psim-incident-v1-IncidentEventRecord)
     - [IncidentLinkAdded](#psim-incident-v1-IncidentLinkAdded)
+    - [IncidentNotificationUpdated](#psim-incident-v1-IncidentNotificationUpdated)
     - [IncidentPriorityChanged](#psim-incident-v1-IncidentPriorityChanged)
     - [IncidentReopened](#psim-incident-v1-IncidentReopened)
     - [IncidentResolved](#psim-incident-v1-IncidentResolved)
@@ -3179,6 +3192,7 @@ Incident groups signals and tracks the response lifecycle (ADR-027).
 | auto_close_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  | Durable deadline used by automatic close after resolution. |
 | signal_count | [uint64](#uint64) |  | Total identities in the paginated signal collection. |
 | signal_ids_truncated | [bool](#bool) |  | The preview is bounded to 1000 identities. |
+| escalation_policy_id | [string](#string) |  | Policy identity fixed with the incident type version. |
 
 
 
@@ -4591,6 +4605,7 @@ Recipient is a notification recipient: a user or a role within the incident scop
 | ----- | ---- | ----- | ----------- |
 | user_id | [string](#string) |  |  |
 | role | [string](#string) |  |  |
+| current_duty | [bool](#bool) |  | Resolve the current site duty at escalation dispatch. Must be true. |
 
 
 
@@ -4743,6 +4758,9 @@ Notification is a message to a recipient over a channel.
 | delivered_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | read | [bool](#bool) |  | In-app notifications only. |
 | version | [uint64](#uint64) |  |  |
+| request_id | [string](#string) |  | Stable source request and delivery receipt identities. |
+| receipt_id | [string](#string) |  |  |
+| failure_code | [string](#string) |  |  |
 
 
 
@@ -4780,6 +4798,7 @@ NotificationState is the delivery state.
 | NOTIFICATION_STATE_DELIVERED | 3 |  |
 | NOTIFICATION_STATE_FAILED | 4 |  |
 | NOTIFICATION_STATE_AGGREGATED | 5 |  |
+| NOTIFICATION_STATE_UNKNOWN | 6 | External acceptance cannot be inferred after transport or process failure. |
 
 
 
@@ -4861,10 +4880,103 @@ MarkNotificationReadResponse is the response of MarkNotificationRead.
 
 
 
+<a name="psim-api-v1-NotificationContact"></a>
+
+### NotificationContact
+NotificationContact supplies destinations; account roles and scope come from the identity provider.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user_id | [string](#string) |  |  |
+| site_id | [string](#string) |  |  |
+| email | [string](#string) |  |  |
+| webhook_url | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
 
 
 
 
+
+
+<a name="psim-api-v1-ResolveUnknownDeliveryRequest"></a>
+
+### ResolveUnknownDeliveryRequest
+ResolveUnknownDeliveryRequest records evidence from the transport receiver.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| notification_id | [string](#string) |  |  |
+| accepted | [bool](#bool) |  |  |
+| receipt_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ResolveUnknownDeliveryResponse"></a>
+
+### ResolveUnknownDeliveryResponse
+ResolveUnknownDeliveryResponse contains the reconciled notification.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| notification | [psim.response.v1.Notification](#psim-response-v1-Notification) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetNotificationContactRequest"></a>
+
+### SetNotificationContactRequest
+SetNotificationContactRequest replaces destinations.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user_id | [string](#string) |  |  |
+| contact | [NotificationContact](#psim-api-v1-NotificationContact) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetNotificationContactResponse"></a>
+
+### SetNotificationContactResponse
+SetNotificationContactResponse contains the stored destinations.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| contact | [NotificationContact](#psim-api-v1-NotificationContact) |  |  |
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="psim-api-v1-NotificationContactService"></a>
+
+### NotificationContactService
+NotificationContactService manages channel destinations. Owner: Notification Service.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| SetNotificationContact | [SetNotificationContactRequest](#psim-api-v1-SetNotificationContactRequest) | [SetNotificationContactResponse](#psim-api-v1-SetNotificationContactResponse) | SetNotificationContact replaces destinations for a user in a site. |
+| ResolveUnknownDelivery | [ResolveUnknownDeliveryRequest](#psim-api-v1-ResolveUnknownDeliveryRequest) | [ResolveUnknownDeliveryResponse](#psim-api-v1-ResolveUnknownDeliveryResponse) | ResolveUnknownDelivery records a verified transport outcome; it never resends a notification. |
 
 
 <a name="psim-api-v1-NotificationService"></a>
@@ -5360,6 +5472,36 @@ GetPlanResponse is the response of GetPlan.
 
 
 
+<a name="psim-api-v1-GetSiteDutyRequest"></a>
+
+### GetSiteDutyRequest
+GetSiteDutyRequest selects a site.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetSiteDutyResponse"></a>
+
+### GetSiteDutyResponse
+GetSiteDutyResponse contains responsibility.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-ListEscalationPoliciesRequest"></a>
 
 ### ListEscalationPoliciesRequest
@@ -5550,6 +5692,55 @@ SavePlanDraftResponse is the response of SavePlanDraft.
 
 
 
+<a name="psim-api-v1-SetSiteDutyRequest"></a>
+
+### SetSiteDutyRequest
+SetSiteDutyRequest replaces responsibility.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetSiteDutyResponse"></a>
+
+### SetSiteDutyResponse
+SetSiteDutyResponse contains the stored version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SiteDuty"></a>
+
+### SiteDuty
+SiteDuty is explicit responsibility; empty user_id activates the fallback.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| user_id | [string](#string) |  |  |
+| fallback_user_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-SkipStepRequest"></a>
 
 ### SkipStepRequest
@@ -5689,6 +5880,17 @@ ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
 | SkipStep | [SkipStepRequest](#psim-api-v1-SkipStepRequest) | [SkipStepResponse](#psim-api-v1-SkipStepResponse) | SkipStep skips a non-mandatory step with a reason (RR3). |
 | RetryStep | [RetryStepRequest](#psim-api-v1-RetryStepRequest) | [RetryStepResponse](#psim-api-v1-RetryStepResponse) | RetryStep retries a failed step. |
 | OverrideStep | [OverrideStepRequest](#psim-api-v1-OverrideStepRequest) | [OverrideStepResponse](#psim-api-v1-OverrideStepResponse) | OverrideStep completes a failed step by a supervisor decision. |
+
+
+<a name="psim-api-v1-SiteDutyService"></a>
+
+### SiteDutyService
+SiteDutyService assigns explicit site responsibility. Owner: Response Engine.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetSiteDuty | [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest) | [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse) | GetSiteDuty returns current and fallback recipients. |
+| SetSiteDuty | [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest) | [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse) | SetSiteDuty replaces responsibility with optimistic concurrency control. |
 
 
 
@@ -7382,6 +7584,7 @@ Every event carries the incident state after the change; envelope.sequence = inc
 | incident_transfer_requested | [IncidentTransferRequested](#psim-incident-v1-IncidentTransferRequested) |  |  |
 | incident_transfer_confirmed | [IncidentTransferConfirmed](#psim-incident-v1-IncidentTransferConfirmed) |  |  |
 | incident_command_updated | [IncidentCommandUpdated](#psim-incident-v1-IncidentCommandUpdated) |  |  |
+| incident_notification_updated | [IncidentNotificationUpdated](#psim-incident-v1-IncidentNotificationUpdated) |  |  |
 
 
 
@@ -7398,6 +7601,22 @@ IncidentLinkAdded is published when an external link is attached.
 | ----- | ---- | ----- | ----------- |
 | incident | [Incident](#psim-incident-v1-Incident) |  |  |
 | link | [Link](#psim-incident-v1-Link) |  |  |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentNotificationUpdated"></a>
+
+### IncidentNotificationUpdated
+IncidentNotificationUpdated appends a notification receipt or delivery state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [Incident](#psim-incident-v1-Incident) |  |  |
+| entry | [TimelineEntry](#psim-incident-v1-TimelineEntry) |  |  |
 
 
 
@@ -7905,6 +8124,7 @@ EscalationLevelTriggered reports that an escalation level fired for an incident.
 | level | [uint32](#uint32) |  |  |
 | policy_id | [string](#string) |  |  |
 | notification_ids | [string](#string) | repeated |  |
+| sla_kind | [string](#string) |  | The independent SLA dimension that triggered the level. |
 
 
 

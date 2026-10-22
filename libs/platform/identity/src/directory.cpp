@@ -1,4 +1,4 @@
-#include "directory.hpp"
+#include "psim/platform/identity/directory.hpp"
 
 #include <nlohmann/json.hpp>
 
@@ -14,8 +14,8 @@
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/stream/runtime.hpp"
 
-namespace psim::incident_service {
-namespace p = platform;
+namespace psim::platform::identity {
+namespace p = psim::platform;
 
 namespace {
 std::string form(std::string_view input) {
@@ -90,4 +90,4 @@ boost::asio::awaitable<p::Result<p::security::Principal>> Directory::lookup(std:
     co_return p::fail(p::ErrorCode::kCommonUnavailable, "invalid identity directory response");
   }
 }
-}  // namespace psim::incident_service
+}  // namespace psim::platform::identity

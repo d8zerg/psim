@@ -53,6 +53,8 @@ message Incident {
   uint64 signal_count = 27;
   // The preview is bounded to 1000 identities.
   bool signal_ids_truncated = 28;
+  // Policy identity fixed with the incident type version.
+  string escalation_policy_id = 29;
 }
 
 // IncidentState is the lifecycle state of an incident.

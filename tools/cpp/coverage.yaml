@@ -8,11 +8,11 @@ groups:
   # Adapters whose code runs only against real infrastructure: gated by `task test:component`
   # (unit and component tests together, TS-03); the unit run reports them.
   - name: adapters
-    modules: ['libs/platform/kafka', 'libs/platform/pg', 'libs/platform/redis', 'libs/platform/clickhouse', 'libs/platform/s3', 'libs/platform/stream', 'libs/platform/timers']
+    modules: ['libs/platform/kafka', 'libs/platform/pg', 'libs/platform/redis', 'libs/platform/clickhouse', 'libs/platform/s3', 'libs/platform/stream', 'libs/platform/timers', 'libs/platform/identity']
     lines: 75
     measured_by: component
   - name: pipeline
-    modules: ['services/response-engine', 'services/command-service', 'services/connector-gateway', 'services/normalizer', 'services/event-history', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway', 'services/resource-catalog']
+    modules: ['services/notification-service', 'services/response-engine', 'services/command-service', 'services/connector-gateway', 'services/normalizer', 'services/event-history', 'services/correlation-engine', 'services/incident-service', 'services/api-gateway', 'services/resource-catalog']
     lines: 75
     measured_by: component
   - name: connectors

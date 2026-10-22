@@ -2730,6 +2730,79 @@ paths:
         '409': *id008
         '412': *id009
       summary: MarkNotificationRead marks an in-app notification as read
+  /v1/notification-contacts/{userId}:
+    put:
+      tags:
+      - NotificationContactService
+      description: SetNotificationContact replaces destinations for a user in a site.
+      operationId: NotificationContactService_SetNotificationContact
+      parameters:
+      - name: userId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.NotificationContact'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SetNotificationContactResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: SetNotificationContact replaces destinations for a user in a site
+  /v1/notifications/{notificationId}:resolve:
+    post:
+      tags:
+      - NotificationContactService
+      description: ResolveUnknownDelivery records a verified transport outcome; it never resends a notification.
+      operationId: NotificationContactService_ResolveUnknownDelivery
+      parameters:
+      - name: notificationId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id011
+      - *id012
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ResolveUnknownDeliveryRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ResolveUnknownDeliveryResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id008
+        '412': *id009
+      summary: ResolveUnknownDelivery records a verified transport outcome; it never resends a notification
   /v1/plans:
     get:
       tags:
@@ -3592,6 +3665,68 @@ paths:
         '412': *id015
       parameters: *id016
       summary: UpdateRetentionSettings replaces retention settings (If-Match required)
+  /v1/sites/{siteId}/duty:
+    get:
+      tags:
+      - SiteDutyService
+      description: GetSiteDuty returns current and fallback recipients.
+      operationId: SiteDutyService_GetSiteDuty
+      parameters:
+      - name: siteId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetSiteDutyResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+      summary: GetSiteDuty returns current and fallback recipients
+    put:
+      tags:
+      - SiteDutyService
+      description: SetSiteDuty replaces responsibility with optimistic concurrency control.
+      operationId: SiteDutyService_SetSiteDuty
+      parameters:
+      - name: siteId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id013
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.SiteDuty'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SetSiteDutyResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '429': *id005
+        '500': *id006
+        '503': *id007
+        '409': *id014
+        '412': *id015
+      summary: SetSiteDuty replaces responsibility with optimistic concurrency control
 components:
   schemas:
     psim.api.v1.AcknowledgeIncidentRequest:
@@ -4109,6 +4244,12 @@ components:
         processing:
           $ref: '#/components/schemas/psim.config.v1.ProcessingSettings'
       description: GetSettingsResponse is the response of GetSettings.
+    psim.api.v1.GetSiteDutyResponse:
+      type: object
+      properties:
+        duty:
+          $ref: '#/components/schemas/psim.api.v1.SiteDuty'
+      description: GetSiteDutyResponse contains responsibility.
     psim.api.v1.ImportJob:
       type: object
       properties:
@@ -4394,6 +4535,20 @@ components:
         notification:
           $ref: '#/components/schemas/psim.response.v1.Notification'
       description: MarkNotificationReadResponse is the response of MarkNotificationRead.
+    psim.api.v1.NotificationContact:
+      type: object
+      properties:
+        userId:
+          type: string
+        siteId:
+          type: string
+        email:
+          type: string
+        webhookUrl:
+          type: string
+        version:
+          type: string
+      description: NotificationContact supplies destinations; account roles and scope come from the identity provider.
     psim.api.v1.OperatorLoad:
       type: object
       properties:
@@ -4531,6 +4686,22 @@ components:
         incident:
           $ref: '#/components/schemas/psim.incident.v1.Incident'
       description: ResolveIncidentResponse is the response of ResolveIncident.
+    psim.api.v1.ResolveUnknownDeliveryRequest:
+      type: object
+      properties:
+        notificationId:
+          type: string
+        accepted:
+          type: boolean
+        receiptId:
+          type: string
+      description: ResolveUnknownDeliveryRequest records evidence from the transport receiver.
+    psim.api.v1.ResolveUnknownDeliveryResponse:
+      type: object
+      properties:
+        notification:
+          $ref: '#/components/schemas/psim.response.v1.Notification'
+      description: ResolveUnknownDeliveryResponse contains the reconciled notification.
     psim.api.v1.RetryStepRequest:
       type: object
       properties:
@@ -4675,6 +4846,30 @@ components:
         incident:
           $ref: '#/components/schemas/psim.incident.v1.Incident'
       description: SetIncidentPriorityResponse is the response of SetIncidentPriority.
+    psim.api.v1.SetNotificationContactResponse:
+      type: object
+      properties:
+        contact:
+          $ref: '#/components/schemas/psim.api.v1.NotificationContact'
+      description: SetNotificationContactResponse contains the stored destinations.
+    psim.api.v1.SetSiteDutyResponse:
+      type: object
+      properties:
+        duty:
+          $ref: '#/components/schemas/psim.api.v1.SiteDuty'
+      description: SetSiteDutyResponse contains the stored version.
+    psim.api.v1.SiteDuty:
+      type: object
+      properties:
+        siteId:
+          type: string
+        userId:
+          type: string
+        fallbackUserId:
+          type: string
+        version:
+          type: string
+      description: SiteDuty is explicit responsibility; empty user_id activates the fallback.
     psim.api.v1.SkipStepRequest:
       type: object
       properties:
@@ -5507,6 +5702,9 @@ components:
         signalIdsTruncated:
           type: boolean
           description: The preview is bounded to 1000 identities.
+        escalationPolicyId:
+          type: string
+          description: Policy identity fixed with the incident type version.
       description: Incident groups signals and tracks the response lifecycle (ADR-027).
     psim.incident.v1.IncidentTransfer:
       type: object
@@ -6206,6 +6404,7 @@ components:
           - NOTIFICATION_STATE_DELIVERED
           - NOTIFICATION_STATE_FAILED
           - NOTIFICATION_STATE_AGGREGATED
+          - NOTIFICATION_STATE_UNKNOWN
           type: string
           format: enum
         template:
@@ -6234,6 +6433,13 @@ components:
           type: boolean
           description: In-app notifications only.
         version:
+          type: string
+        requestId:
+          type: string
+          description: Stable source request and delivery receipt identities.
+        receiptId:
+          type: string
+        failureCode:
           type: string
       description: Notification is a message to a recipient over a channel.
     psim.response.v1.NotifyParams:
@@ -6292,6 +6498,9 @@ components:
           type: string
         role:
           type: string
+        currentDuty:
+          type: boolean
+          description: Resolve the current site duty at escalation dispatch. Must be true.
       description: 'Recipient is a notification recipient: a user or a role within the incident scope.'
     psim.response.v1.ResponsePlan:
       type: object
@@ -6563,6 +6772,8 @@ tags:
   description: 'MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.'
 - name: MeService
   description: 'MeService describes the caller. Owner: API Gateway (from the access token and the policy table).'
+- name: NotificationContactService
+  description: 'NotificationContactService manages channel destinations. Owner: Notification Service.'
 - name: NotificationService
   description: 'NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.'
 - name: ReportService
@@ -6575,6 +6786,8 @@ tags:
 - name: SettingsService
   description: "SettingsService manages tenant-wide retention and processing settings.\n Owner: Resource Catalog; changes\
     \ are published to psim.config.v1."
+- name: SiteDutyService
+  description: 'SiteDutyService assigns explicit site responsibility. Owner: Response Engine.'
 servers:
 - url: https://{host}
   variables:

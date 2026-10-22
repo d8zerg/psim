@@ -44,3 +44,53 @@ message MarkNotificationReadRequest {
 message MarkNotificationReadResponse {
   psim.response.v1.Notification notification = 1;
 }
+
+// NotificationContactService manages channel destinations. Owner: Notification Service.
+service NotificationContactService {
+  // SetNotificationContact replaces destinations for a user in a site.
+  rpc SetNotificationContact(SetNotificationContactRequest) returns (SetNotificationContactResponse) {
+    option (google.api.http) = {
+      put: "/v1/notification-contacts/{user_id}"
+      body: "contact"
+    };
+  }
+  // ResolveUnknownDelivery records a verified transport outcome; it never resends a notification.
+  rpc ResolveUnknownDelivery(ResolveUnknownDeliveryRequest) returns (ResolveUnknownDeliveryResponse) {
+    option (google.api.http) = {
+      post: "/v1/notifications/{notification_id}:resolve"
+      body: "*"
+    };
+  }
+}
+
+// NotificationContact supplies destinations; account roles and scope come from the identity provider.
+message NotificationContact {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+  string site_id = 2 [(buf.validate.field).string.uuid = true];
+  string email = 3;
+  string webhook_url = 4;
+  uint64 version = 5;
+}
+
+// SetNotificationContactRequest replaces destinations.
+message SetNotificationContactRequest {
+  string user_id = 1 [(buf.validate.field).string.uuid = true];
+  NotificationContact contact = 2 [(buf.validate.field).required = true];
+}
+
+// SetNotificationContactResponse contains the stored destinations.
+message SetNotificationContactResponse {
+  NotificationContact contact = 1;
+}
+
+// ResolveUnknownDeliveryRequest records evidence from the transport receiver.
+message ResolveUnknownDeliveryRequest {
+  string notification_id = 1 [(buf.validate.field).string.uuid = true];
+  bool accepted = 2;
+  string receipt_id = 3 [(buf.validate.field).string.min_len = 1];
+}
+
+// ResolveUnknownDeliveryResponse contains the reconciled notification.
+message ResolveUnknownDeliveryResponse {
+  psim.response.v1.Notification notification = 1;
+}

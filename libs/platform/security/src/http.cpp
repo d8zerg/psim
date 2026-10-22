@@ -10,6 +10,8 @@
 #include <boost/beast/core/tcp_stream.hpp>
 #include <boost/beast/http.hpp>
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
 #include <chrono>
 #include <cstddef>
@@ -94,6 +96,9 @@ asio::awaitable<Result<HttpResponse>> exchange(Stream* stream, const Url* url, c
   if (!options->bearer_token.empty()) {
     request.set(http::field::authorization, "Bearer " + options->bearer_token);
   }
+  for (const auto& [name, value] : options->headers) {
+    request.set(name, value);
+  }
   if (!body.empty()) {
     request.set(http::field::content_type, content_type);
     request.body() = std::move(body);
@@ -120,6 +125,13 @@ asio::awaitable<Result<HttpResponse>> request_once(Url url, HttpOptions options,
   auto [error, endpoints] = co_await resolver.async_resolve(url.host, url.port, kAwait);
   if (error) {
     co_return fail(ErrorCode::kCommonUnavailable, "HTTP resolution failed");
+  }
+  if (options.public_network_only) {
+    for (const auto& endpoint : endpoints) {
+      if (!public_address(endpoint.endpoint().address().to_string())) {
+        co_return fail(ErrorCode::kAuthForbidden, "HTTP destination address forbidden");
+      }
+    }
   }
   if (!url.tls) {
     beast::tcp_stream stream(executor);
@@ -151,6 +163,26 @@ asio::awaitable<Result<HttpResponse>> request_once(Url url, HttpOptions options,
 }
 }  // namespace
 
+bool public_address(std::string_view input) {
+  boost::system::error_code error;
+  const auto address = asio::ip::make_address(std::string(input), error);
+  if (error || address.is_unspecified() || address.is_loopback() || address.is_multicast()) {
+    return false;
+  }
+  if (address.is_v4()) {
+    const auto number = address.to_v4().to_uint();
+    return (number >> 24) != 0 && (number >> 24) != 10 && (number >> 24) != 127 && (number >> 16) != 0xa9fe
+           && (number >> 20) != 0xac1 && (number >> 16) != 0xc0a8 && (number >> 22) != 0x191 && (number >> 24) < 224
+           && (number >> 8) != 0xc00000 && (number >> 8) != 0xc00002 && (number >> 8) != 0xc05863
+           && (number & 0xfffe0000U) != 0xc6120000U && (number >> 8) != 0xc63364 && (number >> 8) != 0xcb0071;
+  }
+  const auto bytes = address.to_v6().to_bytes();
+  // Only global unicast; mapped IPv4, NAT64, ULA, link-local and transition ranges fail closed.
+  return (bytes[0] & 0xe0) == 0x20 && (bytes[0] != 0x20 || bytes[1] != 0x01 || bytes[2] != 0x0d || bytes[3] != 0xb8)
+         && (bytes[0] != 0x20 || bytes[1] != 0x01 || bytes[2] >= 2) && (bytes[0] != 0x20 || bytes[1] != 0x02)
+         && (bytes[0] != 0x3f || bytes[1] != 0xff || bytes[2] >= 0x10);
+}
+
 Result<void> validate_url(std::string_view url, bool allow_plaintext) {
   auto parsed = parse_url(url, allow_plaintext);
   if (!parsed) {
@@ -170,6 +202,17 @@ asio::awaitable<Result<HttpResponse>> http_request(std::string url, HttpOptions 
       || options.bearer_token.size() > 16384 || options.bearer_token.find_first_of("\r\n") != std::string::npos
       || body.size() > std::size_t{1024} * 1024 || content_type.find_first_of("\r\n") != std::string::npos) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "invalid HTTP request limits");
+  }
+  for (const auto& [name, value] : options.headers) {
+    std::string lower = name;
+    std::ranges::transform(lower, lower.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (name.empty() || name.size() > 100 || value.size() > 8192
+        || !std::ranges::all_of(name, [](unsigned char c) { return std::isalnum(c) || c == '-'; })
+        || !std::ranges::all_of(value, [](unsigned char c) { return c >= 32 && c < 127; }) || lower == "host"
+        || lower == "content-length" || lower == "transfer-encoding" || lower == "authorization"
+        || lower == "connection" || lower == "content-type") {
+      co_return fail(ErrorCode::kCommonInvalidArgument, "invalid HTTP application header");
+    }
   }
   try {
     async::SystemClock clock;

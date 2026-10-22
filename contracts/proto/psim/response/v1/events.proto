@@ -101,4 +101,6 @@ message EscalationLevelTriggered {
   uint32 level = 2;
   string policy_id = 3;
   repeated string notification_ids = 4;
+  // The independent SLA dimension that triggered the level.
+  string sla_kind = 5;
 }

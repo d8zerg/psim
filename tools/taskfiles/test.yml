@@ -234,3 +234,8 @@ tasks:
     desc: Durable response execution, timer accuracy and restart recovery
     cmds:
       - task: :response:test
+
+  notifications:
+    desc: Durable SLA escalation, current site duty and TLS notification delivery
+    cmds:
+      - task: :notifications:test

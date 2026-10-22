@@ -13,3 +13,5 @@ add_subdirectory(event-history)
 add_subdirectory(command-service)
 
 add_subdirectory(response-engine)
+
+add_subdirectory(notification-service)

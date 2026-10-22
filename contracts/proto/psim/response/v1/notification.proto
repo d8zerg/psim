@@ -22,6 +22,10 @@ message Notification {
   // In-app notifications only.
   bool read = 12;
   uint64 version = 13;
+  // Stable source request and delivery receipt identities.
+  string request_id = 14;
+  string receipt_id = 15;
+  string failure_code = 16;
 }
 
 // NotificationState is the delivery state.
@@ -32,4 +36,6 @@ enum NotificationState {
   NOTIFICATION_STATE_DELIVERED = 3;
   NOTIFICATION_STATE_FAILED = 4;
   NOTIFICATION_STATE_AGGREGATED = 5;
+  // External acceptance cannot be inferred after transport or process failure.
+  NOTIFICATION_STATE_UNKNOWN = 6;
 }

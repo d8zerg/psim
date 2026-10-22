@@ -1,0 +1,30 @@
+version: '3'
+vars:
+  NOTIFICATION_PROJECT: '{{.NOTIFICATION_PROJECT | default "psim-notification-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: SLA policies, site duties and notifications through real TLS SMTP and signed webhook receivers
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/notifications/check.py {{.NOTIFICATION_PROJECT}} {{.PRESET}} 10
+  sanitizers:
+    desc: Notification delivery and SLA recovery under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_response_test|psim_notification_test|psim_platform_security_test|psim_incident_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}', NOTIFICATION_PROJECT: '{{.NOTIFICATION_PROJECT}}'}
+  coverage:
+    desc: Notification and SLA coverage with real infrastructure
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage, NOTIFICATION_PROJECT: '{{.NOTIFICATION_PROJECT}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_response_test|psim_notification_test|psim_platform_security_test|psim_incident_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/notification-service libs/platform/identity' --component

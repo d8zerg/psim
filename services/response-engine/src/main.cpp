@@ -23,12 +23,14 @@
 #include <utility>
 #include <vector>
 
+#include "escalation.hpp"
 #include "http.hpp"
 #include "model.hpp"
 #include "psim/catalog/v1/catalog.pb.h"
 #include "psim/incident/v1/events.pb.h"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
+#include "psim/platform/identity/directory.hpp"
 #include "psim/platform/kafka/client.hpp"
 #include "psim/platform/kafka/processor.hpp"
 #include "psim/platform/pg/store.hpp"
@@ -53,6 +55,10 @@ std::string settings() {
        {"tls_ca_file", "tls_certificate_file", "tls_private_key_file", "jwks_ca_file", "handler_ca_file"}) {
     fields[name] = {{"type", "string"}, {"default", ""}};
   }
+  for (const auto* name : {"directory_base", "directory_client", "directory_roles_client"}) {
+    fields[name] = {{"type", "string"}, {"default", ""}};
+  }
+  fields["directory_secret_file"] = {{"type", "string"}, {"x-psim-secret", true}};
   fields["handler_urls"] = {{"type", "array"}, {"items", {{"type", "string"}}}, {"default", Json::array()}};
   return schema.dump();
 }
@@ -140,7 +146,28 @@ class Worker final : public p::stream::Worker {
     if (!initialized) {
       co_return initialized;
     }
-    api_ = std::make_unique<Api>(repository_.get());
+    p::identity::DirectoryOptions directory{
+        .base = config.get<std::string>("settings.directory_base"),
+        .client = config.get<std::string>("settings.directory_client"),
+        .roles_client = config.get<std::string>("settings.directory_roles_client"),
+        .http = {
+            .tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"), .require_client_certificate = false},
+            .allow_plaintext = config.get<bool>("settings.allow_plaintext")}};
+    if (auto secret = config.secret("settings.directory_secret_file")) {
+      directory.secret = std::string(*secret);
+    }
+    directory_ = std::make_unique<p::identity::Directory>(std::move(directory));
+    escalation_ = std::make_unique<Escalation>(
+        pool_.get(),
+        [this](std::string topic, std::string key, const google::protobuf::Message& message) {
+          return record(std::move(topic), std::move(key), message, {});
+        },
+        [this](std::string subject) { return directory_->lookup(std::move(subject)); });
+    initialized = co_await escalation_->initialize();
+    if (!initialized) {
+      co_return initialized;
+    }
+    api_ = std::make_unique<Api>(repository_.get(), escalation_.get());
     auto tls = co_await context().blocking().run([&config] {
       const auto directory = config.get<std::string>("settings.tls_directory");
       const auto certificate = config.get<std::string>("settings.tls_certificate_file");
@@ -194,7 +221,10 @@ class Worker final : public p::stream::Worker {
       co_return std::unexpected(input.error());
     }
     const auto missing = repository_->missing_plans();
-    auto result = co_await repository_->incident(std::move(*input));
+    auto result = co_await escalation_->incident(*input);
+    if (result) {
+      result = co_await repository_->incident(std::move(*input));
+    }
     if (result) {
       missing_->Increment(static_cast<double>(repository_->missing_plans() - missing));
     }
@@ -230,6 +260,9 @@ class Worker final : public p::stream::Worker {
         }
       } else {
         result = co_await repository_->tick();
+        if (result) {
+          result = co_await escalation_->tick();
+        }
       }
       (publishing ? relay_healthy_ : tick_healthy_).store(result.has_value());
       if (!result) {
@@ -354,6 +387,8 @@ class Worker final : public p::stream::Worker {
     verifier_.reset();
     tls_.reset();
     relay_.reset();
+    escalation_.reset();
+    directory_.reset();
     repository_.reset();
     if (pool_) {
       pool_->close();
@@ -373,6 +408,8 @@ class Worker final : public p::stream::Worker {
   std::set<std::shared_ptr<beast::ssl_stream<beast::tcp_stream>>> sessions_;
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<Repository> repository_;
+  std::unique_ptr<Escalation> escalation_;
+  std::unique_ptr<p::identity::Directory> directory_;
   std::unique_ptr<p::pg::OutboxRelay> relay_;
   std::unique_ptr<Api> api_;
   std::unique_ptr<p::security::JwksCache> verifier_;
@@ -404,7 +441,29 @@ class ProjectionWorker final : public p::stream::Worker {
         co_return registered;
       }
     }
-    co_return co_await repository_->initialize();
+    auto initialized = co_await repository_->initialize();
+    if (!initialized) {
+      co_return initialized;
+    }
+    const auto& config = context().config();
+    p::identity::DirectoryOptions directory{
+        .base = config.get<std::string>("settings.directory_base"),
+        .client = config.get<std::string>("settings.directory_client"),
+        .roles_client = config.get<std::string>("settings.directory_roles_client"),
+        .http = {
+            .tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"), .require_client_certificate = false},
+            .allow_plaintext = config.get<bool>("settings.allow_plaintext")}};
+    if (auto secret = config.secret("settings.directory_secret_file")) {
+      directory.secret = std::string(*secret);
+    }
+    directory_ = std::make_unique<p::identity::Directory>(std::move(directory));
+    escalation_ = std::make_unique<Escalation>(
+        pool_.get(),
+        [this](std::string topic, std::string key, const google::protobuf::Message& message) {
+          return record(std::move(topic), std::move(key), message, {});
+        },
+        [this](std::string subject) { return directory_->lookup(std::move(subject)); });
+    co_return co_await escalation_->initialize();
   }
 
   asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
@@ -422,10 +481,16 @@ class ProjectionWorker final : public p::stream::Worker {
     if (!value) {
       co_return std::unexpected(value.error());
     }
+    auto escalated = co_await escalation_->response(*value);
+    if (!escalated) {
+      co_return escalated;
+    }
     co_return co_await repository_->response(std::move(*value));
   }
 
   asio::awaitable<void> shutdown() override {
+    escalation_.reset();
+    directory_.reset();
     repository_.reset();
     if (pool_) {
       pool_->close();
@@ -438,6 +503,8 @@ class ProjectionWorker final : public p::stream::Worker {
   bool catalog_;
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<Repository> repository_;
+  std::unique_ptr<Escalation> escalation_;
+  std::unique_ptr<p::identity::Directory> directory_;
 };
 }  // namespace psim::response_engine
 

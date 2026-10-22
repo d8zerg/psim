@@ -29,6 +29,7 @@ message IncidentEventRecord {
     IncidentTransferRequested incident_transfer_requested = 15;
     IncidentTransferConfirmed incident_transfer_confirmed = 16;
     IncidentCommandUpdated incident_command_updated = 17;
+    IncidentNotificationUpdated incident_notification_updated = 18;
   }
 }
 
@@ -120,6 +121,12 @@ message IncidentTransferConfirmed {
 
 // IncidentCommandUpdated appends a device command change to the incident timeline.
 message IncidentCommandUpdated {
+  Incident incident = 1;
+  TimelineEntry entry = 2;
+}
+
+// IncidentNotificationUpdated appends a notification receipt or delivery state.
+message IncidentNotificationUpdated {
   Incident incident = 1;
   TimelineEntry entry = 2;
 }

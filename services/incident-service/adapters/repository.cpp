@@ -34,6 +34,7 @@
 #include "psim/processing/v1/signal.pb.h"
 #include "psim/response/v1/command.pb.h"
 #include "psim/response/v1/events.pb.h"
+#include "psim/response/v1/notification.pb.h"
 #include "psim/response/v1/run.pb.h"
 
 namespace psim::incident_service {
@@ -162,7 +163,11 @@ boost::asio::awaitable<p::Result<void>> Repository::initialize() {
            {.version = 6,
             .name = "command timeline versions",
             .expand = {"CREATE TABLE incident.command_versions(tenant uuid NOT NULL,id uuid NOT NULL,version bigint "
-                       "NOT NULL,PRIMARY KEY(tenant,id,version))"}}});
+                       "NOT NULL,PRIMARY KEY(tenant,id,version))"}},
+           {.version = 7,
+            .name = "notification timeline versions",
+            .expand = {"CREATE TABLE incident.notification_versions(tenant uuid NOT NULL,id uuid NOT NULL,version "
+                       "bigint NOT NULL,PRIMARY KEY(tenant,id,version))"}}});
 }
 
 asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::security::Principal principal,
@@ -432,6 +437,7 @@ asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord 
           value.set_incident_id(p::stream::uuid7());
           value.set_incident_type_id(source.incident_type_id());
           value.set_incident_type_version(type.version());
+          value.set_escalation_policy_id(type.escalation_policy_id());
           value.set_site_id(source.site_id());
           value.set_zone_id(source.zone_id());
           value.set_state(incident::v1::INCIDENT_STATE_NEW);
@@ -617,7 +623,8 @@ asio::awaitable<p::Result<Json>> Repository::execute(pg::Transaction* tx, p::sec
       co_return output;
     }
     auto type = parse<incident::v1::IncidentType>(body);
-    if (!type || !p::stream::uuid(type->incident_type_id()) || type->code().empty() || type->code().size() > 128
+    if (!type || (!type->escalation_policy_id().empty() && !p::stream::uuid(type->escalation_policy_id()))
+        || !p::stream::uuid(type->incident_type_id()) || type->code().empty() || type->code().size() > 128
         || type->name().empty() || type->name().size() > 1024 || type->default_priority() < 1
         || type->default_priority() > 4 || Time::DurationToNanoseconds(type->grouping_window()) <= 0
         || Time::DurationToNanoseconds(type->grouping_window()) > 86400000000000LL
@@ -1000,11 +1007,13 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
     co_return p::fail(Code::kProcessingPayloadInvalid, "invalid response identity");
   }
   if (!input.has_run_updated() && !input.has_escalation_level_triggered() && !input.has_command_updated()
-      && !input.has_plan_unavailable()) {
+      && !input.has_plan_unavailable() && !input.has_notification_updated()) {
     co_return p::Result<void>{};
   }
   std::string id;
-  if (input.has_command_updated()) {
+  if (input.has_notification_updated()) {
+    id = input.notification_updated().notification().incident_id();
+  } else if (input.has_command_updated()) {
     id = input.command_updated().command().incident_id();
   } else if (input.has_run_updated()) {
     id = input.run_updated().run().incident_id();
@@ -1013,7 +1022,7 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
   } else {
     id = input.escalation_level_triggered().incident_id();
   }
-  if (input.has_command_updated() && id.empty()) {
+  if ((input.has_command_updated() || input.has_notification_updated()) && id.empty()) {
     co_return p::Result<void>{};
   }
   if (!p::stream::uuid(id)) {
@@ -1069,6 +1078,48 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
           envelope(event.mutable_envelope(), system(source.tenant_id()), value.version());
           *event.mutable_incident_comment_added()->mutable_incident() = value;
           *event.mutable_incident_comment_added()->mutable_entry() = entry;
+          co_return co_await messages_.append(
+              tx,
+              {event.envelope().message_id(), (outgoing ? outgoing : encode_)("psim.incidents.events.v1", id, event)});
+        }
+        if (input.has_notification_updated()) {
+          const auto& notification = input.notification_updated().notification();
+          if (source.actor().kind() != common::v1::ACTOR_KIND_SERVICE || source.actor().id() != "notification-service"
+              || !p::stream::uuid(notification.notification_id()) || notification.version() == 0) {
+            co_return p::fail(Code::kProcessingPayloadInvalid, "invalid notification publisher");
+          }
+          auto newer = co_await tx->connection().query(
+              {.sql = "INSERT INTO incident.notification_versions VALUES($1::uuid,$2::uuid,$3::bigint) ON CONFLICT DO "
+                      "NOTHING RETURNING version",
+               .parameters = {Param::text(source.tenant_id()), Param::text(notification.notification_id()),
+                              Param::text(std::to_string(notification.version()))}});
+          if (!newer) {
+            co_return std::unexpected(newer.error());
+          }
+          if (!newer->size()) {
+            co_return p::Result<void>{};
+          }
+          incident::v1::TimelineEntry entry;
+          entry.set_entry_id(source.message_id());
+          entry.set_incident_id(id);
+          *entry.mutable_at() = source.occurred_at();
+          *entry.mutable_actor() = source.actor();
+          entry.set_kind(incident::v1::TIMELINE_ENTRY_KIND_NOTIFICATION);
+          entry.set_ref_id(notification.notification_id());
+          (*entry.mutable_details())["state"] = response::v1::NotificationState_Name(notification.state());
+          (*entry.mutable_details())["receipt_id"] = notification.receipt_id();
+          (*entry.mutable_details())["failure_code"] = notification.failure_code();
+          auto stored = co_await tx->connection().query(
+              {.sql = "INSERT INTO incident.timeline VALUES($1::uuid,$2::uuid,$3::uuid,$4::jsonb)",
+               .parameters = {Param::text(source.tenant_id()), Param::text(id), Param::text(entry.entry_id()),
+                              Param::text(json(entry).dump())}});
+          if (!stored) {
+            co_return std::unexpected(stored.error());
+          }
+          incident::v1::IncidentEventRecord event;
+          envelope(event.mutable_envelope(), system(source.tenant_id()), value.version());
+          *event.mutable_incident_notification_updated()->mutable_incident() = value;
+          *event.mutable_incident_notification_updated()->mutable_entry() = entry;
           co_return co_await messages_.append(
               tx,
               {event.envelope().message_id(), (outgoing ? outgoing : encode_)("psim.incidents.events.v1", id, event)});

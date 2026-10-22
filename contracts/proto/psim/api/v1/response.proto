@@ -264,3 +264,47 @@ message UpdateEscalationPolicyRequest {
 message UpdateEscalationPolicyResponse {
   psim.response.v1.EscalationPolicy policy = 1;
 }
+
+// SiteDutyService assigns explicit site responsibility. Owner: Response Engine.
+service SiteDutyService {
+  // GetSiteDuty returns current and fallback recipients.
+  rpc GetSiteDuty(GetSiteDutyRequest) returns (GetSiteDutyResponse) {
+    option (google.api.http) = {get: "/v1/sites/{site_id}/duty"};
+  }
+  // SetSiteDuty replaces responsibility with optimistic concurrency control.
+  rpc SetSiteDuty(SetSiteDutyRequest) returns (SetSiteDutyResponse) {
+    option (google.api.http) = {
+      put: "/v1/sites/{site_id}/duty"
+      body: "duty"
+    };
+  }
+}
+
+// SiteDuty is explicit responsibility; empty user_id activates the fallback.
+message SiteDuty {
+  string site_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2;
+  string fallback_user_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 version = 4;
+}
+
+// GetSiteDutyRequest selects a site.
+message GetSiteDutyRequest {
+  string site_id = 1 [(buf.validate.field).string.uuid = true];
+}
+
+// GetSiteDutyResponse contains responsibility.
+message GetSiteDutyResponse {
+  SiteDuty duty = 1;
+}
+
+// SetSiteDutyRequest replaces responsibility.
+message SetSiteDutyRequest {
+  string site_id = 1 [(buf.validate.field).string.uuid = true];
+  SiteDuty duty = 2 [(buf.validate.field).required = true];
+}
+
+// SetSiteDutyResponse contains the stored version.
+message SetSiteDutyResponse {
+  SiteDuty duty = 1;
+}

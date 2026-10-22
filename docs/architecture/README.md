@@ -175,7 +175,8 @@ flowchart LR
     K6 --> CGW
     CGW --> K7{{psim.commands.results.v1}}
     K7 --> CMD
-    RE --> NOTIF[Notification Service]
+    K5 --> NOTIF[Notification Service]
+    NOTIF -- outbox --> K5
     K4 --> PROJ[Projection Service]
     K5 --> PROJ
     K4 --> RT[API Gateway:<br/>REST + realtime]
@@ -195,9 +196,9 @@ flowchart LR
 | Event History | C++ | Загрузка всех событий и связей с сигналами в ClickHouse, поиск | ClickHouse | По партициям `psim.events.normalized.v1` |
 | Correlation Engine | C++ | Правила, окна, состояние, сигналы; API управления правилами и пробного прогона | RocksDB + changelog; PostgreSQL для правил | По партициям `psim.events.normalized.v1` |
 | Incident Service | C++, REST | Агрегат инцидента, группировка, назначение, передача ответственности, хронология | PostgreSQL + inbox + outbox | По партициям `psim.signals.v1`; запросы пользователей - любой экземпляр |
-| Response Engine | C++, REST | Сценарии, запуски, SLA и таймеры, эскалации | PostgreSQL + outbox | По партициям `psim.incidents.events.v1`; таймеры распределены по тем же партициям |
+| Response Engine | C++, REST | Сценарии, запуски, SLA и таймеры, эскалации | PostgreSQL + outbox | Чтение Kafka по партициям; таймеры сериализуются блокировкой агрегата PostgreSQL |
 | Command Service | C++, REST | Жизненный цикл команд, подтверждения, таймауты | PostgreSQL + outbox | 2+ экземпляра |
-| Notification Service | C++ | Каналы in-app, email, webhook; повторы, агрегация | PostgreSQL | 1-2 экземпляра |
+| Notification Service | C++, REST | Каналы in-app, email, webhook; контакты, квитанции, повторы, агрегация | PostgreSQL | 1-2 экземпляра |
 | Projection Service | C++ | Лента, состояние объектов и устройств, загрузка операторов; факты инцидентов и отчёты | Redis (горячее), PostgreSQL (запросы), ClickHouse (факты и отчёты) | По партициям входных топиков |
 | Audit Service | C++, REST | Цепочка хэшей, контрольные точки, проверка, поиск | PostgreSQL, только добавление | 1 активный на тенант (цепочка последовательна) + резерв |
 | API Gateway | C++, Beast | REST v1, WebSocket realtime, JWT, ABAC, лимиты, маршрутизация | Redis: лимиты | Без состояния; N экземпляров |

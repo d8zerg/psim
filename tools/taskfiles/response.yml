@@ -23,12 +23,14 @@ tasks:
       - rm -rf build/{{.PLATFORM}}/coverage/profiles
       - task: test
         vars: {PRESET: coverage, RESPONSE_PROJECT: '{{.RESPONSE_PROJECT}}'}
+      - task: :notifications:test
+        vars: {PRESET: coverage, NOTIFICATION_PROJECT: '{{.RESPONSE_PROJECT}}-notifications'}
       - task: :cpp:_run
         vars:
           CMD: >-
-            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_domain_response_test|psim_domain_plan_test|psim_response_test' --output-on-failure &&
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_domain_response_test|psim_domain_plan_test|psim_response_test|psim_notification_test|psim_platform_security_test|psim_incident_test' --output-on-failure &&
             python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/response' &&
-            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/response-engine libs/platform/timers' --component
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/response-engine services/notification-service libs/platform/timers libs/platform/identity' --component
   replay:
     desc: 'Isolated diagnostic replay: task response:replay INPUT=<json-file>'
     requires:

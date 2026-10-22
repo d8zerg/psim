@@ -148,7 +148,11 @@ TEST(SchemaRegistry, MapsFailuresToCatalogCodes) {
   auto unresolvable = SchemaRegistry::create({.url = "http://no-such-host.invalid:8080",
                                               .timeout = std::chrono::milliseconds(500),
                                               .http = {.allow_plaintext = true}});
-  EXPECT_EQ(run(io, unresolvable->latest_id("any-value")).error().code(), ErrorCode::kCommonUnavailable);
+  const auto unavailable = run(io, unresolvable->latest_id("any-value"));
+  ASSERT_FALSE(unavailable);
+  // DNS resolution can fail directly or reach the configured request deadline.
+  const auto code = unavailable.error().code();
+  EXPECT_TRUE(code == ErrorCode::kCommonUnavailable || code == ErrorCode::kCommonDeadlineExceeded);
 }
 
 TEST(SchemaRegistry, ValidatesTheUrl) {

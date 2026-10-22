@@ -20,6 +20,7 @@ add_subdirectory(platform/s3)
 
 add_subdirectory(platform/connector)
 add_subdirectory(platform/stream)
+add_subdirectory(platform/identity)
 add_subdirectory(domain/processing)
 
 add_subdirectory(domain/incident)

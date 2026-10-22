@@ -1,0 +1,6 @@
+add_library(psim_notification_repository STATIC adapters/repository.cpp adapters/transport.cpp adapters/http.cpp)
+target_include_directories(psim_notification_repository PUBLIC adapters)
+target_link_libraries(psim_notification_repository PUBLIC psim::platform_stream psim::platform_authz psim::platform_identity)
+psim_target_defaults(psim_notification_repository)
+psim_add_service(notification-service SOURCES src/main.cpp LIBS psim_notification_repository SUMMARY "PSIM Notification Service")
+psim_add_test(psim_notification_test SOURCES tests/model_test.cpp LIBS psim_notification_repository)
