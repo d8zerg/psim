@@ -1,0 +1,37 @@
+version: '3'
+vars:
+  COMMAND_PROJECT: '{{.COMMAND_PROJECT | default "psim-command-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Device commands through two real services, gateway and durable SDK
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/commands/check.py {{.COMMAND_PROJECT}} {{.PRESET}} 100
+  bench:
+    desc: Release delivery latency at 10 commands per second and complete execution reconciliation
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/commands/check.py {{.COMMAND_PROJECT}}-bench release 1000
+  sanitizers:
+    desc: Command state, HTTP and real process checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_domain_response_test|psim_command_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}', COMMAND_PROJECT: '{{.COMMAND_PROJECT}}'}
+  coverage:
+    desc: Command domain and service coverage including real infrastructure
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage, COMMAND_PROJECT: '{{.COMMAND_PROJECT}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_domain_response_test|psim_command_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/response' &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml services/command-service --component

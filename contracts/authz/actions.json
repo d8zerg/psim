@@ -72,5 +72,14 @@
     "integrator",
     "admin",
     "auditor"
+  ],
+  "command.read": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "command.cancel": [
+    "operator",
+    "supervisor"
   ]
 }

@@ -466,6 +466,7 @@
     - [IncidentAssigned](#psim-incident-v1-IncidentAssigned)
     - [IncidentBlockingStepsChanged](#psim-incident-v1-IncidentBlockingStepsChanged)
     - [IncidentClosed](#psim-incident-v1-IncidentClosed)
+    - [IncidentCommandUpdated](#psim-incident-v1-IncidentCommandUpdated)
     - [IncidentCommentAdded](#psim-incident-v1-IncidentCommentAdded)
     - [IncidentCreated](#psim-incident-v1-IncidentCreated)
     - [IncidentEscalated](#psim-incident-v1-IncidentEscalated)
@@ -2479,6 +2480,7 @@ CommandDelivery is a command routed to the connector session.
 | capability | [string](#string) |  |  |
 | parameters | [CommandDelivery.ParametersEntry](#psim-response-v1-CommandDelivery-ParametersEntry) | repeated |  |
 | deadline_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| session_id | [string](#string) |  | Deliver only to this session; empty preserves compatibility with earlier producers. |
 
 
 
@@ -2561,6 +2563,7 @@ CommandResultRecord is the value of topic psim.commands.results.v1 (key: command
 | envelope | [psim.common.v1.Envelope](#psim-common-v1-Envelope) |  |  |
 | command_receipt | [CommandReceipt](#psim-response-v1-CommandReceipt) |  |  |
 | command_outcome | [CommandOutcome](#psim-response-v1-CommandOutcome) |  |  |
+| session_id | [string](#string) |  | Session that received the delivery. |
 
 
 
@@ -2586,6 +2589,7 @@ CommandState is the lifecycle state of a command.
 | COMMAND_STATE_REJECTED | 7 |  |
 | COMMAND_STATE_TIMED_OUT | 8 |  |
 | COMMAND_STATE_CANCELLED | 9 |  |
+| COMMAND_STATE_UNKNOWN | 10 | The selected connector session ended without a final result; do not retry automatically. |
 
 
 
@@ -7285,6 +7289,22 @@ IncidentClosed is published on transition to closed.
 
 
 
+<a name="psim-incident-v1-IncidentCommandUpdated"></a>
+
+### IncidentCommandUpdated
+IncidentCommandUpdated appends a device command change to the incident timeline.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [Incident](#psim-incident-v1-Incident) |  |  |
+| entry | [TimelineEntry](#psim-incident-v1-TimelineEntry) |  |  |
+
+
+
+
+
+
 <a name="psim-incident-v1-IncidentCommentAdded"></a>
 
 ### IncidentCommentAdded
@@ -7358,6 +7378,7 @@ Every event carries the incident state after the change; envelope.sequence = inc
 | incident_blocking_steps_changed | [IncidentBlockingStepsChanged](#psim-incident-v1-IncidentBlockingStepsChanged) |  |  |
 | incident_transfer_requested | [IncidentTransferRequested](#psim-incident-v1-IncidentTransferRequested) |  |  |
 | incident_transfer_confirmed | [IncidentTransferConfirmed](#psim-incident-v1-IncidentTransferConfirmed) |  |  |
+| incident_command_updated | [IncidentCommandUpdated](#psim-incident-v1-IncidentCommandUpdated) |  |  |
 
 
 

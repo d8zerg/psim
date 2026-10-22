@@ -928,6 +928,7 @@ asio::awaitable<p::Result<void>> Gateway::result(std::shared_ptr<SessionState> s
     co_return p::fail(p::ErrorCode::kAuthForbidden, "command does not belong to session");
   }
   response::v1::CommandResultRecord event;
+  event.set_session_id(session->id);
   envelope(event.mutable_envelope(), session->tenant, session->connector);
   event.mutable_envelope()->set_correlation_id(id);
   if (request.has_command_ack()) {
@@ -981,9 +982,9 @@ asio::awaitable<void> Gateway::commands() {
         }
       }
       for (const auto& session : candidates) {
-        if (!session->registered || session->stopped || !session->command_capability
-            || session->connector != command.connector_id() || session->tenant != decoded->envelope().tenant_id()
-            || !allowed(*session)) {
+        if ((!command.session_id().empty() && command.session_id() != session->id) || !session->registered
+            || session->stopped || !session->command_capability || session->connector != command.connector_id()
+            || session->tenant != decoded->envelope().tenant_id() || !allowed(*session)) {
           continue;
         }
         auto owner = co_await registry_->owns(session->id);

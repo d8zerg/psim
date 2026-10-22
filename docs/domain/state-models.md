@@ -64,7 +64,7 @@ stateDiagram-v2
     pending --> active : предыдущий шаг завершён
     active --> completed : Complete / результат команды executed / ожидание истекло
     active --> skipped : Skip [не обязательный, с причиной]
-    active --> failed : команда failed, timed_out, rejected / ошибка автоматического шага
+    active --> failed : команда failed, timed_out, rejected, unknown / ошибка автоматического шага
     failed --> active : Retry (новая попытка)
     failed --> completed : Override [supervisor, с причиной]
     failed --> skipped : Skip [не обязательный]
@@ -99,6 +99,9 @@ stateDiagram-v2
     acknowledged --> failed : устройство отказало
     sent --> timed_out : deadline_at
     acknowledged --> timed_out : deadline_at
+    sent --> unknown : сессия потеряна без результата
+    acknowledged --> unknown : сессия потеряна без результата
+    unknown --> [*]
     executed --> [*]
     failed --> [*]
     rejected --> [*]
@@ -110,9 +113,10 @@ stateDiagram-v2
 |---|---|
 | `requested` | Запрос принят и авторизован (CM1, CM2) |
 | `awaiting_approval` | Ждёт подтверждения вторым пользователем (CM3) |
-| `sent` | Записана в `psim.commands.v1`; шлюз доставляет её в сессию коннектора |
+| `sent` | Доставка сохранена в outbox; шлюз передаёт её выбранной сессии коннектора |
 | `acknowledged` | Коннектор подтвердил получение |
 | `executed` | Коннектор сообщил об успешном исполнении устройством |
+| `unknown` | Сессия потеряна без финального результата; автоматический повтор запрещён |
 | `failed`, `rejected`, `timed_out`, `cancelled` | Финальные неуспешные состояния с причиной |
 
 Повторная доставка в коннектор с тем же `command_id` допустима: коннектор (SDK) обязан исполнять команду не более одного раза и возвращать сохранённый результат.

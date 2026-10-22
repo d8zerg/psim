@@ -41,6 +41,8 @@ enum CommandState {
   COMMAND_STATE_REJECTED = 7;
   COMMAND_STATE_TIMED_OUT = 8;
   COMMAND_STATE_CANCELLED = 9;
+  // The selected connector session ended without a final result; do not retry automatically.
+  COMMAND_STATE_UNKNOWN = 10;
 }
 
 // CommandDeliveryRecord is the value of topic psim.commands.v1 (key: connector_id).
@@ -60,6 +62,8 @@ message CommandDelivery {
   string capability = 4 [(buf.validate.field).string.min_len = 1];
   map<string, string> parameters = 5;
   google.protobuf.Timestamp deadline_at = 6 [(buf.validate.field).required = true];
+  // Deliver only to this session; empty preserves compatibility with earlier producers.
+  string session_id = 7;
 }
 
 // CommandResultRecord is the value of topic psim.commands.results.v1 (key: command_id).
@@ -70,6 +74,8 @@ message CommandResultRecord {
     CommandReceipt command_receipt = 2;
     CommandOutcome command_outcome = 3;
   }
+  // Session that received the delivery.
+  string session_id = 4;
 }
 
 // CommandReceipt reports that the connector received a command.

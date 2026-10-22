@@ -225,6 +225,7 @@ paths:
             - COMMAND_STATE_REJECTED
             - COMMAND_STATE_TIMED_OUT
             - COMMAND_STATE_CANCELLED
+            - COMMAND_STATE_UNKNOWN
             type: string
             format: enum
       - name: pageSize
@@ -6060,6 +6061,7 @@ components:
           - COMMAND_STATE_REJECTED
           - COMMAND_STATE_TIMED_OUT
           - COMMAND_STATE_CANCELLED
+          - COMMAND_STATE_UNKNOWN
           type: string
           format: enum
         requestedBy:

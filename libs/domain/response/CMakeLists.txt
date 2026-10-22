@@ -1,0 +1,5 @@
+add_library(psim_domain_response STATIC src/command.cpp)
+add_library(psim::domain_response ALIAS psim_domain_response)
+target_include_directories(psim_domain_response PUBLIC include)
+psim_target_defaults(psim_domain_response)
+psim_add_test(psim_domain_response_test SOURCES tests/command_test.cpp LIBS psim::domain_response)

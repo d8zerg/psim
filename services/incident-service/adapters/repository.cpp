@@ -32,6 +32,7 @@
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/processing/v1/signal.pb.h"
+#include "psim/response/v1/command.pb.h"
 #include "psim/response/v1/events.pb.h"
 #include "psim/response/v1/run.pb.h"
 
@@ -157,7 +158,11 @@ boost::asio::awaitable<p::Result<void>> Repository::initialize() {
            {.version = 5,
             .name = "response run versions",
             .expand = {("CREATE TABLE incident.responses(tenant uuid NOT NULL,incident uuid NOT NULL,body jsonb NOT "
-                        "NULL,PRIMARY KEY(tenant,incident))")}}});
+                        "NULL,PRIMARY KEY(tenant,incident))")}},
+           {.version = 6,
+            .name = "command timeline versions",
+            .expand = {"CREATE TABLE incident.command_versions(tenant uuid NOT NULL,id uuid NOT NULL,version bigint "
+                       "NOT NULL,PRIMARY KEY(tenant,id,version))"}}});
 }
 
 asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::security::Principal principal,
@@ -994,11 +999,20 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
   if (!p::stream::uuid(origin.tenant_id()) || !p::stream::uuid(origin.message_id())) {
     co_return p::fail(Code::kProcessingPayloadInvalid, "invalid response identity");
   }
-  if (!input.has_run_updated() && !input.has_escalation_level_triggered()) {
+  if (!input.has_run_updated() && !input.has_escalation_level_triggered() && !input.has_command_updated()) {
     co_return p::Result<void>{};
   }
-  const auto id = input.has_run_updated() ? input.run_updated().run().incident_id()
-                                          : input.escalation_level_triggered().incident_id();
+  std::string id;
+  if (input.has_command_updated()) {
+    id = input.command_updated().command().incident_id();
+  } else if (input.has_run_updated()) {
+    id = input.run_updated().run().incident_id();
+  } else {
+    id = input.escalation_level_triggered().incident_id();
+  }
+  if (input.has_command_updated() && id.empty()) {
+    co_return p::Result<void>{};
+  }
   if (!p::stream::uuid(id)) {
     co_return p::fail(Code::kProcessingPayloadInvalid, "invalid response incident");
   }
@@ -1020,6 +1034,49 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
           co_return std::unexpected(loaded.error());
         }
         auto value = std::move(*loaded);
+        if (input.has_command_updated()) {
+          const auto& command = input.command_updated().command();
+          if (!p::stream::uuid(command.command_id()) || command.version() == 0
+              || command.state() < response::v1::COMMAND_STATE_REQUESTED
+              || command.state() > response::v1::COMMAND_STATE_UNKNOWN) {
+            co_return p::fail(Code::kProcessingPayloadInvalid, "invalid command timeline change");
+          }
+          auto newer = co_await tx->connection().query(
+              {.sql = "INSERT INTO incident.command_versions VALUES($1::uuid,$2::uuid,$3) ON CONFLICT DO NOTHING "
+                      "RETURNING version",
+               .parameters = {Param::text(source.tenant_id()), Param::text(command.command_id()),
+                              Param::integer(static_cast<std::int64_t>(command.version()))}});
+          if (!newer) {
+            co_return std::unexpected(newer.error());
+          }
+          if (newer->size() == 0) {
+            co_return p::Result<void>{};
+          }
+          incident::v1::TimelineEntry entry;
+          entry.set_entry_id(source.message_id());
+          entry.set_incident_id(id);
+          *entry.mutable_at() = source.occurred_at();
+          *entry.mutable_actor() = source.actor();
+          entry.set_kind(incident::v1::TIMELINE_ENTRY_KIND_COMMAND);
+          entry.set_ref_id(command.command_id());
+          (*entry.mutable_details())["state"] = response::v1::CommandState_Name(command.state());
+          (*entry.mutable_details())["version"] = std::to_string(command.version());
+          (*entry.mutable_details())["result_code"] = command.result_code();
+          auto saved = co_await tx->connection().query(
+              {.sql = "INSERT INTO incident.timeline VALUES($1::uuid,$2::uuid,$3::uuid,$4::jsonb)",
+               .parameters = {Param::text(source.tenant_id()), Param::text(id), Param::text(entry.entry_id()),
+                              Param::text(json(entry).dump())}});
+          if (!saved) {
+            co_return std::unexpected(saved.error());
+          }
+          incident::v1::IncidentEventRecord event;
+          envelope(event.mutable_envelope(), system(source.tenant_id()), value.version());
+          *event.mutable_incident_command_updated()->mutable_incident() = value;
+          *event.mutable_incident_command_updated()->mutable_entry() = entry;
+          co_return co_await messages_.append(
+              tx,
+              {event.envelope().message_id(), (outgoing ? outgoing : encode_)("psim.incidents.events.v1", id, event)});
+        }
         if (value.state() == incident::v1::INCIDENT_STATE_CLOSED) {
           co_return p::Result<void>{};
         }

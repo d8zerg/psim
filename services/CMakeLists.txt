@@ -9,3 +9,5 @@ add_subdirectory(api-gateway)
 add_subdirectory(resource-catalog)
 
 add_subdirectory(event-history)
+
+add_subdirectory(command-service)

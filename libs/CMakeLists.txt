@@ -22,3 +22,5 @@ add_subdirectory(platform/stream)
 add_subdirectory(domain/processing)
 
 add_subdirectory(domain/incident)
+
+add_subdirectory(domain/response)

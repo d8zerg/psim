@@ -454,6 +454,14 @@ codes:
     title: Command expired before delivery
     ru: Шлюз не доставил команду с истёкшим deadline_at
 
+  - code: COMMAND_OUTCOME_UNKNOWN
+    http: null
+    grpc: UNKNOWN
+    retryable: false
+    used_in: [command_result]
+    title: Command outcome unknown
+    ru: Сессия коннектора завершилась без результата; автоматический повтор запрещён
+
   # --- NOTIFICATION ---------------------------------------------------------
   - code: NOTIFICATION_DELIVERY_FAILED
     http: null

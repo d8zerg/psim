@@ -1,0 +1,15 @@
+service:
+  instance: command-1
+runtime:
+  shards: 1
+telemetry:
+  otlp_endpoint: otel-collector:4317
+  otlp_tls: false
+  sampling_ratio: 0.001
+settings:
+  issuer: http://keycloak:8080/realms/psim
+  pg_password_file: /repo/.cache/event-flow/postgres.secret
+  redis_password_file: /repo/.cache/event-flow/redis.secret
+  allow_plaintext: true
+  listen_port: 8443
+  command_timeout_seconds: 30

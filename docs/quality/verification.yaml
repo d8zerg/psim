@@ -276,7 +276,7 @@ methods:
     env: E-LOCAL
     gate: release
     barrier: automated
-    task: task load:commands
+    task: task commands:bench
     steps: ['6.2', '10.1']
     purpose: Бюджет задержки команд (DoD шага 6.2)
 

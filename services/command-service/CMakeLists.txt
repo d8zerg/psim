@@ -1,0 +1,6 @@
+add_library(psim_command_repository STATIC adapters/repository.cpp adapters/http.cpp)
+target_include_directories(psim_command_repository PUBLIC adapters)
+target_link_libraries(psim_command_repository PUBLIC psim::platform_stream psim::platform_authz psim::domain_response psim::platform_redis)
+psim_target_defaults(psim_command_repository)
+psim_add_service(command-service SOURCES src/main.cpp LIBS psim_command_repository SUMMARY "PSIM Command Service")
+psim_add_test(psim_command_test SOURCES tests/http_test.cpp LIBS psim_command_repository)
