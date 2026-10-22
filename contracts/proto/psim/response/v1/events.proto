@@ -6,6 +6,7 @@ import "buf/validate/validate.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/response/v1/command.proto";
 import "psim/response/v1/notification.proto";
+import "psim/response/v1/plan.proto";
 import "psim/response/v1/run.proto";
 
 // ResponseEventRecord is the value of topic psim.response.events.v1
@@ -20,7 +21,35 @@ message ResponseEventRecord {
     NotificationUpdated notification_updated = 4;
     SlaBreached sla_breached = 5;
     EscalationLevelTriggered escalation_level_triggered = 6;
+    CommandRequested command_requested = 7;
+    NotificationRequested notification_requested = 8;
+    PlanUnavailable plan_unavailable = 9;
   }
+}
+
+// PlanUnavailable reports that no published plan matched a newly created incident.
+message PlanUnavailable {
+  string incident_id = 1;
+}
+
+// CommandRequested crosses the durable response -> command boundary. Only Response Engine
+// produces these requests; command criticality and device authorization remain server-owned.
+message CommandRequested {
+  // requested_by preserves the verified user for manual steps and the service for automatic steps.
+  Command command = 1;
+  string site_id = 2;
+  string zone_id = 3;
+}
+
+// NotificationRequested records intent; channel delivery belongs to Notification Service.
+message NotificationRequested {
+  string request_id = 1;
+  string incident_id = 2;
+  string run_id = 3;
+  string step_id = 4;
+  NotifyParams params = 5;
+  string site_id = 6;
+  string zone_id = 7;
 }
 
 // RunUpdated reports a change of a response run.

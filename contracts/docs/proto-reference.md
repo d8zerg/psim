@@ -502,9 +502,12 @@
     - [SourceSequenceState](#psim-processing-v1-SourceSequenceState)
 
 - [psim/response/v1/events.proto](#psim_response_v1_events-proto)
+    - [CommandRequested](#psim-response-v1-CommandRequested)
     - [CommandUpdated](#psim-response-v1-CommandUpdated)
     - [EscalationLevelTriggered](#psim-response-v1-EscalationLevelTriggered)
+    - [NotificationRequested](#psim-response-v1-NotificationRequested)
     - [NotificationUpdated](#psim-response-v1-NotificationUpdated)
+    - [PlanUnavailable](#psim-response-v1-PlanUnavailable)
     - [ResponseEventRecord](#psim-response-v1-ResponseEventRecord)
     - [RunUpdated](#psim-response-v1-RunUpdated)
     - [SlaBreached](#psim-response-v1-SlaBreached)
@@ -7857,6 +7860,24 @@ SourceSequenceState is the deduplication tracker of one source epoch.
 
 
 
+<a name="psim-response-v1-CommandRequested"></a>
+
+### CommandRequested
+CommandRequested crosses the durable response -&gt; command boundary. Only Response Engine
+produces these requests; command criticality and device authorization remain server-owned.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command | [Command](#psim-response-v1-Command) |  | requested_by preserves the verified user for manual steps and the service for automatic steps. |
+| site_id | [string](#string) |  |  |
+| zone_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-response-v1-CommandUpdated"></a>
 
 ### CommandUpdated
@@ -7890,6 +7911,27 @@ EscalationLevelTriggered reports that an escalation level fired for an incident.
 
 
 
+<a name="psim-response-v1-NotificationRequested"></a>
+
+### NotificationRequested
+NotificationRequested records intent; channel delivery belongs to Notification Service.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| incident_id | [string](#string) |  |  |
+| run_id | [string](#string) |  |  |
+| step_id | [string](#string) |  |  |
+| params | [NotifyParams](#psim-response-v1-NotifyParams) |  |  |
+| site_id | [string](#string) |  |  |
+| zone_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-response-v1-NotificationUpdated"></a>
 
 ### NotificationUpdated
@@ -7899,6 +7941,21 @@ NotificationUpdated reports a change of a notification; the change equals the ne
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | notification | [Notification](#psim-response-v1-Notification) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-PlanUnavailable"></a>
+
+### PlanUnavailable
+PlanUnavailable reports that no published plan matched a newly created incident.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
 
 
 
@@ -7921,6 +7978,9 @@ Events carry the aggregate state after the change; envelope.sequence = aggregate
 | notification_updated | [NotificationUpdated](#psim-response-v1-NotificationUpdated) |  |  |
 | sla_breached | [SlaBreached](#psim-response-v1-SlaBreached) |  |  |
 | escalation_level_triggered | [EscalationLevelTriggered](#psim-response-v1-EscalationLevelTriggered) |  |  |
+| command_requested | [CommandRequested](#psim-response-v1-CommandRequested) |  |  |
+| notification_requested | [NotificationRequested](#psim-response-v1-NotificationRequested) |  |  |
+| plan_unavailable | [PlanUnavailable](#psim-response-v1-PlanUnavailable) |  |  |
 
 
 

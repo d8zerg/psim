@@ -11,6 +11,7 @@
 #include "psim/platform/pg/store.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/response/v1/command.pb.h"
+#include "psim/response/v1/events.pb.h"
 
 namespace psim::command_service {
 namespace p = platform;
@@ -32,6 +33,7 @@ class Repository {
   asio::awaitable<p::Result<void>> initialize();
   asio::awaitable<p::Result<void>> catalog(catalog::v1::CatalogRecord input);
   asio::awaitable<p::Result<void>> incident(incident::v1::IncidentEventRecord input);
+  asio::awaitable<p::Result<void>> requested(response::v1::ResponseEventRecord input);
   asio::awaitable<p::Result<bool>> result(response::v1::CommandResultRecord input);
   asio::awaitable<p::Result<Json>> request(p::security::Principal principal, std::string operation, Json body,
                                            std::string key = {}, std::optional<std::uint64_t> expected = {});

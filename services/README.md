@@ -13,3 +13,5 @@ task service:new NAME=incident-service CONTEXTS=incident SUMMARY="PSIM Incident 
 Полная нормализация и загрузка истории описаны в [руководстве](../docs/engineering/normalization-and-history.md). `task processing:test` проверяет дедупликацию и восстановление Kafka -> ClickHouse.
 
 [Command Service](../docs/engineering/command-service.md) управляет командами устройствам, подтверждениями, дедлайнами и результатами. `task commands:test` проверяет доставку через настоящий шлюз и SDK на двух экземплярах сервиса.
+
+[Response Engine](../docs/engineering/response-engine.md) исполняет версии сценариев, сохраняет переходы и таймеры, передаёт команды Command Service. `task response:test` проверяет восстановление двух экземпляров и replay без внешних эффектов.

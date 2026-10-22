@@ -81,5 +81,26 @@
   "command.cancel": [
     "operator",
     "supervisor"
+  ],
+  "response.plan.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "auditor"
+  ],
+  "response.plan.write": [
+    "admin"
+  ],
+  "response.run.read": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "response.step.execute": [
+    "operator",
+    "supervisor"
+  ],
+  "response.step.override": [
+    "supervisor"
   ]
 }

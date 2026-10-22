@@ -110,7 +110,7 @@ topics:
     cleanup: delete
     semantics: Outbox
     producers: [response-engine, command-service, notification-service]
-    consumers: [incident-service, projection-service, api-gateway, notification-service]
+    consumers: [incident-service, response-engine, command-service, projection-service, api-gateway, notification-service]
 
   - name: psim.commands.v1
     title: Commands routed to connector sessions
@@ -169,7 +169,7 @@ topics:
 
 dlq:
   # psim.dlq.<stage>.v1: original bytes and key, error in headers.
-  stages: [catalog, normalizer, correlation-router, correlation, history, event-history, history-retention, incident, incident-response, response, command, notification, audit, projection]
+  stages: [catalog, normalizer, correlation-router, correlation, history, event-history, history-retention, incident, incident-response, response, response-catalog, response-results, command, command-requests, notification, audit, projection]
   partitions: {cluster: 3, single: 1}
   retention: P14D
   headers: [psim-dlq-stage, psim-dlq-error-code, psim-dlq-error, psim-dlq-source-topic, psim-dlq-source-partition, psim-dlq-source-offset, psim-dlq-at]

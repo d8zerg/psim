@@ -229,3 +229,8 @@ tasks:
       - task: :cpp:build
         vars: {PRESET: debug}
       - '{{.PYTHON}} tools/env/envctl.py observability {{.PROJECT}} build/{{.PLATFORM}}/debug {{index .RUNTIME_IMAGES "debian13"}}'
+
+  timers:
+    desc: Durable response execution, timer accuracy and restart recovery
+    cmds:
+      - task: :response:test

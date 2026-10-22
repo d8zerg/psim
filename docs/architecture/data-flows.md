@@ -141,13 +141,13 @@
 | Свойство | Значение |
 |---|---|
 | Производители | Response Engine, Command Service, Notification Service (outbox) |
-| Потребители | Incident Service (`blocking_steps`, хронология), Projection Service, API Gateway realtime, Notification Service |
+| Потребители | Incident Service (`blocking_steps`, хронология), Response Engine (результаты команд), Command Service (запросы сценариев), Projection Service, API Gateway realtime, Notification Service |
 | Ключ | `incident_id`; для команд и уведомлений вне инцидента - `command_id` или `notification_id` |
 | Порядок | В пределах инцидента |
 | Семантика | Outbox; потребители - EOS-DB или по версии агрегата |
 | Retention | 30 суток |
 
-В топике публикуются события запусков сценариев, жизненного цикла команд и уведомлений. Отдельные топики для жизненного цикла команд не вводятся: консоли и проекциям нужен единый поток по инциденту.
+В топике публикуются события запусков сценариев, жизненного цикла команд и уведомлений, а также долговечные CommandRequested и NotificationRequested. Отдельные топики для жизненного цикла команд не вводятся: консоли и проекциям нужен единый поток по инциденту.
 
 ### 3.6 Команды: `psim.commands.v1` и `psim.commands.results.v1`
 

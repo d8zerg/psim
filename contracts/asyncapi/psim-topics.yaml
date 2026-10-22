@@ -524,6 +524,48 @@ channels:
       cluster: 3
       single: 1
     x-psim-semantics: ALO
+  dlqResponseCatalogV1:
+    address: psim.dlq.response-catalog.v1
+    title: Dead letters of stage response-catalog
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.response-catalog.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqResponseResultsV1:
+    address: psim.dlq.response-results.v1
+    title: Dead letters of stage response-results
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.response-results.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
   dlqCommandV1:
     address: psim.dlq.command.v1
     title: Dead letters of stage command
@@ -534,6 +576,27 @@ channels:
     bindings:
       kafka:
         topic: psim.dlq.command.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
+  dlqCommandRequestsV1:
+    address: psim.dlq.command-requests.v1
+    title: Dead letters of stage command-requests
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.command-requests.v1
         partitions: 3
         replicas: 3
         topicConfiguration:
@@ -798,6 +861,20 @@ operations:
     messages:
     - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
     x-psim-service: incident-service
+  responseEngineReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: response-engine
+  commandServiceReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: command-service
   projectionServiceReceiveResponseEventsV1:
     action: receive
     channel:

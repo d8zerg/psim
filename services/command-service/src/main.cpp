@@ -26,6 +26,7 @@
 #include "http.hpp"
 #include "psim/catalog/v1/catalog.pb.h"
 #include "psim/incident/v1/events.pb.h"
+#include "psim/platform/config.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
@@ -71,6 +72,23 @@ asio::awaitable<p::Result<std::optional<std::string>>> lookup_session(p::redis::
   }
   co_return std::optional<std::string>{(**session).owner};
 }
+
+p::redis::PoolOptions redis_options(const p::config::Config& config) {
+  p::redis::PoolOptions options;
+  options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
+  options.connection.endpoint.port = "6379";
+  options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
+  options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
+  options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
+  if (auto password = config.secret("settings.redis_password_file")) {
+    options.connection.credentials.password = std::string(*password);
+  }
+  options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
+  options.connection.connect_timeout = std::chrono::milliseconds(500);
+  options.connection.command_timeout = std::chrono::milliseconds(500);
+  return options;
+}
+
 }  // namespace
 
 class Worker final : public p::stream::Worker {
@@ -114,19 +132,7 @@ class Worker final : public p::stream::Worker {
     }
     pool_ = std::move(*pool);
     const auto& config = context().config();
-    p::redis::PoolOptions options;
-    options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
-    options.connection.endpoint.port = "6379";
-    options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
-    options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
-    options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
-    if (auto password = config.secret("settings.redis_password_file")) {
-      options.connection.credentials.password = std::string(*password);
-    }
-    options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
-    options.connection.connect_timeout = std::chrono::milliseconds(500);
-    options.connection.command_timeout = std::chrono::milliseconds(500);
-    redis_ = std::make_unique<p::redis::Pool>(std::move(options));
+    redis_ = std::make_unique<p::redis::Pool>(redis_options(config));
     repository_ = std::make_unique<Repository>(
         pool_.get(),
         [this](std::string topic, std::string key, const google::protobuf::Message& message) {
@@ -417,6 +423,65 @@ class ProjectionWorker final : public p::stream::Worker {
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<Repository> repository_;
 };
+
+class RequestWorker final : public p::stream::Worker {
+ public:
+  explicit RequestWorker(const p::runtime::Context& context)
+      : p::stream::Worker(context, "command-requests", "psim.response.events.v1", p::kafka::Semantics::kAtLeastOnce) {}
+
+  std::string consumer_group() const override { return "psim-command-requests"; }
+
+  asio::awaitable<p::Result<void>> initialize() override {
+    auto pool = co_await database();
+    if (!pool) {
+      co_return std::unexpected(pool.error());
+    }
+    pool_ = std::move(*pool);
+    redis_ = std::make_unique<p::redis::Pool>(redis_options(context().config()));
+    repository_ = std::make_unique<Repository>(
+        pool_.get(),
+        [this](std::string topic, std::string key, const google::protobuf::Message& message) {
+          return record(std::move(topic), std::move(key), message, {});
+        },
+        [this](std::string tenant, std::string connector) {
+          return lookup_session(redis_.get(), std::move(tenant), std::move(connector));
+        },
+        context().config().get<int>("settings.command_timeout_seconds"));
+    for (const auto* topic : {"psim.commands.v1", "psim.response.events.v1", "psim.audit.v1"}) {
+      auto registered = co_await schema(topic);
+      if (!registered) {
+        co_return registered;
+      }
+    }
+    co_return co_await repository_->initialize();
+  }
+
+  asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
+    if (message->value().empty()) {
+      co_return p::Result<void>{};
+    }
+    auto value = decode<response::v1::ResponseEventRecord>(*message);
+    if (!value) {
+      co_return std::unexpected(value.error());
+    }
+    co_return co_await repository_->requested(std::move(*value));
+  }
+
+  asio::awaitable<void> shutdown() override {
+    repository_.reset();
+    redis_.reset();
+    if (pool_) {
+      pool_->close();
+      pool_.reset();
+    }
+    co_return;
+  }
+
+ private:
+  std::unique_ptr<p::redis::Pool> redis_;
+  std::unique_ptr<p::pg::Pool> pool_;
+  std::unique_ptr<Repository> repository_;
+};
 }  // namespace psim::command_service
 
 int main(int argc, char** argv) {
@@ -430,6 +495,7 @@ int main(int argc, char** argv) {
          result.push_back(std::make_unique<psim::command_service::Worker>(context));
          result.push_back(std::make_unique<psim::command_service::ProjectionWorker>(context, true));
          result.push_back(std::make_unique<psim::command_service::ProjectionWorker>(context, false));
+         result.push_back(std::make_unique<psim::command_service::RequestWorker>(context));
          return result;
        }});
 }

@@ -28,6 +28,7 @@
 - [Resource Catalog: ресурсы, планы и обслуживание](engineering/resource-catalog.md)
 - [Incident Service](engineering/incident-service.md)
 - [Command Service: команды устройствам](engineering/command-service.md)
+- [Response Engine: исполнение сценариев](engineering/response-engine.md)
 - [Поиск истории и связь с инцидентами](engineering/event-history.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 

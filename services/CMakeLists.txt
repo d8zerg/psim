@@ -11,3 +11,5 @@ add_subdirectory(resource-catalog)
 add_subdirectory(event-history)
 
 add_subdirectory(command-service)
+
+add_subdirectory(response-engine)

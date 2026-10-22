@@ -99,6 +99,8 @@ asio::awaitable<void> emit(Json input) {
       std::unique_ptr<google::protobuf::Message> record;
       if (topic == "psim.catalog.v1") {
         record = std::make_unique<psim::catalog::v1::CatalogRecord>();
+      } else if (topic == "psim.incidents.events.v1") {
+        record = std::make_unique<psim::incident::v1::IncidentEventRecord>();
       } else if (topic == "psim.commands.results.v1") {
         record = std::make_unique<psim::response::v1::CommandResultRecord>();
       } else if (topic == "psim.response.events.v1") {

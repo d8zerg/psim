@@ -1,0 +1,39 @@
+version: '3'
+vars:
+  RESPONSE_PROJECT: '{{.RESPONSE_PROJECT | default "psim-response-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Response plans and runs through two real processes, commands, durable timers and isolated replay
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/response/check.py {{.RESPONSE_PROJECT}} {{.PRESET}} 20
+  sanitizers:
+    desc: Response domain, HTTP and real process recovery under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_domain_plan_test|psim_response_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}', RESPONSE_PROJECT: '{{.RESPONSE_PROJECT}}'}
+  coverage:
+    desc: Response domain, service and timer coverage with real infrastructure
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage, RESPONSE_PROJECT: '{{.RESPONSE_PROJECT}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_domain_response_test|psim_domain_plan_test|psim_response_test' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/response' &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/response-engine libs/platform/timers' --component
+  replay:
+    desc: 'Isolated diagnostic replay: task response:replay INPUT=<json-file>'
+    requires:
+      vars: [INPUT]
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: debug}
+      - python3 -I tools/response/replay.py build/{{.PLATFORM}}/debug/services/response-engine/psim-response-replay '{{.INPUT}}' {{index .RUNTIME_IMAGES "debian13"}}

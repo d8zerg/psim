@@ -75,8 +75,9 @@ void envelope(common::v1::Envelope* out, const p::security::Principal& actor, st
   *out->mutable_occurred_at() = Time::GetCurrentTime();
   *out->mutable_produced_at() = out->occurred_at();
   out->mutable_actor()->set_id(actor.subject);
-  out->mutable_actor()->set_kind(actor.subject == "command-service" ? common::v1::ACTOR_KIND_SERVICE
-                                                                    : common::v1::ACTOR_KIND_USER);
+  out->mutable_actor()->set_kind((actor.subject == "command-service" || actor.subject == "response-engine")
+                                     ? common::v1::ACTOR_KIND_SERVICE
+                                     : common::v1::ACTOR_KIND_USER);
 }
 
 p::Result<void> access(const p::security::Principal& actor, std::string_view action, const Value& value) {
@@ -199,6 +200,86 @@ p::Result<void> transition(Value& value, d::Action action, std::string_view acto
   return {};
 }
 }  // namespace
+
+asio::awaitable<p::Result<void>> Repository::requested(response::v1::ResponseEventRecord input) {
+  if (!input.has_command_requested()) {
+    co_return p::Result<void>{};
+  }
+  const auto& origin = input.envelope();
+  const auto& intent = input.command_requested();
+  const auto& command = intent.command();
+  if (origin.actor().kind() != common::v1::ACTOR_KIND_SERVICE || origin.actor().id() != "response-engine"
+      || !p::stream::uuid(origin.tenant_id()) || !p::stream::uuid(origin.message_id())
+      || !p::stream::uuid(command.command_id()) || !p::stream::uuid(command.run_id())
+      || !p::stream::uuid(command.device_id()) || !p::stream::uuid(command.incident_id())
+      || !p::stream::uuid(intent.site_id()) || !p::stream::uuid(intent.zone_id()) || command.step_id().empty()
+      || (command.requested_by().kind() != common::v1::ACTOR_KIND_USER
+          && command.requested_by().kind() != common::v1::ACTOR_KIND_SERVICE)
+      || (command.requested_by().kind() == common::v1::ACTOR_KIND_USER && !p::stream::uuid(command.requested_by().id()))
+      || (command.requested_by().kind() == common::v1::ACTOR_KIND_SERVICE
+          && command.requested_by().id() != "response-engine")) {
+    co_return p::fail(Code::kProcessingPayloadInvalid, "invalid response command intent");
+  }
+  p::security::Principal actor{.subject = command.requested_by().id(),
+                               .tenant = origin.tenant_id(),
+                               .roles = {"operator"},
+                               .scopes = {"zone:" + intent.zone_id()},
+                               .expires_at = std::chrono::system_clock::time_point::max()};
+  api::v1::RequestCommandRequest body;
+  body.set_command_id(command.command_id());
+  body.set_device_id(command.device_id());
+  body.set_capability(command.capability());
+  *body.mutable_parameters() = command.parameters();
+  body.set_incident_id(command.incident_id());
+  body.set_run_id(command.run_id());
+  body.set_step_id(command.step_id());
+  auto result = co_await request(actor, "request", json(body), command.command_id());
+  if (result) {
+    co_return p::Result<void>{};
+  }
+  if (result.error().retryable()) {
+    co_return std::unexpected(result.error());
+  }
+  co_return co_await pg::in_transaction<void>(
+      pool_,
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): closure is owned until awaited.
+      [&, this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+        auto lock =
+            co_await tx->connection().query({.sql = "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
+                                             .parameters = {Param::text(actor.tenant + ":" + command.command_id())}});
+        if (!lock) {
+          co_return std::unexpected(lock.error());
+        }
+        auto previous = co_await load(tx, actor.tenant, command.command_id());
+        if (previous) {
+          co_return p::Result<void>{};
+        }
+        if (previous.error().code() != Code::kCommonNotFound) {
+          co_return std::unexpected(previous.error());
+        }
+        auto accepted = co_await messages_.accept(tx, "response", origin.message_id(),
+                                                  p::stream::sha256(input.SerializeAsString()));
+        if (!accepted) {
+          co_return std::unexpected(accepted.error());
+        }
+        if (!*accepted) {
+          co_return p::Result<void>{};
+        }
+        Value value;
+        value.tenant = actor.tenant;
+        value.site = intent.site_id();
+        value.zone = intent.zone_id();
+        value.incident_site = value.site;
+        value.incident_zone = value.zone;
+        value.command = command;
+        value.command.set_state(response::v1::COMMAND_STATE_FAILED);
+        value.command.set_result_code(std::string(result.error().name()));
+        *value.command.mutable_requested_by() = command.requested_by();
+        *value.command.mutable_requested_at() = Time::GetCurrentTime();
+        *value.command.mutable_deadline_at() = value.command.requested_at();
+        co_return co_await save(tx, std::move(value), actor, "command.request.failed");
+      });
+}
 
 asio::awaitable<p::Result<void>> Repository::initialize() {
   auto lease = co_await pool_->acquire();
@@ -570,7 +651,8 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
           command.set_incident_id(input->incident_id());
           command.set_run_id(input->run_id());
           command.set_step_id(input->step_id());
-          command.mutable_requested_by()->set_kind(common::v1::ACTOR_KIND_USER);
+          command.mutable_requested_by()->set_kind(
+              principal.subject == "response-engine" ? common::v1::ACTOR_KIND_SERVICE : common::v1::ACTOR_KIND_USER);
           command.mutable_requested_by()->set_id(principal.subject);
           *command.mutable_requested_at() = Time::GetCurrentTime();
           *command.mutable_deadline_at() = command.requested_at();

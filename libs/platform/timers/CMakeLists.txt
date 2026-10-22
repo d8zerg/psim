@@ -1,0 +1,5 @@
+add_library(psim_platform_timers STATIC src/store.cpp)
+add_library(psim::platform_timers ALIAS psim_platform_timers)
+target_include_directories(psim_platform_timers PUBLIC include)
+target_link_libraries(psim_platform_timers PUBLIC psim::platform_pg)
+psim_target_defaults(psim_platform_timers)
