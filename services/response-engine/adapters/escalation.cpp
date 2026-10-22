@@ -394,6 +394,19 @@ asio::awaitable<p::Result<void>> Escalation::incident(incident::v1::IncidentEven
         if (target == definition.sla().end()) {
           co_return p::fail(Code::kCommonUnavailable, "priority missing in SLA policy");
         }
+        if (old->size() == 0) {
+          response::v1::ResponseEventRecord pinned;
+          envelope(pinned.mutable_envelope(), tenant);
+          auto* targets = pinned.mutable_sla_policy_pinned();
+          targets->set_incident_id(value.incident_id());
+          *targets->mutable_created_at() = value.created_at();
+          *targets->mutable_acknowledge_within() = target->acknowledge_within();
+          *targets->mutable_resolve_within() = target->resolve_within();
+          auto published = co_await publish(tx, std::move(pinned), value.incident_id());
+          if (!published) {
+            co_return published;
+          }
+        }
         // Deadline identity fixes its first timestamp; assignment and priority changes cannot postpone it.
         for (const std::string kind : {"ack", "resolve"}) {
           if (kind == "resolve" && !value.has_acknowledged_at()) {

@@ -17,3 +17,5 @@ add_subdirectory(response-engine)
 add_subdirectory(notification-service)
 
 add_subdirectory(audit-service)
+
+add_subdirectory(projection-service)

@@ -86,6 +86,11 @@ Result<std::string> pack(const Converted& batch, std::span<const kafka::Message*
     rejected.push_back(
         {{"key", binary(message->key())}, {"value", binary(message->value())}, {"headers", std::move(headers)}});
   }
+  for (const auto index : batch.ignored) {
+    if (index >= messages.size() || !indexes.insert(index).second) {
+      return fail(ErrorCode::kCommonInvalidArgument, "converter returned invalid ignored indexes");
+    }
+  }
   if (batch.block.GetRowCount() + indexes.size() != messages.size()) {
     return fail(ErrorCode::kCommonInvalidArgument, "converter did not account for every source record");
   }

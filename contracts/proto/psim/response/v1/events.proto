@@ -3,6 +3,8 @@ syntax = "proto3";
 package psim.response.v1;
 
 import "buf/validate/validate.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/timestamp.proto";
 import "psim/common/v1/envelope.proto";
 import "psim/response/v1/command.proto";
 import "psim/response/v1/notification.proto";
@@ -24,6 +26,7 @@ message ResponseEventRecord {
     CommandRequested command_requested = 7;
     NotificationRequested notification_requested = 8;
     PlanUnavailable plan_unavailable = 9;
+    SlaPolicyPinned sla_policy_pinned = 10;
   }
 }
 
@@ -103,4 +106,13 @@ message EscalationLevelTriggered {
   repeated string notification_ids = 4;
   // The independent SLA dimension that triggered the level.
   string sla_kind = 5;
+}
+
+// SlaPolicyPinned preserves the original SLA targets for analytical projections.
+// Published atomically with the first tracked incident, independent of later policy edits.
+message SlaPolicyPinned {
+  string incident_id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Duration acknowledge_within = 3;
+  google.protobuf.Duration resolve_within = 4;
 }

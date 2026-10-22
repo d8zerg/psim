@@ -19,3 +19,5 @@ task service:new NAME=incident-service CONTEXTS=incident SUMMARY="PSIM Incident 
 [Notification Service](../docs/engineering/notifications.md) доставляет уведомления в приложении, через SMTP с TLS и подписанный webhook. Response Engine управляет SLA и дежурствами. `task notifications:test` проверяет квитанции, повторы, смену дежурного и восстановление процессов.
 
 [Audit Service](../docs/engineering/audit-service.md) строит цепочки хэшей, подписывает внешние контрольные точки и предоставляет поиск и экспорт. `psim-audit-tool` выполняет миграции и независимую проверку. `task audit:test` проверяет историю Kafka, две копии сервиса и вмешательство администратора БД.
+
+[Projection Service](../docs/engineering/incident-reports.md) загружает факты инцидентов и исходные значения SLA, предоставляет отчёты и CSV. `psim-report-tool` пересчитывает факты из PostgreSQL. Проверки: `task reports:test`, `task reports:bench`.

@@ -249,3 +249,8 @@ tasks:
     desc: Audit record modification, deletion, insertion and external checkpoint verification
     cmds:
       - task: :audit:test
+
+  reports:
+    desc: Incident report metrics, CSV and PostgreSQL reconciliation
+    cmds:
+      - task: :reports:test

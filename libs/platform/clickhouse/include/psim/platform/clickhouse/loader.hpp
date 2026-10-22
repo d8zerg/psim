@@ -27,9 +27,11 @@ struct Rejected {
 struct Converted {
   ::clickhouse::Block block{};
   std::vector<Rejected> rejected{};
+  // Valid records outside this projection; offsets advance without rows or DLQ.
+  std::vector<std::size_t> ignored{};
 };
 
-/// One successful row per input except the explicitly rejected indexes. Populate columns
+/// One successful row per input except explicitly rejected or ignored indexes. Populate columns
 /// directly from decoded Protobuf values; no intermediate row objects or JSON are required.
 using Converter = std::function<Result<Converted>(std::span<const kafka::Message* const>)>;
 

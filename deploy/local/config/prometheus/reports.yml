@@ -1,0 +1,17 @@
+groups:
+  - name: incident-reports
+    rules:
+      - alert: IncidentReportLatencyHigh
+        expr: histogram_quantile(0.99, sum by (le) (rate(psim_report_query_seconds_bucket[5m]))) > 3
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Incident report p99 exceeds three seconds
+          description: Check report group count, ClickHouse parts and audit outbox availability.
+      - alert: IncidentReportProjectionErrors
+        expr: sum(rate(psim_clickhouse_errors_total{job="projection-service"}[5m])) > 0
+        for: 5m
+        labels: {severity: warning}
+        annotations:
+          summary: Incident fact loading repeatedly fails
+          description: Check ClickHouse and PostgreSQL connectivity, then pending batches and Kafka lag.

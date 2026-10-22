@@ -141,5 +141,15 @@
   ],
   "audit.export": [
     "auditor"
+  ],
+  "report.read": [
+    "manager",
+    "supervisor",
+    "auditor"
+  ],
+  "report.export": [
+    "manager",
+    "supervisor",
+    "auditor"
   ]
 }

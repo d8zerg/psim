@@ -67,6 +67,7 @@ tasks:
             -o -type f -perm -u+x -name {{.ITEM}} -print)
           [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
           cp "$bins" "$stage"/
+          if [ "{{.ITEM}}" = psim-projection-service ]; then cp {{.RELEASE_BUILD}}/services/projection-service/psim-report-tool "$stage"/; fi
           if [ "{{.ITEM}}" = psim-normalizer ] || [ "{{.ITEM}}" = psim-correlation-engine ]; then cp contracts/taxonomy/v1/taxonomy.yaml "$stage"/; fi
           docker build --quiet --platform linux/amd64 --build-arg BASE={{.DISTROLESS_IMAGE}} \
             --label org.opencontainers.image.title=psim-platform-{{.ITEM}} \

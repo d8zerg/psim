@@ -25,7 +25,9 @@ service ReportService {
   }
 }
 
-// ReportFilter selects incidents for a report.
+// ReportFilter bounds each metric by its observation time, using [from, to).
+// Creation, acknowledgement and resolution metrics use their respective timestamps.
+// SLA observations use the earlier of completion and deadline; pending ones are excluded.
 message ReportFilter {
   google.protobuf.Timestamp from = 1 [(buf.validate.field).required = true];
   google.protobuf.Timestamp to = 2 [(buf.validate.field).required = true];
@@ -49,7 +51,9 @@ enum ReportGrouping {
 message IncidentMetrics {
   // Group key: site id, incident type id, priority, user id or date; empty for totals.
   string group = 1;
+  // Created during the period.
   uint64 incidents_created = 2;
+  // Resolved during the period, including incidents created earlier.
   uint64 incidents_resolved = 3;
   google.protobuf.Duration mtta = 4;
   google.protobuf.Duration mttr = 5;
@@ -59,7 +63,11 @@ message IncidentMetrics {
   double ack_sla_compliance = 7;
   // Share of incidents resolved within SLA, 0..1.
   double resolve_sla_compliance = 8;
+  // Created during the period and currently carrying a nonzero escalation level.
   uint64 escalated = 9;
+  // Completed or overdue observations with a pinned target; pending observations are excluded.
+  uint64 ack_sla_evaluated = 10;
+  uint64 resolve_sla_evaluated = 11;
 }
 
 // GetIncidentReportRequest is the request of GetIncidentReport.

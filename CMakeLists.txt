@@ -57,3 +57,5 @@ add_subdirectory(tools/incidents)
 add_subdirectory(tools/history)
 
 add_subdirectory(tools/commands)
+
+add_subdirectory(tools/reports)

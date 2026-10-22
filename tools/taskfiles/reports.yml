@@ -1,0 +1,36 @@
+version: '3'
+vars:
+  REPORTS_PROJECT: '{{.REPORTS_PROJECT | default "psim-reports-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Incident reports, pinned SLA, authorization, CSV and PostgreSQL reconciliation
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/reports/check.py {{.REPORTS_PROJECT}} {{.PRESET}} 100
+  bench:
+    desc: Report over thirty days within three seconds
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/reports/check.py {{.REPORTS_PROJECT}}-bench release 1000000 bench
+  sanitizers:
+    desc: Report unit and component checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_projection_test|psim-projection-service'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}', REPORTS_PROJECT: '{{.REPORTS_PROJECT}}'}
+  coverage:
+    desc: Report coverage with Kafka, ClickHouse and PostgreSQL
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_projection_test|psim-projection-service' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/projection-service' --component

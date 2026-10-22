@@ -524,6 +524,7 @@
     - [ResponseEventRecord](#psim-response-v1-ResponseEventRecord)
     - [RunUpdated](#psim-response-v1-RunUpdated)
     - [SlaBreached](#psim-response-v1-SlaBreached)
+    - [SlaPolicyPinned](#psim-response-v1-SlaPolicyPinned)
 
     - [RunChange](#psim-response-v1-RunChange)
 
@@ -5130,14 +5131,16 @@ IncidentMetrics are incident counts, response times and SLA compliance for a gro
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | group | [string](#string) |  | Group key: site id, incident type id, priority, user id or date; empty for totals. |
-| incidents_created | [uint64](#uint64) |  |  |
-| incidents_resolved | [uint64](#uint64) |  |  |
+| incidents_created | [uint64](#uint64) |  | Created during the period. |
+| incidents_resolved | [uint64](#uint64) |  | Resolved during the period, including incidents created earlier. |
 | mtta | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
 | mttr | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
 | false_alarm_rate | [double](#double) |  | Share of resolution = false_alarm among resolved, 0..1. |
 | ack_sla_compliance | [double](#double) |  | Share of incidents acknowledged within SLA, 0..1. |
 | resolve_sla_compliance | [double](#double) |  | Share of incidents resolved within SLA, 0..1. |
-| escalated | [uint64](#uint64) |  |  |
+| escalated | [uint64](#uint64) |  | Created during the period and currently carrying a nonzero escalation level. |
+| ack_sla_evaluated | [uint64](#uint64) |  | Completed or overdue observations with a pinned target; pending observations are excluded. |
+| resolve_sla_evaluated | [uint64](#uint64) |  |  |
 
 
 
@@ -5147,7 +5150,9 @@ IncidentMetrics are incident counts, response times and SLA compliance for a gro
 <a name="psim-api-v1-ReportFilter"></a>
 
 ### ReportFilter
-ReportFilter selects incidents for a report.
+ReportFilter bounds each metric by its observation time, using [from, to).
+Creation, acknowledgement and resolution metrics use their respective timestamps.
+SLA observations use the earlier of completion and deadline; pending ones are excluded.
 
 
 | Field | Type | Label | Description |
@@ -8203,6 +8208,7 @@ Events carry the aggregate state after the change; envelope.sequence = aggregate
 | command_requested | [CommandRequested](#psim-response-v1-CommandRequested) |  |  |
 | notification_requested | [NotificationRequested](#psim-response-v1-NotificationRequested) |  |  |
 | plan_unavailable | [PlanUnavailable](#psim-response-v1-PlanUnavailable) |  |  |
+| sla_policy_pinned | [SlaPolicyPinned](#psim-response-v1-SlaPolicyPinned) |  |  |
 
 
 
@@ -8237,6 +8243,25 @@ SlaBreached reports that an incident missed its SLA.
 | incident_id | [string](#string) |  |  |
 | sla_kind | [string](#string) |  | &#34;ack&#34; or &#34;resolve&#34;. |
 | policy_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-SlaPolicyPinned"></a>
+
+### SlaPolicyPinned
+SlaPolicyPinned preserves the original SLA targets for analytical projections.
+Published atomically with the first tracked incident, independent of later policy edits.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| acknowledge_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+| resolve_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
 
 
 

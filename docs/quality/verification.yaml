@@ -240,6 +240,16 @@ methods:
     barrier: automated
     task: task history:bench
     steps: ['5.4']
+  - id: TS-30
+    kind: test
+    name: Факты инцидентов и отчётность
+    purpose: Метрики, авторизация, повторы и пересчёт фактов для API отчётов
+    criteria: Метрики совпадают с эталоном; повторы и пересчёт не меняют результат; роли и области соблюдены
+    env: E-LOCAL
+    gate: pr
+    barrier: automated
+    task: task reports:test
+    steps: ['6.5']
   - id: L-09
     kind: load
     name: Отчёт за 30 суток
@@ -247,7 +257,7 @@ methods:
     env: E-LOCAL
     gate: nightly
     barrier: automated
-    task: task load:report
+    task: task reports:bench
     steps: ['6.5']
   - id: L-10
     kind: load
@@ -1022,4 +1032,4 @@ scenarios:
   - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28]}
   - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24]}
   - {id: S12, methods: [C-12]}
-  - {id: S13, methods: [L-09, TS-10, TS-11, M-05]}
+  - {id: S13, methods: [L-09, TS-30, TS-10, TS-11, M-05]}
