@@ -19,6 +19,13 @@ codes:
     used_in: [rest, connector]
     title: Invalid argument
     ru: Запрос не прошёл валидацию; подробности в errors[]
+  - code: COMMON_PAYLOAD_TOO_LARGE
+    http: 413
+    grpc: RESOURCE_EXHAUSTED
+    retryable: false
+    used_in: [rest]
+    title: Payload too large
+    ru: Размер тела запроса превышает допустимый предел
   - code: COMMON_NOT_FOUND
     http: 404
     grpc: NOT_FOUND

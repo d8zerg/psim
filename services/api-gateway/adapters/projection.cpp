@@ -101,13 +101,13 @@ boost::asio::awaitable<p::Result<Snapshot>> Projection::snapshot(std::string ten
         Snapshot result;
         auto rows = co_await transaction->connection().query(
             {.sql = "SELECT body::text FROM access.incident_feed WHERE replica=$1 AND tenant_id=$2::uuid ORDER BY "
-                    "incident_id DESC LIMIT 1001",
+                    "incident_id DESC LIMIT 10001",
              .parameters = {pg::Parameter::text(replica_), pg::Parameter::text(tenant)}});
         if (!rows) {
           co_return std::unexpected(rows.error());
         }
-        if (rows->size() > 1000) {
-          co_return p::fail(p::ErrorCode::kCommonUnavailable, "fixture feed limit reached");
+        if (rows->size() > 10000) {
+          co_return p::fail(p::ErrorCode::kCommonUnavailable, "incident feed limit reached");
         }
         for (std::size_t i = 0; i < rows->size(); ++i) {
           if (!google::protobuf::util::JsonStringToMessage(std::string(*rows->value(i, 0)), result.feed.add_incidents())

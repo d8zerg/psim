@@ -124,7 +124,10 @@ asio::awaitable<void> observe(p::async::BlockingPool* blocking, std::string path
               throw std::runtime_error("catalog audit lacks its version snapshot");
             }
             const auto snapshot = Json::parse(details.at("snapshot"));
-            if (snapshot.at("version") != details.at("version")) {
+            const auto version = snapshot.at("version").is_string()
+                                     ? snapshot.at("version").get<std::string>()
+                                     : std::to_string(snapshot.at("version").get<std::uint64_t>());
+            if (version != details.at("version")) {
               throw std::runtime_error("audit version does not match its snapshot");
             }
             report["auditSnapshots"] = report.value("auditSnapshots", 0) + 1;

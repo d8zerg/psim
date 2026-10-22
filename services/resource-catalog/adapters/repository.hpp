@@ -11,6 +11,7 @@
 #include <string>
 
 #include "model.hpp"
+#include "psim/config/v1/config.pb.h"
 #include "psim/platform/kafka/client.hpp"
 #include "psim/platform/pg/pool.hpp"
 #include "psim/platform/pg/store.hpp"
@@ -49,6 +50,12 @@ class Repository {
                                          std::string after);
   asio::awaitable<p::Result<void>> cleanup_files(std::function<asio::awaitable<p::Result<void>>(std::string)> remove);
   asio::awaitable<p::Result<void>> denied(p::security::Principal principal, std::string object);
+
+  asio::awaitable<p::Result<Json>> configurations(p::security::Principal principal, std::string kind,
+                                                  std::string id = {});
+  asio::awaitable<p::Result<Json>> configure(config::v1::ConfigRecord record, std::string kind, std::string id,
+                                             Mutation mutation);
+  asio::awaitable<p::Result<void>> project_configuration(config::v1::ConfigRecord record);
 
   [[nodiscard]] p::pg::MessageStore messages() const { return messages_; }
 

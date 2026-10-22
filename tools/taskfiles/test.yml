@@ -4,6 +4,11 @@
 version: '3'
 
 tasks:
+  api-contract:
+    desc: Public REST contract, security, configuration and streaming checks
+    cmds:
+      - task: :api:test
+        vars: {PROJECT: '{{.PROJECT | default "psim-api-test"}}', PRESET: '{{.PRESET | default "debug"}}'}
   s3:
     desc: S3 streaming, integrity, conditional writes, cancellation and network recovery
     vars:
@@ -209,6 +214,8 @@ tasks:
       - task: :flow:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :catalog:test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
+      - task: :api:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}
       - task: :processing:test
         vars: {PROJECT: '{{.PROJECT}}', PRESET: coverage}

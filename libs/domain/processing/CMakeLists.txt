@@ -1,5 +1,5 @@
-add_library(psim_domain_processing STATIC src/expression.cpp)
+add_library(psim_domain_processing STATIC src/expression.cpp src/mapping.cpp)
 psim_target_defaults(psim_domain_processing)
 add_library(psim::domain_processing ALIAS psim_domain_processing)
 target_include_directories(psim_domain_processing PUBLIC include)
-psim_add_test(psim_domain_processing_test SOURCES tests/alarm_test.cpp LIBS psim::domain_processing)
+psim_add_test(psim_domain_processing_test SOURCES tests/alarm_test.cpp tests/mapping_test.cpp LIBS psim::domain_processing)

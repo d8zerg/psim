@@ -23,7 +23,7 @@ GRPC_CODES = {
     "PERMISSION_DENIED", "RESOURCE_EXHAUSTED", "FAILED_PRECONDITION", "ABORTED", "OUT_OF_RANGE",
     "UNIMPLEMENTED", "INTERNAL", "UNAVAILABLE", "DATA_LOSS", "UNAUTHENTICATED",
 }
-HTTP_CODES = {400, 401, 403, 404, 409, 412, 422, 428, 429, 500, 503, 504}
+HTTP_CODES = {400, 401, 403, 404, 409, 412, 413, 422, 428, 429, 500, 503, 504}
 USED_IN = {"rest", "connector", "dlq", "command_result", "notification", "realtime"}
 SERVICES = {
     "connector-gateway", "resource-catalog", "normalizer", "event-history", "correlation-engine",

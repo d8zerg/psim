@@ -1,0 +1,10 @@
+groups:
+  - name: api-gateway
+    rules:
+      - alert: ApiGatewayProxyFailures
+        expr: sum(rate(psim_api_proxy_failures_total[5m])) > 1
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: API Gateway repeatedly fails to transfer requests or responses
+          description: Check upstream readiness, TLS trust, response sizes and client connection failures.

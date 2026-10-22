@@ -1,4 +1,7 @@
 #include <boost/asio/as_tuple.hpp>
+#include <boost/asio/bind_cancellation_slot.hpp>
+#include <boost/asio/cancellation_signal.hpp>
+#include <boost/asio/cancellation_type.hpp>
 #include <boost/asio/co_spawn.hpp>
 #include <boost/asio/detached.hpp>
 #include <boost/asio/ip/tcp.hpp>
@@ -6,9 +9,13 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/websocket.hpp>
+#include <boost/beast/websocket/ssl.hpp>
 #include <google/protobuf/util/json_util.h>
+#include <google/protobuf/util/time_util.h>
 #include <nlohmann/json.hpp>
 #include <psim/api/v1/feed.pb.h>
+#include <psim/api/v1/me.pb.h>
+#include <psim/audit/v1/audit.pb.h>
 #include <psim/incident/v1/events.pb.h>
 
 #include <algorithm>
@@ -23,17 +30,31 @@
 #include <optional>
 #include <set>
 #include <string>
+#include <type_traits>
 #include <utility>
+#include <vector>
 
+#include "metrics.hpp"
 #include "projection.hpp"
+#include "proxy.hpp"
+#include "psim/common/v1/envelope.pb.h"
+#include "psim/incident/v1/incident.pb.h"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
 #include "psim/platform/kafka/processor.hpp"
+#include "psim/platform/pg/repository.hpp"
+#include "psim/platform/pg/store.hpp"
+#include "psim/platform/pg/transaction.hpp"
+#include "psim/platform/redis/pool.hpp"
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/security/jwt.hpp"
+#include "psim/platform/security/tls.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/realtime/v1/realtime.pb.h"
+#include "routes.hpp"
+#include "state.hpp"
 
 namespace psim::api_gateway {
 namespace p = platform;
@@ -45,21 +66,31 @@ using Tcp = asio::ip::tcp;
 using Json = nlohmann::json;
 class Gateway;
 
-class Session : public std::enable_shared_from_this<Session> {
+class SessionBase {
  public:
-  Session(Gateway* owner, Tcp::socket connection);
+  virtual ~SessionBase() = default;
+  virtual void stop() = 0;
+  virtual void send(const realtime::v1::ServerFrame&) = 0;
+  virtual void delta(const incident::v1::IncidentEventRecord&, const std::string&) = 0;
+  asio::cancellation_signal cancel;
+  std::optional<p::security::Principal> principal;
+  std::string subscription;
+};
+
+template <typename Stream>
+class Session : public SessionBase, public std::enable_shared_from_this<Session<Stream>> {
+ public:
+  Session(Gateway* owner, Stream connection);
   asio::awaitable<void> run();
   asio::awaitable<void> write();
-  void send(const realtime::v1::ServerFrame& frame);
-  void stop();
-  void delta(const incident::v1::IncidentEventRecord& event, const std::string& token);
+  void send(const realtime::v1::ServerFrame& frame) override;
+  void stop() override;
+  void delta(const incident::v1::IncidentEventRecord& event, const std::string& token) override;
   Gateway* gateway;
-  ws::stream<beast::tcp_stream> socket;
+  ws::stream<Stream> socket;
   asio::steady_timer wake;
   std::deque<std::string> queue;
   std::size_t queued_bytes = 0;
-  std::optional<p::security::Principal> principal;
-  std::string subscription;
   bool closed = false, upgraded = false;
 };
 
@@ -76,20 +107,86 @@ class Gateway final : public p::stream::Worker {
       : p::stream::Worker(context, "projection", "psim.incidents.events.v1", p::kafka::Semantics::kAtLeastOnce, true),
         acceptor_(executor()),
         idle_(executor()),
+        relay_timer_(executor()),
         epoch_(p::stream::uuid7()) {}
 
   asio::awaitable<p::Result<void>> initialize() override {
+    auto registered = co_await schema("psim.audit.v1");
+    if (!registered) {
+      co_return registered;
+    }
+    http_metrics_ = std::make_unique<HttpMetrics>(context());
+    const auto& config = context().config();
+    origins_ = config.get<std::vector<std::string>>("settings.allowed_origins");
+    limiter_ = std::make_unique<RateLimiter>(config.get<std::size_t>("settings.rate_per_second"),
+                                             config.get<std::size_t>("settings.rate_burst"));
+    ip_limiter_ = std::make_unique<RateLimiter>(config.get<std::size_t>("settings.ip_rate_per_second"),
+                                                config.get<std::size_t>("settings.ip_rate_burst"));
+    for (const auto* name :
+         {"catalog", "rules", "incidents", "commands", "response", "history", "reports", "audit", "notifications"}) {
+      endpoints_.emplace(name, Endpoint{config.get<std::string>(std::string("settings.") + name + "_host"),
+                                        config.get<std::string>(std::string("settings.") + name + "_port")});
+    }
+    auto upstream = co_await context().blocking().run([&config] {
+      return p::security::tls_context(
+          {.ca_file = config.get<std::string>("settings.upstream_ca_file"),
+           .certificate_file = config.get<std::string>("settings.upstream_certificate_file"),
+           .private_key_file = config.get<std::string>("settings.upstream_key_file"),
+           .require_client_certificate = false});
+    });
+    if (!upstream) {
+      co_return std::unexpected(upstream.error());
+    }
+    upstream_tls_ = std::move(*upstream);
+    plaintext_ = config.get<bool>("settings.listen_plaintext");
+    if (plaintext_ && !config.get<bool>("settings.allow_plaintext")) {
+      co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "plaintext listener requires development opt-in");
+    }
+    if (!plaintext_) {
+      auto tls = co_await context().blocking().run([&config] {
+        return p::security::tls_context({.boundary = p::security::Boundary::kExternal,
+                                         .ca_file = config.get<std::string>("settings.tls_ca_file"),
+                                         .certificate_file = config.get<std::string>("settings.tls_certificate_file"),
+                                         .private_key_file = config.get<std::string>("settings.tls_private_key_file"),
+                                         .require_client_certificate = false},
+                                        true);
+      });
+      if (!tls) {
+        co_return std::unexpected(tls.error());
+      }
+      tls_ = std::move(*tls);
+    }
     auto pool = co_await database();
     if (!pool) {
       co_return std::unexpected(pool.error());
     }
     pool_ = std::move(*pool);
+    if (!config.get<std::string>("settings.redis_host").empty()) {
+      p::redis::PoolOptions options;
+      options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
+      options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
+      options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
+      options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
+      options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
+      options.connection.connect_timeout = std::chrono::milliseconds(500);
+      options.connection.command_timeout = std::chrono::milliseconds(500);
+      if (auto password = config.secret("settings.redis_password_file")) {
+        options.connection.credentials.password = std::string(*password);
+      }
+      leases_ = std::make_unique<p::redis::Pool>(std::move(options));
+    }
+    state_ = std::make_unique<StateProjection>(pool_.get(), context().config().get<std::string>("service.instance"),
+                                               leases_.get());
+    auto state_initialized = co_await state_->initialize();
+    if (!state_initialized) {
+      co_return state_initialized;
+    }
     projection_ = std::make_unique<Projection>(pool_.get(), context().config().get<std::string>("service.instance"));
     auto initialized = co_await projection_->initialize();
     if (!initialized) {
       co_return initialized;
     }
-    auto snapshot = co_await projection_->snapshot("11111111-1111-4111-8111-111111111111");
+    auto snapshot = co_await projection_->snapshot("00000000-0000-0000-0000-000000000000");
     if (!snapshot) {
       co_return std::unexpected(snapshot.error());
     }
@@ -98,7 +195,9 @@ class Gateway final : public p::stream::Worker {
     auto verifier = p::security::JwksCache::create(
         {.jwt = {.issuer = context().config().get<std::string>("settings.issuer"), .audience = "psim"},
          .url = context().config().get<std::string>("settings.jwks_url"),
-         .http = {.allow_plaintext = context().config().get<bool>("settings.allow_plaintext")}});
+         .http = {
+             .tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"), .require_client_certificate = false},
+             .allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
     if (!verifier) {
       co_return std::unexpected(verifier.error());
     }
@@ -107,6 +206,14 @@ class Gateway final : public p::stream::Worker {
     if (!keys) {
       co_return keys;
     }
+    relay_ = std::make_unique<p::pg::OutboxRelay>(pool_.get(), p::pg::MessageStore("access"),
+                                                  p::pg::kafka_publisher(producer()));
+    relaying_ = true;
+    asio::co_spawn(executor(), relay(), [this](const std::exception_ptr& error) {
+      (void)error;
+      relaying_ = false;
+      idle_.cancel();
+    });
     acceptor_.open(Tcp::v4());
     acceptor_.set_option(Tcp::acceptor::reuse_address(true));
     acceptor_.bind({Tcp::v4(), static_cast<unsigned short>(context().config().get<int>("settings.listen_port"))});
@@ -122,27 +229,37 @@ class Gateway final : public p::stream::Worker {
     if (!principal) {
       co_return std::unexpected(principal.error());
     }
-    if (principal->tenant != "11111111-1111-4111-8111-111111111111"
-        || (!principal->roles.contains("operator") && !principal->roles.contains("supervisor"))) {
-      co_return p::fail(p::ErrorCode::kAuthForbidden, "incident feed access denied");
+    if (!p::stream::uuid(principal->tenant)) {
+      co_return p::fail(p::ErrorCode::kAuthForbidden, "tenant identity required");
     }
     co_return principal;
   }
 
-  std::string token(const std::map<std::string, std::int64_t>& positions) const {
-    return Json{{"epoch", epoch_}, {"tenant", "11111111-1111-4111-8111-111111111111"}, {"offsets", positions}}.dump();
+  std::string token(const std::map<std::string, std::int64_t>& positions, std::string tenant) const {
+    return Json{{"epoch", epoch_}, {"tenant", std::move(tenant)}, {"offsets", positions}}.dump();
   }
 
-  asio::awaitable<p::Result<api::v1::GetIncidentFeedResponse>> snapshot(std::string tenant) {
-    auto result = co_await projection_->snapshot(std::move(tenant));
+  asio::awaitable<p::Result<api::v1::GetIncidentFeedResponse>> snapshot(p::security::Principal principal,
+                                                                        FeedFilter filter) {
+    auto result = co_await projection_->snapshot(principal.tenant);
     if (!result) {
       co_return std::unexpected(result.error());
     }
-    result->feed.set_resume_token(token(result->offsets));
+    auto* incidents = result->feed.mutable_incidents();
+    for (int index = incidents->size() - 1; index >= 0; --index) {
+      const auto& incident = incidents->Get(index);
+      if ((!filter.sites.empty() && !filter.sites.contains(incident.site_id()))
+          || (!filter.zones.empty() && !filter.zones.contains(incident.zone_id()))
+          || !p::authz::scoped(principal, {principal.tenant, incident.site_id(), incident.zone_id()})
+          || incident.state() == incident::v1::INCIDENT_STATE_CLOSED) {
+        incidents->DeleteSubrange(index, 1);
+      }
+    }
+    result->feed.set_resume_token(token(result->offsets, principal.tenant));
     co_return std::move(result->feed);
   }
 
-  void subscribe(Session* session, const realtime::v1::Subscribe& request, const std::string& request_id) {
+  void subscribe(SessionBase* session, const realtime::v1::Subscribe& request, const std::string& request_id) {
     if (!session->principal) {
       return;
     }
@@ -194,7 +311,7 @@ class Gateway final : public p::stream::Worker {
   asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
     auto trace = p::stream::span(context(), "project and deliver incident", message->headers());
     auto event = decode<incident::v1::IncidentEventRecord>(*message);
-    if (!event || (!event->has_incident_created() && !event->has_signal_attached())) {
+    if (!event) {
       trace->End();
       co_return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "unsupported incident event");
     }
@@ -209,7 +326,7 @@ class Gateway final : public p::stream::Worker {
       co_return p::Result<void>{};
     }
     offsets_[partition] = std::max(offsets_[partition], message->offset() + 1);
-    const auto resume = token(offsets_);
+    const auto resume = token(offsets_, event->envelope().tenant_id());
     journal_.push_back({*event, partition, message->offset(), resume});
     if (journal_.size() > 256) {
       const auto& old = journal_.front();
@@ -233,15 +350,17 @@ class Gateway final : public p::stream::Worker {
         socket.close();
         continue;
       }
-      auto session = std::make_shared<Session>(this, std::move(socket));
-      sessions_.insert(session);
-      asio::co_spawn(executor(), session->run(), [this, session](const std::exception_ptr& failure) {
-        if (failure) {
-          session->stop();
-        }
-        sessions_.erase(session);
-        idle_.cancel();
-      });
+      if (!ip_limiter_->allow(socket.remote_endpoint().address().to_string(), std::chrono::steady_clock::now())) {
+        http_metrics_->limited();
+        socket.close();
+        continue;
+      }
+      if (plaintext_) {
+        launch(std::make_shared<Session<beast::tcp_stream>>(this, beast::tcp_stream(std::move(socket))));
+      } else {
+        launch(std::make_shared<Session<beast::ssl_stream<beast::tcp_stream>>>(
+            this, beast::ssl_stream<beast::tcp_stream>(std::move(socket), *tls_)));
+      }
     }
     accepting_ = false;
     listening_ = false;
@@ -255,9 +374,15 @@ class Gateway final : public p::stream::Worker {
     for (const auto& session : sessions_) {
       session->stop();
     }
-    while (!sessions_.empty() || listening_) {
+    relay_timer_.cancel();
+    while (!sessions_.empty() || listening_ || relaying_) {
       idle_.expires_after(std::chrono::milliseconds(10));
       co_await idle_.async_wait(asio::as_tuple(asio::use_awaitable));
+    }
+    state_.reset();
+    if (leases_) {
+      leases_->close();
+      leases_.reset();
     }
     projection_.reset();
     if (pool_) {
@@ -267,35 +392,144 @@ class Gateway final : public p::stream::Worker {
     verifier_.reset();
   }
 
+  template <typename Stream>
+  void launch(std::shared_ptr<Session<Stream>> session) {
+    sessions_.insert(session);
+    asio::co_spawn(
+        executor(), session->run(),
+        asio::bind_cancellation_slot(session->cancel.slot(), [this, session](const std::exception_ptr& failure) {
+          if (failure) {
+            try {
+              std::rethrow_exception(failure);
+            } catch (const std::exception& error) {
+              if (!session->closed) {
+                context().logger().warn("API session failed", {{"error", error.what()}});
+              }
+            }
+            session->stop();
+          }
+          sessions_.erase(session);
+          idle_.cancel();
+        }));
+  }
+
+  asio::awaitable<void> relay() {
+    while (accepting_ || !listening_) {
+      if (!relaying_) {
+        co_return;
+      }
+      auto result = co_await relay_->drain_once();
+      (void)result;
+      relay_timer_.expires_after(std::chrono::milliseconds(100));
+      co_await relay_timer_.async_wait(asio::as_tuple(asio::use_awaitable));
+      if (!accepting_) {
+        break;
+      }
+    }
+  }
+
+  asio::awaitable<p::Result<void>> denied(std::optional<p::security::Principal> principal, std::string operation) {
+    http_metrics_->denied();
+    audit::v1::AuditEventRecord event;
+    auto* env = event.mutable_envelope();
+    env->set_message_id(p::stream::uuid7());
+    env->set_correlation_id(env->message_id());
+    env->set_schema_version("1");
+    env->set_tenant_id(principal ? principal->tenant : "00000000-0000-0000-0000-000000000000");
+    *env->mutable_occurred_at() = google::protobuf::util::TimeUtil::GetCurrentTime();
+    *env->mutable_produced_at() = env->occurred_at();
+    auto* entry = event.mutable_audit_entry();
+    entry->mutable_actor()->set_kind(principal ? common::v1::ACTOR_KIND_USER : common::v1::ACTOR_KIND_SERVICE);
+    entry->mutable_actor()->set_id(principal ? principal->subject : "api-gateway");
+    *env->mutable_actor() = entry->actor();
+    entry->set_action("access.denied");
+    entry->set_object_type("rest-operation");
+    entry->set_object_id(std::move(operation));
+    entry->set_outcome(audit::v1::AUDIT_OUTCOME_DENIED);
+    auto message = record("psim.audit.v1", env->tenant_id(), event, {});
+    co_return co_await p::pg::in_transaction<void>(
+        pool_.get(),
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited closure.
+        [&event, &message](p::pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+          co_return co_await p::pg::MessageStore("access").append(
+              tx, {.id = event.envelope().message_id(), .record = std::move(message)});
+        });
+  }
+
+  asio::awaitable<p::Result<std::string>> operational(p::security::Principal principal, std::string location,
+                                                      std::set<std::string> sites) {
+    const bool operators = location.empty();
+    if (!operators && !p::stream::uuid(location)) {
+      co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "location identity must be a UUID");
+    }
+    auto result = co_await state_->snapshot(principal, std::move(location), std::move(sites));
+    if (!result) {
+      co_return std::unexpected(result.error());
+    }
+    const auto resume = Json{{"epoch", epoch_}, {"tenant", principal.tenant}, {"stateOffsets", result->offsets}}.dump();
+    result->location.set_resume_token(resume);
+    result->operators.set_resume_token(resume);
+    co_return operators ? p::stream::json(result->operators) : p::stream::json(result->location);
+  }
+
+  bool origin(std::string_view value) const { return allowed_origin(value, origins_); }
+
+  bool limit(const p::security::Principal& principal) {
+    const bool allowed = limiter_->allow(principal.tenant + ":" + principal.subject, std::chrono::steady_clock::now());
+    if (!allowed) {
+      http_metrics_->limited();
+    }
+    return allowed;
+  }
+
+  const Endpoint& endpoint(const std::string& service) const { return endpoints_.at(service); }
+
+  asio::ssl::context& upstream_tls() { return *upstream_tls_; }
+
+  HttpMetrics& metrics() { return *http_metrics_; }
+
  private:
   Tcp::acceptor acceptor_;
-  asio::steady_timer idle_;
+  asio::steady_timer idle_, relay_timer_;
+  bool plaintext_ = false, relaying_ = false;
+  std::shared_ptr<asio::ssl::context> tls_, upstream_tls_;
+  std::unique_ptr<p::pg::OutboxRelay> relay_;
+  std::unique_ptr<RateLimiter> limiter_, ip_limiter_;
+  std::unique_ptr<HttpMetrics> http_metrics_;
+  std::vector<std::string> origins_;
+  std::map<std::string, Endpoint> endpoints_;
   bool accepting_ = false;
   bool listening_ = false;
   std::string epoch_;
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<Projection> projection_;
+  std::unique_ptr<StateProjection> state_;
+  std::unique_ptr<p::redis::Pool> leases_;
   std::unique_ptr<p::security::JwksCache> verifier_;
   std::map<std::string, std::int64_t> offsets_, floor_;
   std::deque<JournalEntry> journal_;
-  std::set<std::shared_ptr<Session>> sessions_;
+  std::set<std::shared_ptr<SessionBase>> sessions_;
 };
 
-Session::Session(Gateway* owner, Tcp::socket connection)
+template <typename Stream>
+Session<Stream>::Session(Gateway* owner, Stream connection)
     : gateway(owner), socket(std::move(connection)), wake(socket.get_executor()) {}
 
-void Session::stop() {
+template <typename Stream>
+void Session<Stream>::stop() {
   if (closed) {
     return;
   }
   closed = true;
+  cancel.emit(asio::cancellation_type::terminal);
   wake.cancel();
   boost::system::error_code ignored;
   (void)beast::get_lowest_layer(socket).socket().cancel(ignored);
   (void)beast::get_lowest_layer(socket).socket().close(ignored);
 }
 
-void Session::send(const realtime::v1::ServerFrame& frame) {
+template <typename Stream>
+void Session<Stream>::send(const realtime::v1::ServerFrame& frame) {
   if (closed) {
     return;
   }
@@ -309,8 +543,24 @@ void Session::send(const realtime::v1::ServerFrame& frame) {
   wake.cancel();
 }
 
-void Session::delta(const incident::v1::IncidentEventRecord& event, const std::string& token) {
+template <typename Stream>
+void Session<Stream>::delta(const incident::v1::IncidentEventRecord& event, const std::string& token) {
   if (!principal || subscription.empty() || principal->tenant != event.envelope().tenant_id()) {
+    return;
+  }
+  const auto* payload = incident::v1::IncidentEventRecord::GetReflection()->GetOneofFieldDescriptor(
+      event, incident::v1::IncidentEventRecord::GetDescriptor()->FindOneofByName("payload"));
+  if (!payload) {
+    return;
+  }
+  const auto& change = incident::v1::IncidentEventRecord::GetReflection()->GetMessage(event, payload);
+  const auto* field = change.GetDescriptor()->FindFieldByName("incident");
+  if (!field) {
+    return;
+  }
+  incident::v1::Incident value;
+  value.CopyFrom(change.GetReflection()->GetMessage(change, field));
+  if (!p::authz::scoped(*principal, {principal->tenant, value.site_id(), value.zone_id()})) {
     return;
   }
   realtime::v1::ServerFrame frame;
@@ -321,7 +571,8 @@ void Session::delta(const incident::v1::IncidentEventRecord& event, const std::s
   send(frame);
 }
 
-asio::awaitable<void> Session::write() {
+template <typename Stream>
+asio::awaitable<void> Session<Stream>::write() {
   while (!closed) {
     if (principal && principal->expires_at <= std::chrono::system_clock::now()) {
       stop();
@@ -344,37 +595,64 @@ asio::awaitable<void> Session::write() {
   }
 }
 
-asio::awaitable<void> Session::run() {
+template <typename Stream>
+asio::awaitable<void> Session<Stream>::run() {
   beast::get_lowest_layer(socket).expires_after(std::chrono::seconds(10));
   beast::flat_buffer buffer;
-  http::request_parser<http::string_body> parser;
-  parser.body_limit(16384);
-  parser.header_limit(16384);
-  auto [error, bytes] =
-      co_await http::async_read(socket.next_layer(), buffer, parser, asio::as_tuple(asio::use_awaitable));
-  (void)bytes;
-  if (error) {
-    stop();
-    co_return;
-  }
-  const auto request = parser.release();
-  if (ws::is_upgrade(request) && request.target() == "/v1/realtime") {
-    const std::string origin(request[http::field::origin]);
-    if (origin != "http://localhost:5173" && origin != "http://localhost:4173" && origin != "http://console:4173") {
+  if constexpr (!std::is_same_v<Stream, beast::tcp_stream>) {
+    auto [handshake] = co_await socket.next_layer().async_handshake(asio::ssl::stream_base::server,
+                                                                    asio::as_tuple(asio::use_awaitable));
+    if (handshake) {
       stop();
       co_return;
     }
+  }
+  http::request_parser<http::buffer_body> parser;
+  parser.body_limit(64ULL * 1024 * 1024);
+  parser.header_limit(16384);
+  auto [error, bytes] =
+      co_await http::async_read_header(socket.next_layer(), buffer, parser, asio::as_tuple(asio::use_awaitable));
+  (void)bytes;
+  if (error) {
+    const auto status = error == http::error::body_limit ? http::status::payload_too_large : http::status::bad_request;
+    http::response<http::string_body> response(status, 11);
+    response.set(http::field::content_type, "application/problem+json");
+    security_headers(response.base());
+    response.body() =
+        Json{{"type", "about:blank"},
+             {"title", "Invalid request"},
+             {"status", response.result_int()},
+             {"code", error == http::error::body_limit ? "COMMON_PAYLOAD_TOO_LARGE" : "COMMON_INVALID_ARGUMENT"}}
+            .dump();
+    response.prepare_payload();
+    co_await http::async_write(socket.next_layer(), response, asio::as_tuple(asio::use_awaitable));
+    stop();
+    co_return;
+  }
+  const auto& request = parser.get();
+  if (ws::is_upgrade(request) && request.target() == "/v1/realtime") {
+    const std::string origin(request[http::field::origin]);
+    if (origin.empty() || !gateway->origin(origin)) {
+      stop();
+      co_return;
+    }
+    if (!parser.is_done()) {
+      stop();
+      co_return;
+    }
+    http::request<http::empty_body> upgrade(request.method(), request.target(), request.version());
+    upgrade.base() = request.base();
     socket.set_option(ws::stream_base::timeout::suggested(beast::role_type::server));
     socket.read_message_max(16384);
     beast::get_lowest_layer(socket).expires_never();
-    const auto [accepted] = co_await socket.async_accept(request, asio::as_tuple(asio::use_awaitable));
+    const auto [accepted] = co_await socket.async_accept(upgrade, asio::as_tuple(asio::use_awaitable));
     if (accepted) {
       stop();
       co_return;
     }
     upgraded = true;
     asio::co_spawn(socket.get_executor(), write(),
-                   [self = shared_from_this()](const std::exception_ptr&) { self->stop(); });
+                   [self = this->shared_from_this()](const std::exception_ptr&) { self->stop(); });
     while (!closed) {
       buffer.consume(buffer.size());
       const auto [read_error, read_bytes] = co_await socket.async_read(buffer, asio::as_tuple(asio::use_awaitable));
@@ -393,7 +671,10 @@ asio::awaitable<void> Session::run() {
       }
       if (frame.has_authenticate()) {
         auto authenticated = co_await gateway->authenticate(frame.authenticate().access_token());
-        if (!authenticated) {
+        if (!authenticated || !p::authz::decide_role(*authenticated, "feed.read", std::chrono::system_clock::now())) {
+          auto logged = co_await gateway->denied(authenticated ? std::optional(*authenticated) : std::nullopt,
+                                                 "realtime.authenticate");
+          (void)logged;
           break;
         }
         principal = std::move(*authenticated);
@@ -417,50 +698,266 @@ asio::awaitable<void> Session::run() {
     stop();
     co_return;
   }
-  http::response<http::string_body> response(http::status::ok, request.version());
-  response.keep_alive(false);
-  response.set(http::field::content_type, "application/json");
-  response.set(http::field::cache_control, "no-store");
-  p::Result<p::security::Principal> authenticated =
-      p::fail(p::ErrorCode::kAuthUnauthenticated, "Bearer token required");
-  const std::string authorization(request[http::field::authorization]);
-  if (authorization.starts_with("Bearer ") && authorization.size() <= 8192) {
-    authenticated = co_await gateway->authenticate(authorization.substr(7));
-  }
-  if (!authenticated) {
-    response.result(static_cast<http::status>(p::info(authenticated.error().code()).http_status));
-    response.set(http::field::content_type, "application/problem+json");
-    response.body() = Json{{"type", "about:blank"},
-                           {"title", "Access denied"},
-                           {"status", response.result_int()},
-                           {"code", authenticated.error().name()}}
-                          .dump();
-  } else if (request.method() != http::verb::get || request.target() != "/v1/feed/incidents") {
-    response.result(http::status::not_found);
-    response.body() = "{}";
+  const std::string origin(request[http::field::origin]);
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): closure lives in the awaiting session.
+  auto send = [&](http::status status, std::string body,
+                  std::string type = "application/json") -> asio::awaitable<void> {
+    http::response<http::string_body> response(status, request.version());
+    response.keep_alive(false);
+    response.set(http::field::content_type, type);
+    security_headers(response.base(), gateway->origin(origin) ? origin : "");
+    if (status == http::status::unauthorized) {
+      response.set(http::field::www_authenticate, "Bearer");
+    }
+    if (status == http::status::too_many_requests) {
+      response.set(http::field::retry_after, "1");
+    }
+    if (request.method() == http::verb::options && status == http::status::no_content) {
+      response.set(http::field::access_control_allow_methods, "GET, POST, PUT, OPTIONS");
+      response.set(http::field::access_control_allow_headers,
+                   "Authorization, Content-Type, Idempotency-Key, If-Match, If-None-Match, traceparent");
+    }
+    response.body() = std::move(body);
+    response.prepare_payload();
+    co_await http::async_write(socket.next_layer(), response, asio::as_tuple(asio::use_awaitable));
+  };
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): closure lives in the awaiting session.
+  auto problem = [&](p::Error failure) -> asio::awaitable<void> {
+    const auto& info = p::info(failure.code());
+    co_await send(
+        static_cast<http::status>(info.http_status),
+        Json{{"type", "about:blank"}, {"title", info.title}, {"status", info.http_status}, {"code", failure.name()}}
+            .dump(),
+        "application/problem+json");
+  };
+  auto selected = route(request.method() == http::verb::options
+                            ? http::string_to_verb(request[http::field::access_control_request_method])
+                            : request.method(),
+                        request.target());
+  const auto measurement =
+      gateway->metrics().start(selected ? (*selected)->operation : "unmatched", &parser.get().base());
+  if (!gateway->origin(origin)) {
+    auto logged = co_await gateway->denied(std::nullopt, "cors");
+    co_await problem(logged ? p::Error(p::ErrorCode::kAuthForbidden, "origin denied") : logged.error());
+  } else if (!selected) {
+    co_await problem(selected.error());
+  } else if (request.method() == http::verb::options) {
+    co_await send(http::status::no_content, "");
   } else {
-    auto feed = co_await gateway->snapshot(authenticated->tenant);
-    if (!feed) {
-      response.result(http::status::service_unavailable);
-      response.body() = "{}";
+    p::Result<p::security::Principal> authenticated =
+        p::fail(p::ErrorCode::kAuthUnauthenticated, "Bearer token required");
+    const std::string authorization(request[http::field::authorization]);
+    if (authorization.starts_with("Bearer ") && authorization.size() <= 8192
+        && request.count(http::field::authorization) == 1) {
+      authenticated = co_await gateway->authenticate(authorization.substr(7));
+    }
+    p::Result<void> access;
+    if (!authenticated) {
+      access = std::unexpected(authenticated.error());
+    } else if (!(*selected)->action.empty()) {
+      access = p::authz::decide_role(*authenticated, (*selected)->action, std::chrono::system_clock::now());
+    }
+    if (access) {
+      beast::get_lowest_layer(socket).expires_after(std::chrono::seconds(60));
+    }
+    if (!access) {
+      auto logged = co_await gateway->denied(authenticated ? std::optional(*authenticated) : std::nullopt,
+                                             (*selected)->operation);
+      co_await problem(logged ? access.error() : logged.error());
+    } else if (!gateway->limit(*authenticated)) {
+      co_await problem(p::Error(p::ErrorCode::kCommonRateLimited, "request rate exceeded"));
+    } else if (auto headers = request_headers(**selected, request.base()); !headers) {
+      co_await problem(headers.error());
+    } else if ((*selected)->service == "local") {
+      if (!parser.is_done()) {
+        co_await problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "body not supported"));
+      } else if ((*selected)->operation == "MeService_GetMe") {
+        if (request.target().find('?') != std::string_view::npos) {
+          co_await problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "query not supported"));
+          stop();
+          co_return;
+        }
+        api::v1::GetMeResponse me;
+        me.set_user_id(authenticated->subject);
+        me.set_tenant_id(authenticated->tenant);
+        for (const auto& role : authenticated->roles) {
+          me.add_roles(role);
+        }
+        for (const auto& scope : authenticated->scopes) {
+          if (scope.starts_with("site:")) {
+            me.add_site_ids(scope.substr(5));
+          } else if (scope.starts_with("zone:")) {
+            me.add_zone_ids(scope.substr(5));
+          } else {
+            me.add_site_ids(scope);
+          }
+        }
+        for (const auto& action : p::authz::actions(*authenticated, std::chrono::system_clock::now())) {
+          me.add_actions(action);
+        }
+        co_await send(http::status::ok, p::stream::json(me));
+      } else if ((*selected)->operation == "FeedService_GetIncidentFeed") {
+        auto filter = feed_filter(request.target());
+        if (!filter) {
+          co_await problem(filter.error());
+          stop();
+          co_return;
+        }
+        auto feed = co_await gateway->snapshot(*authenticated, std::move(*filter));
+        if (!feed) {
+          co_await problem(feed.error());
+        } else {
+          co_await send(http::status::ok, p::stream::json(*feed));
+        }
+      } else {
+        const auto path = std::string(request.target().substr(0, request.target().find('?')));
+        const auto location =
+            (*selected)->operation == "FeedService_GetLocationStatus" ? path.substr(19, path.size() - 26) : "";
+        auto filter = feed_filter(request.target(), false);
+        if (!filter || (!location.empty() && request.target().find('?') != std::string_view::npos)) {
+          co_await problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "invalid snapshot filter"));
+          stop();
+          co_return;
+        }
+        auto result = co_await gateway->operational(*authenticated, location, std::move(filter->sites));
+        if (!result) {
+          const auto status = p::info(result.error().code()).http_status;
+          if (status == 401 || status == 403) {
+            auto logged = co_await gateway->denied(*authenticated, (*selected)->operation);
+            if (!logged) {
+              co_await problem(logged.error());
+              stop();
+              co_return;
+            }
+          }
+          co_await problem(result.error());
+        } else {
+          co_await send(http::status::ok, std::move(*result));
+        }
+      }
+    } else if (parser.content_length().value_or(0) > request_limit(**selected)) {
+      co_await problem(p::Error(p::ErrorCode::kCommonPayloadTooLarge, "request body exceeds limit"));
     } else {
-      response.body() = p::stream::json(*feed);
+      parser.body_limit(request_limit(**selected));
+      bool started = false;
+      bool forwarded = false;
+      bool invalid_body = false;
+      bool oversized = false;
+      if (request[http::field::expect] == "100-continue") {
+        const http::response<http::empty_body> interim(http::status::continue_, 11);
+        co_await http::async_write(socket.next_layer(), interim, asio::as_tuple(asio::use_awaitable));
+      }
+      try {
+        forwarded = co_await proxy(&socket.next_layer(), &buffer, &parser, gateway->endpoint((*selected)->service),
+                                   &gateway->upstream_tls(), origin, (*selected)->floor_plan, &started, &invalid_body,
+                                   &oversized);
+      } catch (const std::exception&) {
+        forwarded = false;
+      }
+      if (!forwarded && !invalid_body && !oversized && !closed) {
+        gateway->metrics().proxy_failed();
+      }
+      if (!forwarded && !started) {
+        auto code = p::ErrorCode::kCommonUnavailable;
+        if (invalid_body) {
+          code = p::ErrorCode::kCommonInvalidArgument;
+        }
+        if (oversized) {
+          code = p::ErrorCode::kCommonPayloadTooLarge;
+        }
+        co_await problem(p::Error(code, "upstream request failed"));
+      }
     }
   }
-  response.prepare_payload();
-  co_await http::async_write(socket.next_layer(), response, asio::as_tuple(asio::use_awaitable));
+  if constexpr (!std::is_same_v<Stream, beast::tcp_stream>) {
+    beast::get_lowest_layer(socket).expires_after(std::chrono::seconds(2));
+    (void)co_await socket.next_layer().async_shutdown(asio::as_tuple(asio::use_awaitable));
+  }
   stop();
 }
+
+class StateWorker final : public p::stream::Worker {
+ public:
+  StateWorker(const p::runtime::Context& context, std::string stage, std::string topic)
+      : p::stream::Worker(context, std::move(stage), std::move(topic), p::kafka::Semantics::kAtLeastOnce, true) {}
+
+  asio::awaitable<p::Result<void>> initialize() override {
+    auto pool = co_await database();
+    if (!pool) {
+      co_return std::unexpected(pool.error());
+    }
+    pool_ = std::move(*pool);
+    projection_ =
+        std::make_unique<StateProjection>(pool_.get(), context().config().get<std::string>("service.instance"));
+    co_return co_await projection_->initialize();
+  }
+
+  asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
+    co_return co_await projection_->apply(message);
+  }
+
+  asio::awaitable<void> shutdown() override {
+    projection_.reset();
+    if (pool_) {
+      pool_->close();
+      pool_.reset();
+    }
+    co_return;
+  }
+
+ private:
+  std::unique_ptr<p::pg::Pool> pool_;
+  std::unique_ptr<StateProjection> projection_;
+};
+}  // namespace psim::api_gateway
+
+namespace psim::api_gateway {
+namespace {
+std::string settings() {
+  auto schema = Json::parse(p::stream::kSettings);
+  auto& fields = schema["properties"];
+  fields["listen_plaintext"] = {{"type", "boolean"}, {"default", false}};
+  fields["allowed_origins"] = {{"type", "array"}, {"items", {{"type", "string"}}}, {"default", Json::array()}};
+  for (const auto* name : {"tls_ca_file", "tls_certificate_file", "tls_private_key_file", "upstream_ca_file",
+                           "upstream_certificate_file", "upstream_key_file", "jwks_ca_file", "redis_host",
+                           "redis_ca_file", "redis_certificate_file", "redis_key_file"}) {
+    fields[name] = {{"type", "string"}, {"default", ""}};
+  }
+  fields["redis_password_file"] = {{"type", "string"}, {"x-psim-secret", true}};
+  for (const auto* name : {"rate_per_second", "rate_burst", "ip_rate_per_second", "ip_rate_burst"}) {
+    fields[name] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 100000}, {"default", 100}};
+  }
+  for (const auto& [name, host] : std::map<std::string, std::string>{{"catalog", "resource-catalog"},
+                                                                     {"rules", "rule-management"},
+                                                                     {"incidents", "incident-service"},
+                                                                     {"commands", "command-service"},
+                                                                     {"response", "response-engine"},
+                                                                     {"history", "event-history"},
+                                                                     {"reports", "projection-service"},
+                                                                     {"audit", "audit-service"},
+                                                                     {"notifications", "notification-service"}}) {
+    fields[name + "_host"] = {{"type", "string"}, {"minLength", 1}, {"default", host}};
+    fields[name + "_port"] = {{"type", "string"}, {"pattern", "^[0-9]{1,5}$"}, {"default", "8443"}};
+  }
+  return schema.dump();
+}
+}  // namespace
 }  // namespace psim::api_gateway
 
 int main(int argc, char** argv) {
   return psim::platform::runtime::run(argc, argv,
                                       {.name = "api-gateway",
-                                       .settings_schema = std::string(psim::platform::stream::kSettings),
+                                       .settings_schema = psim::api_gateway::settings(),
                                        .create = [](psim::platform::runtime::Context& context)
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
                                          result.push_back(std::make_unique<psim::api_gateway::Gateway>(context));
+                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
+                                             context, "state-catalog", "psim.catalog.v1"));
+                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
+                                             context, "state-observations", "psim.events.normalized.v1"));
+                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
+                                             context, "state-connections", "psim.ingest.state.v1"));
                                          return result;
                                        }});
 }

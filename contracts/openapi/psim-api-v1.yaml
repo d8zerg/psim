@@ -87,11 +87,13 @@ paths:
           $ref: '#/components/responses/Problem'
         '404': &id004
           $ref: '#/components/responses/Problem'
-        '429': &id005
+        '413': &id005
           $ref: '#/components/responses/Problem'
-        '500': &id006
+        '429': &id006
           $ref: '#/components/responses/Problem'
-        '503': &id007
+        '500': &id007
+          $ref: '#/components/responses/Problem'
+        '503': &id008
           $ref: '#/components/responses/Problem'
       summary: SearchAuditRecords searches audit records; newest first
   /v1/audit/records:export:
@@ -154,9 +156,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ExportAuditRecords exports records with neighbouring hashes and checkpoints (JSON lines)
   /v1/audit:verify:
     post:
@@ -181,17 +184,22 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': &id008
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': &id009
           $ref: '#/components/responses/Problem'
-        '412': &id009
+        '412': &id010
           $ref: '#/components/responses/Problem'
-      parameters: &id010
-      - &id011
+        '422': &id011
+          $ref: '#/components/responses/Problem'
+        '428': &id012
+          $ref: '#/components/responses/Problem'
+      parameters: &id013
+      - &id014
         $ref: '#/components/parameters/IfMatch'
-      - &id012
+      - &id015
         $ref: '#/components/parameters/IdempotencyKey'
       summary: VerifyAuditIntegrity recomputes the chain over a range of records
   /v1/commands:
@@ -248,9 +256,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListCommands lists commands by incident, device or state
     post:
       tags:
@@ -274,12 +283,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: RequestCommand requests a command; Idempotency-Key header equals command_id
   /v1/commands/{commandId}:
     get:
@@ -304,9 +316,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetCommand returns one command
   /v1/commands/{commandId}:approve:
     post:
@@ -320,8 +333,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -339,11 +352,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ApproveCommand approves a critical command; approver must differ from requester (CM3)
   /v1/commands/{commandId}:cancel:
     post:
@@ -357,8 +373,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -376,11 +392,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: CancelCommand cancels a command before it is sent
   /v1/commands/{commandId}:reject:
     post:
@@ -394,8 +413,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -413,11 +432,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: RejectCommand rejects a critical command
   /v1/connectors:
     get:
@@ -446,9 +468,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListConnectors lists registered connectors with their status
     post:
       tags:
@@ -461,8 +484,8 @@ paths:
         description: Public client certificate; its fingerprint and validity are verified by the gateway.
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -480,11 +503,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: RegisterConnector registers a connector and binds its certificate
   /v1/connectors/{connectorId}:
     get:
@@ -509,9 +535,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetConnector returns the latest projected registration
   /v1/connectors/{connectorId}:revoke:
     post:
@@ -525,8 +552,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -544,11 +571,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: RevokeConnector revokes a connector and closes its sessions (C2)
   /v1/connectors/{connectorId}:rotate-certificate:
     post:
@@ -562,8 +592,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -581,11 +611,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: RotateConnectorCertificate adds a new certificate and sets expiry of the old one (C1)
   /v1/device-types:
     get:
@@ -614,9 +647,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListDeviceTypes lists device types
     post:
       tags:
@@ -640,12 +674,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateDeviceType creates a device type
   /v1/device-types/{deviceTypeId}:
     get:
@@ -670,9 +707,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetDeviceType returns one device type
     put:
       tags:
@@ -685,8 +723,10 @@ paths:
         required: true
         schema:
           type: string
-      - &id013
+      - &id016
         $ref: '#/components/parameters/IfMatch'
+      - &id017
+        $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         content:
           application/json:
@@ -704,12 +744,17 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': &id014
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': &id018
           $ref: '#/components/responses/Problem'
-        '412': &id015
+        '412': &id019
+          $ref: '#/components/responses/Problem'
+        '422': &id020
+          $ref: '#/components/responses/Problem'
+        '428': &id021
           $ref: '#/components/responses/Problem'
       summary: UpdateDeviceType replaces a device type (If-Match required)
   /v1/devices:
@@ -762,9 +807,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListDevices lists devices, filtered by location, connector or state
     post:
       tags:
@@ -788,12 +834,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateDevice registers a device with its sources
   /v1/devices/{deviceId}:
     get:
@@ -818,9 +867,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetDevice returns one device
     put:
       tags:
@@ -833,7 +883,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -851,11 +902,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UpdateDevice replaces a device, including zone, position and state (If-Match required)
   /v1/devices:export:
     get:
@@ -888,9 +942,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ExportDevices exports devices in CSV or JSON
   /v1/dry-runs/{dryRunId}:
     get:
@@ -924,9 +979,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetDryRun returns dry-run progress and produced signals
   /v1/escalation-policies:
     get:
@@ -955,9 +1011,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListEscalationPolicies lists policies
     post:
       tags:
@@ -981,12 +1038,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateEscalationPolicy creates a policy
   /v1/escalation-policies/{policyId}:
     put:
@@ -1000,7 +1060,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -1018,11 +1079,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UpdateEscalationPolicy replaces a policy (If-Match required)
   /v1/events:
     get:
@@ -1102,9 +1166,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: SearchEvents searches events by location, device, type and time; newest first
   /v1/events/rule-statistics:
     get:
@@ -1161,9 +1226,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: RuleStatistics aggregates firings within the caller's tenant, scope and interval
   /v1/events/{eventId}:
     get:
@@ -1199,9 +1265,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetEvent returns one event
   /v1/feed/incidents:
     get:
@@ -1234,9 +1301,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: "GetIncidentFeed returns active incidents of the caller scope and the resume token\n at which the snapshot\
         \ is consistent (ADR-019)"
   /v1/feed/locations/{locationId}/status:
@@ -1262,9 +1330,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetLocationStatus returns the state of devices and zones of a location for the object view
   /v1/feed/operators:
     get:
@@ -1290,9 +1359,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetOperatorLoad returns the current load of operators (supervisor)
   /v1/imports:
     post:
@@ -1311,8 +1381,8 @@ paths:
         description: Validate only, do not apply.
         schema:
           type: boolean
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         required: true
         content:
@@ -1335,11 +1405,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: StartImport starts a bulk import of devices from CSV or JSON
   /v1/imports/{importId}:
     get:
@@ -1364,9 +1437,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetImport returns import progress and per-row results
   /v1/incident-types:
     get:
@@ -1395,9 +1469,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListIncidentTypes lists incident types
     post:
       tags:
@@ -1421,12 +1496,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateIncidentType creates an incident type
   /v1/incident-types/{incidentTypeId}:
     put:
@@ -1440,7 +1518,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -1458,11 +1537,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UpdateIncidentType replaces an incident type (If-Match required)
   /v1/incidents:
     get:
@@ -1554,9 +1636,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListIncidents lists incidents within the caller scope
   /v1/incidents/{incidentId}:
     get:
@@ -1581,9 +1664,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetIncident returns one incident; the ETag is the incident version
   /v1/incidents/{incidentId}/comments:
     post:
@@ -1597,8 +1681,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1616,11 +1700,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: AddIncidentComment adds a comment to the timeline
   /v1/incidents/{incidentId}/events:
     get:
@@ -1664,9 +1751,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListIncidentEvents returns source events of all signals of an incident
   /v1/incidents/{incidentId}/links:
     post:
@@ -1680,8 +1768,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1699,11 +1787,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: AddIncidentLink attaches an external link
   /v1/incidents/{incidentId}/run:
     get:
@@ -1728,9 +1819,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetIncidentRun returns the active or last run of an incident
   /v1/incidents/{incidentId}/signals:
     get:
@@ -1764,9 +1856,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListIncidentSignals returns signals attached to the incident
   /v1/incidents/{incidentId}/timeline:
     get:
@@ -1800,9 +1893,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListTimeline returns the incident timeline
   /v1/incidents/{incidentId}:acknowledge:
     post:
@@ -1816,8 +1910,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1835,11 +1929,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: AcknowledgeIncident accepts an incident; the caller becomes the assignee
   /v1/incidents/{incidentId}:assign:
     post:
@@ -1853,8 +1950,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1872,11 +1969,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: AssignIncident assigns or reassigns an incident
   /v1/incidents/{incidentId}:close:
     post:
@@ -1890,8 +1990,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1909,11 +2009,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: CloseIncident closes a resolved incident before the auto-close timer (supervisor)
   /v1/incidents/{incidentId}:reopen:
     post:
@@ -1927,8 +2030,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1946,11 +2049,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ReopenIncident reopens a resolved incident (I10)
   /v1/incidents/{incidentId}:resolve:
     post:
@@ -1964,8 +2070,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -1983,11 +2089,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ResolveIncident resolves an incident; fails while mandatory steps are pending (I7)
   /v1/incidents/{incidentId}:set-priority:
     post:
@@ -2001,8 +2110,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2020,11 +2129,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: SetIncidentPriority sets the priority manually (supervisor)
   /v1/incidents/{incidentId}:start-work:
     post:
@@ -2038,8 +2150,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2057,11 +2169,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: StartIncidentWork moves an incident to in_progress
   /v1/incidents:transfer:
     post:
@@ -2086,12 +2201,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: TransferIncidents applies independent, version-checked transfer requests or confirmations
   /v1/locations:
     get:
@@ -2139,9 +2257,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListLocations lists locations, filtered by parent or kind
     post:
       tags:
@@ -2165,12 +2284,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateLocation creates a site, building, floor or zone
   /v1/locations/{locationId}:
     get:
@@ -2195,9 +2317,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetLocation returns one location
     put:
       tags:
@@ -2210,7 +2333,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -2228,11 +2352,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UpdateLocation replaces mutable fields of a location (If-Match required)
   /v1/locations/{locationId}/floor-plan:
     get:
@@ -2263,9 +2390,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetFloorPlan downloads the floor plan image
     put:
       tags:
@@ -2289,7 +2417,8 @@ paths:
         schema:
           type: number
           format: double
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         required: true
         content:
@@ -2312,11 +2441,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UploadFloorPlan uploads the floor plan image of a floor
   /v1/locations/{locationId}/floor-plan/versions:
     get:
@@ -2350,9 +2482,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListFloorPlanVersions returns immutable metadata for a floor's previous images
   /v1/locations/{locationId}:archive:
     post:
@@ -2366,8 +2499,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2385,11 +2518,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ArchiveLocation archives a location without children and devices (L3)
   /v1/maintenance-windows:
     get:
@@ -2422,9 +2558,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListMaintenanceWindows lists intervals in the caller's scope
     post:
       tags:
@@ -2448,12 +2585,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: CreateMaintenanceWindow schedules a one-off interval
   /v1/maintenance-windows/{maintenanceId}:
     get:
@@ -2478,9 +2618,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetMaintenanceWindow returns one interval, including completed intervals
     put:
       tags:
@@ -2493,7 +2634,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -2511,11 +2653,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: UpdateMaintenanceWindow replaces a scheduled or active interval (If-Match required)
   /v1/maintenance-windows/{maintenanceId}:cancel:
     post:
@@ -2529,8 +2674,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2548,11 +2693,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: CancelMaintenanceWindow ends an interval explicitly (If-Match required)
   /v1/mappings:
     get:
@@ -2571,9 +2719,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListMappingRuleSets lists the active mapping rule set of each connector type
   /v1/mappings/{connectorType}:
     get:
@@ -2598,9 +2747,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetMappingRuleSet returns the active mapping rule set of a connector type
     put:
       tags:
@@ -2613,7 +2763,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -2631,11 +2782,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: PublishMappingRuleSet validates and publishes a new version (M1-M3)
   /v1/me:
     get:
@@ -2654,9 +2808,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetMe returns the caller identity, roles, scopes and allowed actions
   /v1/me/notifications:
     get:
@@ -2689,9 +2844,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListMyNotifications lists in-app notifications of the caller; newest first
   /v1/me/notifications/{notificationId}:read:
     post:
@@ -2705,8 +2861,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2724,11 +2880,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: MarkNotificationRead marks an in-app notification as read
   /v1/notification-contacts/{userId}:
     put:
@@ -2742,7 +2901,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -2760,11 +2920,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: SetNotificationContact replaces destinations for a user in a site
   /v1/notifications/{notificationId}:resolve:
     post:
@@ -2778,8 +2941,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2797,11 +2960,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ResolveUnknownDelivery records a verified transport outcome; it never resends a notification
   /v1/plans:
     get:
@@ -2838,9 +3004,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListPlans lists the latest version of each plan
     post:
       tags:
@@ -2864,12 +3031,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: SavePlanDraft creates a plan or a new draft version of it
   /v1/plans/{planId}:
     get:
@@ -2899,9 +3069,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetPlan returns a plan version; latest when version is 0
   /v1/plans/{planId}:archive:
     post:
@@ -2915,8 +3086,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2934,11 +3105,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ArchivePlan archives a plan
   /v1/plans/{planId}:publish:
     post:
@@ -2952,8 +3126,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -2971,11 +3145,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: PublishPlan publishes a draft version; published versions are immutable
   /v1/plans:validate:
     post:
@@ -3000,12 +3177,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: ValidatePlan validates a plan without saving it (P1-P5)
   /v1/reports/incidents:
     get:
@@ -3073,9 +3253,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetIncidentReport returns incident metrics for a period
   /v1/reports/incidents:export:
     get:
@@ -3144,9 +3325,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ExportIncidentReport exports the same report as CSV
   /v1/rule-sets/active:
     get:
@@ -3165,9 +3347,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetActiveRuleSet returns the active rule set
   /v1/rule-sets:activate:
     post:
@@ -3192,12 +3375,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: ActivateRuleSet atomically activates a new set of rule versions (RS1-RS3)
   /v1/rules:
     get:
@@ -3239,9 +3425,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: ListRules lists the latest version of each rule
     post:
       tags:
@@ -3265,12 +3452,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
-      parameters: *id010
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
       summary: SaveRuleDraft creates a rule or a new draft version of it
   /v1/rules/{ruleId}:
     get:
@@ -3300,9 +3490,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetRule returns a rule version; latest when version is 0
   /v1/rules/{ruleId}:archive:
     post:
@@ -3316,8 +3507,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3335,11 +3526,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ArchiveRule archives a rule; it is removed from the next rule set
   /v1/rules/{ruleId}:dry-run:
     post:
@@ -3353,8 +3547,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3372,11 +3566,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: StartDryRun runs a rule version over historical events without publishing signals
   /v1/rules/{ruleId}:validate:
     post:
@@ -3390,8 +3587,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3409,11 +3606,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: ValidateRule validates a draft and moves it to testing on success (R1)
   /v1/runs/{runId}/steps/{stepId}:complete:
     post:
@@ -3432,8 +3632,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3451,11 +3651,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: CompleteStep completes an active step with its result
   /v1/runs/{runId}/steps/{stepId}:override:
     post:
@@ -3474,8 +3677,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3493,11 +3696,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: OverrideStep completes a failed step by a supervisor decision
   /v1/runs/{runId}/steps/{stepId}:retry:
     post:
@@ -3516,8 +3722,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3535,11 +3741,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: RetryStep retries a failed step
   /v1/runs/{runId}/steps/{stepId}:skip:
     post:
@@ -3558,8 +3767,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id011
-      - *id012
+      - *id014
+      - *id015
       requestBody:
         content:
           application/json:
@@ -3577,11 +3786,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id008
-        '412': *id009
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
       summary: SkipStep skips a non-mandatory step with a reason (RR3)
   /v1/settings:
     get:
@@ -3600,9 +3812,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetSettings returns the current settings
   /v1/settings/processing:
     put:
@@ -3627,13 +3840,17 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
-      parameters: &id016
-      - *id013
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
+      parameters: &id022
+      - *id016
+      - *id017
       summary: UpdateProcessingSettings replaces processing settings (If-Match required)
   /v1/settings/retention:
     put:
@@ -3658,12 +3875,15 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
-      parameters: *id016
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
+      parameters: *id022
       summary: UpdateRetentionSettings replaces retention settings (If-Match required)
   /v1/sites/{siteId}/duty:
     get:
@@ -3688,9 +3908,10 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
       summary: GetSiteDuty returns current and fallback recipients
     put:
       tags:
@@ -3703,7 +3924,8 @@ paths:
         required: true
         schema:
           type: string
-      - *id013
+      - *id016
+      - *id017
       requestBody:
         content:
           application/json:
@@ -3721,11 +3943,14 @@ paths:
         '401': *id002
         '403': *id003
         '404': *id004
-        '429': *id005
-        '500': *id006
-        '503': *id007
-        '409': *id014
-        '412': *id015
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id018
+        '412': *id019
+        '422': *id020
+        '428': *id021
       summary: SetSiteDuty replaces responsibility with optimistic concurrency control
 components:
   schemas:
@@ -3905,6 +4130,27 @@ components:
         run:
           $ref: '#/components/schemas/psim.response.v1.ResponseRun'
       description: CompleteStepResponse is the response of CompleteStep.
+    psim.api.v1.ConnectorRuntimeStatus:
+      type: object
+      properties:
+        connectorId:
+          type: string
+        connection:
+          type: string
+        quality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+        confirmedAt:
+          type: string
+          format: date-time
+        sessionId:
+          type: string
+      description: ConnectorRuntimeStatus describes a connection without asserting equipment state.
     psim.api.v1.ConnectorStatus:
       type: object
       properties:
@@ -3983,6 +4229,30 @@ components:
           format: date-time
         online:
           type: boolean
+        quality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+        confirmedAt:
+          type: string
+          format: date-time
+        resourceState:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
+        connectorId:
+          type: string
+        connection:
+          type: string
+          description: Equipment availability remains unknown when only events have been observed.
       description: DeviceStatus is the current state of a device derived from alarm, fault, restore and state events.
     psim.api.v1.DryRun:
       type: object
@@ -4171,6 +4441,15 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/psim.api.v1.DeviceStatus'
+        resumeToken:
+          type: string
+        snapshotAt:
+          type: string
+          format: date-time
+        connectors:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.ConnectorRuntimeStatus'
       description: GetLocationStatusResponse is the response of GetLocationStatus.
     psim.api.v1.GetMaintenanceWindowResponse:
       type: object
@@ -4223,6 +4502,11 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/psim.api.v1.OperatorLoad'
+        resumeToken:
+          type: string
+        snapshotAt:
+          type: string
+          format: date-time
       description: GetOperatorLoadResponse is the response of GetOperatorLoad.
     psim.api.v1.GetPlanResponse:
       type: object
@@ -5130,6 +5414,25 @@ components:
         openIncidents:
           type: integer
           format: uint32
+        quality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+        confirmedAt:
+          type: string
+          format: date-time
+        resourceState:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
       description: ZoneStatus is the aggregated state of a zone.
     psim.audit.v1.AuditChainEntry:
       type: object
@@ -6783,7 +7086,8 @@ tags:
 - name: IncidentService
   description: 'IncidentService manages incidents and incident types. Owner: Incident Service.'
 - name: MappingService
-  description: 'MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.'
+  description: 'MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1.
+    Scenario S1.'
 - name: MeService
   description: 'MeService describes the caller. Owner: API Gateway (from the access token and the policy table).'
 - name: NotificationContactService

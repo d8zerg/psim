@@ -151,5 +151,54 @@
     "manager",
     "supervisor",
     "auditor"
+  ],
+  "catalog.read": [
+    "operator",
+    "supervisor",
+    "admin",
+    "integrator",
+    "auditor",
+    "manager"
+  ],
+  "catalog.write": [
+    "admin"
+  ],
+  "connector.write": [
+    "admin",
+    "integrator"
+  ],
+  "rule.read": [
+    "admin",
+    "integrator",
+    "supervisor",
+    "auditor"
+  ],
+  "rule.write": [
+    "admin"
+  ],
+  "mapping.read": [
+    "admin",
+    "integrator",
+    "auditor"
+  ],
+  "mapping.write": [
+    "admin",
+    "integrator"
+  ],
+  "settings.read": [
+    "admin",
+    "integrator",
+    "auditor"
+  ],
+  "settings.write": [
+    "admin"
+  ],
+  "feed.read": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "feed.operators.read": [
+    "supervisor"
   ]
 }

@@ -59,3 +59,5 @@ add_subdirectory(tools/history)
 add_subdirectory(tools/commands)
 
 add_subdirectory(tools/reports)
+
+add_subdirectory(tools/api-gateway)

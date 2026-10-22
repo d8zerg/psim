@@ -26,3 +26,4 @@ settings:
   management_ca_file: /repo/.cache/event-flow/ca.pem
   management_certificate_file: /repo/.cache/event-flow/catalog-client.pem
   management_key_file: /repo/.cache/event-flow/catalog-client.key
+  taxonomy_path: /repo/contracts/taxonomy/v1/taxonomy.yaml

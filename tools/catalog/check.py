@@ -103,12 +103,14 @@ class Check:
             content = response.read()
             return json.loads(content) if content else None
 
+    def principal_cases(self):
+        return {"admin": ("admin", ["*"], TENANT), "site": ("admin", [self.site_id], TENANT), "other": ("admin", [self.foreign_site], TENANT), "operator": ("operator", [self.site_id], TENANT), "empty": ("admin", [], TENANT), "tenant": ("admin", ["*"], OTHER_TENANT)}
+
     def principals(self):
         admin = self.keycloak("POST", "/realms/master/protocol/openid-connect/token", body={"grant_type": "password", "client_id": "admin-cli", "username": "admin", "password": "psim-dev-keycloak-admin"}, form=True)["access_token"]
         clients = "/admin/realms/psim/clients"
         resource = self.keycloak("GET", clients + "?clientId=psim", admin)[0]["id"]
-        cases = {"admin": ("admin", ["*"], TENANT), "site": ("admin", [self.site_id], TENANT), "other": ("admin", [self.foreign_site], TENANT), "operator": ("operator", [self.site_id], TENANT), "empty": ("admin", [], TENANT), "tenant": ("admin", ["*"], OTHER_TENANT)}
-        for name, (role, scopes, tenant) in cases.items():
+        for name, (role, scopes, tenant) in self.principal_cases().items():
             client_id = "psim-catalog-" + self.fixtures + "-" + name
             self.keycloak("POST", clients, admin, {"clientId": client_id, "enabled": True, "publicClient": False, "serviceAccountsEnabled": True, "standardFlowEnabled": False, "secret": "psim-dev-catalog", "protocol": "openid-connect", "protocolMappers": [
                 {"name": "audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper", "config": {"included.client.audience": "psim", "access.token.claim": "true"}},
@@ -200,6 +202,7 @@ class Check:
         print("ok: " + name, flush=True)
 
     def prepare(self):
+        (ROOT / f"build/debian13/{self.preset}/profiles").mkdir(parents=True, exist_ok=True)
         authority = ROOT / ".cache/s3-tls/ca.pem"
         previous_ca = authority.read_bytes() if authority.exists() else b""
         self.env_command("sh tools/env/event_flow_tls.sh && sh tools/env/s3_test_tls.sh", network=False)

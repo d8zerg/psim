@@ -21,6 +21,7 @@
 #include <utility>
 #include <vector>
 
+#include "configuration.hpp"
 #include "file_store.hpp"
 #include "model.hpp"
 #include "psim/platform/error.hpp"
@@ -80,7 +81,9 @@ Response json_response(Json body, std::string wrapper = "", http::status status 
   Response response(status, 11);
   response.set(http::field::content_type, "application/json");
   if (body.is_object() && body.contains("version")) {
-    response.set(http::field::etag, '"' + body.at("version").get<std::string>() + '"');
+    const auto version = body.at("version").is_string() ? body.at("version").get<std::string>()
+                                                        : std::to_string(body.at("version").get<std::uint64_t>());
+    response.set(http::field::etag, '"' + version + '"');
   }
   response.body() = wrapper.empty() ? body.dump() : Json{{wrapper, std::move(body)}}.dump();
   return response;
@@ -188,6 +191,74 @@ boost::asio::awaitable<p::Result<Response>> Api::handle(Request request, p::secu
 boost::asio::awaitable<p::Result<Response>> Api::route(Request request, p::security::Principal principal,
                                                        std::string token) {
   const auto [path, query] = target(request.target());
+  if (path == "/v1/settings" || path == "/v1/settings/retention" || path == "/v1/settings/processing"
+      || path == "/v1/mappings" || path.starts_with("/v1/mappings/")) {
+    if (!query.empty()) {
+      co_return p::fail(Code::kCommonInvalidArgument, "query not supported");
+    }
+    const bool mapping = path.starts_with("/v1/mappings");
+    std::string id;
+    if (mapping) {
+      if (path != "/v1/mappings") {
+        id = path.substr(13);
+      }
+    } else {
+      id = path.substr(path.find_last_of('/') + 1);
+    }
+    const auto kind = mapping ? "mapping" : id;
+    if (request.method() == http::verb::get) {
+      if (path == "/v1/settings") {
+        auto retention = co_await repository_->configurations(principal, "retention", "retention");
+        if (!retention) {
+          co_return std::unexpected(retention.error());
+        }
+        auto processing = co_await repository_->configurations(principal, "processing", "processing");
+        if (!processing) {
+          co_return std::unexpected(processing.error());
+        }
+        co_return json_response({{"retention", *retention}, {"processing", *processing}});
+      }
+      if (!mapping) {
+        co_return p::fail(Code::kCommonNotFound, "unknown settings operation");
+      }
+      auto result = co_await repository_->configurations(principal, kind, id);
+      if (!result) {
+        co_return std::unexpected(result.error());
+      }
+      co_return json_response(*result, id.empty() ? "mappingRuleSets" : "mappingRuleSet");
+    }
+    if (request.method() != http::verb::put || id.empty() || path == "/v1/settings"
+        || request[http::field::content_type] != "application/json") {
+      co_return p::fail(Code::kCommonInvalidArgument, "JSON PUT required");
+    }
+    const std::string expected(request[http::field::if_match]);
+    if (expected.empty()) {
+      co_return p::fail(Code::kCommonPreconditionRequired, "If-Match required");
+    }
+    if (expected.size() < 3 || expected.front() != '"' || expected.back() != '"') {
+      co_return p::fail(Code::kCommonInvalidArgument, "quoted If-Match version required");
+    }
+    auto version = number(std::string_view(expected).substr(1, expected.size() - 2));
+    if (!version) {
+      co_return std::unexpected(version.error());
+    }
+    auto change = mutation(request, principal, false);
+    if (!change) {
+      co_return std::unexpected(change.error());
+    }
+    change->expected = *version;
+    change->action = "publish";
+    auto record = configuration(kind, id, Json::parse(request.body()), taxonomy_);
+    if (!record) {
+      co_return std::unexpected(record.error());
+    }
+    auto result = co_await repository_->configure(std::move(*record), kind, id, *change);
+    if (!result) {
+      co_return std::unexpected(result.error());
+    }
+    co_return json_response(*result, mapping ? "mappingRuleSet" : kind);
+  }
+
   if (!std::ranges::any_of(principal.roles, [](const auto& role) {
         return role == "admin" || role == "integrator" || role == "operator" || role == "supervisor"
                || role == "auditor" || role == "manager";

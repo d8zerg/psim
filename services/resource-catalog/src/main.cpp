@@ -8,6 +8,7 @@
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
 #include <psim/catalog/v1/catalog.pb.h>
+#include <yaml-cpp/yaml.h>
 
 #include <array>
 #include <atomic>
@@ -17,14 +18,17 @@
 #include <expected>
 #include <filesystem>
 #include <initializer_list>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "connector_admin.hpp"
 #include "http.hpp"
 #include "model.hpp"
+#include "psim/config/v1/config.pb.h"
 #include "psim/platform/connector/grpc_process.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
@@ -35,6 +39,7 @@
 #include "psim/platform/s3/client.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/security/tls.hpp"
+#include "psim/platform/stream/replica.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "repository.hpp"
 #include "s3_files.hpp"
@@ -66,6 +71,7 @@ std::string settings() {
                                                                   {"jwks_ca_file", ""}}) {
     fields[name] = {{"type", "string"}, {"default", value}};
   }
+  fields["taxonomy_path"] = {{"type", "string"}, {"default", "/usr/share/psim/taxonomy.yaml"}};
   return schema.dump();
 }
 
@@ -80,9 +86,12 @@ class Worker final : public p::stream::Worker {
         imports_(executor()),
         relay_timer_(executor()),
         cleanup_(executor()),
+        config_timer_(executor()),
         done_(executor()) {}
 
-  [[nodiscard]] bool ready() const override { return p::stream::Worker::ready() && healthy_.load(); }
+  [[nodiscard]] bool ready() const override {
+    return p::stream::Worker::ready() && healthy_.load() && config_healthy_.load();
+  }
 
   asio::awaitable<p::Result<void>> initialize() override {
     for (const auto* topic : {"psim.catalog.v1", "psim.config.v1", "psim.audit.v1"}) {
@@ -104,6 +113,35 @@ class Worker final : public p::stream::Worker {
     if (!initialized) {
       co_return initialized;
     }
+    auto replica = co_await p::stream::Replica::open(
+        executor(), kafka_options("catalog-config-" + context().config().get<std::string>("service.instance")),
+        {.blocking = &context().blocking(), .logger = &context().logger()}, {"psim.config.v1"},
+        [this](const p::kafka::Message& message) -> p::Result<void> {
+          auto parsed = decode<config::v1::ConfigRecord>(message);
+          if (!parsed) {
+            return std::unexpected(parsed.error());
+          }
+          if (!parsed->has_mapping_rule_set() && !parsed->has_retention() && !parsed->has_processing()) {
+            return {};
+          }
+          if (pending_config_.size() >= 10000 && !pending_config_.contains(std::string(message.key()))) {
+            return p::fail(p::ErrorCode::kCommonRateLimited, "configuration replica limit exceeded");
+          }
+          pending_config_[std::string(message.key())] = std::move(*parsed);
+          return {};
+        });
+    if (!replica) {
+      co_return std::unexpected(replica.error());
+    }
+    config_replica_ = std::move(*replica);
+    for (auto& [key, record] : pending_config_) {
+      (void)key;
+      auto applied = co_await repository_->project_configuration(std::move(record));
+      if (!applied) {
+        co_return applied;
+      }
+    }
+    pending_config_.clear();
     // Restore interval boundaries before accepting requests.
     auto restored = co_await repository_->tick(context().clock().wall());
     if (!restored) {
@@ -148,7 +186,28 @@ class Worker final : public p::stream::Worker {
       co_return std::unexpected(created.error());
     }
     files_ = std::make_unique<S3Files>(s3_.get(), &context().blocking(), directory);
-    api_ = std::make_unique<Api>(repository_.get(), files_.get(), admin_.get(), &context().blocking());
+    auto taxonomy = co_await context().blocking().run([&config]() -> p::Result<std::set<std::string>> {
+      try {
+        std::set<std::string> result;
+        const auto document = YAML::LoadFile(config.get<std::string>("settings.taxonomy_path"));
+        for (const auto& system : document["domains"]) {
+          for (const auto& type : system["types"]) {
+            result.insert(type["code"].as<std::string>());
+          }
+        }
+        if (result.empty()) {
+          return p::fail(p::ErrorCode::kCommonInvalidArgument, "empty event taxonomy");
+        }
+        return result;
+      } catch (const std::exception&) {
+        return p::fail(p::ErrorCode::kCommonInvalidArgument, "cannot load event taxonomy");
+      }
+    });
+    if (!taxonomy) {
+      co_return std::unexpected(taxonomy.error());
+    }
+    api_ = std::make_unique<Api>(repository_.get(), files_.get(), admin_.get(), &context().blocking(),
+                                 std::move(*taxonomy));
     auto tls = co_await context().blocking().run([&config] {
       return p::security::tls_context({.boundary = p::security::Boundary::kExternal,
                                        .ca_file = config.get<std::string>("settings.tls_ca_file"),
@@ -181,6 +240,7 @@ class Worker final : public p::stream::Worker {
     launch(background(1));
     launch(background(2));
     launch(background(3));
+    launch(background(4));
     acceptor_.open(Tcp::v4());
     acceptor_.set_option(Tcp::acceptor::reuse_address(true));
     acceptor_.bind({Tcp::v4(), static_cast<unsigned short>(config.get<int>("settings.listen_port"))});
@@ -215,7 +275,7 @@ class Worker final : public p::stream::Worker {
   }
 
   asio::awaitable<void> background(std::size_t operation) {
-    const std::array timers{&tick_, &imports_, &relay_timer_, &cleanup_};
+    const std::array timers{&tick_, &imports_, &relay_timer_, &cleanup_, &config_timer_};
     auto& timer = *timers.at(operation);
     while (!stopping_) {
       p::Result<void> result;
@@ -228,6 +288,21 @@ class Worker final : public p::stream::Worker {
         if (!published) {
           result = std::unexpected(published.error());
         }
+      } else if (operation == 4) {
+        result = co_await config_replica_->update();
+        if (result) {
+          for (auto& [key, record] : pending_config_) {
+            (void)key;
+            result = co_await repository_->project_configuration(record);
+            if (!result) {
+              break;
+            }
+          }
+          if (result) {
+            pending_config_.clear();
+          }
+        }
+        config_healthy_.store(result.has_value());
       } else {
         result =
             co_await repository_->cleanup_files([this](std::string key) { return files_->remove(std::move(key)); });
@@ -340,6 +415,7 @@ class Worker final : public p::stream::Worker {
     imports_.cancel();
     relay_timer_.cancel();
     cleanup_.cancel();
+    config_timer_.cancel();
     for (const auto& socket : sessions_) {
       (void)beast::get_lowest_layer(*socket).socket().close(ignored);
     }
@@ -353,6 +429,10 @@ class Worker final : public p::stream::Worker {
     verifier_.reset();
     tls_.reset();
     relay_.reset();
+    if (config_replica_) {
+      co_await config_replica_->close();
+      config_replica_.reset();
+    }
     repository_.reset();
     if (s3_) {
       s3_->close();
@@ -366,11 +446,13 @@ class Worker final : public p::stream::Worker {
 
  private:
   Tcp::acceptor acceptor_;
-  asio::steady_timer tick_, imports_, relay_timer_, cleanup_, done_;
-  std::atomic_bool healthy_{false};
+  asio::steady_timer tick_, imports_, relay_timer_, cleanup_, config_timer_, done_;
+  std::atomic_bool healthy_{false}, config_healthy_{true};
   bool stopping_ = false;
   std::size_t background_ = 0;
   std::set<std::shared_ptr<beast::ssl_stream<beast::tcp_stream>>> sessions_;
+  std::unique_ptr<p::stream::Replica> config_replica_;
+  std::map<std::string, config::v1::ConfigRecord> pending_config_;
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<Repository> repository_;
   std::unique_ptr<p::pg::OutboxRelay> relay_;

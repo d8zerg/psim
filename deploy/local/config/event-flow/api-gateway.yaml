@@ -9,3 +9,9 @@ telemetry:
 settings:
   allow_plaintext: true
   pg_password_file: /repo/.cache/event-flow/postgres.secret
+  listen_plaintext: true
+  allowed_origins: [http://localhost:5173, http://localhost:4173, http://console:4173]
+  upstream_ca_file: /repo/.cache/event-flow/ca.pem
+  redis_host: valkey
+  redis_password_file: /repo/.cache/event-flow/redis.secret
+  incidents_port: "8080"

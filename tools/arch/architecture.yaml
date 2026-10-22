@@ -40,7 +40,7 @@ includes:
 # A new service must be listed here.
 services:
   connector-gateway: [ingest]
-  resource-catalog: [catalog]
+  resource-catalog: [catalog, processing]
   normalizer: [processing]
   event-history: [processing]
   correlation-engine: [processing]

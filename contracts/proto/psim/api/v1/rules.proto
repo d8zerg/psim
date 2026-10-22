@@ -66,7 +66,7 @@ service CorrelationRuleService {
   }
 }
 
-// MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.
+// MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1. Scenario S1.
 service MappingService {
   // ListMappingRuleSets lists the active mapping rule set of each connector type.
   rpc ListMappingRuleSets(ListMappingRuleSetsRequest) returns (ListMappingRuleSetsResponse) {

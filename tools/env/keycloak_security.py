@@ -31,6 +31,9 @@ def main(base):
             {"name": "psim-fixture-tenant", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
              "consentRequired": False, "config": {"claim.name": "psim_tenant", "claim.value": "11111111-1111-4111-8111-111111111111",
              "jsonType.label": "String", "id.token.claim": "false", "access.token.claim": "true"}},
+            {"name": "psim-fixture-scopes", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
+             "consentRequired": False, "config": {"claim.name": "psim_scopes", "claim.value": '["site:33333333-3333-4333-8333-333333333333"]',
+             "jsonType.label": "JSON", "id.token.claim": "false", "access.token.claim": "true"}},
         ]
         for desired in desired_mappers:
             current = next((item for item in mappers if item["name"] == desired["name"]), None)
@@ -51,7 +54,7 @@ def main(base):
                 headers={"Authorization": "Bearer " + auth, "Content-Type": "application/json"})
             with urllib.request.urlopen(update, timeout=10):
                 pass
-    print("Keycloak: PSIM audience, fixture tenant and console redirects configured")
+    print("Keycloak: PSIM audience, fixture tenant, scope and console redirects configured")
 
 
 if __name__ == "__main__":

@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <string>
+#include <vector>
 
 #include "policy.hpp"
 #include "psim/platform/error.hpp"
@@ -24,8 +25,8 @@ bool scoped(const security::Principal& principal, Resource resource) {
                  || principal.scopes.contains("zone:" + std::string(resource.zone))));
 }
 
-Result<void> decide(const security::Principal& principal, std::string_view action, Resource resource,
-                    std::chrono::system_clock::time_point now) {
+Result<void> decide_role(const security::Principal& principal, std::string_view action,
+                         std::chrono::system_clock::time_point now) {
   if (principal.subject.empty() || principal.tenant.empty() || principal.expires_at <= now) {
     return fail(ErrorCode::kAuthUnauthenticated, "current verified identity required");
   }
@@ -40,6 +41,27 @@ Result<void> decide(const security::Principal& principal, std::string_view actio
   }
   if (!allowed) {
     return fail(ErrorCode::kAuthForbidden, "role does not allow action");
+  }
+  return {};
+}
+
+std::vector<std::string> actions(const security::Principal& principal, std::chrono::system_clock::time_point now) {
+  static const auto kPolicies = nlohmann::json::parse(kPolicy);
+  std::vector<std::string> result;
+  for (const auto& [action, roles] : kPolicies.items()) {
+    (void)roles;
+    if (decide_role(principal, action, now)) {
+      result.push_back(action);
+    }
+  }
+  return result;
+}
+
+Result<void> decide(const security::Principal& principal, std::string_view action, Resource resource,
+                    std::chrono::system_clock::time_point now) {
+  auto role = decide_role(principal, action, now);
+  if (!role) {
+    return role;
   }
   if (action == "incident.types.read" && principal.tenant == resource.tenant && !principal.scopes.empty()) {
     return {};

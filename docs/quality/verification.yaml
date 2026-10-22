@@ -51,7 +51,7 @@ methods:
   - id: TS-05
     kind: test
     name: Контрактные тесты REST против OpenAPI
-    criteria: Schemathesis по psim-api-v1.yaml - ответы соответствуют схеме, коды ошибок из каталога, RFC 9457
+    criteria: Все маршруты Protobuf доступны через Gateway; реальные ответы проверяются по psim-api-v1.yaml, коды ошибок из каталога, RFC 9457
     env: E-CI
     gate: nightly
     barrier: automated

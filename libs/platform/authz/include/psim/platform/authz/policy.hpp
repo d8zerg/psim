@@ -1,6 +1,8 @@
 #pragma once
 #include <chrono>
+#include <string>
 #include <string_view>
+#include <vector>
 
 #include "psim/platform/security/jwt.hpp"
 
@@ -10,6 +12,12 @@ struct Resource {
   std::string_view site{};
   std::string_view zone{};
 };
+
+/// Check identity and role before the resource-owning service resolves its scope.
+[[nodiscard]] Result<void> decide_role(const security::Principal& principal, std::string_view action,
+                                       std::chrono::system_clock::time_point now);
+[[nodiscard]] std::vector<std::string> actions(const security::Principal& principal,
+                                               std::chrono::system_clock::time_point now);
 
 /// Evaluate verified identity and resource scope. Persistence of denials belongs to the caller.
 [[nodiscard]] Result<void> decide(const security::Principal& principal, std::string_view action, Resource resource,

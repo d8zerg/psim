@@ -111,7 +111,11 @@ asio::awaitable<p::Result<void>> Repository::initialize() {
               "external text NOT NULL, PRIMARY KEY(tenant,job,connector,external))")}},
        {.version = 2,
         .name = "global resource identities",
-        .expand = {"CREATE UNIQUE INDEX catalog_resource_identity ON catalog.resources(kind,id)"}}});
+        .expand = {"CREATE UNIQUE INDEX catalog_resource_identity ON catalog.resources(kind,id)"}},
+       {.version = 3,
+        .name = "versioned tenant configuration",
+        .expand = {"CREATE TABLE catalog.configuration(tenant uuid NOT NULL, kind text NOT NULL, id text NOT NULL, "
+                   "version bigint NOT NULL, body jsonb NOT NULL, PRIMARY KEY(tenant,kind,id))"}}});
 }
 
 asio::awaitable<p::Result<void>> Repository::lock(pg::Transaction* tx, std::string tenant) {
@@ -253,9 +257,12 @@ asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, Mutation
   entry->set_site_id(std::move(site));
   entry->set_outcome(denied ? audit::v1::AUDIT_OUTCOME_DENIED : audit::v1::AUDIT_OUTCOME_SUCCESS);
   if (!snapshot.is_null()) {
-    (*entry->mutable_details())["version"] = snapshot.at("version").get<std::string>();
+    const auto version = snapshot.at("version").is_string()
+                             ? snapshot.at("version").get<std::string>()
+                             : std::to_string(snapshot.at("version").get<std::uint64_t>());
+    (*entry->mutable_details())["version"] = version;
     (*entry->mutable_details())["snapshot"] = snapshot.dump();
-    record.mutable_envelope()->set_sequence(std::stoull(snapshot.at("version").get<std::string>()));
+    record.mutable_envelope()->set_sequence(std::stoull(version));
     record.mutable_envelope()->set_causation_id(std::move(cause));
   }
   co_return co_await messages_.append(tx, {.id = record.envelope().message_id(),

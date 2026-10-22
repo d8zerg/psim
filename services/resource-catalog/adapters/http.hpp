@@ -2,6 +2,7 @@
 
 #include <boost/beast/http.hpp>
 
+#include <set>
 #include <string>
 
 #include "connector_admin.hpp"
@@ -17,8 +18,9 @@ using Response = http::response<http::string_body>;
 
 class Api {
  public:
-  Api(Repository* repository, FileStore* files, ConnectorAdmin* admin, platform::async::BlockingPool* blocking)
-      : repository_(repository), files_(files), admin_(admin), blocking_(blocking) {}
+  Api(Repository* repository, FileStore* files, ConnectorAdmin* admin, platform::async::BlockingPool* blocking,
+      std::set<std::string> taxonomy = {})
+      : taxonomy_(std::move(taxonomy)), repository_(repository), files_(files), admin_(admin), blocking_(blocking) {}
 
   boost::asio::awaitable<platform::Result<Response>> handle(Request request, platform::security::Principal principal,
                                                             std::string token);
@@ -27,6 +29,7 @@ class Api {
  private:
   boost::asio::awaitable<platform::Result<Response>> route(Request request, platform::security::Principal principal,
                                                            std::string token);
+  std::set<std::string> taxonomy_;
   Repository* repository_;
   FileStore* files_;
   ConnectorAdmin* admin_;

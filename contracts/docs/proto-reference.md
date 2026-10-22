@@ -193,6 +193,7 @@
     - [TimelineEntryKind](#psim-incident-v1-TimelineEntryKind)
 
 - [psim/api/v1/feed.proto](#psim_api_v1_feed-proto)
+    - [ConnectorRuntimeStatus](#psim-api-v1-ConnectorRuntimeStatus)
     - [DeviceStatus](#psim-api-v1-DeviceStatus)
     - [GetIncidentFeedRequest](#psim-api-v1-GetIncidentFeedRequest)
     - [GetIncidentFeedResponse](#psim-api-v1-GetIncidentFeedResponse)
@@ -202,6 +203,8 @@
     - [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse)
     - [OperatorLoad](#psim-api-v1-OperatorLoad)
     - [ZoneStatus](#psim-api-v1-ZoneStatus)
+
+    - [DataQuality](#psim-api-v1-DataQuality)
 
     - [FeedService](#psim-api-v1-FeedService)
 
@@ -3414,6 +3417,25 @@ TimelineEntryKind classifies timeline entries.
 
 
 
+<a name="psim-api-v1-ConnectorRuntimeStatus"></a>
+
+### ConnectorRuntimeStatus
+ConnectorRuntimeStatus describes a connection without asserting equipment state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| connector_id | [string](#string) |  |  |
+| connection | [string](#string) |  |  |
+| quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+| confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| session_id | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-DeviceStatus"></a>
 
 ### DeviceStatus
@@ -3427,6 +3449,11 @@ DeviceStatus is the current state of a device derived from alarm, fault, restore
 | last_type | [string](#string) |  | Last state-changing taxonomy type. |
 | last_changed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | online | [bool](#bool) |  |  |
+| quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+| confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| resource_state | [psim.catalog.v1.ResourceState](#psim-catalog-v1-ResourceState) |  |  |
+| connector_id | [string](#string) |  |  |
+| connection | [string](#string) |  | Equipment availability remains unknown when only events have been observed. |
 
 
 
@@ -3492,6 +3519,9 @@ GetLocationStatusResponse is the response of GetLocationStatus.
 | ----- | ---- | ----- | ----------- |
 | zones | [ZoneStatus](#psim-api-v1-ZoneStatus) | repeated |  |
 | devices | [DeviceStatus](#psim-api-v1-DeviceStatus) | repeated |  |
+| resume_token | [string](#string) |  |  |
+| snapshot_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| connectors | [ConnectorRuntimeStatus](#psim-api-v1-ConnectorRuntimeStatus) | repeated |  |
 
 
 
@@ -3522,6 +3552,8 @@ GetOperatorLoadResponse is the response of GetOperatorLoad.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | operators | [OperatorLoad](#psim-api-v1-OperatorLoad) | repeated |  |
+| resume_token | [string](#string) |  |  |
+| snapshot_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 
@@ -3558,11 +3590,28 @@ ZoneStatus is the aggregated state of a zone.
 | state | [psim.common.v1.EventClass](#psim-common-v1-EventClass) |  | Highest class among active device states. |
 | armed | [bool](#bool) |  |  |
 | open_incidents | [uint32](#uint32) |  |  |
+| quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+| confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| resource_state | [psim.catalog.v1.ResourceState](#psim-catalog-v1-ResourceState) |  |  |
 
 
 
 
 
+
+
+
+<a name="psim-api-v1-DataQuality"></a>
+
+### DataQuality
+DataQuality separates observed equipment freshness from resource lifecycle.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| DATA_QUALITY_UNSPECIFIED | 0 |  |
+| DATA_QUALITY_ACTUAL | 1 |  |
+| DATA_QUALITY_STALE | 2 |  |
+| DATA_QUALITY_UNKNOWN | 3 |  |
 
 
 
@@ -6692,7 +6741,7 @@ Owner: Correlation Engine (rule management module). Scenario S4.
 <a name="psim-api-v1-MappingService"></a>
 
 ### MappingService
-MappingService manages mapping rules of connector types. Owner: Normalizer. Scenario S1.
+MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1. Scenario S1.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|

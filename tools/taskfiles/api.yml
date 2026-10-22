@@ -1,0 +1,52 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-api-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  image:
+    internal: true
+    vars:
+      IMAGE:
+        sh: echo "psim-platform/api-check:$(sha256sum tools/api-gateway/image/Dockerfile | cut -c1-12)"
+    status:
+      - docker image inspect {{.IMAGE}} >/dev/null 2>&1
+    cmds:
+      - docker build -t {{.IMAGE}} tools/api-gateway/image
+  test:
+    desc: Public REST routing, identity, configuration publication and bounded file streaming
+    cmds:
+      - task: image
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/api-gateway/check.py {{.PROJECT}} {{.PRESET}}
+  sanitizers:
+    desc: Public API under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_api_gateway_test|psim_platform_authz_test|psim_catalog_test|psim_normalizer_test|psim_domain_processing_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Gateway and configuration coverage with real services and the browser flow
+    cmds:
+      - defer: >-
+          docker compose -p {{.PROJECT}}-coverage -f deploy/local/compose.yaml
+          --profile catalog-test --profile event-flow --profile gateway-test
+          down -v --remove-orphans --timeout 10
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - mkdir -p build/{{.PLATFORM}}/coverage/profiles
+      - task: image
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - PSIM_CATALOG_KEEP_ENV=1 python3 -I tools/api-gateway/check.py {{.PROJECT}}-coverage coverage
+      - PSIM_CATALOG_KEEP_ENV=1 python3 -I tools/catalog/check.py {{.PROJECT}}-coverage coverage 100
+      - task: :flow:test
+        vars: {PROJECT: '{{.PROJECT}}-coverage', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            ctest --test-dir build/{{.PLATFORM}}/coverage -LE '^component$' -j {{.JOBS}} --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/api-gateway services/resource-catalog' --component &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/processing libs/platform/authz'

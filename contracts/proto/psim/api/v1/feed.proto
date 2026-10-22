@@ -5,6 +5,7 @@ package psim.api.v1;
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
+import "psim/catalog/v1/catalog.proto";
 import "psim/common/v1/types.proto";
 import "psim/incident/v1/incident.proto";
 
@@ -49,6 +50,9 @@ message GetLocationStatusRequest {
 message GetLocationStatusResponse {
   repeated ZoneStatus zones = 1;
   repeated DeviceStatus devices = 2;
+  string resume_token = 3;
+  google.protobuf.Timestamp snapshot_at = 4;
+  repeated ConnectorRuntimeStatus connectors = 5;
 }
 
 // ZoneStatus is the aggregated state of a zone.
@@ -58,6 +62,9 @@ message ZoneStatus {
   psim.common.v1.EventClass state = 2;
   bool armed = 3;
   uint32 open_incidents = 4;
+  DataQuality quality = 5;
+  google.protobuf.Timestamp confirmed_at = 6;
+  psim.catalog.v1.ResourceState resource_state = 7;
 }
 
 // DeviceStatus is the current state of a device derived from alarm, fault, restore and state events.
@@ -68,6 +75,29 @@ message DeviceStatus {
   string last_type = 3;
   google.protobuf.Timestamp last_changed_at = 4;
   bool online = 5;
+  DataQuality quality = 6;
+  google.protobuf.Timestamp confirmed_at = 7;
+  psim.catalog.v1.ResourceState resource_state = 8;
+  string connector_id = 9;
+  // Equipment availability remains unknown when only events have been observed.
+  string connection = 10;
+}
+
+// DataQuality separates observed equipment freshness from resource lifecycle.
+enum DataQuality {
+  DATA_QUALITY_UNSPECIFIED = 0;
+  DATA_QUALITY_ACTUAL = 1;
+  DATA_QUALITY_STALE = 2;
+  DATA_QUALITY_UNKNOWN = 3;
+}
+
+// ConnectorRuntimeStatus describes a connection without asserting equipment state.
+message ConnectorRuntimeStatus {
+  string connector_id = 1;
+  string connection = 2;
+  DataQuality quality = 3;
+  google.protobuf.Timestamp confirmed_at = 4;
+  string session_id = 5;
 }
 
 // GetOperatorLoadRequest is the request of GetOperatorLoad.
@@ -78,6 +108,8 @@ message GetOperatorLoadRequest {
 // GetOperatorLoadResponse is the response of GetOperatorLoad.
 message GetOperatorLoadResponse {
   repeated OperatorLoad operators = 1;
+  string resume_token = 2;
+  google.protobuf.Timestamp snapshot_at = 3;
 }
 
 // OperatorLoad is the current load of one operator.

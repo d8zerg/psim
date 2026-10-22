@@ -24,6 +24,7 @@ TEST(Authorization, RoleAndScopeMatrixHasNoAdministratorBypass) {
     EXPECT_FALSE(decide(principal, "incident.read", {"other", "a", "zone"}, now));
     EXPECT_FALSE(decide(principal, "incident.read", {"tenant", "other", "other"}, now));
     EXPECT_FALSE(decide(principal, "unregistered.action", {"tenant", "a"}, now));
+    EXPECT_EQ(decide_role(principal, "rule.write", now).has_value(), std::string(role) == "admin");
   }
 }
 

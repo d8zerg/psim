@@ -6,6 +6,7 @@ target=.cache/s3-tls
 mkdir -p "$target"
 chmod 755 "$target"
 if [ -f "$target/server.pem" ] && openssl x509 -in "$target/ca.pem" -noout -ext keyUsage 2>/dev/null | grep -q "Certificate Sign" && openssl x509 -checkend 86400 -noout -in "$target/server.pem" >/dev/null 2>&1; then
+  chmod 400 "$target"/*.access "$target"/*.secret
   exit 0
 fi
 chmod u+w "$target"/* 2>/dev/null || true

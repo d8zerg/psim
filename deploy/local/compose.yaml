@@ -388,6 +388,7 @@ services:
       - prometheus:/prometheus
       - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./config/prometheus/reports.yml:/etc/prometheus/reports.yml:ro
+      - ./config/prometheus/api.yml:/etc/prometheus/api.yml:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:9090/-/ready >/dev/null"]
       interval: 3s
