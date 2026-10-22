@@ -9,7 +9,7 @@
 # title - English, returned in Problem.title; ru - description for documentation.
 
 version: 1
-domains: [COMMON, AUTH, CATALOG, INGEST, PROCESSING, INCIDENT, RESPONSE, COMMAND, NOTIFICATION, REALTIME]
+domains: [COMMON, AUTH, CATALOG, INGEST, PROCESSING, INCIDENT, RESPONSE, COMMAND, NOTIFICATION, AUDIT, REALTIME]
 codes:
   # --- COMMON ---------------------------------------------------------------
   - code: COMMON_INVALID_ARGUMENT
@@ -494,3 +494,12 @@ codes:
     used_in: [realtime]
     title: Invalid subscription
     ru: Неверная подписка или фильтр
+
+  # --- AUDIT ----------------------------------------------------------------
+  - code: AUDIT_INTEGRITY_VIOLATION
+    http: 409
+    grpc: DATA_LOSS
+    retryable: false
+    used_in: [rest]
+    title: Audit integrity violation
+    ru: Цепочка аудита или контрольная точка не прошла проверку целостности

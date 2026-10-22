@@ -47,6 +47,8 @@ message AuditCheckpoint {
   google.protobuf.Timestamp created_at = 3;
   bytes signature = 4;
   string key_id = 5;
+  // Tenant is included in the signed checkpoint payload.
+  string tenant_id = 6;
 }
 
 // AuditChainEntry is an audit entry as stored in the chain.
@@ -58,4 +60,6 @@ message AuditChainEntry {
   google.protobuf.Timestamp recorded_at = 5;
   bytes prev_hash = 6;
   bytes hash = 7;
+  // Tenant is included in the canonical hash payload.
+  string tenant_id = 8;
 }

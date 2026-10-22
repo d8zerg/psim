@@ -17,3 +17,5 @@ task service:new NAME=incident-service CONTEXTS=incident SUMMARY="PSIM Incident 
 [Response Engine](../docs/engineering/response-engine.md) исполняет версии сценариев, сохраняет переходы и таймеры, передаёт команды Command Service. `task response:test` проверяет восстановление двух экземпляров и replay без внешних эффектов.
 
 [Notification Service](../docs/engineering/notifications.md) доставляет уведомления в приложении, через SMTP с TLS и подписанный webhook. Response Engine управляет SLA и дежурствами. `task notifications:test` проверяет квитанции, повторы, смену дежурного и восстановление процессов.
+
+[Audit Service](../docs/engineering/audit-service.md) строит цепочки хэшей, подписывает внешние контрольные точки и предоставляет поиск и экспорт. `psim-audit-tool` выполняет миграции и независимую проверку. `task audit:test` проверяет историю Kafka, две копии сервиса и вмешательство администратора БД.

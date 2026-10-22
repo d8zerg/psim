@@ -643,6 +643,7 @@ AuditChainEntry is an audit entry as stored in the chain.
 | recorded_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | prev_hash | [bytes](#bytes) |  |  |
 | hash | [bytes](#bytes) |  |  |
+| tenant_id | [string](#string) |  | Tenant is included in the canonical hash payload. |
 
 
 
@@ -662,6 +663,7 @@ AuditCheckpoint fixes the head of the chain (ADR-021).
 | created_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | signature | [bytes](#bytes) |  |  |
 | key_id | [string](#string) |  |  |
+| tenant_id | [string](#string) |  | Tenant is included in the signed checkpoint payload. |
 
 
 

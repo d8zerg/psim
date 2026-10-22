@@ -81,6 +81,8 @@ class Check:
         args = ["docker", "run", "--rm", "--security-opt", "seccomp=unconfined", "-u", f"{os.getuid()}:{os.getgid()}"]
         if network:
             args += ["--network", self.project + "_default"]
+        else:
+            args += ["--network", "none"]
         return self.run(args + ["-v", str(ROOT) + ":/repo", "-w", "/repo", self.toolchain, "bash", "-c", command])
 
     def port(self, service, port):
@@ -141,10 +143,12 @@ class Check:
         try:
             with urllib.request.urlopen(urllib.request.Request(url, method=method, data=data, headers=headers), context=self.ca, timeout=90) as response:
                 status, raw = response.status, response.read()
+                media = response.headers.get_content_type()
         except urllib.error.HTTPError as error:
             status, raw = error.code, error.read()
+            media = error.headers.get_content_type()
         assert status == expected, f"{method} {path[:100]}: expected {expected}, got {status}, {raw[:500]!r}"
-        return json.loads(raw) if raw[:1] in (b"{", b"[") else raw
+        return json.loads(raw) if media in ("application/json", "application/problem+json") and raw[:1] in (b"{", b"[") else raw
 
     def s3_request(self, method, key, authenticated=False):
         port = self.port("s3", 8443)

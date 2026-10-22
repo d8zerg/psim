@@ -51,3 +51,4 @@ services:
   projection-service: [access]
   audit-service: [audit]
   api-gateway: [access]
+  audit-service: []

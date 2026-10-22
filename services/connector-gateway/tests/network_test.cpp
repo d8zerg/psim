@@ -2,6 +2,7 @@
 #include <google/rpc/status.pb.h>
 #include <grpcpp/support/status.h>
 #include <gtest/gtest.h>
+#include <psim/audit/v1/audit.pb.h>
 #include <psim/catalog/v1/catalog.pb.h>
 #include <psim/connector/v1/administration.pb.h>
 #include <psim/connector/v1/connector.pb.h>
@@ -24,6 +25,9 @@ namespace psim::connector_gateway::testing {
 TEST(GatewayNetwork, RejectsUnregisteredTrustedCertificate) {
   Stream stream(19);
   EXPECT_FALSE(stream.connect());
+  const auto audit = run(find<psim::audit::v1::AuditEventRecord>("psim.audit.v1", identity(19), "access.denied"));
+  EXPECT_EQ(audit.audit_entry().outcome(), psim::audit::v1::AUDIT_OUTCOME_DENIED);
+  EXPECT_EQ(audit.envelope().tenant_id(), kTenant);
 }
 
 TEST(GatewayNetwork, DurableBatchRejectionsAndHistoricalMetadata) {
@@ -44,6 +48,10 @@ TEST(GatewayNetwork, DurableBatchRejectionsAndHistoricalMetadata) {
   EXPECT_FALSE(persisted.raw_event().live_observation());
   EXPECT_EQ(persisted.envelope().occurred_at().seconds(), historic.occurred_at().seconds());
   EXPECT_TRUE(stream.heartbeat());
+  const auto audit = run(find<psim::audit::v1::AuditEventRecord>("psim.audit.v1", identity(0), "connector.connected"));
+  EXPECT_EQ(audit.audit_entry().details().at("session_id"), stream.registered.session_id());
+  EXPECT_EQ(audit.audit_entry().outcome(), psim::audit::v1::AUDIT_OUTCOME_SUCCESS);
+  EXPECT_FALSE(audit.envelope().causation_id().empty());
 }
 
 TEST(GatewayNetwork, VersionedIdempotentAdministrationAndRoleChecks) {
@@ -65,6 +73,9 @@ TEST(GatewayNetwork, VersionedIdempotentAdministrationAndRoleChecks) {
   ASSERT_TRUE(details.details(0).UnpackTo(&info));
   EXPECT_EQ(info.reason(), "AUTH_FORBIDDEN");
   EXPECT_EQ(info.domain(), "psim");
+  const auto audit = run(find<psim::audit::v1::AuditEventRecord>("psim.audit.v1", identity(1), "access.denied"));
+  EXPECT_EQ(audit.audit_entry().outcome(), psim::audit::v1::AUDIT_OUTCOME_DENIED);
+  EXPECT_EQ(audit.audit_entry().details().at("requested_action"), "connector.manage");
   ASSERT_TRUE(manage(request, &first).ok());
   ASSERT_TRUE(manage(request, &second, 1).ok());
   EXPECT_EQ(first.SerializeAsString(), second.SerializeAsString());

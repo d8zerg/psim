@@ -27,6 +27,7 @@ task gateway:coverage
 - `settings.pg_host`, защищённый `pg_password_file`, `pg_ca_file`, `pg_certificate_file`, `pg_private_key_file` - PostgreSQL с проверкой имени и CA. Схема `ingest` создаётся версионированным мигратором.
 - `settings.redis_host`, защищённый `redis_password_file`, `redis_ca_file`, `redis_certificate_file`, `redis_key_file` - Redis/Valkey. Ошибка Redis останавливает подтверждение и владение сессией.
 - `settings.issuer`, `settings.jwks_url` - фиксированные параметры IdP, audience `psim`, роли клиента `psim`. Тенант берётся из проверенного `psim_tenant`.
+- `settings.security_audit_tenant` - тенант централизованного аудита для отказов незарегистрированным коннекторам. Для известной регистрации используется её сохранённый тенант. Поле обязательно при рабочем TLS; TLS-отказы до установления проверенной личности остаются в журнале границы транспорта.
 - `settings.max_sessions` - предел одновременных транспортов экземпляра, по умолчанию 256.
 
 Служебные пароли и закрытые ключи читаются из защищённых файлов. Пути и доверенные endpoint задаёт оператор; сообщения коннектора и JWT не выбирают адрес JWKS или другую инфраструктуру.

@@ -5144,6 +5144,9 @@ components:
         hash:
           type: string
           format: bytes
+        tenantId:
+          type: string
+          description: Tenant is included in the canonical hash payload.
       description: AuditChainEntry is an audit entry as stored in the chain.
     psim.audit.v1.AuditCheckpoint:
       type: object
@@ -5161,6 +5164,9 @@ components:
           format: bytes
         keyId:
           type: string
+        tenantId:
+          type: string
+          description: Tenant is included in the signed checkpoint payload.
       description: AuditCheckpoint fixes the head of the chain (ADR-021).
     psim.audit.v1.AuditEntry:
       type: object

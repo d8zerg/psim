@@ -132,5 +132,14 @@
   ],
   "notification.delivery.resolve": [
     "admin"
+  ],
+  "audit.search": [
+    "auditor"
+  ],
+  "audit.verify": [
+    "auditor"
+  ],
+  "audit.export": [
+    "auditor"
   ]
 }

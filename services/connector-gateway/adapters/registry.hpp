@@ -30,6 +30,8 @@ class Registry {
   boost::asio::awaitable<platform::Result<connector::v1::ManageResponse>> manage(
       connector::v1::ManageRequest request, platform::security::Principal principal,
       std::optional<Certificate> certificate);
+  boost::asio::awaitable<platform::Result<void>> denied(std::string tenant, std::string actor, std::string object,
+                                                        std::string action);
   boost::asio::awaitable<platform::Result<void>> acknowledge(std::string boot, std::uint64_t revision);
   boost::asio::awaitable<platform::Result<bool>> enforced(std::uint64_t revision);
   boost::asio::awaitable<platform::Result<void>> connected(Registration registration, Certificate peer,

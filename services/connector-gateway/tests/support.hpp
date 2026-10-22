@@ -6,6 +6,7 @@
 #include <google/protobuf/util/time_util.h>
 #include <grpcpp/grpcpp.h>
 #include <nlohmann/json.hpp>
+#include <psim/audit/v1/audit.pb.h>
 #include <psim/connector/v1/administration.grpc.pb.h>
 #include <psim/connector/v1/connector.grpc.pb.h>
 #include <psim/ingest/v1/raw_event.pb.h>
@@ -275,6 +276,11 @@ asio::awaitable<Message> find(std::string topic, std::string connector, std::str
       }
       if constexpr (std::is_same_v<Message, ingest::v1::RawEventRecord>) {
         if (value->raw_event().connector_id() == connector && value->envelope().message_id() == event_id) {
+          result = std::move(*value);
+        }
+      } else if constexpr (std::is_same_v<Message, audit::v1::AuditEventRecord>) {
+        if (value->has_audit_entry() && value->audit_entry().object_id() == connector
+            && value->audit_entry().action() == event_id) {
           result = std::move(*value);
         }
       } else if constexpr (std::is_same_v<Message, response::v1::CommandResultRecord>) {

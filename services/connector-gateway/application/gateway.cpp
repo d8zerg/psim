@@ -133,6 +133,7 @@ std::string settings_schema() {
   for (const auto& name : {"redis_host", "redis_ca_file", "redis_certificate_file", "redis_key_file"}) {
     fields[name] = {{"type", "string"}, {"default", name == std::string_view("redis_host") ? "valkey" : ""}};
   }
+  fields["security_audit_tenant"] = {{"type", "string"}, {"default", ""}};
   fields["redis_password_file"] = {{"type", "string"}, {"x-psim-secret", true}};
   fields["max_sessions"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 10000}, {"default", 256}};
   return schema.dump();
@@ -369,6 +370,12 @@ bool Gateway::allowed(const SessionState& session) const {
 }
 
 asio::awaitable<p::Result<void>> Gateway::initialize() {
+  const auto security_tenant = context().config().get<std::string>("settings.security_audit_tenant");
+  if ((!security_tenant.empty() || !context().config().get<bool>("settings.allow_plaintext"))
+      && !p::stream::uuid(security_tenant)) {
+    co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "security audit tenant required");
+  }
+
   const auto& config = context().config();
   ca_file_ = config.get<std::string>("settings.tls_directory") + "/ca.pem";
   for (const auto* topic :
@@ -727,6 +734,20 @@ asio::awaitable<void> Gateway::dispatch(std::shared_ptr<SessionState> session) {
       session->stop(grpc::Status::OK, "goodbye");
     } else {
       result = p::fail(p::ErrorCode::kCommonInvalidArgument, "unexpected connector message");
+    }
+    if (!result
+        && (result.error().code() == p::ErrorCode::kAuthUnauthenticated
+            || result.error().code() == p::ErrorCode::kAuthForbidden)) {
+      const auto registered = snapshot_.registrations.find(session->connector);
+      const auto tenant = registered != snapshot_.registrations.end()
+                              ? registered->second.tenant
+                              : context().config().get<std::string>("settings.security_audit_tenant");
+      if (p::stream::uuid(tenant)) {
+        auto recorded = co_await registry_->denied(tenant, session->connector, session->connector, "connector.session");
+        if (!recorded) {
+          context().logger().error("connector denial audit deferred");
+        }
+      }
     }
   } catch (const std::exception&) {
     result = p::fail(p::ErrorCode::kCommonInternal, "connector request failed");

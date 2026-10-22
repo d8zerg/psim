@@ -5,6 +5,7 @@
 #include <google/protobuf/util/json_util.h>
 #include <google/protobuf/util/time_util.h>
 #include <nlohmann/json.hpp>
+#include <psim/audit/v1/audit.pb.h>
 #include <psim/catalog/v1/catalog.pb.h>
 #include <psim/incident/v1/events.pb.h>
 #include <psim/response/v1/command.pb.h>
@@ -97,7 +98,9 @@ asio::awaitable<void> emit(Json input) {
     for (auto item : input.at("records")) {
       const auto topic = item.at("topic").get<std::string>();
       std::unique_ptr<google::protobuf::Message> record;
-      if (topic == "psim.catalog.v1") {
+      if (topic == "psim.audit.v1") {
+        record = std::make_unique<psim::audit::v1::AuditEventRecord>();
+      } else if (topic == "psim.catalog.v1") {
         record = std::make_unique<psim::catalog::v1::CatalogRecord>();
       } else if (topic == "psim.incidents.events.v1") {
         record = std::make_unique<psim::incident::v1::IncidentEventRecord>();

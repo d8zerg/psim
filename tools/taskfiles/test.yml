@@ -239,3 +239,13 @@ tasks:
     desc: Durable SLA escalation, current site duty and TLS notification delivery
     cmds:
       - task: :notifications:test
+
+  audit:
+    desc: Immutable audit chains, external checkpoints and independent verification
+    cmds:
+      - task: :audit:test
+
+  audit-integrity:
+    desc: Audit record modification, deletion, insertion and external checkpoint verification
+    cmds:
+      - task: :audit:test

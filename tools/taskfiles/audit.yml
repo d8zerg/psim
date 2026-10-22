@@ -1,0 +1,30 @@
+version: '3'
+vars:
+  AUDIT_PROJECT: '{{.AUDIT_PROJECT | default "psim-audit-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Audit ingestion, immutable chains, external checkpoints, scoped search and offline verification
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/audit/check.py {{.AUDIT_PROJECT}} {{.PRESET}} 100
+  sanitizers:
+    desc: Audit unit and component checks under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_audit_test|psim-audit'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PRESET: '{{.ITEM}}', AUDIT_PROJECT: '{{.AUDIT_PROJECT}}'}
+  coverage:
+    desc: Audit coverage with real Kafka, PostgreSQL and identity
+    cmds:
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - task: test
+        vars: {PRESET: coverage, AUDIT_PROJECT: '{{.AUDIT_PROJECT}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw ctest --test-dir build/{{.PLATFORM}}/coverage -L 'psim_audit_test|psim-audit' --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/audit-service' --component

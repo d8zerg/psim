@@ -19,6 +19,7 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         webhookReceivers = softwareSystem "Получатели webhook" "Внешние системы" "External"
         observability = softwareSystem "Стек наблюдаемости" "OTel Collector, Prometheus, Grafana, логи, трассировки" "External"
 
+        checkpointArchive = softwareSystem "Архив контрольных точек" "Независимый от PostgreSQL носитель подписанных контрольных точек"
         psim = softwareSystem "Open-Source PSIM Platform" "Вендор-нейтральная платформа управления ситуациями" {
 
             connectorSdk = container "Connector SDK" "Библиотека коннекторов: протокол, буфер на диске, команды" "C++ library" "Library"
@@ -158,6 +159,9 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         psim.notificationService -> psim.postgres "notification: очередь и квитанции"
         psim.projectionService -> psim.postgres "projection"
         psim.projectionService -> psim.clickhouse "incident_facts, отчёты" "ClickHouse native, TLS"
+        psim.auditService -> keycloak "Read-only журнал безопасности" "HTTPS + OAuth2"
+        psim.auditService -> checkpointArchive "Подписанные контрольные точки" "Файлы + fsync"
+        psim.auditService -> psim.kafka "Контрольные точки и аудит операций через outbox" "Kafka"
         psim.auditService -> psim.postgres "audit"
         psim.normalizer -> psim.schemaRegistry "Схемы"
         psim.correlationEngine -> psim.schemaRegistry "Схемы"

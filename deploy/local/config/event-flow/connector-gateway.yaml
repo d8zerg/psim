@@ -7,6 +7,7 @@ telemetry:
   otlp_tls: false
   sampling_ratio: 1
 settings:
+  security_audit_tenant: 11111111-1111-4111-8111-111111111111
   issuer: http://keycloak:8080/realms/psim
   pg_password_file: /repo/.cache/event-flow/postgres.secret
   redis_password_file: /repo/.cache/event-flow/redis.secret

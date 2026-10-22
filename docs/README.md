@@ -30,6 +30,7 @@
 - [Command Service: команды устройствам](engineering/command-service.md)
 - [Response Engine: исполнение сценариев](engineering/response-engine.md)
 - [SLA, дежурства и уведомления](engineering/notifications.md)
+- [Audit Service и независимая проверка журнала](engineering/audit-service.md)
 - [Поиск истории и связь с инцидентами](engineering/event-history.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
 

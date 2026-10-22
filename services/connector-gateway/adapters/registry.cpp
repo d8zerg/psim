@@ -157,9 +157,16 @@ asio::awaitable<p::Result<connector::v1::ManageResponse>> Registry::manage(conne
       || request.action() == REGISTRATION_ACTION_UNSPECIFIED || !RegistrationAction_IsValid(request.action())
       || (request.action() == REGISTRATION_ACTION_RECOVER
           && (!principal.roles.contains("admin") || principal.authorized_party != "psim-console"))) {
+    if (p::stream::uuid(principal.tenant) && !principal.subject.empty()) {
+      auto recorded =
+          co_await denied(principal.tenant, principal.subject, request.connector().connector_id(), "connector.manage");
+      if (!recorded) {
+        co_return std::unexpected(recorded.error());
+      }
+    }
     co_return p::fail(p::ErrorCode::kAuthForbidden, "registration operation denied");
   }
-  co_return co_await pg::in_transaction<ManageResponse>(
+  auto managed = co_await pg::in_transaction<ManageResponse>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): closure is owned by in_transaction
       [this, &request, &principal, &cert](pg::Transaction* tx) -> asio::awaitable<p::Result<ManageResponse>> {
@@ -392,6 +399,14 @@ asio::awaitable<p::Result<connector::v1::ManageResponse>> Registry::manage(conne
         }
         co_return response;
       });
+  if (!managed && managed.error().code() == p::ErrorCode::kAuthForbidden) {
+    auto recorded =
+        co_await denied(principal.tenant, principal.subject, request.connector().connector_id(), "connector.manage");
+    if (!recorded) {
+      co_return std::unexpected(recorded.error());
+    }
+  }
+  co_return managed;
 }
 
 asio::awaitable<p::Result<void>> Registry::publish_catalog(pg::Transaction* tx, std::string tenant,
@@ -452,9 +467,48 @@ asio::awaitable<p::Result<bool>> Registry::enforced(std::uint64_t revision) {
   co_return *count == 0;
 }
 
+asio::awaitable<p::Result<void>> Registry::denied(std::string tenant, std::string actor, std::string object,
+                                                  std::string action) {
+  audit::v1::AuditEventRecord record;
+  envelope(record.mutable_envelope(), tenant, object);
+  record.mutable_envelope()->mutable_actor()->set_id("connector-gateway");
+  record.mutable_envelope()->mutable_actor()->set_kind(common::v1::ACTOR_KIND_SERVICE);
+  auto* entry = record.mutable_audit_entry();
+  entry->mutable_actor()->set_id(actor);
+  entry->mutable_actor()->set_kind(action == "connector.session" ? common::v1::ACTOR_KIND_CONNECTOR
+                                                                 : common::v1::ACTOR_KIND_USER);
+  entry->set_action("access.denied");
+  entry->set_object_type("connector");
+  entry->set_object_id(object);
+  entry->set_outcome(audit::v1::AUDIT_OUTCOME_DENIED);
+  (*entry->mutable_details())["requested_action"] = action;
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): in_transaction owns the awaited closure.
+  co_return co_await pg::in_transaction<void>(pool_, [&, this](pg::Transaction* tx) {
+    return messages_.append(tx, {record.envelope().message_id(), encode_("psim.audit.v1", tenant, record)});
+  });
+}
+
 asio::awaitable<p::Result<void>> Registry::append(pg::Transaction* tx, const ingest::v1::GatewayStateRecord* state) {
-  co_return co_await messages_.append(
+  auto saved = co_await messages_.append(
       tx, {state->envelope().message_id(), encode_("psim.ingest.state.v1", state->connector_id(), *state)});
+  if (!saved) {
+    co_return saved;
+  }
+  audit::v1::AuditEventRecord record;
+  envelope(record.mutable_envelope(), state->envelope().tenant_id(), state->connector_id());
+  record.mutable_envelope()->set_causation_id(state->envelope().message_id());
+  record.mutable_envelope()->mutable_actor()->set_id("connector-gateway");
+  record.mutable_envelope()->mutable_actor()->set_kind(common::v1::ACTOR_KIND_SERVICE);
+  auto* entry = record.mutable_audit_entry();
+  *entry->mutable_actor() = record.envelope().actor();
+  entry->set_action(state->connection().online() ? "connector.connected" : "connector.disconnected");
+  entry->set_object_type("connector");
+  entry->set_object_id(state->connector_id());
+  entry->set_outcome(audit::v1::AUDIT_OUTCOME_SUCCESS);
+  (*entry->mutable_details())["session_id"] = state->session_id();
+  (*entry->mutable_details())["reason"] = state->connection().reason();
+  co_return co_await messages_.append(
+      tx, {record.envelope().message_id(), encode_("psim.audit.v1", record.envelope().tenant_id(), record)});
 }
 
 asio::awaitable<p::Result<void>> Registry::connected(Registration registration, Certificate peer, std::string session,
