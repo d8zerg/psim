@@ -118,7 +118,10 @@ asio::awaitable<p::Result<void>> Repository::audit(p::pg::Transaction* tx, std::
   entry->mutable_actor()->set_id(actor);
   entry->mutable_actor()->set_kind(actor == "notification-service" ? common::v1::ACTOR_KIND_SERVICE
                                                                    : common::v1::ACTOR_KIND_USER);
-  entry->set_action(action);
+  entry->set_action(denied ? "access.denied" : action);
+  if (denied) {
+    details["requested_action"] = std::move(action);
+  }
   entry->set_object_type("notification");
   entry->set_object_id(id);
   entry->set_site_id(site);

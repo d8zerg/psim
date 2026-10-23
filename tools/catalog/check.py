@@ -91,7 +91,7 @@ class Check:
         return self.ports[service]
 
     def keycloak(self, method, path, token=None, body=None, form=False):
-        headers = {"Host": "keycloak:8080"}
+        headers = {"Host": "keycloak:8080", "Accept": "application/json"}
         if token:
             headers["Authorization"] = "Bearer " + token
         data = None

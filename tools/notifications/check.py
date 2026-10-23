@@ -388,6 +388,14 @@ class Check(ResponseCheck):
             logs = self.compose('logs', '--no-color', 'notification-service', 'notification-2', 'notification-fixture')
             (self.output / 'notification-servers.log').write_text(logs)
             assert not re.search(r'AddressSanitizer|LeakSanitizer|ThreadSanitizer|runtime error:', logs), logs[-2000:]
+            if self.report['passed']:
+                for service in ('notification-service', 'notification-2'):
+                    identity = self.compose('ps', '-aq', service).strip()
+                    state = json.loads(self.run(['docker', 'inspect', identity]))[0]['State']
+                    assert state['ExitCode'] == 0, (service, state)
+        except Exception:
+            self.report['passed'] = False
+            raise
         finally:
             super().cleanup()
 

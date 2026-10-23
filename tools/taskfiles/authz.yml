@@ -11,6 +11,7 @@ tasks:
         vars: {PRESET: '{{.PRESET}}'}
       - task: :cpp:_run
         vars:
+          RUN_OPTIONS: '{{if eq .PRESET "tsan"}}--security-opt seccomp=unconfined{{end}}'
           CMD: ctest --preset {{.PRESET}} -L 'psim_platform_authz_test|psim_platform_security_test' --output-on-failure
       - task: :arch:authz
       - python3 -I tools/authz/check.py {{.PROJECT}} {{.PRESET}}
@@ -27,6 +28,8 @@ tasks:
       - task: :api:image
       - task: :cpp:build
         vars: {PRESET: coverage}
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - mkdir -p build/{{.PLATFORM}}/coverage/profiles
       - task: :cpp:_run
         vars:
           CMD: ctest --preset coverage -j {{.JOBS}} --output-on-failure

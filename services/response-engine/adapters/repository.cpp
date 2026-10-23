@@ -148,7 +148,10 @@ asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, std::str
   envelope(event.mutable_envelope(), tenant, actor);
   auto* entry = event.mutable_audit_entry();
   *entry->mutable_actor() = event.envelope().actor();
-  entry->set_action(std::move(action));
+  entry->set_action(denied ? "access.denied" : action);
+  if (denied) {
+    (*entry->mutable_details())["requested_action"] = std::move(action);
+  }
   entry->set_object_type("response");
   entry->set_object_id(std::move(id));
   entry->set_site_id(std::move(site));

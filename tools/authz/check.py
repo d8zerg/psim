@@ -199,10 +199,14 @@ class Check(Base):
         private_json(config, {'preset': self.preset, 'tokens': matrix})
         self.env_command('python3 -I tools/authz/connector.py /repo/' + str(config.relative_to(ROOT)))
         self.report['connectorCombinations'] = len(matrix)
+        self.report['denialAuditRecords'] = {}
         for schema in ('catalog', 'rules', 'incident', 'command', 'response', 'notification', 'history', 'reports', 'access', 'ingest', 'audit'):
             self.wait(lambda schema=schema: int(self.sql("SELECT count(*) FROM " + schema + ".psim_outbox WHERE position(convert_to('access.denied','UTF8') in payload)>0")) > 0, 30)
-        self.wait(lambda: int(self.sql("SELECT count(*) FROM audit.entries WHERE body->'entry'->>'action'='access.denied'")) > 0, 30)
-        self.mark('every service commits denial audit through its outbox and the audit owner ingests the records')
+            denied = self.sql("SELECT string_agg(quote_literal(event_id),',') FROM " + schema + ".psim_outbox WHERE position(convert_to('access.denied','UTF8') in payload)>0")
+            count = int(self.sql("SELECT count(*) FROM " + schema + ".psim_outbox WHERE event_id IN (" + denied + ")"))
+            self.wait(lambda denied=denied, count=count: int(self.sql("SELECT count(*) FROM audit.entries WHERE source IN (" + denied + ") AND body->'entry'->>'action'='access.denied' AND body->'entry'->>'outcome'='AUDIT_OUTCOME_DENIED'")) == count, 60)
+            self.report['denialAuditRecords'][schema] = count
+        self.mark('every service commits denial audit through its outbox and every source identity reaches the audit owner with a denied outcome')
         self.report['boundaryRequests'] = checked
         self.mark('six roles with wildcard, site, zone, unrelated and empty scopes at each REST owner and public Gateway')
 
@@ -290,17 +294,21 @@ class Check(Base):
             bearer = self.keycloak('POST', '/realms/psim/protocol/openid-connect/token', body={'grant_type': 'password', 'client_id': client_id, 'client_secret': 'psim-test-profile', 'username': username, 'password': 'psim-test-profile-password'}, form=True)['access_token']
             own = self.keycloak('GET', '/realms/psim/account/', bearer)
             assert own['username'] == username
+            assert not {'psim_tenant', 'psim_scopes'} & own.get('attributes', {}).keys()
+            self.keycloak('POST', '/realms/psim/account/', bearer, own | {'firstName': 'Updated'})
+            assert self.keycloak('GET', path, self.admin)['firstName'] == 'Updated'
             before = self.keycloak('GET', path, self.admin)
-            try:
-                self.keycloak('POST', '/realms/psim/account/', bearer, own | {'attributes': {'psim_tenant': [helpers['OTHER_TENANT']], 'psim_scopes': ['*']}})
-            except urllib.error.HTTPError as error:
-                assert error.code in (400, 403), error.code
-            after = self.keycloak('GET', path, self.admin)
-            assert after.get('attributes') == before.get('attributes'), 'self-service profile changed access grants'
+            for attributes in ({'psim_tenant': [helpers['OTHER_TENANT']]}, {'psim_scopes': ['*']}):
+                try:
+                    self.keycloak('POST', '/realms/psim/account/', bearer, own | {'attributes': attributes})
+                except urllib.error.HTTPError as error:
+                    assert error.code in (400, 403), error.code
+                after = self.keycloak('GET', path, self.admin)
+                assert after.get('attributes') == before.get('attributes'), 'self-service profile changed access grants'
         finally:
             self.keycloak('DELETE', path, self.admin)
             self.keycloak('DELETE', clients + '/' + client, self.admin)
-        self.mark('an authenticated user can read the account profile and cannot change tenant or grant wildcard scope')
+        self.mark('an authenticated user can edit ordinary profile fields, cannot read protected grants, change tenant or grant wildcard scope')
 
     def outage(self, config):
         ready = self.auth_output / 'outage-ready'
@@ -322,21 +330,31 @@ class Check(Base):
 
 
     def cleanup(self):
-        for infrastructure in ('registry', 'keycloak', 'postgres'):
-            (self.auth_output / (infrastructure + '.log')).write_text(self.compose('logs', '--no-color', '--tail', '200', infrastructure))
-            identity = self.compose('ps', '-aq', infrastructure).strip()
-            if identity:
-                state = self.run(['docker', 'inspect', '--format', '{{json .State}}', identity])
-                (self.auth_output / (infrastructure + '-state.json')).write_text(state)
-        self.compose('stop', '-t', '30', *self.owners)
-        for owner in self.owners:
-            logs = self.compose('logs', '--no-color', owner)
-            (self.auth_output / (owner + '.log')).write_text(logs)
-            if self.report['passed']:
-                assert not re.search(r'AddressSanitizer|LeakSanitizer|ThreadSanitizer|runtime error:', logs), owner
-        super().cleanup()
-        for name in ('connector.json', 'revocation.json', 'outage.json'):
-            (self.auth_output / name).unlink(missing_ok=True)
+        try:
+            for infrastructure in ('registry', 'keycloak', 'postgres'):
+                (self.auth_output / (infrastructure + '.log')).write_text(self.compose('logs', '--no-color', '--tail', '200', infrastructure))
+                identity = self.compose('ps', '-aq', infrastructure).strip()
+                if identity:
+                    state = self.run(['docker', 'inspect', '--format', '{{json .State}}', identity])
+                    (self.auth_output / (infrastructure + '-state.json')).write_text(state)
+            self.compose('stop', '-t', '30', *self.owners)
+            for owner in self.owners:
+                logs = self.compose('logs', '--no-color', owner)
+                (self.auth_output / (owner + '.log')).write_text(logs)
+                if self.report['passed']:
+                    identity = self.compose('ps', '-aq', owner).strip()
+                    state = json.loads(self.run(['docker', 'inspect', identity]))[0]['State']
+                    assert state['ExitCode'] == 0, (owner, state)
+                    assert not re.search(r'AddressSanitizer|LeakSanitizer|ThreadSanitizer|runtime error:', logs), owner
+        except Exception:
+            self.report['passed'] = False
+            raise
+        finally:
+            try:
+                super().cleanup()
+            finally:
+                for name in ('connector.json', 'revocation.json', 'outage.json'):
+                    (self.auth_output / name).unlink(missing_ok=True)
 
 
 def main():
@@ -349,6 +367,9 @@ def main():
     finally:
         try:
             check.cleanup()
+        except Exception:
+            check.report['passed'] = False
+            raise
         finally:
             (check.auth_output / 'result.json').write_text(json.dumps(check.report, indent=2) + '\n')
     print(json.dumps(check.report, indent=2))
