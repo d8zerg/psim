@@ -130,6 +130,7 @@ grpc::Status status(const p::Error& error) {
 std::string settings_schema() {
   auto schema = nlohmann::json::parse(p::stream::kSettings);
   auto& fields = schema["properties"];
+  fields["jwks_ca_file"] = {{"type", "string"}, {"default", ""}};
   for (const auto& name : {"redis_host", "redis_ca_file", "redis_certificate_file", "redis_key_file"}) {
     fields[name] = {{"type", "string"}, {"default", name == std::string_view("redis_host") ? "valkey" : ""}};
   }
@@ -420,10 +421,11 @@ asio::awaitable<p::Result<void>> Gateway::initialize() {
   if (!connection) {
     co_return std::unexpected(connection.error());
   }
-  auto verifier =
-      p::security::JwksCache::create({.jwt = {.issuer = config.get<std::string>("settings.issuer"), .audience = "psim"},
-                                      .url = config.get<std::string>("settings.jwks_url"),
-                                      .http = {.allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
+  auto authentication = p::stream::authentication_options(context());
+  if (!authentication) {
+    co_return std::unexpected(authentication.error());
+  }
+  auto verifier = p::security::JwksCache::create(std::move(*authentication));
   if (!verifier) {
     co_return std::unexpected(verifier.error());
   }

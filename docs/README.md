@@ -87,6 +87,8 @@
 - Слой Valkey/Redis: RESP3, Sentinel, кэш, лимиты и сессии - [ADR-015](adr/0015-redis-client-and-role.md), [интерфейсы и примеры](../libs/platform/redis/README.md)
 - Слой PostgreSQL: libpq, пул, транзакции, миграции и inbox/outbox - [ADR-014](adr/0014-postgresql-async-driver.md), [интерфейсы и примеры](../libs/platform/pg/README.md)
 
+- Авторизация, Keycloak, наборы областей и отзыв доступа - [ADR-061](adr/0061-live-access-validation.md), [руководство](security/authorization.md)
+
 - Безопасность платформы: TLS/mTLS, JWT/JWKS, секреты и внешняя PKI - [ADR-043](adr/0043-platform-security.md), [интерфейсы](../libs/platform/security/README.md), [регламент доверия](security/platform-trust.md)
 
 - Realtime, возобновление из Kafka и оперативные образы - [ADR-060](adr/0060-realtime-delivery.md), [руководство](engineering/realtime.md)

@@ -4,7 +4,6 @@
 #include <psim/api/v1/catalog.pb.h>
 #include <psim/connector/v1/administration.pb.h>
 
-#include <algorithm>
 #include <charconv>
 #include <chrono>
 #include <cmath>
@@ -24,6 +23,7 @@
 #include "configuration.hpp"
 #include "file_store.hpp"
 #include "model.hpp"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/security/jwt.hpp"
@@ -259,15 +259,13 @@ boost::asio::awaitable<p::Result<Response>> Api::route(Request request, p::secur
     co_return json_response(*result, mapping ? "mappingRuleSet" : kind);
   }
 
-  if (!std::ranges::any_of(principal.roles, [](const auto& role) {
-        return role == "admin" || role == "integrator" || role == "operator" || role == "supervisor"
-               || role == "auditor" || role == "manager";
-      })) {
-    co_return p::fail(Code::kAuthForbidden, "catalog role required");
+  std::string_view policy_action = "catalog.read";
+  if (request.method() != http::verb::get) {
+    policy_action = path.starts_with("/v1/connectors") ? "connector.write" : "catalog.write";
   }
-  if (request.method() != http::verb::get && !principal.roles.contains("admin")
-      && !(path.starts_with("/v1/connectors") && principal.roles.contains("integrator"))) {
-    co_return p::fail(Code::kAuthForbidden, "administrator role required");
+  auto access = p::authz::decide_role(principal, policy_action, std::chrono::system_clock::now());
+  if (!access) {
+    co_return std::unexpected(access.error());
   }
   if (!path.starts_with("/v1/")) {
     co_return p::fail(Code::kCommonNotFound, "unknown endpoint");
@@ -487,8 +485,7 @@ boost::asio::awaitable<p::Result<Response>> Api::route(Request request, p::secur
     co_return std::unexpected(change.error());
   }
   if (kind == "connector") {
-    if (!principal.scopes.contains("*")
-        || (!principal.roles.contains("admin") && !principal.roles.contains("integrator"))) {
+    if (!p::authz::decide(principal, "connector.write", {principal.tenant}, std::chrono::system_clock::now())) {
       co_return p::fail(Code::kAuthScopeDenied, "connector management requires tenant scope");
     }
     connector::v1::ManageRequest management;

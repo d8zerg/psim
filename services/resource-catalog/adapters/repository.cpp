@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "model.hpp"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/pg/connection.hpp"
@@ -141,6 +142,23 @@ asio::awaitable<p::Result<Json>> Repository::load(pg::Transaction* tx, std::stri
   co_return Json::parse(rows->value(0, 0).value_or(""));
 }
 
+asio::awaitable<p::Result<std::string>> Repository::scope_zone(pg::Transaction* tx, std::string tenant, Json body) {
+  if (body.value("kind", "") == "LOCATION_KIND_ZONE") {
+    co_return body.value("locationId", "");
+  }
+  if (body.contains("zoneId")) {
+    co_return body.at("zoneId").get<std::string>();
+  }
+  if (body.contains("deviceId") && body.contains("maintenanceId")) {
+    auto device = co_await load(tx, std::move(tenant), "device", body.at("deviceId").get<std::string>());
+    if (!device) {
+      co_return std::unexpected(device.error());
+    }
+    co_return device->value("zoneId", "");
+  }
+  co_return std::string{};
+}
+
 asio::awaitable<p::Result<Json>> Repository::get(p::security::Principal principal, std::string kind, std::string id) {
   if (!canonical_uuid(id) || !canonical_uuid(principal.tenant)) {
     co_return p::fail(Code::kCommonInvalidArgument, "invalid resource identity");
@@ -153,7 +171,11 @@ asio::awaitable<p::Result<Json>> Repository::get(p::security::Principal principa
         if (!result) {
           co_return result;
         }
-        if (!allowed(principal, result->value("siteId", ""))) {
+        auto zone = co_await scope_zone(tx, principal.tenant, *result);
+        if (!zone) {
+          co_return std::unexpected(zone.error());
+        }
+        if (!allowed(principal, result->value("siteId", ""), false, *zone)) {
           co_return p::fail(Code::kAuthScopeDenied, "resource outside access scope");
         }
         co_return result;
@@ -165,8 +187,9 @@ asio::awaitable<p::Result<Page>> Repository::list(p::security::Principal princip
   if (!canonical_uuid(principal.tenant) || size == 0 || size > 1000 || (!after.empty() && !canonical_uuid(after))) {
     co_return p::fail(Code::kCommonInvalidArgument, "invalid pagination");
   }
-  std::vector<std::string> const sites(principal.scopes.begin(), principal.scopes.end());
-  if (!principal.scopes.contains("*") && sites.empty()) {
+  const auto scope = p::authz::scope_filter(principal);
+  const auto& sites = scope.sites;
+  if (!p::authz::all_scopes(principal) && sites.empty() && scope.zones.empty()) {
     co_return Page{};
   }
   auto lease = co_await pool_->acquire();
@@ -177,20 +200,26 @@ asio::awaitable<p::Result<Page>> Repository::list(p::security::Principal princip
       .sql =
           "WITH RECURSIVE subtree AS (SELECT id::text FROM catalog.resources WHERE tenant=$1::uuid AND kind='location' "
           "AND id::text=$5 UNION ALL SELECT r.id::text FROM catalog.resources r JOIN subtree s ON r.parent=s.id WHERE "
-          "r.tenant=$1::uuid AND r.kind='location') SELECT body::text,id::text FROM catalog.resources WHERE "
+          "r.tenant=$1::uuid AND r.kind='location'), visible AS (SELECT r.*, CASE WHEN r.kind='location' AND "
+          "r.body->>'kind'='LOCATION_KIND_ZONE' THEN r.id::text WHEN r.kind='maintenance' AND r.body ? 'deviceId' "
+          "THEN (SELECT d.body->>'zoneId' FROM catalog.resources d WHERE d.tenant=r.tenant AND d.kind='device' "
+          "AND d.id::text=r.body->>'deviceId') ELSE r.body->>'zoneId' END AS scope_zone FROM catalog.resources r) "
+          "SELECT body::text,id::text,COALESCE(scope_zone,'') FROM visible WHERE "
           "tenant=$1::uuid AND kind=$2 AND ($3='' OR id::text>$3) AND ($4::boolean OR site IN (SELECT "
-          "jsonb_array_elements_text($6::jsonb))) AND ($5='' OR parent IN (SELECT id FROM subtree) OR id::text=$5) AND "
+          "jsonb_array_elements_text($6::jsonb)) OR scope_zone IN (SELECT jsonb_array_elements_text($15::jsonb))) AND "
+          "($5='' OR parent IN (SELECT id FROM subtree) OR id::text=$5) AND "
           "($7='' OR parent=$7) AND ($8='' OR connector=$8) AND ($9='' OR body->>'deviceTypeId'=$9) AND ($10='' OR "
           "body->>'kind'=$10) AND ($11='' OR body->>'state'=$11) AND ($12::boolean OR "
           "COALESCE(body->>'state','')<>'RESOURCE_STATE_ARCHIVED') AND ($13='' OR site=$13) ORDER BY id LIMIT "
           "$14::integer",
       .parameters = {Param::text(principal.tenant), Param::text(kind), Param::text(after),
-                     Param::boolean(principal.scopes.contains("*")), Param::text(filters.value("locationId", "")),
+                     Param::boolean(p::authz::all_scopes(principal)), Param::text(filters.value("locationId", "")),
                      Param::text(Json(sites).dump()), Param::text(filters.value("parentId", "")),
                      Param::text(filters.value("connectorId", "")), Param::text(filters.value("deviceTypeId", "")),
                      Param::text(filters.value("kind", "")), Param::text(filters.value("state", "")),
                      Param::boolean(filters.value("includeArchived", "false") == "true"),
-                     Param::text(filters.value("siteId", "")), Param::integer(static_cast<std::int64_t>(size + 1))}};
+                     Param::text(filters.value("siteId", "")), Param::integer(static_cast<std::int64_t>(size + 1)),
+                     Param::text(Json(scope.zones).dump())}};
   auto rows = co_await (*lease)->query(std::move(query));
   if (!rows) {
     co_return std::unexpected(rows.error());
@@ -198,7 +227,7 @@ asio::awaitable<p::Result<Page>> Repository::list(p::security::Principal princip
   Page page;
   for (std::size_t i = 0; i < std::min(size, rows->size()); ++i) {
     auto body = Json::parse(rows->value(i, 0).value_or(""));
-    if (!allowed(principal, body.value("siteId", ""))) {
+    if (!allowed(principal, body.value("siteId", ""), false, rows->value(i, 2).value_or(""))) {
       continue;
     }
     page.items.push_back(std::move(body));
@@ -327,7 +356,12 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, Resource
   if (resource.kind == "connector") {
     co_return p::fail(Code::kCommonInvalidArgument, "connector credentials are managed by the gateway");
   }
-  if (old && !allowed(mutation.principal, old->value("siteId", ""), true)) {
+  auto old_zone =
+      old ? co_await scope_zone(tx, mutation.principal.tenant, *old) : p::Result<std::string>(std::string{});
+  if (!old_zone) {
+    co_return std::unexpected(old_zone.error());
+  }
+  if (old && !allowed(mutation.principal, old->value("siteId", ""), true, *old_zone)) {
     co_return p::fail(Code::kAuthScopeDenied, "existing resource outside access scope");
   }
   if (mutation.action == "archive" || mutation.action == "cancel") {
@@ -520,7 +554,11 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, Resource
       resource.body["completedAt"] = timestamp(now);
     }
   }
-  if (!allowed(mutation.principal, resource.site, true)) {
+  auto zone_scope = co_await scope_zone(tx, mutation.principal.tenant, resource.body);
+  if (!zone_scope) {
+    co_return std::unexpected(zone_scope.error());
+  }
+  if (!allowed(mutation.principal, resource.site, true, *zone_scope)) {
     co_return p::fail(Code::kAuthScopeDenied, "resource outside write scope");
   }
   if (resource.kind == "location" || resource.kind == "device_type") {
@@ -629,7 +667,11 @@ asio::awaitable<p::Result<Json>> Repository::change(Resource resource, Mutation 
           co_return std::unexpected(replay.error());
         }
         if (*replay) {
-          if (!allowed(mutation.principal, (**replay).value("siteId", ""), true)) {
+          auto zone = co_await scope_zone(tx, mutation.principal.tenant, **replay);
+          if (!zone) {
+            co_return std::unexpected(zone.error());
+          }
+          if (!allowed(mutation.principal, (**replay).value("siteId", ""), true, *zone)) {
             co_return p::fail(Code::kAuthScopeDenied, "request result outside access scope");
           }
           co_return **replay;

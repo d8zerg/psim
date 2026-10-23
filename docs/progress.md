@@ -335,7 +335,7 @@
 | 7.1 | API Gateway | утверждён | [ADR-058](adr/0058-api-gateway-and-configuration.md), [настройка и совместимость](engineering/api-gateway.md); REST по HTTP-аннотациям Protobuf, TLS, роли и области, версии конфигурации, снимки состояния и потоковая передача планов; `task api:test`, `api:sanitizers`, `api:coverage` |
 | 7.2 | Realtime-канал | утверждён | [ADR-060](adr/0060-realtime-delivery.md), [realtime](engineering/realtime.md); подписки WSS, возобновление Kafka, оперативные образы и ограничения очередей |
 | 7.3 | Projection Service | утверждён | [ADR-059](adr/0059-console-projections.md), [модели консоли](engineering/console-projections.md); общая модель PostgreSQL, Redis, scoped HTTPS и атомарное перестроение; `projection:test`, `projection:sanitizers`, `projection:coverage` |
-| 7.4 | Аутентификация и авторизация | не начат | |
+| 7.4 | Аутентификация и авторизация | в работе | Общая проверка токенов, RBAC/ABAC, отзыв доступа и матрица разрешений |
 
 Проверено для 7.1:
 

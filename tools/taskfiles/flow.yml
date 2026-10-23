@@ -31,7 +31,7 @@ tasks:
     internal: true
     cmds:
       - task: :cpp:_run_env
-        vars: {PROJECT: '{{.PROJECT}}', CMD: python3 -I tools/env/keycloak_security.py http://keycloak:8080}
+        vars: {PROJECT: '{{.PROJECT}}', CMD: 'python3 -I tools/env/keycloak_security.py http://keycloak:8080 {{.ISSUER}}'}
       - cmd: |
           python3 -c 'import json,pathlib; pathlib.Path(".cache/event-flow/{{.PROJECT}}.config.js").write_text("window.psimConfig = " + json.dumps({"issuer":"{{.ISSUER}}"}) + ";\n")'
           PSIM_UID={{.UID}} PSIM_GID={{.GID}} PSIM_PRESET={{.PRESET}} PSIM_OIDC_ISSUER={{.ISSUER}} \

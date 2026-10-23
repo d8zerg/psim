@@ -379,6 +379,131 @@ TEST(SecurityJwks, RotatesKeysBoundsOutagesAndThrottlesUnknownKidRequests) {
   EXPECT_FALSE(run(cache->verify(sign(second.get(), claims(saved), "new-key"))));
 }
 
+TEST(SecurityIntrospection, RevocationOutagesAndReferenceScopesAreBounded) {
+  const auto native = key();
+  auto now = std::chrono::system_clock::now();
+  auto payload = claims(now);
+  payload.erase("psim_scopes");
+  payload["psim_scope_set"] = "permission-set";
+  auto response = payload;
+  response["active"] = true;
+  response["client_id"] = payload.at("azp");
+  response["psim_scopes"] = Json::array();
+  for (int i = 0; i < 1000; ++i) {
+    response["psim_scopes"].push_back("site:" + std::to_string(i));
+  }
+  bool unavailable = false;
+  int inspections = 0;
+  auto fetch =
+      [&]() -> asio::awaitable<Result<std::string>> {  // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines):
+                                                       // test joins before closure destruction.
+    co_return jwks(native.get());
+  };
+  // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): run joins while the callback is owned.
+  auto inspect = [&](std::string)
+      -> asio::awaitable<Result<std::string>> {  // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines):
+                                                 // test joins before closure destruction.
+    ++inspections;
+    if (unavailable) {
+      co_return fail(ErrorCode::kCommonUnavailable, "IdP unavailable");
+    }
+    co_return response.dump();
+  };
+  JwksOptions options{.jwt = jwt_options(),
+                      .url = "https://keycloak.test/certs",
+                      .introspection_url = "https://keycloak.test/introspect",
+                      .introspection_client = "psim",
+                      .introspection_secret = "test-secret"};
+  auto cache = take(JwksCache::create(options, fetch, [&] { return now; }, inspect));
+  const auto token = sign(native.get(), payload);
+  const auto first = run(cache->verify(token));
+  ASSERT_TRUE(first);
+  EXPECT_EQ(first->scopes.size(), 1000U);
+  EXPECT_TRUE(run(cache->verify(token)));
+  EXPECT_EQ(inspections, 1);
+  now += std::chrono::seconds(1);
+  response["active"] = false;
+  EXPECT_FALSE(run(cache->verify(token)));
+  now += std::chrono::seconds(1);
+  response["active"] = true;
+  unavailable = true;
+  EXPECT_EQ(run(cache->verify(token)).error().code(), ErrorCode::kCommonUnavailable);
+  now += std::chrono::seconds(1);
+  unavailable = false;
+  response["psim_scope_set"] = "another-set";
+  EXPECT_FALSE(run(cache->verify(token)));
+  now += std::chrono::seconds(1);
+  response["psim_scope_set"] = "permission-set";
+  response["sub"] = "different-user";
+  EXPECT_FALSE(run(cache->verify(token)));
+  EXPECT_FALSE(run(cache->verify("malformed")));
+  EXPECT_EQ(inspections, 5);
+  response["sub"] = payload.at("sub");
+  const auto valid = response;
+  for (const auto* field : {"iss", "client_id", "psim_tenant", "exp", "resource_access", "psim_scopes"}) {
+    SCOPED_TRACE(field);
+    response = valid;
+    response[field] = nullptr;
+    now += std::chrono::seconds(1);
+    EXPECT_FALSE(run(cache->verify(token)));
+  }
+  response = valid;
+  response["psim_scopes"] = Json::array();
+  for (int i = 0; i < 10001; ++i) {
+    response["psim_scopes"].push_back("zone:" + std::to_string(i));
+  }
+  now += std::chrono::seconds(1);
+  EXPECT_FALSE(run(cache->verify(token)));
+  response = valid;
+  response["resource_access"]["psim"]["roles"] = Json::array({"admin"});
+  now += std::chrono::seconds(1);
+  EXPECT_FALSE(run(cache->verify(token)));
+  payload["psim_scopes"] = Json::array({"*"});
+  EXPECT_FALSE(run(cache->verify(sign(native.get(), payload))));
+  options.introspection_secret.clear();
+  EXPECT_FALSE(JwksCache::create(options));
+}
+
+// NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines): with_https joins all operations before their
+// captures leave scope.
+TEST(SecurityIntrospection, UsesVerifiedHttpsAndRejectsInvalidInlineClaimsAndServerFailures) {
+  const Fixture fixture;
+  const auto native = key();
+  const auto payload = claims(std::chrono::system_clock::now());
+  auto response = payload;
+  response["active"] = true;
+  response["client_id"] = payload.at("azp");
+  for (const auto status : {200U, 503U}) {
+    for (const auto valid : {true, false}) {
+      auto document = response;
+      if (!valid) {
+        document["psim_scopes"] = Json::array({"*"});
+      }
+      auto operation = [&](std::string url)
+          -> asio::awaitable<void> {  // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines):
+                                      // joined before closure destruction.
+        auto cache = take(JwksCache::create(
+            {.jwt = jwt_options(),
+             .url = url + "/certs",
+             .http = {.tls = fixture.options(fixture.client, "introspection-client")},
+             .introspection_url = url + "/introspect",
+             .introspection_client = "psim",
+             .introspection_secret = "secret+&=%"},
+            [&]() -> asio::awaitable<
+                      Result<std::string>> {  // NOLINT(cppcoreguidelines-avoid-capturing-lambda-coroutines):
+                                              // native key outlives joined operation.
+              co_return jwks(native.get());
+            }));
+        auto result = co_await cache->verify(sign(native.get(), payload));
+        EXPECT_EQ(result.has_value(), valid && status == 200);
+      };
+      run(with_https(&fixture, document.dump(), status, operation));
+    }
+  }
+}
+
+// NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+
 TEST(SecurityJwks, MalformedTokensNeverCauseFetchAndConfigurationIsValidated) {
   int requests = 0;
   auto fetch =

@@ -168,7 +168,7 @@ asio::awaitable<p::Result<Json>> Escalation::request(p::security::Principal prin
   const auto action = duty ? std::string("response.duty.") : std::string("response.policy.");
   auto access = p::authz::decide(principal, action + (read ? "read" : "write"), {principal.tenant, site},
                                  std::chrono::system_clock::now());
-  if (!duty && !principal.scopes.contains("*")) {
+  if (!duty && !p::authz::all_scopes(principal)) {
     access = p::fail(Code::kAuthScopeDenied, "tenant-wide policy scope required");
   }
   if (!access) {

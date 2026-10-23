@@ -22,6 +22,7 @@
 #include <utility>
 #include <vector>
 
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/security/jwt.hpp"
@@ -124,17 +125,14 @@ p::Result<Time> time(std::string_view value) {
   return Time(std::chrono::nanoseconds(Util::TimestampToNanoseconds(parsed)));
 }
 
-bool allowed(const p::security::Principal& principal, std::string_view site, bool write) {
+bool allowed(const p::security::Principal& principal, std::string_view site, bool write, std::string_view zone) {
   if (!canonical_uuid(principal.tenant) || principal.subject.empty()
       || principal.expires_at <= std::chrono::system_clock::now()) {
     return false;
   }
-  const bool role =
-      write ? principal.roles.contains("admin") : std::ranges::any_of(principal.roles, [](const auto& value) {
-        return value == "admin" || value == "integrator" || value == "operator" || value == "supervisor"
-               || value == "auditor" || value == "manager";
-      });
-  return role && (principal.scopes.contains("*") || (!site.empty() && principal.scopes.contains(std::string(site))));
+  return p::authz::decide(principal, write ? "catalog.write" : "catalog.read", {principal.tenant, site, zone},
+                          std::chrono::system_clock::now())
+      .has_value();
 }
 
 p::Result<void> validate_type(const Json& body) {

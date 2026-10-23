@@ -13,6 +13,7 @@ tasks:
       - task: deps
       - task: domain-purity
       - task: sql
+      - task: authz
 
   selftest:
     desc: Prove that every fitness function catches its violation; tests of the ci scope and the service generator
@@ -37,3 +38,8 @@ tasks:
     desc: SQL text is never composed at run time (FF-07, SR-13)
     cmds:
       - '{{.ARCH}} sql .'
+
+  authz:
+    desc: Shared scope decisions and online authentication at service boundaries (FF-22)
+    cmds:
+      - '{{.PYTHON}} tools/arch/authz_check.py .'

@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "model.hpp"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/pg/connection.hpp"
@@ -23,7 +24,8 @@ using Param = pg::Parameter;
 using Code = p::ErrorCode;
 
 asio::awaitable<p::Result<Json>> Repository::start_import(Mutation mutation, std::vector<Json> rows, bool dry_run) {
-  if (rows.size() > kMaxImportRows || !mutation.principal.roles.contains("admin")) {
+  if (rows.size() > kMaxImportRows
+      || !p::authz::decide_somewhere(mutation.principal, "catalog.write", std::chrono::system_clock::now())) {
     co_return p::fail(Code::kAuthForbidden, "import requires administrator role");
   }
   co_return co_await pg::in_transaction<Json>(
@@ -100,8 +102,8 @@ asio::awaitable<p::Result<Json>> Repository::get_import(p::security::Principal p
   if (rows->size() == 0U) {
     co_return p::fail(Code::kCommonNotFound, "import not found");
   }
-  if (!principal.roles.contains("admin")
-      || (rows->value(0, 1) != principal.subject && !principal.scopes.contains("*"))) {
+  if (!p::authz::decide_somewhere(principal, "catalog.write", std::chrono::system_clock::now())
+      || (rows->value(0, 1) != principal.subject && !p::authz::all_scopes(principal))) {
     co_return p::fail(Code::kAuthForbidden, "import belongs to another administrator");
   }
   co_return Json::parse(rows->value(0, 0).value_or(""));

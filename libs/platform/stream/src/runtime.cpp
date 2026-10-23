@@ -27,8 +27,30 @@
 #include "psim/platform/kafka/wire_format.hpp"
 #include "psim/platform/pg/pool.hpp"
 #include "psim/platform/runtime.hpp"
+#include "psim/platform/security/jwt.hpp"
 
 namespace psim::platform::stream {
+
+Result<security::JwksOptions> authentication_options(const runtime::Context& context) {
+  const auto& config = context.config();
+  auto secret = config.secret("settings.introspection_secret_file");
+  if (!secret || secret->empty()) {
+    return fail(ErrorCode::kCommonInvalidArgument, "token introspection secret required");
+  }
+  security::JwksOptions options{.jwt = {.issuer = config.get<std::string>("settings.issuer"), .audience = "psim"},
+                                .url = config.get<std::string>("settings.jwks_url"),
+                                .http = {.tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"),
+                                                 .require_client_certificate = false},
+                                         .allow_plaintext = config.get<bool>("settings.allow_plaintext")},
+                                .introspection_url = config.get<std::string>("settings.introspection_url"),
+                                .introspection_client = config.get<std::string>("settings.introspection_client"),
+                                .introspection_secret = std::string(*secret)};
+  if (options.introspection_url.empty()) {
+    return fail(ErrorCode::kCommonInvalidArgument, "token introspection endpoint required");
+  }
+  return options;
+}
+
 Span span(const runtime::Context& context, std::string_view name, const kafka::Headers& headers) {
   opentelemetry::trace::StartSpanOptions options;
   options.parent = kafka::extract(headers);

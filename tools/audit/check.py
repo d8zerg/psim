@@ -86,7 +86,7 @@ class Check(IncidentCheck):
         self.signing_key.chmod(0o400)
         self.audit_config.write_text(json.dumps({'service': {'instance': 'audit-1'}, 'runtime': {'shards': 1},
             'telemetry': {'otlp_endpoint': 'otel-collector:4317', 'otlp_tls': False, 'sampling_ratio': 0.001},
-            'settings': {'allow_plaintext': True, 'pg_user': 'psim_audit', 'pg_password_file': '/repo/' + str(self.password.relative_to(ROOT)), 'listen_port': 8443,
+            'settings': {'allow_plaintext': True, 'introspection_secret_file': '/repo/.cache/event-flow/introspection.secret', 'pg_user': 'psim_audit', 'pg_password_file': '/repo/' + str(self.password.relative_to(ROOT)), 'listen_port': 8443,
                          'issuer': 'http://keycloak:8080/realms/psim', 'signing_key_file': '/repo/' + str(self.signing_key.relative_to(ROOT)),
                          'trusted_keys_file': '/repo/' + str(self.trusted_keys.relative_to(ROOT)), 'checkpoint_directory': '/checkpoints',
                          'checkpoint_interval_ms': 5000, 'checkpoint_records': 10}}, indent=2))

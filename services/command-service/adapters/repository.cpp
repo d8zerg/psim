@@ -512,9 +512,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         } else if (operation == "cancel") {
           action = "command.cancel";
         }
-        auto role = principal;
-        role.scopes.insert("*");
-        auto allowed = p::authz::decide(role, action, {principal.tenant}, std::chrono::system_clock::now());
+        auto allowed = p::authz::decide_role(principal, action, std::chrono::system_clock::now());
         if (!allowed) {
           co_return std::unexpected(allowed.error());
         }

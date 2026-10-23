@@ -63,7 +63,7 @@ class Check(HistoryCheck):
         self.principals()
         self.report_scopes()
         common = {"service": {"instance": "reports-fixture"}, "runtime": {"shards": 1, "blocking_threads": 8}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.01},
-                  "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "listen_port": 8443, "issuer": "http://keycloak:8080/realms/psim"}}
+                  "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "listen_port": 8443, "issuer": "http://keycloak:8080/realms/psim"}}
         config = json.loads(json.dumps(common))
         config["settings"]["console_enabled"] = False
         config["settings"].update({"clickhouse_host": "clickhouse", "clickhouse_port": 9000, "clickhouse_password_file": "/repo/.cache/processing/clickhouse.password"})

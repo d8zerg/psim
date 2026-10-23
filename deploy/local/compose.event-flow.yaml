@@ -9,6 +9,7 @@ x-event-flow: &event-flow
   volumes: ["../..:/repo:ro", "../../build/debian13/${PSIM_PRESET:-debug}/profiles:/profiles"]
   environment:
     LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+    PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
     ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
   working_dir: /repo
   tmpfs: [/tmp]
@@ -18,6 +19,7 @@ services:
     <<: *event-flow
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
       PSIM__TELEMETRY__SAMPLING_RATIO: "${PSIM_GATEWAY_SAMPLING_RATIO:-1}"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
@@ -26,6 +28,7 @@ services:
     profiles: [gateway-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: gateway-2
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/connector-gateway/psim-connector-gateway", "--config", "/repo/deploy/local/config/event-flow/connector-gateway.yaml"]
@@ -38,6 +41,7 @@ services:
     profiles: [command-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: command-2
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/command-service/psim-command-service", "--config", "/repo/deploy/local/config/commands/command-service.yaml"]
   resource-catalog:
@@ -49,6 +53,7 @@ services:
     profiles: [catalog-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: catalog-2
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/resource-catalog/psim-resource-catalog", "--config", "/repo/deploy/local/config/catalog/resource-catalog.yaml"]
   normalizer:
@@ -59,6 +64,7 @@ services:
     profiles: [processing-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: normalizer-2
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
@@ -67,6 +73,7 @@ services:
     profiles: [processing-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: normalizer-3
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/normalizer/psim-normalizer", "--config", "/repo/deploy/local/config/event-flow/normalizer.yaml"]
@@ -79,6 +86,7 @@ services:
     profiles: [processing-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: history-2
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/event-history/psim-event-history", "--config", "/repo/deploy/local/config/processing/event-history.yaml"]
   correlation-engine:
@@ -89,6 +97,7 @@ services:
     profiles: [correlation-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: correlation-2
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
@@ -97,6 +106,7 @@ services:
     profiles: [correlation-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: correlation-3
       PSIM__TELEMETRY__SAMPLING_RATIO: "0.001"
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/event-flow/correlation-engine.yaml"]
@@ -109,6 +119,7 @@ services:
     profiles: [rules-test]
     environment:
       LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://keycloak:8080/realms/psim}"
       PSIM__SERVICE__INSTANCE: rule-manager-2
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/correlation-engine/psim-correlation-engine", "--config", "/repo/deploy/local/config/rules/management.yaml"]
   incident-service:

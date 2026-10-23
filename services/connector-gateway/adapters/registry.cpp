@@ -18,6 +18,7 @@
 #include <utility>
 
 #include "protocol.hpp"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/pg/connection.hpp"
@@ -153,10 +154,11 @@ asio::awaitable<p::Result<connector::v1::ManageResponse>> Registry::manage(conne
   using namespace connector::v1;
   if (!p::stream::uuid(request.request_id()) || !p::stream::uuid(request.connector().connector_id())
       || !p::stream::uuid(principal.tenant) || principal.subject.empty() || principal.subject.size() > 256
-      || (!principal.roles.contains("admin") && !principal.roles.contains("integrator"))
+      || !p::authz::decide(principal,
+                           request.action() == REGISTRATION_ACTION_RECOVER ? "connector.recover" : "connector.write",
+                           {principal.tenant}, std::chrono::system_clock::now())
       || request.action() == REGISTRATION_ACTION_UNSPECIFIED || !RegistrationAction_IsValid(request.action())
-      || (request.action() == REGISTRATION_ACTION_RECOVER
-          && (!principal.roles.contains("admin") || principal.authorized_party != "psim-console"))) {
+      || (request.action() == REGISTRATION_ACTION_RECOVER && principal.authorized_party != "psim-console")) {
     if (p::stream::uuid(principal.tenant) && !principal.subject.empty()) {
       auto recorded =
           co_await denied(principal.tenant, principal.subject, request.connector().connector_id(), "connector.manage");

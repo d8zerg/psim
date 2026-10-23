@@ -5,8 +5,11 @@
 #include <chrono>
 #include <exception>
 #include <expected>
+#include <set>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
@@ -81,6 +84,42 @@ boost::asio::awaitable<p::Result<p::security::Principal>> Directory::lookup(std:
     result.tenant = attributes["psim_tenant"][0].get<std::string>();
     for (const auto& scope : attributes.value("psim_scopes", nlohmann::json::array())) {
       result.scopes.insert(scope.get<std::string>());
+    }
+    auto groups = co_await p::security::http_request(
+        options_.base + "/admin/realms/psim/users/" + subject + "/groups?briefRepresentation=false&max=101", http);
+    if (!groups || groups->status != 200) {
+      co_return p::fail(p::ErrorCode::kCommonUnavailable, "recipient groups unavailable");
+    }
+    auto pending = nlohmann::json::parse(groups->body).get<std::vector<nlohmann::json>>();
+    std::set<std::string> visited;
+    while (!pending.empty()) {
+      auto group = std::move(pending.back());
+      pending.pop_back();
+      const auto id = group.at("id").get<std::string>();
+      if (!visited.insert(id).second) {
+        continue;
+      }
+      if (visited.size() > 100) {
+        co_return p::fail(p::ErrorCode::kCommonUnavailable, "recipient group capacity exceeded");
+      }
+      for (const auto& scope :
+           group.value("attributes", nlohmann::json::object()).value("psim_scopes", nlohmann::json::array())) {
+        result.scopes.insert(scope.get<std::string>());
+      }
+      const auto parent = group.value("parentId", std::string{});
+      if (!parent.empty() && !visited.contains(parent)) {
+        if (!p::stream::uuid(parent)) {
+          co_return p::fail(p::ErrorCode::kCommonUnavailable, "invalid recipient group");
+        }
+        auto ancestor = co_await p::security::http_request(options_.base + "/admin/realms/psim/groups/" + parent, http);
+        if (!ancestor || ancestor->status != 200) {
+          co_return p::fail(p::ErrorCode::kCommonUnavailable, "recipient group unavailable");
+        }
+        pending.push_back(nlohmann::json::parse(ancestor->body));
+      }
+      if (result.scopes.size() > 10000) {
+        co_return p::fail(p::ErrorCode::kCommonUnavailable, "recipient scope capacity exceeded");
+      }
     }
     for (const auto& role : nlohmann::json::parse(roles->body)) {
       result.roles.insert(role.at("name").get<std::string>());

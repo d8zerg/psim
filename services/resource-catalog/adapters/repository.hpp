@@ -62,6 +62,7 @@ class Repository {
  private:
   static asio::awaitable<p::Result<Json>> load(p::pg::Transaction* tx, std::string tenant, std::string kind,
                                                std::string id);
+  static asio::awaitable<p::Result<std::string>> scope_zone(p::pg::Transaction* tx, std::string tenant, Json body);
   static asio::awaitable<p::Result<void>> lock(p::pg::Transaction* tx, std::string tenant);
   asio::awaitable<p::Result<Json>> apply(p::pg::Transaction* tx, Resource resource, Mutation mutation, Time now);
   asio::awaitable<p::Result<void>> publish(p::pg::Transaction* tx, Resource resource, Mutation mutation, Time now);

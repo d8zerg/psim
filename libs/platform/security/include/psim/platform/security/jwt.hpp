@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <functional>
+#include <map>
 #include <memory>
 #include <set>
 #include <string>
@@ -29,6 +30,8 @@ struct Principal {
   std::set<std::string> roles{};
   std::set<std::string> scopes{};
   std::chrono::system_clock::time_point expires_at{};
+  std::string scope_set{};
+  std::chrono::system_clock::time_point checked_until{};
 };
 
 /// A bounded, immutable JWKS snapshot. Duplicate kids, private keys and malformed supported keys
@@ -54,6 +57,9 @@ struct JwksOptions {
   std::chrono::seconds refresh_interval{60};
   std::chrono::seconds max_stale{300};
   std::chrono::seconds unknown_key_cooldown{5};
+  std::string introspection_url{};
+  std::string introspection_client{};
+  std::string introspection_secret{};
 };
 
 /// Shard-owned cache. Known keys survive transient IdP outages for max_stale; removed keys disappear
@@ -62,15 +68,21 @@ class JwksCache {
  public:
   using Fetch = std::function<boost::asio::awaitable<Result<std::string>>()>;
   using Now = std::function<std::chrono::system_clock::time_point()>;
-  [[nodiscard]] static Result<std::unique_ptr<JwksCache>> create(JwksOptions options, Fetch fetch = {}, Now now = {});
+  using Inspect = std::function<boost::asio::awaitable<Result<std::string>>(std::string)>;
+  [[nodiscard]] static Result<std::unique_ptr<JwksCache>> create(JwksOptions options, Fetch fetch = {}, Now now = {},
+                                                                 Inspect inspect = {});
   boost::asio::awaitable<Result<Principal>> verify(std::string token);
   boost::asio::awaitable<Result<void>> refresh();
 
  private:
-  JwksCache(JwksOptions options, Fetch fetch, Now now);
+  struct Inspection;
+  JwksCache(JwksOptions options, Fetch fetch, Now now, Inspect inspect);
+  boost::asio::awaitable<Result<Principal>> inspect(std::string token, Principal principal);
   JwksOptions options_;
   Fetch fetch_;
   Now now_;
+  Inspect inspect_;
+  std::map<std::string, std::shared_ptr<Inspection>> inspections_;
   std::unique_ptr<JwtVerifier> verifier_;
   std::chrono::system_clock::time_point loaded_{};
   std::chrono::system_clock::time_point attempted_{};

@@ -173,16 +173,9 @@ p::Result<p::clickhouse::Read> search_query(const p::security::Principal& princi
     }
     Json sites = Json::array();
     Json zones = Json::array();
-    for (const auto& scope : principal.scopes) {
-      if (scope.starts_with("site:")) {
-        sites.push_back(scope.substr(5));
-      } else if (scope.starts_with("zone:")) {
-        zones.push_back(scope.substr(5));
-      } else if (scope != "*") {
-        sites.push_back(scope);
-        zones.push_back(scope);
-      }
-    }
+    const auto scope = p::authz::scope_filter(principal);
+    sites = scope.sites;
+    zones = scope.zones;
     std::string statement = kEvents;
     if (operation == "statistics") {
       statement = kStatistics;
@@ -192,7 +185,7 @@ p::Result<p::clickhouse::Read> search_query(const p::security::Principal& princi
     }
     p::clickhouse::Read query{.statement = statement, .tenant = principal.tenant, .from_ms = from, .to_ms = to};
     auto& params = query.parameters;
-    params = {{"all", principal.scopes.contains("*") ? "1" : "0"},
+    params = {{"all", p::authz::all_scopes(principal) ? "1" : "0"},
               {"sites", sites.dump()},
               {"zones", zones.dump()},
               {"site_ids", input.value("siteIds", Json::array()).dump()},

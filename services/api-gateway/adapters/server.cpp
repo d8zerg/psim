@@ -204,12 +204,11 @@ class Gateway final : public p::stream::Worker {
     if (!initialized) {
       co_return initialized;
     }
-    auto verifier = p::security::JwksCache::create(
-        {.jwt = {.issuer = context().config().get<std::string>("settings.issuer"), .audience = "psim"},
-         .url = context().config().get<std::string>("settings.jwks_url"),
-         .http = {
-             .tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"), .require_client_certificate = false},
-             .allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
+    auto authentication = p::stream::authentication_options(context());
+    if (!authentication) {
+      co_return std::unexpected(authentication.error());
+    }
+    auto verifier = p::security::JwksCache::create(std::move(*authentication));
     if (!verifier) {
       co_return std::unexpected(verifier.error());
     }
@@ -923,6 +922,10 @@ void Session<Stream>::send(const realtime::v1::ServerFrame& frame) {
   if (closed || closing) {
     return;
   }
+  if (principal && principal->checked_until <= std::chrono::system_clock::now()) {
+    stop();
+    return;
+  }
   auto text = p::stream::json(frame);
   if (queue.size() >= gateway->queue_messages() || queued_bytes + text.size() > gateway->queue_bytes()
       || !gateway->reserve(text.size())) {
@@ -970,6 +973,22 @@ asio::awaitable<void> Session<Stream>::write() {
       stop();
       break;
     }
+    if (principal && std::chrono::system_clock::now() >= principal->checked_until - std::chrono::milliseconds(400)) {
+      const auto checked_bearer = bearer;
+      auto refreshed = co_await gateway->authenticate(checked_bearer);
+      if (closed) {
+        break;
+      }
+      if (checked_bearer != bearer) {
+        continue;
+      }
+      if (!refreshed || refreshed->checked_until <= std::chrono::system_clock::now()
+          || scope_key(*principal) != scope_key(*refreshed)) {
+        stop();
+        break;
+      }
+      principal = std::move(*refreshed);
+    }
     if (!principal && std::chrono::steady_clock::now() - opened > std::chrono::seconds(5)) {
       stop();
       break;
@@ -981,7 +1000,7 @@ asio::awaitable<void> Session<Stream>::write() {
         stop();
         break;
       }
-      wake.expires_after(std::chrono::seconds(1));
+      wake.expires_after(std::chrono::milliseconds(100));
       co_await wake.async_wait(asio::as_tuple(asio::use_awaitable));
       continue;
     }
@@ -1255,14 +1274,15 @@ asio::awaitable<void> Session<Stream>::run() {
         for (const auto& role : authenticated->roles) {
           me.add_roles(role);
         }
-        for (const auto& scope : authenticated->scopes) {
-          if (scope.starts_with("site:")) {
-            me.add_site_ids(scope.substr(5));
-          } else if (scope.starts_with("zone:")) {
-            me.add_zone_ids(scope.substr(5));
-          } else {
-            me.add_site_ids(scope);
-          }
+        const auto scope = p::authz::scope_filter(*authenticated);
+        for (const auto& site : scope.sites) {
+          me.add_site_ids(site);
+        }
+        for (const auto& zone : scope.zones) {
+          me.add_zone_ids(zone);
+        }
+        if (scope.all) {
+          me.add_site_ids("*");
         }
         for (const auto& action : p::authz::actions(*authenticated, std::chrono::system_clock::now())) {
           me.add_actions(action);

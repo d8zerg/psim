@@ -1,7 +1,7 @@
 add_library(psim_connector_gateway_core STATIC application/gateway.cpp application/protocol.cpp adapters/certificate.cpp adapters/registry.cpp)
 psim_target_defaults(psim_connector_gateway_core)
 target_include_directories(psim_connector_gateway_core PUBLIC application adapters)
-target_link_libraries(psim_connector_gateway_core PUBLIC psim::platform_stream psim::platform_redis psim::platform_connector)
+target_link_libraries(psim_connector_gateway_core PUBLIC psim::platform_authz psim::platform_stream psim::platform_redis psim::platform_connector)
 psim_add_service(connector-gateway SOURCES src/main.cpp LIBS psim_connector_gateway_core SUMMARY "PSIM Connector Gateway")
 psim_add_test(psim_connector_gateway_test SOURCES tests/protocol_test.cpp LIBS psim_connector_gateway_core)
 add_executable(psim_gateway_network_component_test tests/network_test.cpp)

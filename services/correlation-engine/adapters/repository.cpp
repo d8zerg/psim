@@ -20,6 +20,7 @@
 #include "psim/common/v1/envelope.pb.h"
 #include "psim/common/v1/types.pb.h"
 #include "psim/config/v1/config.pb.h"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/pg/connection.hpp"
@@ -61,15 +62,6 @@ void envelope(common::v1::Envelope* value, p::security::Principal principal, std
   *value->mutable_produced_at() = value->occurred_at();
   value->mutable_actor()->set_kind(common::v1::ACTOR_KIND_USER);
   value->mutable_actor()->set_id(principal.subject);
-}
-
-bool visible(const rules::Rule& rule, const p::security::Principal& principal) {
-  if (principal.scopes.contains("*")) {
-    return true;
-  }
-  return !rule.filter().site_ids().empty() && std::ranges::all_of(rule.filter().site_ids(), [&](const auto& site) {
-    return can_read_site(principal, site);
-  });
 }
 
 asio::awaitable<p::Result<rules::Rule>> load(pg::Transaction* tx, std::string tenant, std::string id,
@@ -114,20 +106,32 @@ asio::awaitable<p::Result<processing::v1::RuleSet>> active(pg::Transaction* tx, 
 }
 }  // namespace
 
+bool can_read_rule(const rules::Rule& rule, const p::security::Principal& principal) {
+  if (p::authz::all_scopes(principal)) {
+    return true;
+  }
+  const bool sites = !rule.filter().site_ids().empty()
+                     && std::ranges::all_of(rule.filter().site_ids(),
+                                            [&](const auto& site) { return can_read_site(principal, site); });
+  const bool zones =
+      !rule.filter().zone_ids().empty() && std::ranges::all_of(rule.filter().zone_ids(), [&](const auto& zone) {
+        return p::authz::scoped(principal, {principal.tenant, {}, zone});
+      });
+  return sites || zones;
+}
+
 bool can_read(const p::security::Principal& principal) {
   return p::stream::uuid(principal.tenant) && p::stream::uuid(principal.subject)
-         && principal.expires_at > std::chrono::system_clock::now()
-         && std::ranges::any_of(principal.roles, [](const auto& role) {
-              return role == "admin" || role == "integrator" || role == "supervisor" || role == "auditor";
-            });
+         && p::authz::decide_role(principal, "rule.read", std::chrono::system_clock::now()).has_value();
 }
 
 bool can_write(const p::security::Principal& principal) {
-  return can_read(principal) && principal.roles.contains("admin") && principal.scopes.contains("*");
+  return can_read(principal)
+         && p::authz::decide(principal, "rule.write", {principal.tenant}, std::chrono::system_clock::now()).has_value();
 }
 
 bool can_read_site(const p::security::Principal& principal, std::string_view site) {
-  return principal.scopes.contains("*") || principal.scopes.contains(std::string(site));
+  return p::authz::scoped(principal, {principal.tenant, site});
 }
 
 asio::awaitable<p::Result<void>> Repository::initialize() {
@@ -168,6 +172,10 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
   const bool mutation = operation == "save" || operation == "validate" || operation == "archive"
                         || operation == "activate" || operation == "dry-run";
   if (!can_read(principal) || (mutation && operation != "dry-run" && !can_write(principal))) {
+    auto recorded = co_await denied(principal, operation);
+    if (!recorded) {
+      co_return std::unexpected(recorded.error());
+    }
     co_return p::fail(Code::kAuthForbidden, "rule operation is not allowed");
   }
   if (mutation && !p::stream::uuid(key)) {
@@ -175,7 +183,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
   }
   const auto fingerprint =
       p::stream::sha256(operation + ":" + body.dump() + ":" + (expected ? std::to_string(*expected) : ""));
-  co_return co_await pg::in_transaction<Json>(
+  auto result = co_await pg::in_transaction<Json>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited before captures are released
       [this, &principal, &operation, &body, &key, &fingerprint, mutation,
@@ -215,6 +223,22 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         }
         co_return response;
       });
+  if (!result && (result.error().code() == Code::kAuthForbidden || result.error().code() == Code::kAuthScopeDenied)) {
+    auto recorded = co_await denied(principal, operation);
+    if (!recorded) {
+      co_return std::unexpected(recorded.error());
+    }
+  }
+  co_return result;
+}
+
+asio::awaitable<p::Result<void>> Repository::denied(p::security::Principal principal, std::string operation) {
+  if (!p::stream::uuid(principal.tenant) || !p::stream::uuid(principal.subject)) {
+    co_return p::Result<void>{};
+  }
+  co_return co_await pg::in_transaction<void>(pool_, [this, &principal, &operation](pg::Transaction* tx) {
+    return audit(tx, principal, "access.denied", "", {{"action", "rule." + operation}});
+  });
 }
 
 asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::security::Principal principal,
@@ -226,7 +250,8 @@ asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::secur
   entry->set_action(std::move(action));
   entry->set_object_type("correlation_rule");
   entry->set_object_id(std::move(id));
-  entry->set_outcome(audit::v1::AUDIT_OUTCOME_SUCCESS);
+  entry->set_outcome(entry->action() == "access.denied" ? audit::v1::AUDIT_OUTCOME_DENIED
+                                                        : audit::v1::AUDIT_OUTCOME_SUCCESS);
   (*entry->mutable_details())["snapshot"] = details.dump();
   co_return co_await messages_.append(
       tx, {record.envelope().message_id(), encode_("psim.audit.v1", principal.tenant, record)});
@@ -272,7 +297,7 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, p::secur
     if (!rule) {
       co_return std::unexpected(rule.error());
     }
-    if (!visible(*rule, principal)) {
+    if (!can_read_rule(*rule, principal)) {
       co_return p::fail(Code::kAuthScopeDenied, "rule outside access scope");
     }
     co_return Json{{"rule", json(*rule)}};
@@ -296,12 +321,15 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, p::secur
                 "WHERE tenant=$1::uuid AND id::text>$2 ORDER BY id,version DESC) latest "
                 "WHERE ($4::boolean OR (jsonb_array_length(body->'filter'->'siteIds')>0 AND NOT EXISTS("
                 "SELECT 1 FROM jsonb_array_elements_text(body->'filter'->'siteIds') AS sites(value) WHERE NOT "
-                "($5::jsonb ? value)))) "
+                "($5::jsonb ? value))) OR (jsonb_array_length(body->'filter'->'zoneIds')>0 AND NOT EXISTS("
+                "SELECT 1 FROM jsonb_array_elements_text(body->'filter'->'zoneIds') AS zones(value) WHERE NOT "
+                "($7::jsonb ? value)))) "
                 "AND (jsonb_array_length($6::jsonb)=0 OR $6::jsonb @> jsonb_build_array(state)) ORDER BY id LIMIT "
                 "$3::integer",
          .parameters = {Param::text(principal.tenant), Param::text(request->page_token()), Param::integer(size + 1),
-                        Param::boolean(principal.scopes.contains("*")), Param::text(Json(principal.scopes).dump()),
-                        Param::text(states.dump())}});
+                        Param::boolean(p::authz::all_scopes(principal)),
+                        Param::text(Json(p::authz::scope_filter(principal).sites).dump()), Param::text(states.dump()),
+                        Param::text(Json(p::authz::scope_filter(principal).zones).dump())}});
     if (!rows) {
       co_return std::unexpected(rows.error());
     }
@@ -314,7 +342,7 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, p::secur
         co_return p::fail(Code::kCommonInternal, "invalid stored rule");
       }
       rule->set_state(static_cast<processing::v1::RuleState>(*state));
-      if (visible(*rule, principal)
+      if (can_read_rule(*rule, principal)
           && (request->states().empty() || std::ranges::contains(request->states(), rule->state()))) {
         values.push_back(json(*rule));
       }
@@ -326,7 +354,7 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, p::secur
     if (!parse<api::v1::GetActiveRuleSetRequest>(body)) {
       co_return p::fail(Code::kCommonInvalidArgument, "unexpected active-set query fields");
     }
-    if (!principal.scopes.contains("*")) {
+    if (!p::authz::all_scopes(principal)) {
       co_return p::fail(Code::kAuthScopeDenied, "tenant rule set requires global scope");
     }
     auto set = co_await active(tx, principal.tenant);

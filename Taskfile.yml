@@ -108,6 +108,9 @@ includes:
   contracts:
     taskfile: ./contracts/Taskfile.yml
     dir: ./contracts
+  authz:
+    taskfile: ./tools/taskfiles/authz.yml
+    dir: .
   realtime:
     taskfile: ./tools/taskfiles/realtime.yml
     dir: .

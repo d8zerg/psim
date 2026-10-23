@@ -308,6 +308,25 @@ boost::asio::awaitable<Result<std::string>> fetch_keys(std::string url, HttpOpti
 }
 }  // namespace
 
+namespace {
+std::string form_encode(std::string_view input) {
+  constexpr std::string_view kHex = "0123456789ABCDEF";
+  std::string output;
+  for (const char byte : input) {
+    const auto value = static_cast<unsigned char>(byte);
+    if ((value >= 'a' && value <= 'z') || (value >= 'A' && value <= 'Z') || (value >= '0' && value <= '9')
+        || value == '-' || value == '_' || value == '.') {
+      output += byte;
+    } else {
+      output += '%';
+      output += kHex[value >> 4];
+      output += kHex[value & 15];
+    }
+  }
+  return output;
+}
+}  // namespace
+
 struct JwtVerifier::State {
   JwtOptions options;
   std::map<std::string, Key, std::less<>> keys;
@@ -432,6 +451,7 @@ Result<Principal> JwtVerifier::verify(std::string_view token, std::chrono::syste
     }
   }
   auto scopes = string_set(claims, "psim_scopes");
+  auto scope_set = field(claims, "psim_scope_set", false);
   std::set<std::string> roles;
   if (claims.contains("resource_access")) {
     const auto& resources = claims["resource_access"];
@@ -446,23 +466,50 @@ Result<Principal> JwtVerifier::verify(std::string_view token, std::chrono::syste
       roles = std::move(*role_values);
     }
   }
-  if (!scopes) {
+  if (!scopes || !scope_set || scope_set->size() > 128 || (!scope_set->empty() && !scopes->empty())) {
     return denied();
   }
-  return Principal{std::move(*subject), std::move(*tenant),
-                   std::move(*party),   std::move(roles),
-                   std::move(*scopes),  std::chrono::system_clock::time_point(std::chrono::seconds(*expires))};
+  return Principal{std::move(*subject),   std::move(*tenant),
+                   std::move(*party),     std::move(roles),
+                   std::move(*scopes),    std::chrono::system_clock::time_point(std::chrono::seconds(*expires)),
+                   std::move(*scope_set), std::chrono::system_clock::time_point(std::chrono::seconds(*expires))};
 }
 
-JwksCache::JwksCache(JwksOptions options, Fetch fetch, Now now)
-    : options_(std::move(options)), fetch_(std::move(fetch)), now_(std::move(now)) {}
+JwksCache::JwksCache(JwksOptions options, Fetch fetch, Now now, Inspect inspect)
+    : options_(std::move(options)), fetch_(std::move(fetch)), now_(std::move(now)), inspect_(std::move(inspect)) {}
 
-Result<std::unique_ptr<JwksCache>> JwksCache::create(JwksOptions options, Fetch fetch, Now now) {
+Result<std::unique_ptr<JwksCache>> JwksCache::create(JwksOptions options, Fetch fetch, Now now, Inspect inspect) {
   auto valid = validate_url(options.url, options.http.allow_plaintext);
   if (!valid || !valid_options(options.jwt) || options.refresh_interval <= std::chrono::seconds::zero()
       || options.max_stale < options.refresh_interval || options.max_stale > std::chrono::hours(1)
       || options.unknown_key_cooldown <= std::chrono::seconds::zero()) {
     return fail(ErrorCode::kCommonInvalidArgument, "invalid JWKS cache configuration");
+  }
+  if (!options.introspection_url.empty()) {
+    if (!validate_url(options.introspection_url, options.http.allow_plaintext) || options.introspection_client.empty()
+        || options.introspection_secret.empty()) {
+      return fail(ErrorCode::kCommonInvalidArgument, "token introspection credentials required");
+    }
+    if (!inspect) {
+      // NOLINTBEGIN(cppcoreguidelines-avoid-capturing-lambda-coroutines): cache owns the callback during verification.
+      inspect = [url = options.introspection_url, client = options.introspection_client,
+                 secret = options.introspection_secret,
+                 http = options.http](std::string token) mutable -> boost::asio::awaitable<Result<std::string>> {
+        http.max_body_bytes = 1048576;
+        http.timeout = std::chrono::milliseconds(1000);
+        auto response =
+            co_await http_request(url, http,
+                                  "client_id=" + form_encode(client) + "&client_secret=" + form_encode(secret)
+                                      + "&token=" + form_encode(token) + "&token_type_hint=access_token",
+                                  "application/x-www-form-urlencoded");
+        if (!response || response->status != 200) {
+          co_return fail(ErrorCode::kCommonUnavailable, "token introspection unavailable");
+        }
+        co_return std::move(response->body);
+      };
+
+      // NOLINTEND(cppcoreguidelines-avoid-capturing-lambda-coroutines)
+    }
   }
   if (!fetch) {
     fetch = [url = options.url, http = options.http] {
@@ -475,8 +522,8 @@ Result<std::unique_ptr<JwksCache>> JwksCache::create(JwksOptions options, Fetch 
     };
   }
   return std::unique_ptr<JwksCache>(
-      new JwksCache(std::move(options), std::move(fetch),
-                    std::move(now)));  // NOLINT(cppcoreguidelines-owning-memory): private constructor
+      new JwksCache(std::move(options), std::move(fetch), std::move(now),
+                    std::move(inspect)));  // NOLINT(cppcoreguidelines-owning-memory): private constructor
 }
 
 boost::asio::awaitable<Result<void>> JwksCache::refresh() {
@@ -530,7 +577,11 @@ boost::asio::awaitable<Result<Principal>> JwksCache::verify(std::string token) {
   if (!verifier_ || current < loaded_ || current - loaded_ > options_.max_stale) {
     co_return fail(ErrorCode::kCommonUnavailable, "trusted signing keys unavailable or stale");
   }
-  co_return verifier_->verify(token, current);
+  auto principal = verifier_->verify(token, current);
+  if (!principal || !inspect_) {
+    co_return principal;
+  }
+  co_return co_await inspect(std::move(token), std::move(*principal));
 }
 
 Result<void> authenticate_service(const Peer& peer, const Principal& token,

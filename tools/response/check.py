@@ -80,7 +80,7 @@ class Check(CommandCheck):
         self.tokens["bob"]["expires"] = 0
         self.response_config.write_text(json.dumps({"service": {"instance": "response-1"}, "runtime": {"shards": 1},
           "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001},
-          "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "listen_port": 8443,
+          "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "listen_port": 8443,
           "issuer": "http://keycloak:8080/realms/psim", "handler_ca_file": "/repo/.cache/event-flow/ca.pem",
           "handler_urls": ["https://response-handler:8443/" + name for name in ("ok", "fail", "hold")]}}, indent=2))
         self.compose("up", "-d", "--force-recreate", "response-engine", "response-2", "response-handler")

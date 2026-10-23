@@ -138,11 +138,11 @@ class Check(HttpCheck):
         self.emit("config", tenant=self.retention_tenant, allSeconds=15, significantSeconds=60)
         self.config.write_text(json.dumps({"service": {"instance": "history-1"}, "runtime": {"shards": 1, "blocking_threads": 8},
             "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001},
-            "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "clickhouse_host": "clickhouse",
+            "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "clickhouse_host": "clickhouse",
                 "clickhouse_port": 9000, "clickhouse_password_file": "/repo/.cache/processing/clickhouse.password", "listen_port": 8443,
                 "history_api": True, "history_batch_messages": 50000 if self.preset == "release" else 5000,
                 "history_batch_wait_ms": 500 if self.preset == "release" else 100, "issuer": "http://keycloak:8080/realms/psim"}}))
-        self.incident_config.write_text(json.dumps({"service": {"instance": "history-evidence"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001}, "settings": {"allow_plaintext": True, "legacy_types": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "issuer": "http://keycloak:8080/realms/psim", "listen_port": 8443}}))
+        self.incident_config.write_text(json.dumps({"service": {"instance": "history-evidence"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001}, "settings": {"allow_plaintext": True, "legacy_types": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "issuer": "http://keycloak:8080/realms/psim", "listen_port": 8443}}))
         self.compose("up", "-d", "--force-recreate", *self.history_apps, "incident-service")
         self.interval = {"from": stamp(self.dataset["timeMs"] - 86400000), "to": stamp(self.dataset["timeMs"] + 86400000)}
         self.wait(lambda: self.search()["events"] == [], 90)

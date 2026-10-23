@@ -7,6 +7,17 @@
 #include "psim/platform/security/jwt.hpp"
 
 namespace psim::platform::authz {
+struct ScopeFilter {
+  bool all = false;
+  std::vector<std::string> sites;
+  std::vector<std::string> zones;
+};
+
+[[nodiscard]] bool all_scopes(const security::Principal& principal);
+[[nodiscard]] bool any_scope(const security::Principal& principal);
+[[nodiscard]] bool covers_scopes(const security::Principal& principal, const security::Principal& required);
+[[nodiscard]] ScopeFilter scope_filter(const security::Principal& principal);
+
 struct Resource {
   std::string_view tenant;
   std::string_view site{};
@@ -16,6 +27,8 @@ struct Resource {
 /// Check identity and role before the resource-owning service resolves its scope.
 [[nodiscard]] Result<void> decide_role(const security::Principal& principal, std::string_view action,
                                        std::chrono::system_clock::time_point now);
+[[nodiscard]] Result<void> decide_somewhere(const security::Principal& principal, std::string_view action,
+                                            std::chrono::system_clock::time_point now);
 [[nodiscard]] std::vector<std::string> actions(const security::Principal& principal,
                                                std::chrono::system_clock::time_point now);
 

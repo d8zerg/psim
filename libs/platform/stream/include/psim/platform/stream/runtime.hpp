@@ -20,6 +20,7 @@
 #include "psim/platform/kafka/serde.hpp"
 #include "psim/platform/pg/pool.hpp"
 #include "psim/platform/runtime.hpp"
+#include "psim/platform/security/jwt.hpp"
 
 namespace psim::platform::stream {
 namespace asio = boost::asio;
@@ -48,10 +49,14 @@ inline constexpr std::string_view kSettings = R"({"type":"object","additionalPro
  "listen_port":{"type":"integer","minimum":1,"maximum":65535,"default":8080},
  "tls_directory":{"type":"string","default":"/repo/.cache/event-flow"},
  "issuer":{"type":"string","default":"http://localhost:8180/realms/psim"},
+ "introspection_url":{"type":"string","default":"http://keycloak:8080/realms/psim/protocol/openid-connect/token/introspect"},
+ "introspection_client":{"type":"string","default":"psim"},
+ "introspection_secret_file":{"type":"string","x-psim-secret":true},
  "jwks_url":{"type":"string","default":"http://keycloak:8080/realms/psim/protocol/openid-connect/certs"}
 }})";
 
 [[nodiscard]] std::string uuid7();
+[[nodiscard]] Result<security::JwksOptions> authentication_options(const runtime::Context& context);
 [[nodiscard]] std::string uuid5(std::string_view space, const std::vector<std::string>& parts);
 [[nodiscard]] bool uuid(std::string_view value);
 [[nodiscard]] std::string sha256(std::string_view bytes);

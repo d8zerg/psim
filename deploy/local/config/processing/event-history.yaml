@@ -9,6 +9,7 @@ telemetry:
 settings:
   allow_plaintext: true
   pg_password_file: /repo/.cache/event-flow/postgres.secret
+  introspection_secret_file: /repo/.cache/event-flow/introspection.secret
   clickhouse_host: clickhouse
   clickhouse_port: 9000
   clickhouse_password_file: /repo/.cache/processing/clickhouse.password

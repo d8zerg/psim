@@ -105,7 +105,7 @@ class Check(HttpCheck):
         self.secret.write_text("psim-dev-directory")
         self.secret.chmod(0o400)
         self.config.write_text(json.dumps({"service": {"instance": "incident-1"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001},
-          "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "listen_port": 8443,
+          "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "listen_port": 8443,
                        "issuer": "http://keycloak:8080/realms/psim", "directory_base": "http://keycloak:8080", "directory_client": self.directory_client,
                        "directory_roles_client": self.roles_client, "directory_secret_file": "/repo/" + str(self.secret.relative_to(ROOT))}}, indent=2))
         (ROOT / f"build/debian13/{self.preset}/profiles").mkdir(parents=True, exist_ok=True)

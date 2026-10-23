@@ -18,6 +18,7 @@ settings:
   listen_port: 8443
   taxonomy_file: /repo/contracts/taxonomy/v1/taxonomy.yaml
   pg_user: rule_management
+  introspection_secret_file: /repo/.cache/event-flow/introspection.secret
   pg_password_file: /repo/.cache/rules/pg.secret
   tls_ca_file: /repo/.cache/event-flow/ca.pem
   tls_certificate_file: /repo/.cache/rules/server.pem

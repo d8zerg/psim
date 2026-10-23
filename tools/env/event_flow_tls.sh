@@ -25,7 +25,7 @@ if [ ! -f "$target/admin.pem" ]; then
   printf '%s\n' 'subjectAltName=URI:psim://service/gateway-admin' 'extendedKeyUsage=clientAuth' > "$target/admin.ext"
   openssl x509 -req -days 7 -in "$target/admin.csr" -CA "$target/ca.pem" -CAkey "$target/ca.key" -CAcreateserial -extfile "$target/admin.ext" -out "$target/admin.pem" >/dev/null 2>&1
 fi
-for identity in api-server catalog-server catalog-client incident-server history-server command-server response-server notification-server audit-server reports-server; do
+for identity in api-server catalog-server catalog-client incident-server history-server command-server response-server notification-server audit-server reports-server rule-server; do
   if [ ! -f "$target/$identity.pem" ] || ! openssl verify -CAfile "$target/ca.pem" "$target/$identity.pem" >/dev/null 2>&1 || ! openssl x509 -checkend 86400 -noout -in "$target/$identity.pem" >/dev/null 2>&1; then
     chmod u+w "$target/$identity.key" 2>/dev/null || true
     openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -noenc -subj /CN=psim-resource-catalog -keyout "$target/$identity.key" -out "$target/$identity.csr" >/dev/null 2>&1
@@ -33,6 +33,8 @@ for identity in api-server catalog-server catalog-client incident-server history
       printf '%s\n' 'subjectAltName=DNS:api-gateway,DNS:api-2,DNS:localhost,URI:psim://service/api-gateway' 'extendedKeyUsage=serverAuth' > "$target/$identity.ext"
     elif [ "$identity" = history-server ]; then
       printf '%s\n' 'subjectAltName=DNS:event-history,DNS:history-2,DNS:localhost,URI:psim://service/event-history' 'extendedKeyUsage=serverAuth' > "$target/$identity.ext"
+    elif [ "$identity" = rule-server ]; then
+      printf '%s\n' 'subjectAltName=DNS:rule-management,DNS:rule-manager-2,DNS:localhost,URI:psim://service/correlation-engine' 'extendedKeyUsage=serverAuth' > "$target/$identity.ext"
     elif [ "$identity" = reports-server ]; then
       printf '%s\n' 'subjectAltName=DNS:projection-service,DNS:reports-2,DNS:localhost,URI:psim://service/projection-service' 'extendedKeyUsage=serverAuth' > "$target/$identity.ext"
     elif [ "$identity" = audit-server ]; then
@@ -64,6 +66,10 @@ fi
 for file in "$target"/*.pem; do
   [ "$(stat -c %a "$file")" = 644 ] || chmod 644 "$file"
 done
-for file in "$target"/*.key "$target/postgres.secret" "$target/redis.secret"; do
+if ! printf %s psim-dev-introspection | cmp -s - "$target/introspection.secret"; then
+  chmod u+w "$target/introspection.secret" 2>/dev/null || true
+  printf %s psim-dev-introspection > "$target/introspection.secret"
+fi
+for file in "$target"/*.key "$target/postgres.secret" "$target/redis.secret" "$target/introspection.secret"; do
   [ "$(stat -c %a "$file")" = 400 ] || chmod 400 "$file"
 done

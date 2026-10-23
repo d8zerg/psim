@@ -39,7 +39,8 @@ struct Page {
 
 [[nodiscard]] Json read_json(std::string_view bytes);
 [[nodiscard]] p::Result<Resource> parse(std::string kind, const Json& input);
-[[nodiscard]] bool allowed(const p::security::Principal& principal, std::string_view site, bool write = false);
+[[nodiscard]] bool allowed(const p::security::Principal& principal, std::string_view site, bool write = false,
+                           std::string_view zone = {});
 [[nodiscard]] std::string timestamp(Time now);
 [[nodiscard]] p::Result<Time> time(std::string_view value);
 [[nodiscard]] p::Result<std::vector<Json>> import_rows(std::string_view format, std::string_view bytes);

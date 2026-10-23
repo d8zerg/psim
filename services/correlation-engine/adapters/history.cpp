@@ -12,6 +12,7 @@
 #include <map>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -20,11 +21,13 @@
 #include "psim/catalog/v1/catalog.pb.h"
 #include "psim/catalog/v1/maintenance.pb.h"
 #include "psim/config/v1/config.pb.h"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
 #include "psim/platform/kafka/consumer.hpp"
 #include "psim/platform/kafka/serde.hpp"
+#include "psim/platform/security/jwt.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/processing/v1/event.pb.h"
 #include "repository.hpp"
@@ -44,9 +47,11 @@ p::Result<T> parse(const Json& body) {
   return value;
 }
 
-bool scoped(const Job& job, const std::string& site) {
-  const auto scopes = job.principal.at("scopes").get<std::set<std::string>>();
-  return scopes.contains("*") || scopes.contains(site);
+bool scoped(const Job& job, const std::string& site, std::string_view zone = {}) {
+  p::security::Principal principal;
+  principal.tenant = job.principal.at("tenant");
+  principal.scopes = job.principal.at("scopes").get<std::set<std::string>>();
+  return p::authz::scoped(principal, {principal.tenant, site, zone});
 }
 }  // namespace
 
@@ -155,7 +160,7 @@ asio::awaitable<p::Result<HistoricalInput>> History::read(Job job) {
     }
     const auto time = Time::TimestampToMilliseconds(event.envelope().occurred_at());
     if (event.envelope().tenant_id() != job.tenant || time < from || time >= to
-        || !scoped(job, event.event().site_id())) {
+        || !scoped(job, event.event().site_id(), event.event().zone_id())) {
       return {};
     }
     bytes += event.ByteSizeLong();
@@ -199,7 +204,7 @@ asio::awaitable<p::Result<HistoricalInput>> History::read(Job job) {
           old = value->location();
         }
       }
-      if (value->has_device() && scoped(job, value->device().site_id())) {
+      if (value->has_device() && scoped(job, value->device().site_id(), value->device().zone_id())) {
         auto& old = devices[value->device().device_id()];
         if (value->device().version() > old.version()) {
           old = value->device();
@@ -216,7 +221,7 @@ asio::awaitable<p::Result<HistoricalInput>> History::read(Job job) {
         return std::unexpected(value.error());
       }
       if (value->envelope().tenant_id() == job.tenant && value->has_maintenance_window()
-          && scoped(job, value->maintenance_window().site_id())) {
+          && scoped(job, value->maintenance_window().site_id(), value->maintenance_window().zone_id())) {
         const auto& policy = value->maintenance_window();
         maintenance[{policy.maintenance_id(), policy.version()}] = policy;
       }

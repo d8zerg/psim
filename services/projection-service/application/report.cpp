@@ -195,22 +195,15 @@ p::Result<p::clickhouse::Read> report_query(const p::security::Principal& princi
     }
     priorities.push_back(priority);
   }
-  for (const auto& scope : principal.scopes) {
-    if (scope.starts_with("site:")) {
-      sites.push_back(scope.substr(5));
-    } else if (scope.starts_with("zone:")) {
-      zones.push_back(scope.substr(5));
-    } else if (scope != "*") {
-      sites.push_back(scope);
-      zones.push_back(scope);
-    }
-  }
+  const auto scope = p::authz::scope_filter(principal);
+  sites = scope.sites;
+  zones = scope.zones;
   return p::clickhouse::Read{
       .statement = kQuery,
       .tenant = principal.tenant,
       .from_ms = from,
       .to_ms = to,
-      .parameters = {{"all", principal.scopes.contains("*") ? "1" : "0"},
+      .parameters = {{"all", p::authz::all_scopes(principal) ? "1" : "0"},
                      {"sites", sites.dump()},
                      {"zones", zones.dump()},
                      {"site_ids", site_ids.dump()},
@@ -293,7 +286,7 @@ boost::asio::awaitable<p::Result<Response>> Api::handle(Request request, p::secu
   }
   const std::string action = exporting ? "report.export" : "report.read";
   auto allowed = p::authz::decide(principal, action, {principal.tenant}, std::chrono::system_clock::now());
-  if (!allowed && (allowed.error().code() != p::ErrorCode::kAuthScopeDenied || principal.scopes.empty())) {
+  if (!allowed && (allowed.error().code() != p::ErrorCode::kAuthScopeDenied || !p::authz::any_scope(principal))) {
     auto saved = co_await audit_(principal, action, true);
     if (!saved) {
       co_return std::unexpected(saved.error());

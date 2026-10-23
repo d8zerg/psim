@@ -7,11 +7,13 @@
 #include <expected>
 #include <memory>
 #include <optional>
+#include <set>
 #include <string>
 #include <system_error>
 #include <utility>
 
 #include "psim/api/v1/rules.pb.h"
+#include "psim/platform/authz/policy.hpp"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/pg/connection.hpp"
@@ -75,10 +77,7 @@ asio::awaitable<p::Result<Json>> Repository::jobs(p::pg::Transaction* tx, p::sec
     if (!rule || !rules::compile(*rule, taxonomy_).compiled) {
       co_return p::fail(Code::kProcessingRuleInvalid, "dry-run rule is invalid");
     }
-    if (!principal.scopes.contains("*")
-        && (rule->filter().site_ids().empty() || !std::ranges::all_of(rule->filter().site_ids(), [&](const auto& site) {
-              return can_read_site(principal, site);
-            }))) {
+    if (!can_read_rule(*rule, principal)) {
       co_return p::fail(Code::kAuthScopeDenied, "rule outside access scope");
     }
     auto pending = co_await tx->connection().query(
@@ -149,10 +148,10 @@ asio::awaitable<p::Result<Json>> Repository::jobs(p::pg::Transaction* tx, p::sec
     co_return p::fail(Code::kAuthScopeDenied, "dry run belongs to another user");
   }
   const auto identity = Json::parse(rows->value(0, 1).value_or(""));
-  for (const auto& scope : identity.at("scopes")) {
-    if (!can_read_site(principal, scope.get<std::string>())) {
-      co_return p::fail(Code::kAuthScopeDenied, "dry-run scope no longer accessible");
-    }
+  const p::security::Principal required{.tenant = principal.tenant,
+                                        .scopes = identity.at("scopes").get<std::set<std::string>>()};
+  if (!p::authz::covers_scopes(principal, required)) {
+    co_return p::fail(Code::kAuthScopeDenied, "dry-run scope no longer accessible");
   }
   const auto run = Json::parse(rows->value(0, 2).value_or(""));
   const auto results = Json::parse(rows->value(0, 3).value_or("[]"));

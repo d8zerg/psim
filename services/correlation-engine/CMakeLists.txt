@@ -3,7 +3,7 @@ find_package(RocksDB REQUIRED CONFIG)
 add_library(psim_correlation_rules STATIC application/validation.cpp application/replay.cpp adapters/repository.cpp adapters/jobs.cpp adapters/history.cpp adapters/http.cpp adapters/management.cpp application/live.cpp adapters/state_store.cpp adapters/live_worker.cpp)
 psim_target_defaults(psim_correlation_rules)
 target_include_directories(psim_correlation_rules PUBLIC application adapters)
-target_link_libraries(psim_correlation_rules PUBLIC psim::domain_processing psim::platform_stream psim::platform_clickhouse yaml-cpp::yaml-cpp RocksDB::rocksdb)
+target_link_libraries(psim_correlation_rules PUBLIC psim::platform_authz psim::domain_processing psim::platform_stream psim::platform_clickhouse yaml-cpp::yaml-cpp RocksDB::rocksdb)
 psim_add_test(psim_rules_test SOURCES tests/expression_test.cpp tests/validation_test.cpp tests/replay_test.cpp tests/authorization_test.cpp tests/live_test.cpp tests/state_store_test.cpp LIBS psim_correlation_rules)
 psim_add_service(correlation-engine SOURCES src/main.cpp LIBS psim_correlation_rules SUMMARY "PSIM correlation-engine")
 

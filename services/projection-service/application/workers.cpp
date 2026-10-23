@@ -124,12 +124,11 @@ class HttpWorker final : public p::stream::Worker {
       co_return std::unexpected(tls.error());
     }
     tls_ = std::move(*tls);
-    auto verifier = p::security::JwksCache::create(
-        {.jwt = {.issuer = config.get<std::string>("settings.issuer"), .audience = "psim"},
-         .url = config.get<std::string>("settings.jwks_url"),
-         .http = {
-             .tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"), .require_client_certificate = false},
-             .allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
+    auto authentication = p::stream::authentication_options(context());
+    if (!authentication) {
+      co_return std::unexpected(authentication.error());
+    }
+    auto verifier = p::security::JwksCache::create(std::move(*authentication));
     if (!verifier) {
       co_return std::unexpected(verifier.error());
     }

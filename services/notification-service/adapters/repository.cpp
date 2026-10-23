@@ -514,10 +514,9 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
     action = "notification.delivery.resolve";
   }
   auto access = p::authz::decide(principal, action, {principal.tenant, site}, std::chrono::system_clock::now());
-  // Personal notification reads require some scope; each row is checked below.
-  if (!contact && !principal.scopes.empty()) {
-    access = p::authz::decide(principal, action, {principal.tenant, *principal.scopes.begin()},
-                              std::chrono::system_clock::now());
+  // Personal notification operations check each persisted resource below.
+  if (!contact) {
+    access = p::authz::decide_somewhere(principal, action, std::chrono::system_clock::now());
   }
   if (!access) {
     auto recorded = co_await p::pg::in_transaction<void>(pool_, [&, this](p::pg::Transaction* tx) {
@@ -573,24 +572,20 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
       if (size < 1 || size > 1000 || (!cursor.empty() && !p::stream::uuid(cursor))) {
         co_return p::fail(Code::kCommonInvalidArgument, "invalid page");
       }
-      Json scopes = Json::array();
-      for (const auto& scope : principal.scopes) {
-        scopes.push_back(scope);
-      }
+      const auto scope = p::authz::scope_filter(principal);
       auto rows = co_await tx->connection().query(
-          {.sql =
-               ("SELECT site::text,body::text FROM notification.notifications WHERE tenant=$1::uuid AND "
-                "recipient=$2::uuid AND channel=1 AND status='complete' AND "
-                "body->>'state'='NOTIFICATION_STATE_DELIVERED' AND ($3='' OR "
-                "((body->>'createdAt')::timestamptz,id)<(SELECT (body->>'createdAt')::timestamptz,id FROM "
-                "notification.notifications WHERE tenant=$1::uuid AND recipient=$2::uuid AND "
-                "id=NULLIF($3,'')::uuid)) AND (NOT $4::boolean OR NOT COALESCE((body->>'read')::boolean,false)) "
-                "AND ($5::jsonb ? '*' OR $5::jsonb ? site::text OR $5::jsonb ? ('site:'||site::text) OR $5::jsonb ? "
-                "COALESCE(body->'data'->>'zoneId','') OR $5::jsonb ? ('zone:'||COALESCE(body->'data'->>'zoneId',''))) "
-                "ORDER BY (body->>'createdAt')::timestamptz DESC,id DESC LIMIT $6::integer"),
+          {.sql = ("SELECT site::text,body::text FROM notification.notifications WHERE tenant=$1::uuid AND "
+                   "recipient=$2::uuid AND channel=1 AND status='complete' AND "
+                   "body->>'state'='NOTIFICATION_STATE_DELIVERED' AND ($3='' OR "
+                   "((body->>'createdAt')::timestamptz,id)<(SELECT (body->>'createdAt')::timestamptz,id FROM "
+                   "notification.notifications WHERE tenant=$1::uuid AND recipient=$2::uuid AND "
+                   "id=NULLIF($3,'')::uuid)) AND (NOT $4::boolean OR NOT COALESCE((body->>'read')::boolean,false)) "
+                   "AND ($7::boolean OR $5::jsonb ? site::text OR $8::jsonb ? COALESCE(body->'data'->>'zoneId','')) "
+                   "ORDER BY (body->>'createdAt')::timestamptz DESC,id DESC LIMIT $6::integer"),
            .parameters = {Param::text(principal.tenant), Param::text(principal.subject), Param::text(cursor),
-                          Param::text(body.value("unreadOnly", false) ? "true" : "false"), Param::text(scopes.dump()),
-                          Param::text(std::to_string(size + 1))}});
+                          Param::text(body.value("unreadOnly", false) ? "true" : "false"),
+                          Param::text(Json(scope.sites).dump()), Param::text(std::to_string(size + 1)),
+                          Param::boolean(scope.all), Param::text(Json(scope.zones).dump())}});
       if (!rows) {
         co_return std::unexpected(rows.error());
       }
@@ -603,13 +598,13 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         output["notifications"].push_back(Json::parse(rows->value(i, 1).value_or("")));
       }
       auto unread = co_await tx->connection().query(
-          {.sql =
-               ("SELECT count(*) FROM notification.notifications WHERE tenant=$1::uuid AND recipient=$2::uuid AND "
-                "channel=1 AND status='complete' AND body->>'state'='NOTIFICATION_STATE_DELIVERED' AND NOT "
-                "COALESCE((body->>'read')::boolean,false) AND ($3::jsonb ? '*' "
-                "OR $3::jsonb ? site::text OR $3::jsonb ? ('site:'||site::text) OR $3::jsonb ? "
-                "COALESCE(body->'data'->>'zoneId','') OR $3::jsonb ? ('zone:'||COALESCE(body->'data'->>'zoneId','')))"),
-           .parameters = {Param::text(principal.tenant), Param::text(principal.subject), Param::text(scopes.dump())}});
+          {.sql = ("SELECT count(*) FROM notification.notifications WHERE tenant=$1::uuid AND recipient=$2::uuid AND "
+                   "channel=1 AND status='complete' AND body->>'state'='NOTIFICATION_STATE_DELIVERED' AND NOT "
+                   "COALESCE((body->>'read')::boolean,false) AND ($4::boolean OR $3::jsonb ? site::text OR "
+                   "$5::jsonb ? COALESCE(body->'data'->>'zoneId',''))"),
+           .parameters = {Param::text(principal.tenant), Param::text(principal.subject),
+                          Param::text(Json(scope.sites).dump()), Param::boolean(scope.all),
+                          Param::text(Json(scope.zones).dump())}});
       if (!unread) {
         co_return std::unexpected(unread.error());
       }

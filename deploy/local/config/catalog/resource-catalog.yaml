@@ -14,6 +14,7 @@ settings:
   listen_port: 8443
   pg_max_result_bytes: 134217728
   pg_password_file: /repo/.cache/event-flow/postgres.secret
+  introspection_secret_file: /repo/.cache/event-flow/introspection.secret
   tls_ca_file: /repo/.cache/event-flow/ca.pem
   tls_certificate_file: /repo/.cache/event-flow/catalog-server.pem
   tls_private_key_file: /repo/.cache/event-flow/catalog-server.key

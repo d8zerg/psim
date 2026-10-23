@@ -43,6 +43,13 @@ def token(base, directory):
                             "jsonType.label": "String", "access.token.claim": "true"}},
             ]})
         found = request(base, clients + "?clientId=" + client_id, admin)
+    mappers_path = clients + "/" + found[0]["id"] + "/protocol-mappers/models"
+    mappers = request(base, mappers_path, admin)
+    if not any(item.get("config", {}).get("claim.name") == "psim_scopes" for item in mappers):
+        request(base, mappers_path, admin, {
+            "name": "scope", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
+            "config": {"claim.name": "psim_scopes", "claim.value": '["*"]', "jsonType.label": "JSON",
+                       "access.token.claim": "true", "introspection.token.claim": "true"}})
     account = request(base, clients + "/" + found[0]["id"] + "/service-account-user", admin)
     resource = request(base, clients + "?clientId=psim", admin)[0]
     role = request(base, clients + "/" + resource["id"] + "/roles/integrator", admin)

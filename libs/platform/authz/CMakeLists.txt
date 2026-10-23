@@ -7,4 +7,6 @@ add_library(psim::platform_authz ALIAS psim_platform_authz)
 target_include_directories(psim_platform_authz PUBLIC include PRIVATE "${CMAKE_CURRENT_BINARY_DIR}/generated")
 target_link_libraries(psim_platform_authz PUBLIC psim::platform_security PRIVATE nlohmann_json::nlohmann_json)
 psim_target_defaults(psim_platform_authz)
-psim_add_test(psim_platform_authz_test SOURCES tests/policy_test.cpp LIBS psim::platform_authz)
+psim_add_test(psim_platform_authz_test SOURCES tests/policy_test.cpp LIBS psim::platform_authz nlohmann_json::nlohmann_json)
+
+target_compile_definitions(psim_platform_authz_test PRIVATE PSIM_AUTHZ_ACTIONS="${PROJECT_SOURCE_DIR}/contracts/authz/actions.json")

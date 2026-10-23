@@ -11,7 +11,7 @@
 | `make_csr` | CSR P-256 с ограниченным URI SAN для внешней PKI |
 | `http_request` | HTTPS GET/POST, SNI и DNS/IP verification, один дедлайн с DNS, ограничения заголовков/тела, без redirects и повторов |
 | `JwtVerifier` | RS256/ES256 через EVP; issuer/audience/тип/сроки; роли клиента, тенант и области |
-| `JwksCache` | Настроенный HTTPS endpoint, ротация, ограниченный устаревший кэш и частота запросов неизвестного `kid` |
+| `JwksCache` | Ротация JWKS, подпись JWT и introspection с кэшем 500 мс; актуальные наборы областей по ссылке |
 | `authenticate_service` | mTLS URI SAN, разрешённый сервис и JWT; привязка `azp` для client credentials |
 | `ConnectorTrust` | Регистрация отпечатка, перекрытие двух сертификатов, закрытие сессий при отзыве/истечении, восстановление |
 
@@ -29,7 +29,10 @@ JWT не больше 16 КиБ; header до 2 КиБ, claims до 12 КиБ, г
 using namespace psim::platform;
 security::JwksOptions options{
     .jwt = {.issuer = "https://identity.example/realms/psim", .audience = "psim"},
-    .url = "https://identity.example/realms/psim/protocol/openid-connect/certs"};
+    .url = "https://identity.example/realms/psim/protocol/openid-connect/certs",
+    .introspection_url = "https://identity.example/realms/psim/protocol/openid-connect/token/introspect",
+    .introspection_client = "psim",
+    .introspection_secret = std::string(secret.view())};
 auto cache = security::JwksCache::create(options);
 if (!cache) {
   co_return std::unexpected(cache.error());
@@ -57,3 +60,5 @@ task test:component
 Профиль `security` запускает отдельные Kafka/PostgreSQL с mTLS и `valkey-tls`, без опубликованных портов. Тесты подтверждают реальные токены Keycloak, загрузку JWKS через HTTPS, Schema Registry/mTLS, публикацию и чтение Kafka, PostgreSQL и Valkey, продление и отзыв активного потока. Тестовые ключи находятся в игнорируемом `.cache/`, генерация использует только тестовый УЦ. Обычные наборы данных локального окружения сохраняются.
 
 Явные исключения для изолированного локального стенда: Kafka/HTTP `allow_plaintext=true`, PostgreSQL `sslmode=disable`, Redis `tls.enabled=false`, OTLP `telemetry.otlp_tls=false`. Эксплуатационные процедуры и внешняя step-ca описаны в [регламенте доверия](../../../docs/security/platform-trust.md). ClickHouse и gRPC/HTTP серверы предметных сервисов подключают механизмы на своих шагах; проверка защищённой поставки и её ACL относится к Ф9 и шагу 10.3.
+
+Рабочие сервисы получают общую конфигурацию через `platform::stream::authentication_options`. Режим только с подписью остаётся низкоуровневым API для автономных проверок криптографии. Параметры актуальности, ссылок на области и WebSocket описаны в [руководстве авторизации](../../../docs/security/authorization.md).

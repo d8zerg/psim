@@ -714,11 +714,11 @@ asio::awaitable<p::Result<Json>> Repository::execute(pg::Transaction* tx, p::sec
     if (size < 1 || size > 1000 || (!after.empty() && !p::stream::uuid(after))) {
       co_return p::fail(Code::kCommonInvalidArgument, "invalid page");
     }
-    const Json scopes = principal.scopes;
+    const auto scope = p::authz::scope_filter(principal);
     auto rows = co_await tx->connection().query(
         {.sql =
              R"sql(SELECT body::text FROM incident.incidents WHERE tenant_id=$1::uuid AND ($2='' OR incident_id::text>$2)
-      AND ($3::boolean OR body->>'siteId' IN(SELECT jsonb_array_elements_text($4::jsonb)) OR 'site:'||(body->>'siteId') IN(SELECT jsonb_array_elements_text($4::jsonb)) OR (COALESCE(body->>'zoneId','')<>'' AND (body->>'zoneId' IN(SELECT jsonb_array_elements_text($4::jsonb)) OR 'zone:'||(body->>'zoneId') IN(SELECT jsonb_array_elements_text($4::jsonb)))))
+      AND ($3::boolean OR body->>'siteId' IN(SELECT jsonb_array_elements_text($4::jsonb)) OR body->>'zoneId' IN(SELECT jsonb_array_elements_text($7::jsonb)))
       AND (NOT ($5::jsonb ? 'states') OR body->>'state' IN(SELECT jsonb_array_elements_text($5::jsonb->'states')))
       AND (NOT ($5::jsonb ? 'priorities') OR body->>'priority' IN(SELECT jsonb_array_elements_text($5::jsonb->'priorities')))
       AND (NOT ($5::jsonb ? 'siteIds') OR body->>'siteId' IN(SELECT jsonb_array_elements_text($5::jsonb->'siteIds')))
@@ -729,9 +729,9 @@ asio::awaitable<p::Result<Json>> Repository::execute(pg::Transaction* tx, p::sec
       AND (NOT ($5::jsonb ? 'createdFrom') OR (body->>'createdAt')::timestamptz>=($5::jsonb->>'createdFrom')::timestamptz)
       AND (NOT ($5::jsonb ? 'createdTo') OR (body->>'createdAt')::timestamptz<=($5::jsonb->>'createdTo')::timestamptz)
       ORDER BY incident_id LIMIT $6)sql",
-         .parameters = {Param::text(principal.tenant), Param::text(after),
-                        Param::boolean(principal.scopes.contains("*")), Param::text(scopes.dump()),
-                        Param::text(body.dump()), Param::integer(size + 1)}});
+         .parameters = {Param::text(principal.tenant), Param::text(after), Param::boolean(scope.all),
+                        Param::text(Json(scope.sites).dump()), Param::text(body.dump()), Param::integer(size + 1),
+                        Param::text(Json(scope.zones).dump())}});
     if (!rows) {
       co_return std::unexpected(rows.error());
     }

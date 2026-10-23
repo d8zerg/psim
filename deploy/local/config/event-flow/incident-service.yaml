@@ -9,5 +9,6 @@ telemetry:
 settings:
   allow_plaintext: true
   pg_password_file: /repo/.cache/event-flow/postgres.secret
+  introspection_secret_file: /repo/.cache/event-flow/introspection.secret
   legacy_types: true
   issuer: http://keycloak:8080/realms/psim

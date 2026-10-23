@@ -1,0 +1,36 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-authz-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Full action policy matrix and live service authorization with Keycloak
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :cpp:_run
+        vars:
+          CMD: ctest --preset {{.PRESET}} -L 'psim_platform_authz_test|psim_platform_security_test' --output-on-failure
+      - task: :arch:authz
+      - python3 -I tools/authz/check.py {{.PROJECT}} {{.PRESET}}
+  sanitizers:
+    desc: Authentication and service authorization under ASan/UBSan and TSan
+    cmds:
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}-{{.ITEM}}', PRESET: '{{.ITEM}}'}
+
+  coverage:
+    desc: Measure shared authorization and online authentication with real service requests
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: ctest --preset coverage -j {{.JOBS}} --output-on-failure
+      - python3 -I tools/authz/check.py {{.PROJECT}}-coverage coverage
+      - task: :cpp:_run
+        vars:
+          CMD: python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/platform/security libs/platform/authz'

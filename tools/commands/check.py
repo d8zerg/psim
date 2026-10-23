@@ -84,7 +84,7 @@ class Check(IncidentCheck):
                 target.write_bytes(source.read_bytes())
                 target.chmod(source.stat().st_mode & 0o777)
         self.env_command(f"python3 -I tools/env/gateway_bootstrap.py http://keycloak:8080 connector-gateway:8080 build/debian13/{self.preset}/tools/gateway-admin/psim-gateway-admin {bootstrap.relative_to(ROOT)}")
-        self.command_config.write_text(json.dumps({"service": {"instance": "command-1"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001}, "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "redis_password_file": "/repo/.cache/event-flow/redis.secret", "listen_port": 8443, "issuer": "http://keycloak:8080/realms/psim", "command_timeout_seconds": 12}}, indent=2))
+        self.command_config.write_text(json.dumps({"service": {"instance": "command-1"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.001}, "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "redis_password_file": "/repo/.cache/event-flow/redis.secret", "listen_port": 8443, "issuer": "http://keycloak:8080/realms/psim", "command_timeout_seconds": 12}}, indent=2))
         self.compose("up", "-d", "--force-recreate", "command-service", "command-2", "command-fixture")
         self.wait(lambda: (self.fixture / "ready").exists(), 90)
         self.zone, self.type_id = uid(), uid()

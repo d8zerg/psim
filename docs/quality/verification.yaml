@@ -114,7 +114,7 @@ methods:
   - id: TS-12
     kind: test
     name: Матрица прав «роль × действие × область»
-    criteria: Все разрешённые и запрещённые комбинации, включая ABAC; отказы в аудите
+    criteria: Все действия и шесть ролей, тенант, площадка и зона; запросы к сервисам и Gateway, компактные наборы областей и отзыв REST/WSS до истечения JWT; отказы в аудите
     env: E-CI
     gate: pr
     barrier: automated
@@ -690,6 +690,17 @@ methods:
     task: task web:check
     steps: ['1.5']
     purpose: Стандарт TypeScript и DoD шага 1.5 (ADR-037)
+
+  - id: FF-22
+    kind: fitness
+    name: Общая авторизация сервисов
+    criteria: В сервисах нет собственных проверок областей и JWT-проверок без общей конфигурации introspection; негативные самопроверки выявляют нарушения
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task arch:authz
+    purpose: Единая реализация RBAC/ABAC и обязательная проверка актуальности идентичности
+    steps: ['7.4']
 
   # --- Security -------------------------------------------------------------
   - id: SEC-01

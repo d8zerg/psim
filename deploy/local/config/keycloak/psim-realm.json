@@ -27,18 +27,49 @@
   "browserFlow": "psim-browser",
   "roles": {
     "realm": [
-      {"name": "mfa-required", "description": "Members must pass a second factor at login (SR-02); held by admin and supervisor"}
+      {
+        "name": "mfa-required",
+        "description": "Members must pass a second factor at login (SR-02); held by admin and supervisor"
+      }
     ],
     "client": {
       "psim": [
-        {"name": "operator", "description": "Operator: incidents in the access scope"},
-        {"name": "supervisor", "description": "Shift supervisor", "composite": true,
-         "composites": {"realm": ["mfa-required"]}},
-        {"name": "admin", "description": "Administrator: configuration, not incident handling", "composite": true,
-         "composites": {"realm": ["mfa-required"]}},
-        {"name": "integrator", "description": "Integrator: connectors"},
-        {"name": "auditor", "description": "Auditor: read-only audit"},
-        {"name": "manager", "description": "Manager: read-only reports"}
+        {
+          "name": "operator",
+          "description": "Operator: incidents in the access scope"
+        },
+        {
+          "name": "supervisor",
+          "description": "Shift supervisor",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa-required"
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "description": "Administrator: configuration, not incident handling",
+          "composite": true,
+          "composites": {
+            "realm": [
+              "mfa-required"
+            ]
+          }
+        },
+        {
+          "name": "integrator",
+          "description": "Integrator: connectors"
+        },
+        {
+          "name": "auditor",
+          "description": "Auditor: read-only audit"
+        },
+        {
+          "name": "manager",
+          "description": "Manager: read-only reports"
+        }
       ]
     }
   },
@@ -48,10 +79,12 @@
       "name": "PSIM API (roles)",
       "description": "Resource client that owns the PSIM roles (ADR-020); no login",
       "enabled": true,
-      "bearerOnly": true,
+      "bearerOnly": false,
       "publicClient": false,
       "standardFlowEnabled": false,
-      "directAccessGrantsEnabled": false
+      "directAccessGrantsEnabled": false,
+      "secret": "psim-dev-introspection",
+      "serviceAccountsEnabled": false
     },
     {
       "clientId": "psim-console",
@@ -63,17 +96,81 @@
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": false,
-      "redirectUris": ["http://localhost:5173/*", "http://localhost:4173/*", "http://console:4173/*"],
-      "webOrigins": ["http://localhost:5173", "http://localhost:4173", "http://console:4173"],
-      "attributes": {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "http://localhost:5173/*"},
-      "protocolMappers": [{"name": "psim-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
-        "consentRequired": false, "config": {"included.client.audience": "psim", "id.token.claim": "false", "access.token.claim": "true"}},
-        {"name": "psim-fixture-tenant", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
-          "consentRequired": false, "config": {"claim.name": "psim_tenant", "claim.value": "11111111-1111-4111-8111-111111111111",
-          "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false"}},
-        {"name": "psim-fixture-scopes", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
-          "consentRequired": false, "config": {"claim.name": "psim_scopes", "claim.value": "[\"site:33333333-3333-4333-8333-333333333333\"]",
-          "jsonType.label": "JSON", "access.token.claim": "true", "id.token.claim": "false"}}]
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:4173/*",
+        "http://console:4173/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "http://console:4173"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "psim-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "psim",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "psim-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "psim_tenant",
+            "claim.name": "psim_tenant",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "psim-scopes",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "psim_scopes",
+            "claim.name": "psim_scopes",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "aggregate.attrs": "true",
+            "access.token.claim": "false",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "psim-scope-set",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "id",
+            "claim.name": "psim_scope_set",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "clientId": "psim-services",
@@ -86,14 +183,67 @@
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
       "serviceAccountsEnabled": true,
-      "protocolMappers": [{"name": "psim-audience", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
-        "consentRequired": false, "config": {"included.client.audience": "psim", "id.token.claim": "false", "access.token.claim": "true"}},
-        {"name": "psim-fixture-tenant", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
-          "consentRequired": false, "config": {"claim.name": "psim_tenant", "claim.value": "11111111-1111-4111-8111-111111111111",
-          "jsonType.label": "String", "access.token.claim": "true", "id.token.claim": "false"}},
-        {"name": "psim-fixture-scopes", "protocol": "openid-connect", "protocolMapper": "oidc-hardcoded-claim-mapper",
-          "consentRequired": false, "config": {"claim.name": "psim_scopes", "claim.value": "[\"site:33333333-3333-4333-8333-333333333333\"]",
-          "jsonType.label": "JSON", "access.token.claim": "true", "id.token.claim": "false"}}]
+      "protocolMappers": [
+        {
+          "name": "psim-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "psim",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "psim-tenant",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "psim_tenant",
+            "claim.name": "psim_tenant",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "psim-scopes",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "psim_scopes",
+            "claim.name": "psim_scopes",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "aggregate.attrs": "true",
+            "access.token.claim": "false",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
+          "name": "psim-scope-set",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-property-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "id",
+            "claim.name": "psim_scope_set",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true",
+            "id.token.claim": "false",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     }
   ],
   "authenticationFlows": [
@@ -104,8 +254,18 @@
       "topLevel": true,
       "builtIn": false,
       "authenticationExecutions": [
-        {"authenticator": "auth-cookie", "requirement": "ALTERNATIVE", "priority": 10, "authenticatorFlow": false},
-        {"flowAlias": "psim-browser-forms", "requirement": "ALTERNATIVE", "priority": 20, "authenticatorFlow": true}
+        {
+          "authenticator": "auth-cookie",
+          "requirement": "ALTERNATIVE",
+          "priority": 10,
+          "authenticatorFlow": false
+        },
+        {
+          "flowAlias": "psim-browser-forms",
+          "requirement": "ALTERNATIVE",
+          "priority": 20,
+          "authenticatorFlow": true
+        }
       ]
     },
     {
@@ -115,8 +275,18 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        {"authenticator": "auth-username-password-form", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false},
-        {"flowAlias": "psim-browser-mfa", "requirement": "CONDITIONAL", "priority": 20, "authenticatorFlow": true}
+        {
+          "authenticator": "auth-username-password-form",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
+        },
+        {
+          "flowAlias": "psim-browser-mfa",
+          "requirement": "CONDITIONAL",
+          "priority": 20,
+          "authenticatorFlow": true
+        }
       ]
     },
     {
@@ -126,36 +296,216 @@
       "topLevel": false,
       "builtIn": false,
       "authenticationExecutions": [
-        {"authenticator": "conditional-user-role", "authenticatorConfig": "psim-mfa-required", "requirement": "REQUIRED", "priority": 10, "authenticatorFlow": false},
-        {"authenticator": "auth-otp-form", "requirement": "REQUIRED", "priority": 20, "authenticatorFlow": false}
+        {
+          "authenticator": "conditional-user-role",
+          "authenticatorConfig": "psim-mfa-required",
+          "requirement": "REQUIRED",
+          "priority": 10,
+          "authenticatorFlow": false
+        },
+        {
+          "authenticator": "auth-otp-form",
+          "requirement": "REQUIRED",
+          "priority": 20,
+          "authenticatorFlow": false
+        }
       ]
     }
   ],
   "authenticatorConfig": [
-    {"alias": "psim-mfa-required", "config": {"condUserRole": "mfa-required", "negate": "false"}}
+    {
+      "alias": "psim-mfa-required",
+      "config": {
+        "condUserRole": "mfa-required",
+        "negate": "false"
+      }
+    }
   ],
   "requiredActions": [
-    {"alias": "CONFIGURE_TOTP", "name": "Configure OTP", "providerId": "CONFIGURE_TOTP", "enabled": true, "defaultAction": false, "priority": 10}
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 10
+    }
   ],
   "users": [
-    {"username": "operator1", "enabled": true, "firstName": "Dev", "lastName": "Operator",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "clientRoles": {"psim": ["operator"]}},
-    {"username": "supervisor1", "enabled": true, "firstName": "Dev", "lastName": "Supervisor",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "requiredActions": ["CONFIGURE_TOTP"], "clientRoles": {"psim": ["supervisor"]}},
-    {"username": "admin1", "enabled": true, "firstName": "Dev", "lastName": "Admin",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "requiredActions": ["CONFIGURE_TOTP"], "clientRoles": {"psim": ["admin"]}},
-    {"username": "integrator1", "enabled": true, "firstName": "Dev", "lastName": "Integrator",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "clientRoles": {"psim": ["integrator"]}},
-    {"username": "auditor1", "enabled": true, "firstName": "Dev", "lastName": "Auditor",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "clientRoles": {"psim": ["auditor"]}},
-    {"username": "manager1", "enabled": true, "firstName": "Dev", "lastName": "Manager",
-     "credentials": [{"type": "password", "value": "psim-dev-Passw0rd", "temporary": false}],
-     "clientRoles": {"psim": ["manager"]}},
-    {"username": "service-account-psim-services", "enabled": true, "serviceAccountClientId": "psim-services"}
+    {
+      "username": "operator1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Operator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "psim": [
+          "operator"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "supervisor1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Supervisor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "clientRoles": {
+        "psim": [
+          "supervisor"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "admin1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Admin",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "requiredActions": [
+        "CONFIGURE_TOTP"
+      ],
+      "clientRoles": {
+        "psim": [
+          "admin"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "integrator1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Integrator",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "psim": [
+          "integrator"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "auditor1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Auditor",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "psim": [
+          "auditor"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "manager1",
+      "enabled": true,
+      "firstName": "Dev",
+      "lastName": "Manager",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "psim-dev-Passw0rd",
+          "temporary": false
+        }
+      ],
+      "clientRoles": {
+        "psim": [
+          "manager"
+        ]
+      },
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    },
+    {
+      "username": "service-account-psim-services",
+      "enabled": true,
+      "serviceAccountClientId": "psim-services",
+      "attributes": {
+        "psim_tenant": [
+          "11111111-1111-4111-8111-111111111111"
+        ],
+        "psim_scopes": [
+          "site:33333333-3333-4333-8333-333333333333"
+        ]
+      }
+    }
   ]
 }

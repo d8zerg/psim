@@ -648,9 +648,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         if (operation == "override") {
           action = "response.step.override";
         }
-        auto role = principal;
-        role.scopes.insert("*");
-        auto permission = p::authz::decide(role, action, {principal.tenant}, std::chrono::system_clock::now());
+        auto permission = p::authz::decide_role(principal, action, std::chrono::system_clock::now());
         if (!permission) {
           co_return std::unexpected(permission.error());
         }
@@ -682,7 +680,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
               if (!scope) {
                 co_return std::unexpected(scope.error());
               }
-            } else if (!principal.scopes.contains("*")) {
+            } else if (!p::authz::all_scopes(principal)) {
               co_return p::fail(Code::kAuthScopeDenied, "global plan scope required");
             }
             co_return output;
@@ -691,7 +689,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         Json output = Json::object();
         if (plan_action) {
           // Plans may bind to every zone of a tenant; scoped administrators cannot publish global configuration.
-          if (!principal.scopes.contains("*")) {
+          if (!p::authz::all_scopes(principal)) {
             co_return p::fail(Code::kAuthScopeDenied, "global plan scope required");
           }
           auto lock = co_await execute(tx, "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",

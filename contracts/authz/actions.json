@@ -163,6 +163,9 @@
   "catalog.write": [
     "admin"
   ],
+  "connector.recover": [
+    "admin"
+  ],
   "connector.write": [
     "admin",
     "integrator"

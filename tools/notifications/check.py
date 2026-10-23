@@ -76,7 +76,7 @@ class Check(ResponseCheck):
         self.response_config.write_text(json.dumps(response, indent=2))
         self.notification_config.write_text(json.dumps({'service': {'instance': 'notification-1'}, 'runtime': {'shards': 1},
             'telemetry': {'otlp_endpoint': 'otel-collector:4317', 'otlp_tls': False, 'sampling_ratio': 0.001},
-            'settings': {'allow_plaintext': True, 'pg_password_file': '/repo/.cache/event-flow/postgres.secret', 'listen_port': 8443,
+            'settings': {'allow_plaintext': True, 'pg_password_file': '/repo/.cache/event-flow/postgres.secret', 'introspection_secret_file': '/repo/.cache/event-flow/introspection.secret', 'listen_port': 8443,
                 'issuer': 'http://keycloak:8080/realms/psim', **directory, 'smtp_host': 'notification-fixture', 'smtp_port': '8465', 'smtp_from': 'platform@example.test',
                 'delivery_ca_file': '/repo/.cache/event-flow/ca.pem', 'webhook_urls': ['https://notification-fixture:8443/hook', 'https://127.0.0.1:8443/blocked'],
                 'fixture_webhook_url': 'https://notification-fixture:8443/hook', 'webhook_secret_file': '/repo/' + str((self.receiver / 'hmac.secret').relative_to(ROOT)),
@@ -171,6 +171,26 @@ class Check(ResponseCheck):
         self.emit_notification(request_id=identity)
         assert len(self.notifications(identity)) == 1
         self.mark('owner isolation, tenant and site scope, strict API validation and duplicate request identity')
+
+    def group_scope(self):
+        self.refresh_admin()
+        groups = '/admin/realms/psim/groups'
+        name = 'notification-scopes-' + self.fixtures
+        self.keycloak('POST', groups, self.admin, {'name': name, 'attributes': {'psim_scopes': ['site:' + self.site_id]}})
+        parent = next(group for group in self.keycloak('GET', groups, self.admin) if group['name'] == name)
+        self.keycloak('POST', groups + '/' + parent['id'] + '/children', self.admin, {'name': 'recipients'})
+        child = self.keycloak('GET', groups + '/' + parent['id'] + '/children', self.admin)[0]
+        user = '/admin/realms/psim/users/' + self.subjects['bob']
+        profile = self.keycloak('GET', user, self.admin)
+        membership = user + '/groups/' + child['id']
+        self.keycloak('PUT', membership, self.admin)
+        self.keycloak('PUT', user, self.admin, profile | {'attributes': {'psim_tenant': [self.tenant]}})
+        try:
+            self.nq('PUT', '/v1/notification-contacts/' + self.subjects['bob'], {'siteId': self.site_id, 'email': 'bob@example.test', 'webhookUrl': 'https://notification-fixture:8443/hook'}, role='admin', version=1)
+        finally:
+            self.keycloak('PUT', user, self.admin, profile)
+            self.keycloak('DELETE', membership, self.admin)
+        self.mark('recipient eligibility includes ancestor group scopes without a direct user grant')
 
     def plan_delivery(self):
         plan = self.publish(self.plan([{'stepId': 'notify', 'title': 'Notify operator', 'notify': {'recipients': [{'userId': self.subjects['operator']}], 'channels': ['NOTIFICATION_CHANNEL_IN_APP'], 'template': 'Plan notification'}}]))
@@ -377,6 +397,7 @@ def main():
     try:
         check.prepare()
         check.access()
+        check.group_scope()
         check.plan_delivery()
         check.checkpoint()
         check.delivery()

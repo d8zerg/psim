@@ -31,7 +31,7 @@ class Check(Base):
     def ready(self, service):
         def probe():
             try:
-                self.env_command("python3 -c 'import urllib.request; assert urllib.request.urlopen(\"http://" + service + ":9100/health/ready\").status==200'")
+                self.env_command("python3 -c 'import urllib.request; assert urllib.request.urlopen(\"http://" + service + ":9100/health/ready\", timeout=2).status==200'")
                 return True
             except RuntimeError:
                 return False

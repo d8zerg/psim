@@ -36,6 +36,7 @@ struct Job {
   Json input;
 };
 
+bool can_read_rule(const rules::Rule& rule, const p::security::Principal& principal);
 bool can_read(const p::security::Principal& principal);
 bool can_write(const p::security::Principal& principal);
 bool can_read_site(const p::security::Principal& principal, std::string_view site);
@@ -62,6 +63,7 @@ class Repository {
                                         Json body);
   asio::awaitable<p::Result<void>> publish(p::pg::Transaction* tx, p::security::Principal principal,
                                            processing::v1::RuleSet* output);
+  asio::awaitable<p::Result<void>> denied(p::security::Principal principal, std::string operation);
   asio::awaitable<p::Result<void>> audit(p::pg::Transaction* tx, p::security::Principal principal, std::string action,
                                          std::string id, Json details);
   p::pg::Pool* pool_;
