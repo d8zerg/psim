@@ -49,10 +49,10 @@ class Check(CommandCheck):
     def archive(self, plan):
         return self.rq("POST", "/v1/plans/" + plan["planId"] + ":archive", {}, role="admin")
 
-    def new_incident(self):
+    def new_incident(self, role="operator"):
         group = "response-" + uid()
         self.emit(count=1, group=group)
-        return self.wait(lambda: next((item["incidentId"] for item in self.request("GET", "/v1/incidents")["incidents"] if item["groupingKey"] == group), None), 60)
+        return self.wait(lambda: next((item["incidentId"] for item in self.request("GET", "/v1/incidents", role=role)["incidents"] if item["groupingKey"] == group), None), 60)
 
     def current_run(self, incident, **options):
         return self.rq("GET", "/v1/incidents/" + incident + "/run", **options)["run"]

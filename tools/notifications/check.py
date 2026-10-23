@@ -335,13 +335,17 @@ class Check(ResponseCheck):
         self.refresh_admin()
         profile_path = '/admin/realms/psim/users/' + self.subjects['operator']
         profile = self.keycloak('GET', profile_path, self.admin)
+        self.token('operator')
         profile['enabled'] = False
         self.keycloak('PUT', profile_path, self.admin, profile)
-        inactive = self.new_incident()
-        self.wait(lambda: self.sql("SELECT count(*) FROM notification.notifications WHERE body->>'incidentId'='" + inactive + "' AND recipient='" + self.subjects['chief'] + "'") == '1')
-        profile['enabled'] = True
-        self.keycloak('PUT', profile_path, self.admin, profile)
-        value = self.incident(inactive)
+        try:
+            self.wait(lambda: self.request('GET', '/v1/incidents', expected=401), 5)
+            inactive = self.new_incident(role='chief')
+            self.wait(lambda: self.sql("SELECT count(*) FROM notification.notifications WHERE body->>'incidentId'='" + inactive + "' AND recipient='" + self.subjects['chief'] + "'") == '1')
+        finally:
+            profile['enabled'] = True
+            self.keycloak('PUT', profile_path, self.admin, profile)
+        value = self.wait(lambda: self.incident(inactive), 5)
         value = self.request('POST', '/v1/incidents/' + inactive + ':acknowledge', {}, version=value['version'])['incident']
         value = self.request('POST', '/v1/incidents/' + inactive + ':start-work', {}, version=value['version'])['incident']
         self.request('POST', '/v1/incidents/' + inactive + ':resolve', {'resolution': 'RESOLUTION_CONFIRMED'}, version=value['version'])
