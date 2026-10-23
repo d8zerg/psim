@@ -309,6 +309,21 @@ asio::awaitable<p::Result<Json>> Escalation::request(p::security::Principal prin
         if (!stored) {
           co_return std::unexpected(stored.error());
         }
+        if (duty) {
+          response::v1::ResponseEventRecord changed;
+          envelope(changed.mutable_envelope(), principal.tenant);
+          changed.mutable_envelope()->set_sequence(version + 1);
+          auto* snapshot = changed.mutable_site_duty_changed();
+          snapshot->set_site_id(site);
+          snapshot->set_user_id(body.value("userId", std::string{}));
+          snapshot->set_fallback_user_id(body.at("fallbackUserId").get<std::string>());
+          snapshot->set_version(version + 1);
+          *snapshot->mutable_updated_at() = changed.envelope().occurred_at();
+          auto published = co_await publish(tx, std::move(changed), site);
+          if (!published) {
+            co_return std::unexpected(published.error());
+          }
+        }
         auto logged = co_await audit(tx, principal.tenant, principal.subject, operation, id, site);
         if (!logged) {
           co_return std::unexpected(logged.error());

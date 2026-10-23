@@ -63,7 +63,7 @@ class Check(Base):
 
     def prepare(self):
         super().prepare()
-        self.compose("up", "-d", "--force-recreate", "api-gateway")
+        self.compose("up", "-d", "--force-recreate", "projection-service", "api-gateway")
         self.wait(lambda: self.request("GET", "/v1/me", service="api-gateway"), 90)
         self.public = True
         self.mark("public HTTPS Gateway with verified Keycloak tokens and TLS upstream")
@@ -148,18 +148,18 @@ class Check(Base):
             return {"topic": "psim.ingest.state.v1", "key": self.connector, "value": {"envelope": origin, "connectorId": self.connector, "sessionId": session, "stateReport": {"snapshot": True, "complete": True, "observations": [{"cursor": {"sourceRef": source["externalRef"], "sourceEpoch": 1, "sourceSeq": str(sequence)}, "observedAt": helpers["utc"](), "availability": "DEVICE_AVAILABILITY_ONLINE"}]}}}
         self.probe([report(10)])
         self.wait(lambda: status()["online"], 30)
-        boundary = int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM gateway_state.positions WHERE replica='public-api' AND topic='psim.ingest.state.v1'"))
+        boundary = int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM console.positions WHERE replica=(SELECT generation FROM console.active) AND topic='psim.ingest.state.v1'"))
         self.probe([report(2)])
-        self.wait(lambda: int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM gateway_state.positions WHERE replica='public-api' AND topic='psim.ingest.state.v1'")) >= boundary + 1, 30)
+        self.wait(lambda: int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM console.positions WHERE replica=(SELECT generation FROM console.active) AND topic='psim.ingest.state.v1'")) >= boundary + 1, 30)
         assert status()["online"]
         self.probe([event(11)])
         current = self.wait(lambda: (found if (found := status())["state"] == "EVENT_CLASS_ALARM" else None), 30)
         confirmed = current["confirmedAt"]
-        before = int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM gateway_state.positions WHERE replica='public-api' AND topic='psim.events.normalized.v1'"))
+        before = int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM console.positions WHERE replica=(SELECT generation FROM console.active) AND topic='psim.events.normalized.v1'"))
         info = event(20, 2)
         info["value"]["event"].update({"eventClass": "EVENT_CLASS_INFO", "type": "access.door.granted"})
         self.probe([event(20, -120, False), event(2, 1), info])
-        self.wait(lambda: int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM gateway_state.positions WHERE replica='public-api' AND topic='psim.events.normalized.v1'")) >= before + 3, 30)
+        self.wait(lambda: int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM console.positions WHERE replica=(SELECT generation FROM console.active) AND topic='psim.events.normalized.v1'")) >= before + 3, 30)
         assert status()["confirmedAt"] == confirmed
         assert status()["state"] == "EVENT_CLASS_ALARM"
         self.probe(releases=[lease])
@@ -275,6 +275,12 @@ class Check(Base):
             pool.shutdown(wait=True)
         self.mark("Gateway drain cancels a stalled TLS upstream without waiting for its deadline")
 
+    def contracts(self):
+        capture_path = self.output / "api-responses.json"
+        capture_path.write_text(json.dumps(self.captures))
+        self.run(["docker", "run", "--rm", "-u", f"{os.getuid()}:{os.getgid()}", "--network", "none", "-v", str(ROOT) + ":/repo:ro", "-w", "/repo", "psim-platform/api-check:" + __import__("hashlib").sha256((ROOT / "tools/api-gateway/image/Dockerfile").read_bytes()).hexdigest()[:12], "python3", "-I", "tools/api-gateway/schema_check.py", str(capture_path.relative_to(ROOT))])
+        self.mark("public JSON responses conform to committed OpenAPI")
+
     def cleanup(self):
         if self.runtime_lease:
             try:
@@ -291,10 +297,11 @@ class Check(Base):
             state = json.loads(self.run(["docker", "inspect", identity]))[0]["State"]
             assert state["ExitCode"] == 0, state["ExitCode"]
             assert not re.search(r"AddressSanitizer|LeakSanitizer|ThreadSanitizer|runtime error:", logs), "Gateway sanitizer finding"
+        self.compose("stop", "-t", "30", "projection-service")
         try:
             super().cleanup()
         finally:
-            subprocess.run(self.compose_cmd + ["stop", "-t", "30", "resource-catalog", "catalog-2", "connector-gateway"], cwd=ROOT, env=self.env, check=True, capture_output=True)
+            subprocess.run(self.compose_cmd + ["stop", "-t", "30", "resource-catalog", "catalog-2", "connector-gateway", "projection-service"], cwd=ROOT, env=self.env, check=True, capture_output=True)
 
 
 def main():
@@ -307,10 +314,7 @@ def main():
         check.streaming()
         check.snapshots()
         check.feeds()
-        capture_path = check.output / "api-responses.json"
-        capture_path.write_text(json.dumps(check.captures))
-        check.run(["docker", "run", "--rm", "-u", f"{os.getuid()}:{os.getgid()}", "--network", "none", "-v", str(ROOT) + ":/repo:ro", "-w", "/repo", "psim-platform/api-check:" + __import__("hashlib").sha256((ROOT / "tools/api-gateway/image/Dockerfile").read_bytes()).hexdigest()[:12], "python3", "-I", "tools/api-gateway/schema_check.py", str(capture_path.relative_to(ROOT))])
-        check.mark("public JSON responses conform to committed OpenAPI")
+        check.contracts()
         check.metrics()
         check.cancel_inflight()
         check.report["passed"] = True

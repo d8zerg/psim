@@ -114,6 +114,13 @@ services:
   incident-service:
     <<: *event-flow
     command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/incident-service/psim-incident-service", "--config", "/repo/deploy/local/config/event-flow/incident-service.yaml"]
+  projection-service:
+    <<: *event-flow
+    environment:
+      LLVM_PROFILE_FILE: /profiles/%p-%m.profraw
+      ASAN_OPTIONS: "${ASAN_OPTIONS:-}"
+      PSIM__SETTINGS__ISSUER: "${PSIM_OIDC_ISSUER:-http://localhost:8180/realms/psim}"
+    command: ["/repo/build/debian13/${PSIM_PRESET:-debug}/services/projection-service/psim-projection-service", "--config", "/repo/deploy/local/config/projection/console.yaml"]
   api-gateway:
     <<: *event-flow
     environment:

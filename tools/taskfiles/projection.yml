@@ -1,0 +1,49 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-projection-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Console models, scoped snapshots, cache fallback, Kafka rebuilds and update latency
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/projection/check.py {{.PROJECT}} {{.PRESET}}
+  bench:
+    desc: Confirm console update p99 within 100 milliseconds
+    cmds:
+      - task: test
+        vars: {PROJECT: '{{.PROJECT}}-bench', PRESET: release}
+  sanitizers:
+    desc: Console projections under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_projection_test|psim_api_gateway_test|psim_response_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Console, Gateway and report coverage with real services and the browser flow
+    cmds:
+      - defer: >-
+          docker compose -p {{.PROJECT}}-coverage -f deploy/local/compose.yaml
+          --profile catalog-test --profile event-flow --profile gateway-test down -v --remove-orphans --timeout 10
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - mkdir -p build/{{.PLATFORM}}/coverage/profiles
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - PSIM_CATALOG_KEEP_ENV=1 python3 -I tools/projection/check.py {{.PROJECT}}-coverage coverage
+      - task: :catalog:test
+        vars: {PROJECT: '{{.PROJECT}}-catalog-coverage', PRESET: coverage}
+      - task: :reports:test
+        vars: {REPORTS_PROJECT: '{{.PROJECT}}-reports-coverage', PRESET: coverage}
+      - task: :flow:test
+        vars: {PROJECT: '{{.PROJECT}}-coverage', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            ctest --test-dir build/{{.PLATFORM}}/coverage -LE '^component$' -j {{.JOBS}} --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/projection-service services/api-gateway services/resource-catalog' --component

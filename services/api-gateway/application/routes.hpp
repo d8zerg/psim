@@ -27,12 +27,6 @@ struct Route {
   bool floor_plan = false;
 };
 
-struct FeedFilter {
-  std::set<std::string> sites;
-  std::set<std::string> zones;
-};
-
-platform::Result<FeedFilter> feed_filter(std::string_view target, bool zones = true);
 const std::vector<Route>& routes();
 std::uint64_t request_limit(const Route& item);
 platform::Result<const Route*> route(http::verb method, std::string_view target);

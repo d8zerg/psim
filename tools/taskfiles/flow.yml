@@ -2,7 +2,7 @@ version: '3'
 vars:
   PROJECT: '{{.PROJECT | default "psim-platform"}}'
   PRESET: '{{.PRESET | default "debug"}}'
-  APPS: connector-gateway normalizer correlation-engine incident-service api-gateway console
+  APPS: connector-gateway normalizer correlation-engine incident-service projection-service api-gateway console
   ISSUER: '{{.ISSUER | default "http://localhost:8180/realms/psim"}}'
 tasks:
   prepare:

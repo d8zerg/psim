@@ -56,6 +56,15 @@ std::string settings() {
   fields["reports_batch_wait_ms"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 1000}, {"default", 100}};
   fields["clickhouse_cluster"]["pattern"] = "^[A-Za-z0-9_]{1,64}$";
   fields["clickhouse_port"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 65535}, {"default", 9440}};
+  for (const auto* name : {"reports_enabled", "console_enabled", "console_writer"}) {
+    fields[name] = {{"type", "boolean"}, {"default", true}};
+  }
+  fields["console_replay_timeout_ms"] = {
+      {"type", "integer"}, {"minimum", 1000}, {"maximum", 3600000}, {"default", 300000}};
+  for (const auto* name : {"redis_host", "redis_ca_file", "redis_certificate_file", "redis_key_file"}) {
+    fields[name] = {{"type", "string"}, {"default", ""}};
+  }
+  fields["redis_password_file"] = {{"type", "string"}, {"x-psim-secret", true}};
   return schema.dump();
 }
 }  // namespace
@@ -201,7 +210,13 @@ int main(int argc, char** argv) {
                                        .create = [](psim::platform::runtime::Context& context)
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
-                                         result.push_back(std::make_unique<psim::projection::Worker>(context));
+                                         if (context.config().get<bool>("settings.reports_enabled")) {
+                                           result.push_back(std::make_unique<psim::projection::Worker>(context));
+                                         }
+                                         if (context.config().get<bool>("settings.console_enabled")
+                                             && context.config().get<bool>("settings.console_writer")) {
+                                           result.push_back(psim::projection::console_worker(context));
+                                         }
                                          result.push_back(psim::projection::reports_http(context));
                                          return result;
                                        }});

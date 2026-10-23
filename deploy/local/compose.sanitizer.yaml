@@ -34,6 +34,8 @@ services:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   incident-service:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
+  projection-service:
+    security_opt: [no-new-privileges:true, seccomp=unconfined]
   api-gateway:
     security_opt: [no-new-privileges:true, seccomp=unconfined]
   simulator:

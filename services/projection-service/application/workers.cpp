@@ -5,6 +5,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/ssl.hpp>
 #include <google/protobuf/util/time_util.h>
+#include <prometheus/counter.h>
 #include <prometheus/histogram.h>
 #include <psim/common/v1/envelope.pb.h>
 
@@ -17,6 +18,8 @@
 #include <set>
 #include <utility>
 
+#include "console_api.hpp"
+#include "console_store.hpp"
 #include "psim/audit/v1/audit.pb.h"
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
@@ -73,11 +76,38 @@ class HttpWorker final : public p::stream::Worker {
     if (!initialized) {
       co_return initialized;
     }
-    destination_ = connection(context(), true);
-    api_ = std::make_unique<Api>(destination_.get(),
-                                 [this](p::security::Principal principal, std::string action, bool denied) {
-                                   return audit(std::move(principal), std::move(action), denied);
-                                 });
+    if (context().config().get<bool>("settings.reports_enabled")) {
+      destination_ = connection(context(), true);
+      api_ = std::make_unique<Api>(destination_.get(),
+                                   [this](p::security::Principal principal, std::string action, bool denied) {
+                                     return audit(std::move(principal), std::move(action), denied);
+                                   });
+    }
+    if (context().config().get<bool>("settings.console_enabled")) {
+      redis_ = console_redis(context());
+      auto& registry = context().metrics().registry();
+      auto* hits = &prometheus::BuildCounter()
+                        .Name("psim_console_cache_hits_total")
+                        .Help("Console raw snapshot cache hits")
+                        .Register(registry)
+                        .Add({});
+      auto* misses = &prometheus::BuildCounter()
+                          .Name("psim_console_cache_misses_total")
+                          .Help("Console raw snapshots read from PostgreSQL")
+                          .Register(registry)
+                          .Add({});
+      console_latency_ =
+          &prometheus::BuildHistogram()
+               .Name("psim_console_query_seconds")
+               .Help("Scoped console snapshot duration")
+               .Register(registry)
+               .Add({}, prometheus::Histogram::BucketBoundaries{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 5});
+      console_ = std::make_unique<ConsoleStore>(pool_.get(), "", redis_.get(), hits, misses);
+      auto initialized_console = co_await console_->initialize();
+      if (!initialized_console) {
+        co_return initialized_console;
+      }
+    }
     const auto& config = context().config();
     auto tls = co_await context().blocking().run([&config] {
       const auto dir = config.get<std::string>("settings.tls_directory");
@@ -138,7 +168,7 @@ class HttpWorker final : public p::stream::Worker {
     auto* a = event.mutable_audit_entry();
     *a->mutable_actor() = e->actor();
     a->set_action(denied ? "access.denied" : action);
-    a->set_object_type("incident_report");
+    a->set_object_type(action.starts_with("console.") ? "console_snapshot" : "incident_report");
     a->set_outcome(denied ? audit::v1::AUDIT_OUTCOME_DENIED : audit::v1::AUDIT_OUTCOME_SUCCESS);
     (*a->mutable_details())["attempted_action"] = std::move(action);
     co_return co_await p::pg::in_transaction<void>(
@@ -211,10 +241,33 @@ class HttpWorker final : public p::stream::Worker {
         if (body) {
           response = Api::problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "invalid or oversized body"));
         } else {
-          auto trace = p::stream::span(context(), "report.query");
+          p::kafka::Headers headers;
+          for (const auto* name : {"traceparent", "tracestate"}) {
+            const auto value = parser.get()[name];
+            if (!value.empty()) {
+              headers.emplace_back(name, std::string(value));
+            }
+          }
+          const bool console = parser.get().target().starts_with("/v1/feed/");
+          auto trace = p::stream::span(context(), console ? "console.query" : "report.query", headers);
           const auto started = std::chrono::steady_clock::now();
-          auto result = co_await api_->handle(parser.release(), std::move(*principal));
-          latency_->Observe(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
+          auto request = parser.release();
+          p::Result<Response> result = p::fail(p::ErrorCode::kCommonNotFound, "unknown projection operation");
+          if (request.target().starts_with("/v1/feed/") && console_) {
+            result = co_await console_request(console_.get(), &request, *principal);
+            if (!result
+                && (p::info(result.error().code()).http_status == 401
+                    || p::info(result.error().code()).http_status == 403)) {
+              auto logged = co_await audit(*principal, "console.read", true);
+              if (!logged) {
+                result = std::unexpected(logged.error());
+              }
+            }
+          } else if (api_) {
+            result = co_await api_->handle(std::move(request), *principal);
+          }
+          (console && console_latency_ ? console_latency_ : latency_)
+              ->Observe(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
           trace->End();
           response = result ? std::move(*result) : Api::problem(result.error());
         }
@@ -264,6 +317,11 @@ class HttpWorker final : public p::stream::Worker {
       done_.expires_at(asio::steady_timer::time_point::max());
       co_await done_.async_wait(asio::as_tuple(asio::use_awaitable));
     }
+    console_.reset();
+    if (redis_) {
+      redis_->close();
+      redis_.reset();
+    }
     api_.reset();
     relay_.reset();
     if (destination_) {
@@ -276,6 +334,7 @@ class HttpWorker final : public p::stream::Worker {
 
  private:
   prometheus::Histogram* latency_ = nullptr;
+  prometheus::Histogram* console_latency_ = nullptr;
   std::atomic_bool failed_{false}, relay_healthy_{true};
   Tcp::acceptor acceptor_;
   asio::steady_timer timer_, done_;
@@ -285,6 +344,8 @@ class HttpWorker final : public p::stream::Worker {
   std::unique_ptr<p::pg::Pool> pool_;
   std::unique_ptr<p::clickhouse::Pool> destination_;
   std::unique_ptr<Api> api_;
+  std::unique_ptr<ConsoleStore> console_;
+  std::unique_ptr<p::redis::Pool> redis_;
   std::unique_ptr<p::pg::OutboxRelay> relay_;
   std::unique_ptr<p::security::JwksCache> verifier_;
   std::shared_ptr<asio::ssl::context> tls_;

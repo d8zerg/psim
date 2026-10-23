@@ -6,13 +6,13 @@ API Gateway предоставляет REST v1 и сохраняет сущес�
 
 `settings.tls_certificate_file` и `settings.tls_private_key_file` задают внешний TLS listener. `listen_plaintext` разрешён только при `allow_plaintext: true` для локального стенда. `allowed_origins` содержит точные разрешённые origin; wildcard не применяется.
 
-Для каждого владельца задаются `<service>_host` и `<service>_port`: `catalog`, `rules`, `incidents`, `commands`, `response`, `history`, `reports`, `audit`, `notifications`. `upstream_ca_file` задаёт доверенную цепочку; при необходимости используются `upstream_certificate_file` и `upstream_key_file`. JWT проверяется через `issuer`, `jwks_url` и `jwks_ca_file`.
+Для каждого владельца задаются `<service>_host` и `<service>_port`: `catalog`, `rules`, `incidents`, `commands`, `response`, `history`, `reports`, `projection`, `audit`, `notifications`. `upstream_ca_file` задаёт доверенную цепочку; при необходимости используются `upstream_certificate_file` и `upstream_key_file`. JWT проверяется через `issuer`, `jwks_url` и `jwks_ca_file`.
 
 `rate_per_second` и `rate_burst` ограничивают пользователя внутри тенанта; `ip_rate_per_second` и `ip_rate_burst` ограничивают соединения одного адреса. Лимиты применяются на экземпляр, таблицы идентификаторов ограничены. Превышение возвращает 429 с Retry-After.
 
 На TLS handshake и заголовки клиента отводится 10 секунд; после проверки доступа запрос и upstream имеют предел 60 секунд. Остановка Gateway отменяет активные операции, включая ожидание upstream.
 
-Снимки используют собственные временные PostgreSQL-проекции событий. `redis_host`, `redis_password_file` и параметры TLS реестра сессий позволяют проверить текущую сессию коннектора. При недоступности реестра снимок не подтверждает актуальность устройства. Без него связь имеет значение unknown.
+Снимки обслуживает [Projection Service](console-projections.md). Gateway передаёт запрос и исходный JWT по HTTPS. Настройки Redis и проверка текущей сессии коннектора принадлежат Projection Service.
 
 ## Конфигурация обработки
 

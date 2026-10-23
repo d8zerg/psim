@@ -16,15 +16,12 @@
 
 #include <algorithm>
 #include <array>
-#include <charconv>
 #include <chrono>
-#include <cstddef>
 #include <cstdint>
 #include <map>
 #include <stdexcept>
 #include <string>
 #include <string_view>
-#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -57,7 +54,7 @@ std::pair<std::string, std::string> destination(std::string_view service, std::s
     return {"history", method == "RuleStatistics" ? "rule.statistics.read" : "event.read"};
   }
   if (service == "FeedService") {
-    return {"local", method == "GetOperatorLoad" ? "feed.operators.read" : "feed.read"};
+    return {"projection", method == "GetOperatorLoad" ? "feed.operators.read" : "feed.read"};
   }
   if (service == "CommandService") {
     if (read) {
@@ -202,55 +199,6 @@ platform::Result<const Route*> route(http::verb method, std::string_view target)
     }
   }
   return platform::fail(platform::ErrorCode::kCommonNotFound, "unknown REST operation");
-}
-
-platform::Result<FeedFilter> feed_filter(std::string_view target, bool zones) {
-  FeedFilter result;
-  const auto question = target.find('?');
-  if (question == std::string_view::npos) {
-    return result;
-  }
-  auto rest = target.substr(question + 1);
-  while (!rest.empty()) {
-    const auto amp = rest.find('&');
-    const auto pair = rest.substr(0, amp);
-    const auto equal = pair.find('=');
-    if (equal == std::string_view::npos) {
-      return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid feed filter");
-    }
-    const auto name = pair.substr(0, equal);
-    std::string value;
-    const auto encoded = pair.substr(equal + 1);
-    for (std::size_t i = 0; i < encoded.size(); ++i) {
-      if (encoded[i] != '%') {
-        value += encoded[i];
-        continue;
-      }
-      unsigned int byte = 0;
-      if (i + 2 >= encoded.size()) {
-        return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid filter encoding");
-      }
-      const auto text = encoded.substr(i + 1, 2);
-      const auto decoded = std::from_chars(text.begin(), text.end(), byte, 16);
-      if (decoded.ec != std::errc{} || decoded.ptr != text.end()) {
-        return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid filter encoding");
-      }
-      value += static_cast<char>(byte);
-      i += 2;
-    }
-    if (!platform::stream::uuid(value)) {
-      return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "filter identity must be a UUID");
-    }
-    if (name == "siteIds") {
-      result.sites.insert(std::move(value));
-    } else if (zones && name == "zoneIds") {
-      result.zones.insert(std::move(value));
-    } else {
-      return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "unknown feed filter");
-    }
-    rest = amp == std::string_view::npos ? std::string_view{} : rest.substr(amp + 1);
-  }
-  return result;
 }
 
 std::uint64_t request_limit(const Route& item) {

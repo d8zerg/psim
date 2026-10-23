@@ -32,6 +32,7 @@
 - [SLA, дежурства и уведомления](engineering/notifications.md)
 - [Audit Service и независимая проверка журнала](engineering/audit-service.md)
 - [Отчёты по инцидентам](engineering/incident-reports.md)
+- [Модели консоли: хранение, актуальность и перестроение](engineering/console-projections.md)
 - [API Gateway: маршрутизация, конфигурация и снимки](engineering/api-gateway.md)
 - [Поиск истории и связь с инцидентами](engineering/event-history.md)
 - [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)

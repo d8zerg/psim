@@ -5,7 +5,9 @@ package psim.api.v1;
 import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
+import "psim/api/v1/response.proto";
 import "psim/catalog/v1/catalog.proto";
+import "psim/catalog/v1/maintenance.proto";
 import "psim/common/v1/types.proto";
 import "psim/incident/v1/incident.proto";
 
@@ -53,6 +55,8 @@ message GetLocationStatusResponse {
   string resume_token = 3;
   google.protobuf.Timestamp snapshot_at = 4;
   repeated ConnectorRuntimeStatus connectors = 5;
+  repeated psim.catalog.v1.MaintenanceWindow maintenance_windows = 6;
+  repeated SiteDuty site_duties = 7;
 }
 
 // ZoneStatus is the aggregated state of a zone.
@@ -81,6 +85,7 @@ message DeviceStatus {
   string connector_id = 9;
   // Equipment availability remains unknown when only events have been observed.
   string connection = 10;
+  repeated SourceRuntimeStatus sources = 11;
 }
 
 // DataQuality separates observed equipment freshness from resource lifecycle.
@@ -98,6 +103,7 @@ message ConnectorRuntimeStatus {
   DataQuality quality = 3;
   google.protobuf.Timestamp confirmed_at = 4;
   string session_id = 5;
+  psim.catalog.v1.ResourceState resource_state = 6;
 }
 
 // GetOperatorLoadRequest is the request of GetOperatorLoad.
@@ -118,4 +124,20 @@ message OperatorLoad {
   string display_name = 2;
   uint32 assigned_open = 3;
   uint32 escalated = 4;
+  repeated string duty_site_ids = 5;
+  repeated string fallback_site_ids = 6;
+}
+
+// SourceRuntimeStatus keeps event state, reported values and equipment availability independent.
+message SourceRuntimeStatus {
+  string source_id = 1;
+  psim.common.v1.EventClass state = 2;
+  DataQuality state_quality = 3;
+  google.protobuf.Timestamp state_confirmed_at = 4;
+  map<string, string> values = 5;
+  DataQuality values_quality = 6;
+  google.protobuf.Timestamp values_confirmed_at = 7;
+  string availability = 8;
+  google.protobuf.Timestamp availability_confirmed_at = 9;
+  DataQuality availability_quality = 10;
 }

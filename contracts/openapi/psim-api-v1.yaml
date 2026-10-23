@@ -4150,6 +4150,14 @@ components:
           format: date-time
         sessionId:
           type: string
+        resourceState:
+          enum:
+          - RESOURCE_STATE_UNSPECIFIED
+          - RESOURCE_STATE_ACTIVE
+          - RESOURCE_STATE_DISABLED
+          - RESOURCE_STATE_ARCHIVED
+          type: string
+          format: enum
       description: ConnectorRuntimeStatus describes a connection without asserting equipment state.
     psim.api.v1.ConnectorStatus:
       type: object
@@ -4253,6 +4261,10 @@ components:
         connection:
           type: string
           description: Equipment availability remains unknown when only events have been observed.
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.SourceRuntimeStatus'
       description: DeviceStatus is the current state of a device derived from alarm, fault, restore and state events.
     psim.api.v1.DryRun:
       type: object
@@ -4450,6 +4462,14 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/psim.api.v1.ConnectorRuntimeStatus'
+        maintenanceWindows:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.MaintenanceWindow'
+        siteDuties:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.SiteDuty'
       description: GetLocationStatusResponse is the response of GetLocationStatus.
     psim.api.v1.GetMaintenanceWindowResponse:
       type: object
@@ -4854,6 +4874,14 @@ components:
         escalated:
           type: integer
           format: uint32
+        dutySiteIds:
+          type: array
+          items:
+            type: string
+        fallbackSiteIds:
+          type: array
+          items:
+            type: string
       description: OperatorLoad is the current load of one operator.
     psim.api.v1.OverrideStepRequest:
       type: object
@@ -5178,6 +5206,62 @@ components:
         run:
           $ref: '#/components/schemas/psim.response.v1.ResponseRun'
       description: SkipStepResponse is the response of SkipStep.
+    psim.api.v1.SourceRuntimeStatus:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        state:
+          enum:
+          - EVENT_CLASS_UNSPECIFIED
+          - EVENT_CLASS_ALARM
+          - EVENT_CLASS_WARNING
+          - EVENT_CLASS_FAULT
+          - EVENT_CLASS_RESTORE
+          - EVENT_CLASS_STATE
+          - EVENT_CLASS_INFO
+          type: string
+          format: enum
+        stateQuality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+        stateConfirmedAt:
+          type: string
+          format: date-time
+        values:
+          type: object
+          additionalProperties:
+            type: string
+        valuesQuality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+        valuesConfirmedAt:
+          type: string
+          format: date-time
+        availability:
+          type: string
+        availabilityConfirmedAt:
+          type: string
+          format: date-time
+        availabilityQuality:
+          enum:
+          - DATA_QUALITY_UNSPECIFIED
+          - DATA_QUALITY_ACTUAL
+          - DATA_QUALITY_STALE
+          - DATA_QUALITY_UNKNOWN
+          type: string
+          format: enum
+      description: SourceRuntimeStatus keeps event state, reported values and equipment availability independent.
     psim.api.v1.StartDryRunRequest:
       type: object
       properties:

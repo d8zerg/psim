@@ -190,8 +190,8 @@ channels:
     x-psim-semantics: Outbox
   responseEventsV1:
     address: psim.response.events.v1
-    title: Response runs, commands, notifications, SLA and escalations
-    description: 'Key: incident_id. Semantics: Outbox.'
+    title: Response runs, commands, notifications, SLA, escalations and site duty
+    description: 'Key: incident_id or site_id. Semantics: Outbox.'
     messages:
       ResponseEventRecord:
         $ref: '#/components/messages/ResponseEventRecord'
@@ -882,13 +882,6 @@ operations:
     messages:
     - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
     x-psim-service: projection-service
-  apiGatewayReceiveResponseEventsV1:
-    action: receive
-    channel:
-      $ref: '#/channels/responseEventsV1'
-    messages:
-    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
-    x-psim-service: api-gateway
   notificationServiceReceiveResponseEventsV1:
     action: receive
     channel:
@@ -987,13 +980,6 @@ operations:
     messages:
     - $ref: '#/channels/catalogV1/messages/CatalogRecord'
     x-psim-service: projection-service
-  apiGatewayReceiveCatalogV1:
-    action: receive
-    channel:
-      $ref: '#/channels/catalogV1'
-    messages:
-    - $ref: '#/channels/catalogV1/messages/CatalogRecord'
-    x-psim-service: api-gateway
   correlationEngineSendConfigV1:
     action: send
     channel:
@@ -1036,6 +1022,13 @@ operations:
     messages:
     - $ref: '#/channels/configV1/messages/ConfigRecord'
     x-psim-service: event-history
+  projectionServiceReceiveConfigV1:
+    action: receive
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: projection-service
   allServicesSendAuditV1:
     action: send
     channel:
@@ -1208,7 +1201,7 @@ components:
         kafka:
           key:
             type: string
-            description: incident_id
+            description: incident_id or site_id
           schemaIdLocation: payload
           schemaIdPayloadEncoding: confluent
           bindingVersion: 0.5.0

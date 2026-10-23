@@ -63,7 +63,7 @@
 | Свойство | Значение |
 |---|---|
 | Производитель | Normalizer |
-| Потребители | Correlation Engine (`psim-correlation`), Event History (`psim-event-history`), Projection Service (`psim-projection`, только классы `alarm`, `fault`, `restore`, `state`) |
+| Потребители | Correlation Engine (`psim-correlation`), Event History (`psim-event-history`), Projection Service (модели консоли; только живые значимые наблюдения) |
 | Ключ | `site_id + ":" + zone_id` |
 | Порядок | В пределах зоны; порядок источника сохраняется, так как источник принадлежит одной зоне |
 | Семантика | EOS-K |
@@ -141,8 +141,8 @@
 | Свойство | Значение |
 |---|---|
 | Производители | Response Engine, Command Service, Notification Service (outbox) |
-| Потребители | Incident Service (`blocking_steps`, хронология), Response Engine (результаты команд), Command Service (запросы сценариев), Projection Service, API Gateway realtime, Notification Service |
-| Ключ | `incident_id`; для команд и уведомлений вне инцидента - `command_id` или `notification_id` |
+| Потребители | Incident Service (`blocking_steps`, хронология), Response Engine (результаты команд), Command Service (запросы сценариев), Projection Service, Notification Service |
+| Ключ | `incident_id`; для дежурства - `site_id`; для команд и уведомлений вне инцидента - `command_id` или `notification_id` |
 | Порядок | В пределах инцидента |
 | Семантика | Outbox; потребители - EOS-DB или по версии агрегата |
 | Retention | 30 суток |
@@ -167,18 +167,18 @@
 | Свойство | Значение |
 |---|---|
 | Производитель | Resource Catalog (ресурсы) и Connector Gateway (регистрации); outbox каждого владельца |
-| Потребители | Normalizer, Connector Gateway, Correlation Engine, Response Engine, Command Service, Projection Service, API Gateway (ABAC: принадлежность зон площадкам) |
+| Потребители | Normalizer, Connector Gateway, Correlation Engine, Response Engine, Command Service, Projection Service (области доступа снимков) |
 | Ключ | `resource_type + ":" + resource_id` |
 | Семантика | Compacted; запись - полное актуальное состояние ресурса с версией |
-| Чтение | Каждый экземпляр читает топик целиком без группы потребителей, строит копию в памяти и считается готовым (readiness) после чтения до конца |
+| Чтение | Каждый экземпляр читает топик целиком без группы потребителей, строит локальную модель и считается готовым (readiness) после чтения до конца; Projection Service хранит общую модель в PostgreSQL |
 | Retention | Бессрочно (compaction) |
 
 ### 3.8 Конфигурация: `psim.config.v1`
 
 | Свойство | Значение |
 |---|---|
-| Производители | Correlation Engine (наборы правил), Normalizer API (правила отображения), администрирование системы |
-| Ключ | `config_key`: `ruleset/<tenant>`, `mapping/<tenant>/<connector_type>`, `retention/<tenant>`, `system/<name>` |
+| Производители | Correlation Engine (наборы правил), Resource Catalog (отображения, retention, параметры обработки, обслуживание) |
+| Ключ | `config_key`: `ruleset/<tenant>`, `mapping/<tenant>/<connector_type>`, `retention/<tenant>`, `maintenance/<tenant>/<id>`, `system/<name>` |
 | Партиции | 1 - единый порядок применения всех изменений конфигурации |
 | Семантика | Compacted; запись - полный активный объект с версией |
 | Применение | Потребитель применяет изменение атомарно между пакетами входных данных |
@@ -220,7 +220,7 @@
 | `psim.correlation.changelog.v1` | `tenant_id/rule_id/rule_version/correlation_key` | compacted | ∞ | - |
 | `psim.correlation.repartition.v1` | `correlation_key` | EOS-K | 6 ч | Новый внутренний топик |
 | `psim.incidents.events.v1` | `incident_id` | Outbox + версия | 30 сут | - |
-| `psim.response.events.v1` | `incident_id` | Outbox + версия | 30 сут | Включает жизненный цикл команд и уведомлений |
+| `psim.response.events.v1` | `incident_id or site_id` | Outbox + версия | 30 сут | Включает жизненный цикл команд и уведомлений |
 | `psim.commands.v1` | `connector_id` | ALO+ID | 24 ч | - |
 | `psim.commands.results.v1` | `command_id` | ALO+ID | 24 ч | - |
 | `psim.catalog.v1` | `resource_type:resource_id` | compacted | ∞ | - |

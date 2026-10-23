@@ -9,6 +9,7 @@
 #include <psim/incident/v1/events.pb.h>
 #include <psim/ingest/v1/state.pb.h>
 #include <psim/processing/v1/event.pb.h>
+#include <psim/response/v1/events.pb.h>
 
 #include <chrono>
 #include <cstddef>
@@ -62,7 +63,8 @@ asio::awaitable<int> run(Json input) {
   }
   for (const auto& lease : input.value("leases", Json::array())) {
     auto claimed = co_await p::redis::SessionRegistry(&redis, {"connector-gateway", lease.at("tenant")})
-                       .claim(lease.at("connector"), {lease.at("session"), "api-probe"}, std::chrono::seconds(60));
+                       .claim(lease.at("connector"), {lease.at("session"), "api-probe"},
+                              std::chrono::seconds(lease.value("ttlSeconds", 60)));
     if (!take(std::move(claimed))) {
       throw std::runtime_error("lease claim failed");
     }
@@ -78,6 +80,8 @@ asio::awaitable<int> run(Json input) {
       value = std::make_unique<psim::ingest::v1::GatewayStateRecord>();
     } else if (topic == "psim.config.v1") {
       value = std::make_unique<psim::config::v1::ConfigRecord>();
+    } else if (topic == "psim.response.events.v1") {
+      value = std::make_unique<psim::response::v1::ResponseEventRecord>();
     } else if (topic == "psim.incidents.events.v1") {
       value = std::make_unique<psim::incident::v1::IncidentEventRecord>();
     } else {

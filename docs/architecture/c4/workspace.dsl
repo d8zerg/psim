@@ -127,8 +127,8 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         psim.commandService -> psim.kafka "psim.commands.v1, psim.response.events.v1 (outbox)" "Kafka"
         psim.kafka -> psim.commandService "psim.commands.results.v1" "Kafka"
         psim.kafka -> psim.notificationService "psim.response.events.v1" "Kafka"
-        psim.kafka -> psim.projectionService "incidents, response, normalized (state), catalog" "Kafka"
-        psim.kafka -> psim.apiGateway "incidents, response, catalog (realtime)" "Kafka"
+        psim.kafka -> psim.projectionService "incidents, response, normalized, ingest.state, catalog, config" "Kafka"
+        psim.kafka -> psim.apiGateway "incidents (realtime)" "Kafka"
         psim.kafka -> psim.auditService "psim.audit.v1" "Kafka"
         psim.resourceCatalog -> psim.kafka "psim.catalog.v1 (outbox)" "Kafka"
 
@@ -147,7 +147,6 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         # Хранилища
         psim.connectorGateway -> psim.redis "Реестр сессий"
         psim.commandService -> psim.redis "Проверка сессии"
-        psim.apiGateway -> psim.redis "Лимиты"
         psim.projectionService -> psim.redis "Горячие проекции"
         psim.resourceCatalog -> psim.postgres "catalog"
         psim.resourceCatalog -> psim.fileStore "FileStore: версии планов" "S3 API, HTTPS"
@@ -157,7 +156,7 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         psim.responseEngine -> psim.postgres "response, escalation"
         psim.commandService -> psim.postgres "command"
         psim.notificationService -> psim.postgres "notification: очередь и квитанции"
-        psim.projectionService -> psim.postgres "projection"
+        psim.projectionService -> psim.postgres "console, reports journal"
         psim.projectionService -> psim.clickhouse "incident_facts, отчёты" "ClickHouse native, TLS"
         psim.auditService -> keycloak "Read-only журнал безопасности" "HTTPS + OAuth2"
         psim.auditService -> checkpointArchive "Подписанные контрольные точки" "Файлы + fsync"

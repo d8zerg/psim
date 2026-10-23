@@ -35,7 +35,6 @@
 #include <vector>
 
 #include "metrics.hpp"
-#include "projection.hpp"
 #include "proxy.hpp"
 #include "psim/common/v1/envelope.pb.h"
 #include "psim/incident/v1/incident.pb.h"
@@ -43,18 +42,17 @@
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
+#include "psim/platform/kafka/consumer.hpp"
 #include "psim/platform/kafka/processor.hpp"
 #include "psim/platform/pg/repository.hpp"
 #include "psim/platform/pg/store.hpp"
 #include "psim/platform/pg/transaction.hpp"
-#include "psim/platform/redis/pool.hpp"
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/security/tls.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/realtime/v1/realtime.pb.h"
 #include "routes.hpp"
-#include "state.hpp"
 
 namespace psim::api_gateway {
 namespace p = platform;
@@ -122,8 +120,8 @@ class Gateway final : public p::stream::Worker {
                                              config.get<std::size_t>("settings.rate_burst"));
     ip_limiter_ = std::make_unique<RateLimiter>(config.get<std::size_t>("settings.ip_rate_per_second"),
                                                 config.get<std::size_t>("settings.ip_rate_burst"));
-    for (const auto* name :
-         {"catalog", "rules", "incidents", "commands", "response", "history", "reports", "audit", "notifications"}) {
+    for (const auto* name : {"catalog", "rules", "incidents", "commands", "response", "history", "reports",
+                             "projection", "audit", "notifications"}) {
       endpoints_.emplace(name, Endpoint{config.get<std::string>(std::string("settings.") + name + "_host"),
                                         config.get<std::string>(std::string("settings.") + name + "_port")});
     }
@@ -161,37 +159,14 @@ class Gateway final : public p::stream::Worker {
       co_return std::unexpected(pool.error());
     }
     pool_ = std::move(*pool);
-    if (!config.get<std::string>("settings.redis_host").empty()) {
-      p::redis::PoolOptions options;
-      options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
-      options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
-      options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
-      options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
-      options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
-      options.connection.connect_timeout = std::chrono::milliseconds(500);
-      options.connection.command_timeout = std::chrono::milliseconds(500);
-      if (auto password = config.secret("settings.redis_password_file")) {
-        options.connection.credentials.password = std::string(*password);
-      }
-      leases_ = std::make_unique<p::redis::Pool>(std::move(options));
+    auto lease = co_await pool_->acquire();
+    if (!lease) {
+      co_return std::unexpected(lease.error());
     }
-    state_ = std::make_unique<StateProjection>(pool_.get(), context().config().get<std::string>("service.instance"),
-                                               leases_.get());
-    auto state_initialized = co_await state_->initialize();
-    if (!state_initialized) {
-      co_return state_initialized;
-    }
-    projection_ = std::make_unique<Projection>(pool_.get(), context().config().get<std::string>("service.instance"));
-    auto initialized = co_await projection_->initialize();
+    auto initialized = co_await p::pg::MessageStore("access").initialize(&**lease);
     if (!initialized) {
       co_return initialized;
     }
-    auto snapshot = co_await projection_->snapshot("00000000-0000-0000-0000-000000000000");
-    if (!snapshot) {
-      co_return std::unexpected(snapshot.error());
-    }
-    offsets_ = std::move(snapshot->offsets);
-    floor_ = offsets_;
     auto verifier = p::security::JwksCache::create(
         {.jwt = {.issuer = context().config().get<std::string>("settings.issuer"), .audience = "psim"},
          .url = context().config().get<std::string>("settings.jwks_url"),
@@ -239,26 +214,6 @@ class Gateway final : public p::stream::Worker {
     return Json{{"epoch", epoch_}, {"tenant", std::move(tenant)}, {"offsets", positions}}.dump();
   }
 
-  asio::awaitable<p::Result<api::v1::GetIncidentFeedResponse>> snapshot(p::security::Principal principal,
-                                                                        FeedFilter filter) {
-    auto result = co_await projection_->snapshot(principal.tenant);
-    if (!result) {
-      co_return std::unexpected(result.error());
-    }
-    auto* incidents = result->feed.mutable_incidents();
-    for (int index = incidents->size() - 1; index >= 0; --index) {
-      const auto& incident = incidents->Get(index);
-      if ((!filter.sites.empty() && !filter.sites.contains(incident.site_id()))
-          || (!filter.zones.empty() && !filter.zones.contains(incident.zone_id()))
-          || !p::authz::scoped(principal, {principal.tenant, incident.site_id(), incident.zone_id()})
-          || incident.state() == incident::v1::INCIDENT_STATE_CLOSED) {
-        incidents->DeleteSubrange(index, 1);
-      }
-    }
-    result->feed.set_resume_token(token(result->offsets, principal.tenant));
-    co_return std::move(result->feed);
-  }
-
   void subscribe(SessionBase* session, const realtime::v1::Subscribe& request, const std::string& request_id) {
     if (!session->principal) {
       return;
@@ -278,7 +233,12 @@ class Gateway final : public p::stream::Worker {
       }
       for (const auto& [partition, offset] : offsets) {
         const auto known = offsets_.find(partition);
-        if (known == offsets_.end() || offset < 0 || offset > known->second) {
+        const bool empty_partition =
+            consumer() != nullptr && std::ranges::any_of(consumer()->positions(), [&](const auto& entry) {
+              return entry.first.topic == "psim.incidents.events.v1"
+                     && std::to_string(entry.first.partition) == partition && entry.second == offset;
+            });
+        if (offset < 0 || (known == offsets_.end() ? !empty_partition : offset > known->second)) {
           valid = false;
         }
       }
@@ -309,22 +269,18 @@ class Gateway final : public p::stream::Worker {
   }
 
   asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
-    auto trace = p::stream::span(context(), "project and deliver incident", message->headers());
+    auto trace = p::stream::span(context(), "deliver incident", message->headers());
     auto event = decode<incident::v1::IncidentEventRecord>(*message);
     if (!event) {
       trace->End();
       co_return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "unsupported incident event");
-    }
-    auto applied = co_await projection_->apply(*event, message);
-    if (!applied) {
-      trace->End();
-      co_return applied;
     }
     const auto partition = std::to_string(message->partition());
     if (message->offset() < offsets_[partition]) {
       trace->End();
       co_return p::Result<void>{};
     }
+    floor_.try_emplace(partition, message->offset());
     offsets_[partition] = std::max(offsets_[partition], message->offset() + 1);
     const auto resume = token(offsets_, event->envelope().tenant_id());
     journal_.push_back({*event, partition, message->offset(), resume});
@@ -379,12 +335,6 @@ class Gateway final : public p::stream::Worker {
       idle_.expires_after(std::chrono::milliseconds(10));
       co_await idle_.async_wait(asio::as_tuple(asio::use_awaitable));
     }
-    state_.reset();
-    if (leases_) {
-      leases_->close();
-      leases_.reset();
-    }
-    projection_.reset();
     if (pool_) {
       pool_->close();
       pool_.reset();
@@ -456,22 +406,6 @@ class Gateway final : public p::stream::Worker {
         });
   }
 
-  asio::awaitable<p::Result<std::string>> operational(p::security::Principal principal, std::string location,
-                                                      std::set<std::string> sites) {
-    const bool operators = location.empty();
-    if (!operators && !p::stream::uuid(location)) {
-      co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "location identity must be a UUID");
-    }
-    auto result = co_await state_->snapshot(principal, std::move(location), std::move(sites));
-    if (!result) {
-      co_return std::unexpected(result.error());
-    }
-    const auto resume = Json{{"epoch", epoch_}, {"tenant", principal.tenant}, {"stateOffsets", result->offsets}}.dump();
-    result->location.set_resume_token(resume);
-    result->operators.set_resume_token(resume);
-    co_return operators ? p::stream::json(result->operators) : p::stream::json(result->location);
-  }
-
   bool origin(std::string_view value) const { return allowed_origin(value, origins_); }
 
   bool limit(const p::security::Principal& principal) {
@@ -488,6 +422,8 @@ class Gateway final : public p::stream::Worker {
 
   HttpMetrics& metrics() { return *http_metrics_; }
 
+  const std::string& epoch() const { return epoch_; }
+
  private:
   Tcp::acceptor acceptor_;
   asio::steady_timer idle_, relay_timer_;
@@ -502,9 +438,6 @@ class Gateway final : public p::stream::Worker {
   bool listening_ = false;
   std::string epoch_;
   std::unique_ptr<p::pg::Pool> pool_;
-  std::unique_ptr<Projection> projection_;
-  std::unique_ptr<StateProjection> state_;
-  std::unique_ptr<p::redis::Pool> leases_;
   std::unique_ptr<p::security::JwksCache> verifier_;
   std::map<std::string, std::int64_t> offsets_, floor_;
   std::deque<JournalEntry> journal_;
@@ -796,44 +729,6 @@ asio::awaitable<void> Session<Stream>::run() {
           me.add_actions(action);
         }
         co_await send(http::status::ok, p::stream::json(me));
-      } else if ((*selected)->operation == "FeedService_GetIncidentFeed") {
-        auto filter = feed_filter(request.target());
-        if (!filter) {
-          co_await problem(filter.error());
-          stop();
-          co_return;
-        }
-        auto feed = co_await gateway->snapshot(*authenticated, std::move(*filter));
-        if (!feed) {
-          co_await problem(feed.error());
-        } else {
-          co_await send(http::status::ok, p::stream::json(*feed));
-        }
-      } else {
-        const auto path = std::string(request.target().substr(0, request.target().find('?')));
-        const auto location =
-            (*selected)->operation == "FeedService_GetLocationStatus" ? path.substr(19, path.size() - 26) : "";
-        auto filter = feed_filter(request.target(), false);
-        if (!filter || (!location.empty() && request.target().find('?') != std::string_view::npos)) {
-          co_await problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "invalid snapshot filter"));
-          stop();
-          co_return;
-        }
-        auto result = co_await gateway->operational(*authenticated, location, std::move(filter->sites));
-        if (!result) {
-          const auto status = p::info(result.error().code()).http_status;
-          if (status == 401 || status == 403) {
-            auto logged = co_await gateway->denied(*authenticated, (*selected)->operation);
-            if (!logged) {
-              co_await problem(logged.error());
-              stop();
-              co_return;
-            }
-          }
-          co_await problem(result.error());
-        } else {
-          co_await send(http::status::ok, std::move(*result));
-        }
       }
     } else if (parser.content_length().value_or(0) > request_limit(**selected)) {
       co_await problem(p::Error(p::ErrorCode::kCommonPayloadTooLarge, "request body exceeds limit"));
@@ -849,8 +744,8 @@ asio::awaitable<void> Session<Stream>::run() {
       }
       try {
         forwarded = co_await proxy(&socket.next_layer(), &buffer, &parser, gateway->endpoint((*selected)->service),
-                                   &gateway->upstream_tls(), origin, (*selected)->floor_plan, &started, &invalid_body,
-                                   &oversized);
+                                   &gateway->upstream_tls(), origin, gateway->epoch(), (*selected)->floor_plan,
+                                   &started, &invalid_body, &oversized);
       } catch (const std::exception&) {
         forwarded = false;
       }
@@ -876,39 +771,6 @@ asio::awaitable<void> Session<Stream>::run() {
   stop();
 }
 
-class StateWorker final : public p::stream::Worker {
- public:
-  StateWorker(const p::runtime::Context& context, std::string stage, std::string topic)
-      : p::stream::Worker(context, std::move(stage), std::move(topic), p::kafka::Semantics::kAtLeastOnce, true) {}
-
-  asio::awaitable<p::Result<void>> initialize() override {
-    auto pool = co_await database();
-    if (!pool) {
-      co_return std::unexpected(pool.error());
-    }
-    pool_ = std::move(*pool);
-    projection_ =
-        std::make_unique<StateProjection>(pool_.get(), context().config().get<std::string>("service.instance"));
-    co_return co_await projection_->initialize();
-  }
-
-  asio::awaitable<p::Result<void>> handle(const p::kafka::Message* message, p::kafka::Output* /*output*/) override {
-    co_return co_await projection_->apply(message);
-  }
-
-  asio::awaitable<void> shutdown() override {
-    projection_.reset();
-    if (pool_) {
-      pool_->close();
-      pool_.reset();
-    }
-    co_return;
-  }
-
- private:
-  std::unique_ptr<p::pg::Pool> pool_;
-  std::unique_ptr<StateProjection> projection_;
-};
 }  // namespace psim::api_gateway
 
 namespace psim::api_gateway {
@@ -934,6 +796,7 @@ std::string settings() {
                                                                      {"response", "response-engine"},
                                                                      {"history", "event-history"},
                                                                      {"reports", "projection-service"},
+                                                                     {"projection", "projection-service"},
                                                                      {"audit", "audit-service"},
                                                                      {"notifications", "notification-service"}}) {
     fields[name + "_host"] = {{"type", "string"}, {"minLength", 1}, {"default", host}};
@@ -952,12 +815,6 @@ int main(int argc, char** argv) {
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
                                          result.push_back(std::make_unique<psim::api_gateway::Gateway>(context));
-                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
-                                             context, "state-catalog", "psim.catalog.v1"));
-                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
-                                             context, "state-observations", "psim.events.normalized.v1"));
-                                         result.push_back(std::make_unique<psim::api_gateway::StateWorker>(
-                                             context, "state-connections", "psim.ingest.state.v1"));
                                          return result;
                                        }});
 }

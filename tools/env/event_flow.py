@@ -12,7 +12,7 @@ import time
 ROOT = Path(__file__).resolve().parents[2]
 PRESET = os.environ.get("PSIM_PRESET", "debug")
 REPORT = ROOT / "build/event-flow-test"
-SERVICES = ["connector-gateway", "normalizer", "correlation-engine", "incident-service", "api-gateway"]
+SERVICES = ["connector-gateway", "normalizer", "correlation-engine", "incident-service", "projection-service", "api-gateway"]
 PLAYWRIGHT = "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27"
 
 
@@ -61,7 +61,7 @@ def ready(project):
         wait(lambda: env.http("GET", "http://console:4173/")[0] == 200)
     finally:
         env.stop_probe()
-    print("event flow: five services and console ready")
+    print("event flow: six services and console ready")
 
 
 def main(project):

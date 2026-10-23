@@ -20,6 +20,7 @@ HistoryCheck, uid, stamp, TASK = (helpers[k] for k in ("Check", "uid", "stamp", 
 class Check(HistoryCheck):
     def __init__(self, project, preset, count, benchmark=False):
         super().__init__(project, preset, count)
+        self.env["PSIM_OIDC_ISSUER"] = "http://keycloak:8080/realms/psim"
         self.log.close()
         self.output = ROOT / "build/reports" / (preset + ("-bench" if benchmark else ""))
         self.output.mkdir(parents=True, exist_ok=True)
@@ -64,6 +65,7 @@ class Check(HistoryCheck):
         common = {"service": {"instance": "reports-fixture"}, "runtime": {"shards": 1, "blocking_threads": 8}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.01},
                   "settings": {"allow_plaintext": True, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "listen_port": 8443, "issuer": "http://keycloak:8080/realms/psim"}}
         config = json.loads(json.dumps(common))
+        config["settings"]["console_enabled"] = False
         config["settings"].update({"clickhouse_host": "clickhouse", "clickhouse_port": 9000, "clickhouse_password_file": "/repo/.cache/processing/clickhouse.password"})
         (self.output / "service.json").write_text(json.dumps(config))
         (self.output / "response.json").write_text(json.dumps(common))

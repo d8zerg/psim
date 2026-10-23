@@ -177,6 +177,81 @@
 
     - [EventHistoryService](#psim-api-v1-EventHistoryService)
 
+- [psim/api/v1/problem.proto](#psim_api_v1_problem-proto)
+    - [FieldViolation](#psim-api-v1-FieldViolation)
+    - [Problem](#psim-api-v1-Problem)
+
+- [psim/response/v1/plan.proto](#psim_response_v1_plan-proto)
+    - [AutomatedParams](#psim-response-v1-AutomatedParams)
+    - [ChecklistItem](#psim-response-v1-ChecklistItem)
+    - [ChecklistParams](#psim-response-v1-ChecklistParams)
+    - [CommandParams](#psim-response-v1-CommandParams)
+    - [CommandParams.ParametersEntry](#psim-response-v1-CommandParams-ParametersEntry)
+    - [DecisionOption](#psim-response-v1-DecisionOption)
+    - [DecisionParams](#psim-response-v1-DecisionParams)
+    - [EscalateParams](#psim-response-v1-EscalateParams)
+    - [EscalationLevel](#psim-response-v1-EscalationLevel)
+    - [EscalationPolicy](#psim-response-v1-EscalationPolicy)
+    - [InstructionParams](#psim-response-v1-InstructionParams)
+    - [NotifyParams](#psim-response-v1-NotifyParams)
+    - [PlanBinding](#psim-response-v1-PlanBinding)
+    - [Recipient](#psim-response-v1-Recipient)
+    - [ResponsePlan](#psim-response-v1-ResponsePlan)
+    - [SlaTarget](#psim-response-v1-SlaTarget)
+    - [Step](#psim-response-v1-Step)
+    - [WaitParams](#psim-response-v1-WaitParams)
+
+    - [NotificationChannel](#psim-response-v1-NotificationChannel)
+    - [PlanState](#psim-response-v1-PlanState)
+
+- [psim/response/v1/run.proto](#psim_response_v1_run-proto)
+    - [ResponseRun](#psim-response-v1-ResponseRun)
+    - [StepExecution](#psim-response-v1-StepExecution)
+    - [StepResult](#psim-response-v1-StepResult)
+
+    - [RunState](#psim-response-v1-RunState)
+    - [StepState](#psim-response-v1-StepState)
+
+- [psim/api/v1/response.proto](#psim_api_v1_response-proto)
+    - [ArchivePlanRequest](#psim-api-v1-ArchivePlanRequest)
+    - [ArchivePlanResponse](#psim-api-v1-ArchivePlanResponse)
+    - [CompleteStepRequest](#psim-api-v1-CompleteStepRequest)
+    - [CompleteStepResponse](#psim-api-v1-CompleteStepResponse)
+    - [CreateEscalationPolicyRequest](#psim-api-v1-CreateEscalationPolicyRequest)
+    - [CreateEscalationPolicyResponse](#psim-api-v1-CreateEscalationPolicyResponse)
+    - [GetIncidentRunRequest](#psim-api-v1-GetIncidentRunRequest)
+    - [GetIncidentRunResponse](#psim-api-v1-GetIncidentRunResponse)
+    - [GetPlanRequest](#psim-api-v1-GetPlanRequest)
+    - [GetPlanResponse](#psim-api-v1-GetPlanResponse)
+    - [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest)
+    - [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse)
+    - [ListEscalationPoliciesRequest](#psim-api-v1-ListEscalationPoliciesRequest)
+    - [ListEscalationPoliciesResponse](#psim-api-v1-ListEscalationPoliciesResponse)
+    - [ListPlansRequest](#psim-api-v1-ListPlansRequest)
+    - [ListPlansResponse](#psim-api-v1-ListPlansResponse)
+    - [OverrideStepRequest](#psim-api-v1-OverrideStepRequest)
+    - [OverrideStepResponse](#psim-api-v1-OverrideStepResponse)
+    - [PublishPlanRequest](#psim-api-v1-PublishPlanRequest)
+    - [PublishPlanResponse](#psim-api-v1-PublishPlanResponse)
+    - [RetryStepRequest](#psim-api-v1-RetryStepRequest)
+    - [RetryStepResponse](#psim-api-v1-RetryStepResponse)
+    - [SavePlanDraftRequest](#psim-api-v1-SavePlanDraftRequest)
+    - [SavePlanDraftResponse](#psim-api-v1-SavePlanDraftResponse)
+    - [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest)
+    - [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse)
+    - [SiteDuty](#psim-api-v1-SiteDuty)
+    - [SkipStepRequest](#psim-api-v1-SkipStepRequest)
+    - [SkipStepResponse](#psim-api-v1-SkipStepResponse)
+    - [UpdateEscalationPolicyRequest](#psim-api-v1-UpdateEscalationPolicyRequest)
+    - [UpdateEscalationPolicyResponse](#psim-api-v1-UpdateEscalationPolicyResponse)
+    - [ValidatePlanRequest](#psim-api-v1-ValidatePlanRequest)
+    - [ValidatePlanResponse](#psim-api-v1-ValidatePlanResponse)
+
+    - [EscalationPolicyService](#psim-api-v1-EscalationPolicyService)
+    - [ResponsePlanService](#psim-api-v1-ResponsePlanService)
+    - [ResponseRunService](#psim-api-v1-ResponseRunService)
+    - [SiteDutyService](#psim-api-v1-SiteDutyService)
+
 - [psim/incident/v1/incident.proto](#psim_incident_v1_incident-proto)
     - [Incident](#psim-incident-v1-Incident)
     - [IncidentTransfer](#psim-incident-v1-IncidentTransfer)
@@ -202,6 +277,8 @@
     - [GetOperatorLoadRequest](#psim-api-v1-GetOperatorLoadRequest)
     - [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse)
     - [OperatorLoad](#psim-api-v1-OperatorLoad)
+    - [SourceRuntimeStatus](#psim-api-v1-SourceRuntimeStatus)
+    - [SourceRuntimeStatus.ValuesEntry](#psim-api-v1-SourceRuntimeStatus-ValuesEntry)
     - [ZoneStatus](#psim-api-v1-ZoneStatus)
 
     - [DataQuality](#psim-api-v1-DataQuality)
@@ -262,29 +339,6 @@
 
     - [MeService](#psim-api-v1-MeService)
 
-- [psim/response/v1/plan.proto](#psim_response_v1_plan-proto)
-    - [AutomatedParams](#psim-response-v1-AutomatedParams)
-    - [ChecklistItem](#psim-response-v1-ChecklistItem)
-    - [ChecklistParams](#psim-response-v1-ChecklistParams)
-    - [CommandParams](#psim-response-v1-CommandParams)
-    - [CommandParams.ParametersEntry](#psim-response-v1-CommandParams-ParametersEntry)
-    - [DecisionOption](#psim-response-v1-DecisionOption)
-    - [DecisionParams](#psim-response-v1-DecisionParams)
-    - [EscalateParams](#psim-response-v1-EscalateParams)
-    - [EscalationLevel](#psim-response-v1-EscalationLevel)
-    - [EscalationPolicy](#psim-response-v1-EscalationPolicy)
-    - [InstructionParams](#psim-response-v1-InstructionParams)
-    - [NotifyParams](#psim-response-v1-NotifyParams)
-    - [PlanBinding](#psim-response-v1-PlanBinding)
-    - [Recipient](#psim-response-v1-Recipient)
-    - [ResponsePlan](#psim-response-v1-ResponsePlan)
-    - [SlaTarget](#psim-response-v1-SlaTarget)
-    - [Step](#psim-response-v1-Step)
-    - [WaitParams](#psim-response-v1-WaitParams)
-
-    - [NotificationChannel](#psim-response-v1-NotificationChannel)
-    - [PlanState](#psim-response-v1-PlanState)
-
 - [psim/response/v1/notification.proto](#psim_response_v1_notification-proto)
     - [Notification](#psim-response-v1-Notification)
     - [Notification.DataEntry](#psim-response-v1-Notification-DataEntry)
@@ -305,10 +359,6 @@
     - [NotificationContactService](#psim-api-v1-NotificationContactService)
     - [NotificationService](#psim-api-v1-NotificationService)
 
-- [psim/api/v1/problem.proto](#psim_api_v1_problem-proto)
-    - [FieldViolation](#psim-api-v1-FieldViolation)
-    - [Problem](#psim-api-v1-Problem)
-
 - [psim/api/v1/reports.proto](#psim_api_v1_reports-proto)
     - [ExportIncidentReportRequest](#psim-api-v1-ExportIncidentReportRequest)
     - [ExportIncidentReportResponse](#psim-api-v1-ExportIncidentReportResponse)
@@ -320,54 +370,6 @@
     - [ReportGrouping](#psim-api-v1-ReportGrouping)
 
     - [ReportService](#psim-api-v1-ReportService)
-
-- [psim/response/v1/run.proto](#psim_response_v1_run-proto)
-    - [ResponseRun](#psim-response-v1-ResponseRun)
-    - [StepExecution](#psim-response-v1-StepExecution)
-    - [StepResult](#psim-response-v1-StepResult)
-
-    - [RunState](#psim-response-v1-RunState)
-    - [StepState](#psim-response-v1-StepState)
-
-- [psim/api/v1/response.proto](#psim_api_v1_response-proto)
-    - [ArchivePlanRequest](#psim-api-v1-ArchivePlanRequest)
-    - [ArchivePlanResponse](#psim-api-v1-ArchivePlanResponse)
-    - [CompleteStepRequest](#psim-api-v1-CompleteStepRequest)
-    - [CompleteStepResponse](#psim-api-v1-CompleteStepResponse)
-    - [CreateEscalationPolicyRequest](#psim-api-v1-CreateEscalationPolicyRequest)
-    - [CreateEscalationPolicyResponse](#psim-api-v1-CreateEscalationPolicyResponse)
-    - [GetIncidentRunRequest](#psim-api-v1-GetIncidentRunRequest)
-    - [GetIncidentRunResponse](#psim-api-v1-GetIncidentRunResponse)
-    - [GetPlanRequest](#psim-api-v1-GetPlanRequest)
-    - [GetPlanResponse](#psim-api-v1-GetPlanResponse)
-    - [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest)
-    - [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse)
-    - [ListEscalationPoliciesRequest](#psim-api-v1-ListEscalationPoliciesRequest)
-    - [ListEscalationPoliciesResponse](#psim-api-v1-ListEscalationPoliciesResponse)
-    - [ListPlansRequest](#psim-api-v1-ListPlansRequest)
-    - [ListPlansResponse](#psim-api-v1-ListPlansResponse)
-    - [OverrideStepRequest](#psim-api-v1-OverrideStepRequest)
-    - [OverrideStepResponse](#psim-api-v1-OverrideStepResponse)
-    - [PublishPlanRequest](#psim-api-v1-PublishPlanRequest)
-    - [PublishPlanResponse](#psim-api-v1-PublishPlanResponse)
-    - [RetryStepRequest](#psim-api-v1-RetryStepRequest)
-    - [RetryStepResponse](#psim-api-v1-RetryStepResponse)
-    - [SavePlanDraftRequest](#psim-api-v1-SavePlanDraftRequest)
-    - [SavePlanDraftResponse](#psim-api-v1-SavePlanDraftResponse)
-    - [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest)
-    - [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse)
-    - [SiteDuty](#psim-api-v1-SiteDuty)
-    - [SkipStepRequest](#psim-api-v1-SkipStepRequest)
-    - [SkipStepResponse](#psim-api-v1-SkipStepResponse)
-    - [UpdateEscalationPolicyRequest](#psim-api-v1-UpdateEscalationPolicyRequest)
-    - [UpdateEscalationPolicyResponse](#psim-api-v1-UpdateEscalationPolicyResponse)
-    - [ValidatePlanRequest](#psim-api-v1-ValidatePlanRequest)
-    - [ValidatePlanResponse](#psim-api-v1-ValidatePlanResponse)
-
-    - [EscalationPolicyService](#psim-api-v1-EscalationPolicyService)
-    - [ResponsePlanService](#psim-api-v1-ResponsePlanService)
-    - [ResponseRunService](#psim-api-v1-ResponseRunService)
-    - [SiteDutyService](#psim-api-v1-SiteDutyService)
 
 - [psim/processing/v1/mapping.proto](#psim_processing_v1_mapping-proto)
     - [MappingRule](#psim-processing-v1-MappingRule)
@@ -526,6 +528,7 @@
     - [PlanUnavailable](#psim-response-v1-PlanUnavailable)
     - [ResponseEventRecord](#psim-response-v1-ResponseEventRecord)
     - [RunUpdated](#psim-response-v1-RunUpdated)
+    - [SiteDutyChanged](#psim-response-v1-SiteDutyChanged)
     - [SlaBreached](#psim-response-v1-SlaBreached)
     - [SlaPolicyPinned](#psim-response-v1-SlaPolicyPinned)
 
@@ -3155,6 +3158,1120 @@ EventHistoryService searches stored events (ADR-028). Owner: Event History. Scen
 
 
 
+<a name="psim_api_v1_problem-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/api/v1/problem.proto
+
+
+
+<a name="psim-api-v1-FieldViolation"></a>
+
+### FieldViolation
+FieldViolation describes one invalid field.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| field | [string](#string) |  | Field path in the request, for example &#34;steps[2].next_step_id&#34;. |
+| code | [string](#string) |  |  |
+| message | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-Problem"></a>
+
+### Problem
+Problem is the error body of every failed REST request (RFC 9457).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| type | [string](#string) |  | URI of the error type: https://psim.local/errors/&lt;code&gt;. |
+| title | [string](#string) |  |  |
+| status | [int32](#int32) |  |  |
+| detail | [string](#string) |  |  |
+| instance | [string](#string) |  |  |
+| code | [string](#string) |  | Error code from contracts/errors/errors.yaml. |
+| trace_id | [string](#string) |  |  |
+| errors | [FieldViolation](#psim-api-v1-FieldViolation) | repeated |  |
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="psim_response_v1_plan-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/response/v1/plan.proto
+
+
+
+<a name="psim-response-v1-AutomatedParams"></a>
+
+### AutomatedParams
+AutomatedParams calls an external handler (ADR-025).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| webhook_url | [string](#string) |  |  |
+| timeout | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-ChecklistItem"></a>
+
+### ChecklistItem
+ChecklistItem is one checklist entry.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| item_id | [string](#string) |  |  |
+| text | [string](#string) |  |  |
+| required | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-ChecklistParams"></a>
+
+### ChecklistParams
+ChecklistParams is a list of items to check.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| items | [ChecklistItem](#psim-response-v1-ChecklistItem) | repeated |  |
+
+
+
+
+
+
+<a name="psim-response-v1-CommandParams"></a>
+
+### CommandParams
+CommandParams sends a command to devices (P3).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| capability | [string](#string) |  |  |
+| device_id | [string](#string) |  |  |
+| target_expression | [string](#string) |  | Target expression, for example &#34;zone.devices(type == &#39;access.door&#39;)&#34;. |
+| parameters | [CommandParams.ParametersEntry](#psim-response-v1-CommandParams-ParametersEntry) | repeated |  |
+| automatic | [bool](#bool) |  | Execute without operator confirmation. |
+
+
+
+
+
+
+<a name="psim-response-v1-CommandParams-ParametersEntry"></a>
+
+### CommandParams.ParametersEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-DecisionOption"></a>
+
+### DecisionOption
+DecisionOption is one branch of a decision.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| option_id | [string](#string) |  |  |
+| label | [string](#string) |  |  |
+| next_step_id | [string](#string) |  |  |
+| suggested_resolution | [string](#string) |  | Resolution suggested when this option leads to the end of the plan, for example false alarm. |
+
+
+
+
+
+
+<a name="psim-response-v1-DecisionParams"></a>
+
+### DecisionParams
+DecisionParams branches the plan by the operator choice (P2).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| question | [string](#string) |  |  |
+| options | [DecisionOption](#psim-response-v1-DecisionOption) | repeated |  |
+
+
+
+
+
+
+<a name="psim-response-v1-EscalateParams"></a>
+
+### EscalateParams
+EscalateParams escalates the incident to the given level.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| level | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-EscalationLevel"></a>
+
+### EscalationLevel
+EscalationLevel is one level of escalation.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| level | [uint32](#uint32) |  |  |
+| delay | [google.protobuf.Duration](#google-protobuf-Duration) |  | Delay after the SLA breach. |
+| recipients | [Recipient](#psim-response-v1-Recipient) | repeated |  |
+| channels | [NotificationChannel](#psim-response-v1-NotificationChannel) | repeated |  |
+
+
+
+
+
+
+<a name="psim-response-v1-EscalationPolicy"></a>
+
+### EscalationPolicy
+EscalationPolicy defines SLA and escalation levels.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy_id | [string](#string) |  |  |
+| name | [string](#string) |  |  |
+| sla | [SlaTarget](#psim-response-v1-SlaTarget) | repeated |  |
+| levels | [EscalationLevel](#psim-response-v1-EscalationLevel) | repeated | Strictly increasing delays (EP1). |
+| version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-InstructionParams"></a>
+
+### InstructionParams
+InstructionParams shows text the operator must read and confirm.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-NotifyParams"></a>
+
+### NotifyParams
+NotifyParams sends notifications.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| recipients | [Recipient](#psim-response-v1-Recipient) | repeated |  |
+| channels | [NotificationChannel](#psim-response-v1-NotificationChannel) | repeated |  |
+| template | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-PlanBinding"></a>
+
+### PlanBinding
+PlanBinding selects incidents a plan applies to; the most specific binding wins (P5).
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_type_id | [string](#string) |  |  |
+| site_ids | [string](#string) | repeated |  |
+| zone_ids | [string](#string) | repeated |  |
+| priorities | [psim.common.v1.Priority](#psim-common-v1-Priority) | repeated |  |
+| binding_priority | [int32](#int32) |  | Tie-breaker among bindings with equal specificity. |
+
+
+
+
+
+
+<a name="psim-response-v1-Recipient"></a>
+
+### Recipient
+Recipient is a notification recipient: a user or a role within the incident scope.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| user_id | [string](#string) |  |  |
+| role | [string](#string) |  |  |
+| current_duty | [bool](#bool) |  | Resolve the current site duty at escalation dispatch. Must be true. |
+
+
+
+
+
+
+<a name="psim-response-v1-ResponsePlan"></a>
+
+### ResponsePlan
+ResponsePlan is one immutable version of a response plan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan_id | [string](#string) |  |  |
+| version | [uint32](#uint32) |  |  |
+| name | [string](#string) |  |  |
+| state | [PlanState](#psim-response-v1-PlanState) |  |  |
+| bindings | [PlanBinding](#psim-response-v1-PlanBinding) | repeated |  |
+| start_step_id | [string](#string) |  |  |
+| steps | [Step](#psim-response-v1-Step) | repeated |  |
+| published_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| published_by | [psim.common.v1.Actor](#psim-common-v1-Actor) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-SlaTarget"></a>
+
+### SlaTarget
+SlaTarget is the SLA for one priority.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| priority | [psim.common.v1.Priority](#psim-common-v1-Priority) |  |  |
+| acknowledge_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+| resolve_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-Step"></a>
+
+### Step
+Step is a node of a plan graph.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| step_id | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+| mandatory | [bool](#bool) |  |  |
+| next_step_id | [string](#string) |  | Next step for all kinds except decision; empty for a final step. |
+| instruction | [InstructionParams](#psim-response-v1-InstructionParams) |  |  |
+| checklist | [ChecklistParams](#psim-response-v1-ChecklistParams) |  |  |
+| decision | [DecisionParams](#psim-response-v1-DecisionParams) |  |  |
+| command | [CommandParams](#psim-response-v1-CommandParams) |  |  |
+| notify | [NotifyParams](#psim-response-v1-NotifyParams) |  |  |
+| wait | [WaitParams](#psim-response-v1-WaitParams) |  |  |
+| escalate | [EscalateParams](#psim-response-v1-EscalateParams) |  |  |
+| automated | [AutomatedParams](#psim-response-v1-AutomatedParams) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-WaitParams"></a>
+
+### WaitParams
+WaitParams pauses the plan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
+
+
+
+
+
+
+
+
+<a name="psim-response-v1-NotificationChannel"></a>
+
+### NotificationChannel
+NotificationChannel is a delivery channel.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| NOTIFICATION_CHANNEL_UNSPECIFIED | 0 |  |
+| NOTIFICATION_CHANNEL_IN_APP | 1 |  |
+| NOTIFICATION_CHANNEL_EMAIL | 2 |  |
+| NOTIFICATION_CHANNEL_WEBHOOK | 3 |  |
+
+
+
+<a name="psim-response-v1-PlanState"></a>
+
+### PlanState
+PlanState is the lifecycle state of a plan version.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| PLAN_STATE_UNSPECIFIED | 0 |  |
+| PLAN_STATE_DRAFT | 1 |  |
+| PLAN_STATE_PUBLISHED | 2 |  |
+| PLAN_STATE_ARCHIVED | 3 |  |
+
+
+
+
+
+
+
+
+
+
+<a name="psim_response_v1_run-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/response/v1/run.proto
+
+
+
+<a name="psim-response-v1-ResponseRun"></a>
+
+### ResponseRun
+ResponseRun is the execution of a plan version for an incident.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run_id | [string](#string) |  |  |
+| incident_id | [string](#string) |  |  |
+| plan_id | [string](#string) |  |  |
+| plan_version | [uint32](#uint32) |  |  |
+| state | [RunState](#psim-response-v1-RunState) |  |  |
+| steps | [StepExecution](#psim-response-v1-StepExecution) | repeated |  |
+| active_step_ids | [string](#string) | repeated |  |
+| blocking_step_ids | [string](#string) | repeated | Unfinished mandatory steps (RR5). |
+| started_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| finished_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-StepExecution"></a>
+
+### StepExecution
+StepExecution is the execution state of one step.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| step_id | [string](#string) |  |  |
+| state | [StepState](#psim-response-v1-StepState) |  |  |
+| attempt | [uint32](#uint32) |  |  |
+| actor | [psim.common.v1.Actor](#psim-common-v1-Actor) |  |  |
+| activated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| finished_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| result | [StepResult](#psim-response-v1-StepResult) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-StepResult"></a>
+
+### StepResult
+StepResult is what the step produced.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| checked_item_ids | [string](#string) | repeated |  |
+| decision_option_id | [string](#string) |  |  |
+| command_ids | [string](#string) | repeated |  |
+| note | [string](#string) |  | Reason for skip or override, or a free note. |
+| overridden | [bool](#bool) |  | Set when a supervisor completed a failed step (Override). |
+
+
+
+
+
+
+
+
+<a name="psim-response-v1-RunState"></a>
+
+### RunState
+RunState is the lifecycle state of a run.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| RUN_STATE_UNSPECIFIED | 0 |  |
+| RUN_STATE_RUNNING | 1 |  |
+| RUN_STATE_COMPLETED | 2 |  |
+| RUN_STATE_CANCELLED | 3 |  |
+
+
+
+<a name="psim-response-v1-StepState"></a>
+
+### StepState
+StepState is the state of a step.
+
+| Name | Number | Description |
+| ---- | ------ | ----------- |
+| STEP_STATE_UNSPECIFIED | 0 |  |
+| STEP_STATE_PENDING | 1 |  |
+| STEP_STATE_ACTIVE | 2 |  |
+| STEP_STATE_COMPLETED | 3 |  |
+| STEP_STATE_SKIPPED | 4 |  |
+| STEP_STATE_FAILED | 5 |  |
+| STEP_STATE_CANCELLED | 6 |  |
+
+
+
+
+
+
+
+
+
+
+<a name="psim_api_v1_response-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/api/v1/response.proto
+
+
+
+<a name="psim-api-v1-ArchivePlanRequest"></a>
+
+### ArchivePlanRequest
+ArchivePlanRequest is the request of ArchivePlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ArchivePlanResponse"></a>
+
+### ArchivePlanResponse
+ArchivePlanResponse is the response of ArchivePlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CompleteStepRequest"></a>
+
+### CompleteStepRequest
+CompleteStepRequest is the request of CompleteStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run_id | [string](#string) |  |  |
+| step_id | [string](#string) |  |  |
+| result | [psim.response.v1.StepResult](#psim-response-v1-StepResult) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CompleteStepResponse"></a>
+
+### CompleteStepResponse
+CompleteStepResponse is the response of CompleteStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CreateEscalationPolicyRequest"></a>
+
+### CreateEscalationPolicyRequest
+CreateEscalationPolicyRequest is the request of CreateEscalationPolicy.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CreateEscalationPolicyResponse"></a>
+
+### CreateEscalationPolicyResponse
+CreateEscalationPolicyResponse is the response of CreateEscalationPolicy.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentRunRequest"></a>
+
+### GetIncidentRunRequest
+GetIncidentRunRequest is the request of GetIncidentRun.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentRunResponse"></a>
+
+### GetIncidentRunResponse
+GetIncidentRunResponse is the response of GetIncidentRun.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  | The plan version used by the run. |
+
+
+
+
+
+
+<a name="psim-api-v1-GetPlanRequest"></a>
+
+### GetPlanRequest
+GetPlanRequest is the request of GetPlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan_id | [string](#string) |  |  |
+| version | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetPlanResponse"></a>
+
+### GetPlanResponse
+GetPlanResponse is the response of GetPlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetSiteDutyRequest"></a>
+
+### GetSiteDutyRequest
+GetSiteDutyRequest selects a site.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetSiteDutyResponse"></a>
+
+### GetSiteDutyResponse
+GetSiteDutyResponse contains responsibility.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListEscalationPoliciesRequest"></a>
+
+### ListEscalationPoliciesRequest
+ListEscalationPoliciesRequest is the request of ListEscalationPolicies.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListEscalationPoliciesResponse"></a>
+
+### ListEscalationPoliciesResponse
+ListEscalationPoliciesResponse is the response of ListEscalationPolicies.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policies | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListPlansRequest"></a>
+
+### ListPlansRequest
+ListPlansRequest is the request of ListPlans.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_type_id | [string](#string) |  |  |
+| include_archived | [bool](#bool) |  |  |
+| page_size | [int32](#int32) |  |  |
+| page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ListPlansResponse"></a>
+
+### ListPlansResponse
+ListPlansResponse is the response of ListPlans.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plans | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) | repeated |  |
+| next_page_token | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-OverrideStepRequest"></a>
+
+### OverrideStepRequest
+OverrideStepRequest is the request of OverrideStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run_id | [string](#string) |  |  |
+| step_id | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-OverrideStepResponse"></a>
+
+### OverrideStepResponse
+OverrideStepResponse is the response of OverrideStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-PublishPlanRequest"></a>
+
+### PublishPlanRequest
+PublishPlanRequest is the request of PublishPlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan_id | [string](#string) |  |  |
+| version | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-PublishPlanResponse"></a>
+
+### PublishPlanResponse
+PublishPlanResponse is the response of PublishPlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-RetryStepRequest"></a>
+
+### RetryStepRequest
+RetryStepRequest is the request of RetryStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run_id | [string](#string) |  |  |
+| step_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-RetryStepResponse"></a>
+
+### RetryStepResponse
+RetryStepResponse is the response of RetryStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SavePlanDraftRequest"></a>
+
+### SavePlanDraftRequest
+SavePlanDraftRequest is the request of SavePlanDraft.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SavePlanDraftResponse"></a>
+
+### SavePlanDraftResponse
+SavePlanDraftResponse is the response of SavePlanDraft.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetSiteDutyRequest"></a>
+
+### SetSiteDutyRequest
+SetSiteDutyRequest replaces responsibility.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetSiteDutyResponse"></a>
+
+### SetSiteDutyResponse
+SetSiteDutyResponse contains the stored version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SiteDuty"></a>
+
+### SiteDuty
+SiteDuty is explicit responsibility; empty user_id activates the fallback.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| user_id | [string](#string) |  |  |
+| fallback_user_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SkipStepRequest"></a>
+
+### SkipStepRequest
+SkipStepRequest is the request of SkipStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run_id | [string](#string) |  |  |
+| step_id | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SkipStepResponse"></a>
+
+### SkipStepResponse
+SkipStepResponse is the response of SkipStep.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-UpdateEscalationPolicyRequest"></a>
+
+### UpdateEscalationPolicyRequest
+UpdateEscalationPolicyRequest is the request of UpdateEscalationPolicy.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy_id | [string](#string) |  |  |
+| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-UpdateEscalationPolicyResponse"></a>
+
+### UpdateEscalationPolicyResponse
+UpdateEscalationPolicyResponse is the response of UpdateEscalationPolicy.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ValidatePlanRequest"></a>
+
+### ValidatePlanRequest
+ValidatePlanRequest is the request of ValidatePlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ValidatePlanResponse"></a>
+
+### ValidatePlanResponse
+ValidatePlanResponse is the response of ValidatePlan.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| valid | [bool](#bool) |  |  |
+| violations | [FieldViolation](#psim-api-v1-FieldViolation) | repeated |  |
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="psim-api-v1-EscalationPolicyService"></a>
+
+### EscalationPolicyService
+EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| ListEscalationPolicies | [ListEscalationPoliciesRequest](#psim-api-v1-ListEscalationPoliciesRequest) | [ListEscalationPoliciesResponse](#psim-api-v1-ListEscalationPoliciesResponse) | ListEscalationPolicies lists policies. |
+| CreateEscalationPolicy | [CreateEscalationPolicyRequest](#psim-api-v1-CreateEscalationPolicyRequest) | [CreateEscalationPolicyResponse](#psim-api-v1-CreateEscalationPolicyResponse) | CreateEscalationPolicy creates a policy. |
+| UpdateEscalationPolicy | [UpdateEscalationPolicyRequest](#psim-api-v1-UpdateEscalationPolicyRequest) | [UpdateEscalationPolicyResponse](#psim-api-v1-UpdateEscalationPolicyResponse) | UpdateEscalationPolicy replaces a policy (If-Match required). |
+
+
+<a name="psim-api-v1-ResponsePlanService"></a>
+
+### ResponsePlanService
+ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| ListPlans | [ListPlansRequest](#psim-api-v1-ListPlansRequest) | [ListPlansResponse](#psim-api-v1-ListPlansResponse) | ListPlans lists the latest version of each plan. |
+| GetPlan | [GetPlanRequest](#psim-api-v1-GetPlanRequest) | [GetPlanResponse](#psim-api-v1-GetPlanResponse) | GetPlan returns a plan version; latest when version is 0. |
+| SavePlanDraft | [SavePlanDraftRequest](#psim-api-v1-SavePlanDraftRequest) | [SavePlanDraftResponse](#psim-api-v1-SavePlanDraftResponse) | SavePlanDraft creates a plan or a new draft version of it. |
+| ValidatePlan | [ValidatePlanRequest](#psim-api-v1-ValidatePlanRequest) | [ValidatePlanResponse](#psim-api-v1-ValidatePlanResponse) | ValidatePlan validates a plan without saving it (P1-P5). |
+| PublishPlan | [PublishPlanRequest](#psim-api-v1-PublishPlanRequest) | [PublishPlanResponse](#psim-api-v1-PublishPlanResponse) | PublishPlan publishes a draft version; published versions are immutable. |
+| ArchivePlan | [ArchivePlanRequest](#psim-api-v1-ArchivePlanRequest) | [ArchivePlanResponse](#psim-api-v1-ArchivePlanResponse) | ArchivePlan archives a plan. |
+
+
+<a name="psim-api-v1-ResponseRunService"></a>
+
+### ResponseRunService
+ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetIncidentRun | [GetIncidentRunRequest](#psim-api-v1-GetIncidentRunRequest) | [GetIncidentRunResponse](#psim-api-v1-GetIncidentRunResponse) | GetIncidentRun returns the active or last run of an incident. |
+| CompleteStep | [CompleteStepRequest](#psim-api-v1-CompleteStepRequest) | [CompleteStepResponse](#psim-api-v1-CompleteStepResponse) | CompleteStep completes an active step with its result. |
+| SkipStep | [SkipStepRequest](#psim-api-v1-SkipStepRequest) | [SkipStepResponse](#psim-api-v1-SkipStepResponse) | SkipStep skips a non-mandatory step with a reason (RR3). |
+| RetryStep | [RetryStepRequest](#psim-api-v1-RetryStepRequest) | [RetryStepResponse](#psim-api-v1-RetryStepResponse) | RetryStep retries a failed step. |
+| OverrideStep | [OverrideStepRequest](#psim-api-v1-OverrideStepRequest) | [OverrideStepResponse](#psim-api-v1-OverrideStepResponse) | OverrideStep completes a failed step by a supervisor decision. |
+
+
+<a name="psim-api-v1-SiteDutyService"></a>
+
+### SiteDutyService
+SiteDutyService assigns explicit site responsibility. Owner: Response Engine.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetSiteDuty | [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest) | [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse) | GetSiteDuty returns current and fallback recipients. |
+| SetSiteDuty | [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest) | [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse) | SetSiteDuty replaces responsibility with optimistic concurrency control. |
+
+
+
+
+
 <a name="psim_incident_v1_incident-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -3430,6 +4547,7 @@ ConnectorRuntimeStatus describes a connection without asserting equipment state.
 | quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
 | confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | session_id | [string](#string) |  |  |
+| resource_state | [psim.catalog.v1.ResourceState](#psim-catalog-v1-ResourceState) |  |  |
 
 
 
@@ -3454,6 +4572,7 @@ DeviceStatus is the current state of a device derived from alarm, fault, restore
 | resource_state | [psim.catalog.v1.ResourceState](#psim-catalog-v1-ResourceState) |  |  |
 | connector_id | [string](#string) |  |  |
 | connection | [string](#string) |  | Equipment availability remains unknown when only events have been observed. |
+| sources | [SourceRuntimeStatus](#psim-api-v1-SourceRuntimeStatus) | repeated |  |
 
 
 
@@ -3522,6 +4641,8 @@ GetLocationStatusResponse is the response of GetLocationStatus.
 | resume_token | [string](#string) |  |  |
 | snapshot_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 | connectors | [ConnectorRuntimeStatus](#psim-api-v1-ConnectorRuntimeStatus) | repeated |  |
+| maintenance_windows | [psim.catalog.v1.MaintenanceWindow](#psim-catalog-v1-MaintenanceWindow) | repeated |  |
+| site_duties | [SiteDuty](#psim-api-v1-SiteDuty) | repeated |  |
 
 
 
@@ -3572,6 +4693,48 @@ OperatorLoad is the current load of one operator.
 | display_name | [string](#string) |  |  |
 | assigned_open | [uint32](#uint32) |  |  |
 | escalated | [uint32](#uint32) |  |  |
+| duty_site_ids | [string](#string) | repeated |  |
+| fallback_site_ids | [string](#string) | repeated |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SourceRuntimeStatus"></a>
+
+### SourceRuntimeStatus
+SourceRuntimeStatus keeps event state, reported values and equipment availability independent.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| source_id | [string](#string) |  |  |
+| state | [psim.common.v1.EventClass](#psim-common-v1-EventClass) |  |  |
+| state_quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+| state_confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| values | [SourceRuntimeStatus.ValuesEntry](#psim-api-v1-SourceRuntimeStatus-ValuesEntry) | repeated |  |
+| values_quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+| values_confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| availability | [string](#string) |  |  |
+| availability_confirmed_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| availability_quality | [DataQuality](#psim-api-v1-DataQuality) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SourceRuntimeStatus-ValuesEntry"></a>
+
+### SourceRuntimeStatus.ValuesEntry
+
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| key | [string](#string) |  |  |
+| value | [string](#string) |  |  |
 
 
 
@@ -4420,368 +5583,6 @@ MeService describes the caller. Owner: API Gateway (from the access token and th
 
 
 
-<a name="psim_response_v1_plan-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## psim/response/v1/plan.proto
-
-
-
-<a name="psim-response-v1-AutomatedParams"></a>
-
-### AutomatedParams
-AutomatedParams calls an external handler (ADR-025).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| webhook_url | [string](#string) |  |  |
-| timeout | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-ChecklistItem"></a>
-
-### ChecklistItem
-ChecklistItem is one checklist entry.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| item_id | [string](#string) |  |  |
-| text | [string](#string) |  |  |
-| required | [bool](#bool) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-ChecklistParams"></a>
-
-### ChecklistParams
-ChecklistParams is a list of items to check.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| items | [ChecklistItem](#psim-response-v1-ChecklistItem) | repeated |  |
-
-
-
-
-
-
-<a name="psim-response-v1-CommandParams"></a>
-
-### CommandParams
-CommandParams sends a command to devices (P3).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| capability | [string](#string) |  |  |
-| device_id | [string](#string) |  |  |
-| target_expression | [string](#string) |  | Target expression, for example &#34;zone.devices(type == &#39;access.door&#39;)&#34;. |
-| parameters | [CommandParams.ParametersEntry](#psim-response-v1-CommandParams-ParametersEntry) | repeated |  |
-| automatic | [bool](#bool) |  | Execute without operator confirmation. |
-
-
-
-
-
-
-<a name="psim-response-v1-CommandParams-ParametersEntry"></a>
-
-### CommandParams.ParametersEntry
-
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| key | [string](#string) |  |  |
-| value | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-DecisionOption"></a>
-
-### DecisionOption
-DecisionOption is one branch of a decision.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| option_id | [string](#string) |  |  |
-| label | [string](#string) |  |  |
-| next_step_id | [string](#string) |  |  |
-| suggested_resolution | [string](#string) |  | Resolution suggested when this option leads to the end of the plan, for example false alarm. |
-
-
-
-
-
-
-<a name="psim-response-v1-DecisionParams"></a>
-
-### DecisionParams
-DecisionParams branches the plan by the operator choice (P2).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| question | [string](#string) |  |  |
-| options | [DecisionOption](#psim-response-v1-DecisionOption) | repeated |  |
-
-
-
-
-
-
-<a name="psim-response-v1-EscalateParams"></a>
-
-### EscalateParams
-EscalateParams escalates the incident to the given level.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| level | [uint32](#uint32) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-EscalationLevel"></a>
-
-### EscalationLevel
-EscalationLevel is one level of escalation.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| level | [uint32](#uint32) |  |  |
-| delay | [google.protobuf.Duration](#google-protobuf-Duration) |  | Delay after the SLA breach. |
-| recipients | [Recipient](#psim-response-v1-Recipient) | repeated |  |
-| channels | [NotificationChannel](#psim-response-v1-NotificationChannel) | repeated |  |
-
-
-
-
-
-
-<a name="psim-response-v1-EscalationPolicy"></a>
-
-### EscalationPolicy
-EscalationPolicy defines SLA and escalation levels.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy_id | [string](#string) |  |  |
-| name | [string](#string) |  |  |
-| sla | [SlaTarget](#psim-response-v1-SlaTarget) | repeated |  |
-| levels | [EscalationLevel](#psim-response-v1-EscalationLevel) | repeated | Strictly increasing delays (EP1). |
-| version | [uint64](#uint64) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-InstructionParams"></a>
-
-### InstructionParams
-InstructionParams shows text the operator must read and confirm.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| text | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-NotifyParams"></a>
-
-### NotifyParams
-NotifyParams sends notifications.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| recipients | [Recipient](#psim-response-v1-Recipient) | repeated |  |
-| channels | [NotificationChannel](#psim-response-v1-NotificationChannel) | repeated |  |
-| template | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-PlanBinding"></a>
-
-### PlanBinding
-PlanBinding selects incidents a plan applies to; the most specific binding wins (P5).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| incident_type_id | [string](#string) |  |  |
-| site_ids | [string](#string) | repeated |  |
-| zone_ids | [string](#string) | repeated |  |
-| priorities | [psim.common.v1.Priority](#psim-common-v1-Priority) | repeated |  |
-| binding_priority | [int32](#int32) |  | Tie-breaker among bindings with equal specificity. |
-
-
-
-
-
-
-<a name="psim-response-v1-Recipient"></a>
-
-### Recipient
-Recipient is a notification recipient: a user or a role within the incident scope.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| user_id | [string](#string) |  |  |
-| role | [string](#string) |  |  |
-| current_duty | [bool](#bool) |  | Resolve the current site duty at escalation dispatch. Must be true. |
-
-
-
-
-
-
-<a name="psim-response-v1-ResponsePlan"></a>
-
-### ResponsePlan
-ResponsePlan is one immutable version of a response plan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan_id | [string](#string) |  |  |
-| version | [uint32](#uint32) |  |  |
-| name | [string](#string) |  |  |
-| state | [PlanState](#psim-response-v1-PlanState) |  |  |
-| bindings | [PlanBinding](#psim-response-v1-PlanBinding) | repeated |  |
-| start_step_id | [string](#string) |  |  |
-| steps | [Step](#psim-response-v1-Step) | repeated |  |
-| published_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| published_by | [psim.common.v1.Actor](#psim-common-v1-Actor) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-SlaTarget"></a>
-
-### SlaTarget
-SlaTarget is the SLA for one priority.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| priority | [psim.common.v1.Priority](#psim-common-v1-Priority) |  |  |
-| acknowledge_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-| resolve_within | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-Step"></a>
-
-### Step
-Step is a node of a plan graph.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| step_id | [string](#string) |  |  |
-| title | [string](#string) |  |  |
-| mandatory | [bool](#bool) |  |  |
-| next_step_id | [string](#string) |  | Next step for all kinds except decision; empty for a final step. |
-| instruction | [InstructionParams](#psim-response-v1-InstructionParams) |  |  |
-| checklist | [ChecklistParams](#psim-response-v1-ChecklistParams) |  |  |
-| decision | [DecisionParams](#psim-response-v1-DecisionParams) |  |  |
-| command | [CommandParams](#psim-response-v1-CommandParams) |  |  |
-| notify | [NotifyParams](#psim-response-v1-NotifyParams) |  |  |
-| wait | [WaitParams](#psim-response-v1-WaitParams) |  |  |
-| escalate | [EscalateParams](#psim-response-v1-EscalateParams) |  |  |
-| automated | [AutomatedParams](#psim-response-v1-AutomatedParams) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-WaitParams"></a>
-
-### WaitParams
-WaitParams pauses the plan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| duration | [google.protobuf.Duration](#google-protobuf-Duration) |  |  |
-
-
-
-
-
-
-
-
-<a name="psim-response-v1-NotificationChannel"></a>
-
-### NotificationChannel
-NotificationChannel is a delivery channel.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| NOTIFICATION_CHANNEL_UNSPECIFIED | 0 |  |
-| NOTIFICATION_CHANNEL_IN_APP | 1 |  |
-| NOTIFICATION_CHANNEL_EMAIL | 2 |  |
-| NOTIFICATION_CHANNEL_WEBHOOK | 3 |  |
-
-
-
-<a name="psim-response-v1-PlanState"></a>
-
-### PlanState
-PlanState is the lifecycle state of a plan version.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| PLAN_STATE_UNSPECIFIED | 0 |  |
-| PLAN_STATE_DRAFT | 1 |  |
-| PLAN_STATE_PUBLISHED | 2 |  |
-| PLAN_STATE_ARCHIVED | 3 |  |
-
-
-
-
-
-
-
-
-
-
 <a name="psim_response_v1_notification-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -5045,61 +5846,6 @@ NotificationService serves in-app notifications of the caller. Owner: Notificati
 
 
 
-<a name="psim_api_v1_problem-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## psim/api/v1/problem.proto
-
-
-
-<a name="psim-api-v1-FieldViolation"></a>
-
-### FieldViolation
-FieldViolation describes one invalid field.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| field | [string](#string) |  | Field path in the request, for example &#34;steps[2].next_step_id&#34;. |
-| code | [string](#string) |  |  |
-| message | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-Problem"></a>
-
-### Problem
-Problem is the error body of every failed REST request (RFC 9457).
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| type | [string](#string) |  | URI of the error type: https://psim.local/errors/&lt;code&gt;. |
-| title | [string](#string) |  |  |
-| status | [int32](#int32) |  |  |
-| detail | [string](#string) |  |  |
-| instance | [string](#string) |  |  |
-| code | [string](#string) |  | Error code from contracts/errors/errors.yaml. |
-| trace_id | [string](#string) |  |  |
-| errors | [FieldViolation](#psim-api-v1-FieldViolation) | repeated |  |
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 <a name="psim_api_v1_reports-proto"></a>
 <p align="right"><a href="#top">Top</a></p>
 
@@ -5250,703 +5996,6 @@ Owner: Projection Service. Scenario S13.
 | ----------- | ------------ | ------------- | ------------|
 | GetIncidentReport | [GetIncidentReportRequest](#psim-api-v1-GetIncidentReportRequest) | [GetIncidentReportResponse](#psim-api-v1-GetIncidentReportResponse) | GetIncidentReport returns incident metrics for a period. |
 | ExportIncidentReport | [ExportIncidentReportRequest](#psim-api-v1-ExportIncidentReportRequest) | [ExportIncidentReportResponse](#psim-api-v1-ExportIncidentReportResponse) | ExportIncidentReport exports the same report as CSV. |
-
-
-
-
-
-<a name="psim_response_v1_run-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## psim/response/v1/run.proto
-
-
-
-<a name="psim-response-v1-ResponseRun"></a>
-
-### ResponseRun
-ResponseRun is the execution of a plan version for an incident.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run_id | [string](#string) |  |  |
-| incident_id | [string](#string) |  |  |
-| plan_id | [string](#string) |  |  |
-| plan_version | [uint32](#uint32) |  |  |
-| state | [RunState](#psim-response-v1-RunState) |  |  |
-| steps | [StepExecution](#psim-response-v1-StepExecution) | repeated |  |
-| active_step_ids | [string](#string) | repeated |  |
-| blocking_step_ids | [string](#string) | repeated | Unfinished mandatory steps (RR5). |
-| started_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| finished_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| version | [uint64](#uint64) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-StepExecution"></a>
-
-### StepExecution
-StepExecution is the execution state of one step.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| step_id | [string](#string) |  |  |
-| state | [StepState](#psim-response-v1-StepState) |  |  |
-| attempt | [uint32](#uint32) |  |  |
-| actor | [psim.common.v1.Actor](#psim-common-v1-Actor) |  |  |
-| activated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| finished_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
-| result | [StepResult](#psim-response-v1-StepResult) |  |  |
-
-
-
-
-
-
-<a name="psim-response-v1-StepResult"></a>
-
-### StepResult
-StepResult is what the step produced.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| checked_item_ids | [string](#string) | repeated |  |
-| decision_option_id | [string](#string) |  |  |
-| command_ids | [string](#string) | repeated |  |
-| note | [string](#string) |  | Reason for skip or override, or a free note. |
-| overridden | [bool](#bool) |  | Set when a supervisor completed a failed step (Override). |
-
-
-
-
-
-
-
-
-<a name="psim-response-v1-RunState"></a>
-
-### RunState
-RunState is the lifecycle state of a run.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| RUN_STATE_UNSPECIFIED | 0 |  |
-| RUN_STATE_RUNNING | 1 |  |
-| RUN_STATE_COMPLETED | 2 |  |
-| RUN_STATE_CANCELLED | 3 |  |
-
-
-
-<a name="psim-response-v1-StepState"></a>
-
-### StepState
-StepState is the state of a step.
-
-| Name | Number | Description |
-| ---- | ------ | ----------- |
-| STEP_STATE_UNSPECIFIED | 0 |  |
-| STEP_STATE_PENDING | 1 |  |
-| STEP_STATE_ACTIVE | 2 |  |
-| STEP_STATE_COMPLETED | 3 |  |
-| STEP_STATE_SKIPPED | 4 |  |
-| STEP_STATE_FAILED | 5 |  |
-| STEP_STATE_CANCELLED | 6 |  |
-
-
-
-
-
-
-
-
-
-
-<a name="psim_api_v1_response-proto"></a>
-<p align="right"><a href="#top">Top</a></p>
-
-## psim/api/v1/response.proto
-
-
-
-<a name="psim-api-v1-ArchivePlanRequest"></a>
-
-### ArchivePlanRequest
-ArchivePlanRequest is the request of ArchivePlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ArchivePlanResponse"></a>
-
-### ArchivePlanResponse
-ArchivePlanResponse is the response of ArchivePlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-CompleteStepRequest"></a>
-
-### CompleteStepRequest
-CompleteStepRequest is the request of CompleteStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run_id | [string](#string) |  |  |
-| step_id | [string](#string) |  |  |
-| result | [psim.response.v1.StepResult](#psim-response-v1-StepResult) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-CompleteStepResponse"></a>
-
-### CompleteStepResponse
-CompleteStepResponse is the response of CompleteStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-CreateEscalationPolicyRequest"></a>
-
-### CreateEscalationPolicyRequest
-CreateEscalationPolicyRequest is the request of CreateEscalationPolicy.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-CreateEscalationPolicyResponse"></a>
-
-### CreateEscalationPolicyResponse
-CreateEscalationPolicyResponse is the response of CreateEscalationPolicy.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-GetIncidentRunRequest"></a>
-
-### GetIncidentRunRequest
-GetIncidentRunRequest is the request of GetIncidentRun.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| incident_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-GetIncidentRunResponse"></a>
-
-### GetIncidentRunResponse
-GetIncidentRunResponse is the response of GetIncidentRun.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  | The plan version used by the run. |
-
-
-
-
-
-
-<a name="psim-api-v1-GetPlanRequest"></a>
-
-### GetPlanRequest
-GetPlanRequest is the request of GetPlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan_id | [string](#string) |  |  |
-| version | [uint32](#uint32) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-GetPlanResponse"></a>
-
-### GetPlanResponse
-GetPlanResponse is the response of GetPlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-GetSiteDutyRequest"></a>
-
-### GetSiteDutyRequest
-GetSiteDutyRequest selects a site.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| site_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-GetSiteDutyResponse"></a>
-
-### GetSiteDutyResponse
-GetSiteDutyResponse contains responsibility.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ListEscalationPoliciesRequest"></a>
-
-### ListEscalationPoliciesRequest
-ListEscalationPoliciesRequest is the request of ListEscalationPolicies.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| page_size | [int32](#int32) |  |  |
-| page_token | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ListEscalationPoliciesResponse"></a>
-
-### ListEscalationPoliciesResponse
-ListEscalationPoliciesResponse is the response of ListEscalationPolicies.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policies | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) | repeated |  |
-| next_page_token | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ListPlansRequest"></a>
-
-### ListPlansRequest
-ListPlansRequest is the request of ListPlans.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| incident_type_id | [string](#string) |  |  |
-| include_archived | [bool](#bool) |  |  |
-| page_size | [int32](#int32) |  |  |
-| page_token | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ListPlansResponse"></a>
-
-### ListPlansResponse
-ListPlansResponse is the response of ListPlans.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plans | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) | repeated |  |
-| next_page_token | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-OverrideStepRequest"></a>
-
-### OverrideStepRequest
-OverrideStepRequest is the request of OverrideStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run_id | [string](#string) |  |  |
-| step_id | [string](#string) |  |  |
-| reason | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-OverrideStepResponse"></a>
-
-### OverrideStepResponse
-OverrideStepResponse is the response of OverrideStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-PublishPlanRequest"></a>
-
-### PublishPlanRequest
-PublishPlanRequest is the request of PublishPlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan_id | [string](#string) |  |  |
-| version | [uint32](#uint32) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-PublishPlanResponse"></a>
-
-### PublishPlanResponse
-PublishPlanResponse is the response of PublishPlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-RetryStepRequest"></a>
-
-### RetryStepRequest
-RetryStepRequest is the request of RetryStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run_id | [string](#string) |  |  |
-| step_id | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-RetryStepResponse"></a>
-
-### RetryStepResponse
-RetryStepResponse is the response of RetryStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SavePlanDraftRequest"></a>
-
-### SavePlanDraftRequest
-SavePlanDraftRequest is the request of SavePlanDraft.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SavePlanDraftResponse"></a>
-
-### SavePlanDraftResponse
-SavePlanDraftResponse is the response of SavePlanDraft.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SetSiteDutyRequest"></a>
-
-### SetSiteDutyRequest
-SetSiteDutyRequest replaces responsibility.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| site_id | [string](#string) |  |  |
-| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SetSiteDutyResponse"></a>
-
-### SetSiteDutyResponse
-SetSiteDutyResponse contains the stored version.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| duty | [SiteDuty](#psim-api-v1-SiteDuty) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SiteDuty"></a>
-
-### SiteDuty
-SiteDuty is explicit responsibility; empty user_id activates the fallback.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| site_id | [string](#string) |  |  |
-| user_id | [string](#string) |  |  |
-| fallback_user_id | [string](#string) |  |  |
-| version | [uint64](#uint64) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SkipStepRequest"></a>
-
-### SkipStepRequest
-SkipStepRequest is the request of SkipStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run_id | [string](#string) |  |  |
-| step_id | [string](#string) |  |  |
-| reason | [string](#string) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-SkipStepResponse"></a>
-
-### SkipStepResponse
-SkipStepResponse is the response of SkipStep.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| run | [psim.response.v1.ResponseRun](#psim-response-v1-ResponseRun) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-UpdateEscalationPolicyRequest"></a>
-
-### UpdateEscalationPolicyRequest
-UpdateEscalationPolicyRequest is the request of UpdateEscalationPolicy.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy_id | [string](#string) |  |  |
-| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-UpdateEscalationPolicyResponse"></a>
-
-### UpdateEscalationPolicyResponse
-UpdateEscalationPolicyResponse is the response of UpdateEscalationPolicy.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| policy | [psim.response.v1.EscalationPolicy](#psim-response-v1-EscalationPolicy) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ValidatePlanRequest"></a>
-
-### ValidatePlanRequest
-ValidatePlanRequest is the request of ValidatePlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| plan | [psim.response.v1.ResponsePlan](#psim-response-v1-ResponsePlan) |  |  |
-
-
-
-
-
-
-<a name="psim-api-v1-ValidatePlanResponse"></a>
-
-### ValidatePlanResponse
-ValidatePlanResponse is the response of ValidatePlan.
-
-
-| Field | Type | Label | Description |
-| ----- | ---- | ----- | ----------- |
-| valid | [bool](#bool) |  |  |
-| violations | [FieldViolation](#psim-api-v1-FieldViolation) | repeated |  |
-
-
-
-
-
-
-
-
-
-
-
-
-<a name="psim-api-v1-EscalationPolicyService"></a>
-
-### EscalationPolicyService
-EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| ListEscalationPolicies | [ListEscalationPoliciesRequest](#psim-api-v1-ListEscalationPoliciesRequest) | [ListEscalationPoliciesResponse](#psim-api-v1-ListEscalationPoliciesResponse) | ListEscalationPolicies lists policies. |
-| CreateEscalationPolicy | [CreateEscalationPolicyRequest](#psim-api-v1-CreateEscalationPolicyRequest) | [CreateEscalationPolicyResponse](#psim-api-v1-CreateEscalationPolicyResponse) | CreateEscalationPolicy creates a policy. |
-| UpdateEscalationPolicy | [UpdateEscalationPolicyRequest](#psim-api-v1-UpdateEscalationPolicyRequest) | [UpdateEscalationPolicyResponse](#psim-api-v1-UpdateEscalationPolicyResponse) | UpdateEscalationPolicy replaces a policy (If-Match required). |
-
-
-<a name="psim-api-v1-ResponsePlanService"></a>
-
-### ResponsePlanService
-ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| ListPlans | [ListPlansRequest](#psim-api-v1-ListPlansRequest) | [ListPlansResponse](#psim-api-v1-ListPlansResponse) | ListPlans lists the latest version of each plan. |
-| GetPlan | [GetPlanRequest](#psim-api-v1-GetPlanRequest) | [GetPlanResponse](#psim-api-v1-GetPlanResponse) | GetPlan returns a plan version; latest when version is 0. |
-| SavePlanDraft | [SavePlanDraftRequest](#psim-api-v1-SavePlanDraftRequest) | [SavePlanDraftResponse](#psim-api-v1-SavePlanDraftResponse) | SavePlanDraft creates a plan or a new draft version of it. |
-| ValidatePlan | [ValidatePlanRequest](#psim-api-v1-ValidatePlanRequest) | [ValidatePlanResponse](#psim-api-v1-ValidatePlanResponse) | ValidatePlan validates a plan without saving it (P1-P5). |
-| PublishPlan | [PublishPlanRequest](#psim-api-v1-PublishPlanRequest) | [PublishPlanResponse](#psim-api-v1-PublishPlanResponse) | PublishPlan publishes a draft version; published versions are immutable. |
-| ArchivePlan | [ArchivePlanRequest](#psim-api-v1-ArchivePlanRequest) | [ArchivePlanResponse](#psim-api-v1-ArchivePlanResponse) | ArchivePlan archives a plan. |
-
-
-<a name="psim-api-v1-ResponseRunService"></a>
-
-### ResponseRunService
-ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| GetIncidentRun | [GetIncidentRunRequest](#psim-api-v1-GetIncidentRunRequest) | [GetIncidentRunResponse](#psim-api-v1-GetIncidentRunResponse) | GetIncidentRun returns the active or last run of an incident. |
-| CompleteStep | [CompleteStepRequest](#psim-api-v1-CompleteStepRequest) | [CompleteStepResponse](#psim-api-v1-CompleteStepResponse) | CompleteStep completes an active step with its result. |
-| SkipStep | [SkipStepRequest](#psim-api-v1-SkipStepRequest) | [SkipStepResponse](#psim-api-v1-SkipStepResponse) | SkipStep skips a non-mandatory step with a reason (RR3). |
-| RetryStep | [RetryStepRequest](#psim-api-v1-RetryStepRequest) | [RetryStepResponse](#psim-api-v1-RetryStepResponse) | RetryStep retries a failed step. |
-| OverrideStep | [OverrideStepRequest](#psim-api-v1-OverrideStepRequest) | [OverrideStepResponse](#psim-api-v1-OverrideStepResponse) | OverrideStep completes a failed step by a supervisor decision. |
-
-
-<a name="psim-api-v1-SiteDutyService"></a>
-
-### SiteDutyService
-SiteDutyService assigns explicit site responsibility. Owner: Response Engine.
-
-| Method Name | Request Type | Response Type | Description |
-| ----------- | ------------ | ------------- | ------------|
-| GetSiteDuty | [GetSiteDutyRequest](#psim-api-v1-GetSiteDutyRequest) | [GetSiteDutyResponse](#psim-api-v1-GetSiteDutyResponse) | GetSiteDuty returns current and fallback recipients. |
-| SetSiteDuty | [SetSiteDutyRequest](#psim-api-v1-SetSiteDutyRequest) | [SetSiteDutyResponse](#psim-api-v1-SetSiteDutyResponse) | SetSiteDuty replaces responsibility with optimistic concurrency control. |
 
 
 
@@ -8258,6 +8307,7 @@ Events carry the aggregate state after the change; envelope.sequence = aggregate
 | notification_requested | [NotificationRequested](#psim-response-v1-NotificationRequested) |  |  |
 | plan_unavailable | [PlanUnavailable](#psim-response-v1-PlanUnavailable) |  |  |
 | sla_policy_pinned | [SlaPolicyPinned](#psim-response-v1-SlaPolicyPinned) |  |  |
+| site_duty_changed | [SiteDutyChanged](#psim-response-v1-SiteDutyChanged) |  |  |
 
 
 
@@ -8275,6 +8325,25 @@ RunUpdated reports a change of a response run.
 | change | [RunChange](#psim-response-v1-RunChange) |  |  |
 | step_id | [string](#string) |  | Step affected by the change, if any. |
 | run | [ResponseRun](#psim-response-v1-ResponseRun) |  |  |
+
+
+
+
+
+
+<a name="psim-response-v1-SiteDutyChanged"></a>
+
+### SiteDutyChanged
+SiteDutyChanged publishes the current site responsibility after a committed replacement.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| site_id | [string](#string) |  |  |
+| user_id | [string](#string) |  |  |
+| fallback_user_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+| updated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
 
 
 

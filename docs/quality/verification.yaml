@@ -996,11 +996,23 @@ methods:
     steps: ['5.4']
     purpose: Полный контекст инцидента, поиск и долговечное продление хранения
 
+  - id: TS-31
+    kind: test
+    name: Общие модели консоли и восстановление Kafka
+    criteria: Настоящие Kafka, PostgreSQL, Valkey и HTTPS; области доступа, независимые курсоры наблюдений и отчётов,
+      дежурство, обслуживание, fallback к PostgreSQL, равенство перестроения и отказ неполной истории; локальный p99 обновления не выше 100 мс
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task projection:test
+    steps: ['7.3']
+    purpose: Согласованные снимки консоли, актуальность состояния и безопасное восстановление
+
 goals:
   # --- Plan 1.3: SLO --------------------------------------------------------
   - {id: G-01, source: '1.3', attribute: 'Пропускная способность', methods: [L-01, L-02, L-03, L-04, L-06, B-01, B-03]}
   - {id: G-02, source: '1.3', attribute: 'Задержка событие -> сигнал', methods: [L-02, L-03, FF-05, B-03, B-04]}
-  - {id: G-03, source: '1.3', attribute: 'Задержка событие -> инцидент в консоли', methods: [L-05, TS-11, FF-05]}
+  - {id: G-03, source: '1.3', attribute: 'Задержка событие -> инцидент в консоли', methods: [L-05, TS-11, FF-05, TS-31]}
   - {id: G-04, source: '1.3', attribute: 'Задержка отклика REST API', methods: [L-05]}
   - {id: G-05, source: '1.3', attribute: 'Потери данных', methods: [TS-07, TS-08, TS-28, L-03, C-01, C-02, C-06, C-07, C-08, C-10, C-11]}
   - {id: G-06, source: '1.3', attribute: 'Дубликаты инцидентов', methods: [TS-02, TS-07, TS-08, TS-28, C-02, C-11]}
@@ -1021,7 +1033,7 @@ goals:
 
 scenarios:
   - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29]}
-  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29]}
+  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29, TS-31]}
   - {id: S3, methods: [TS-09, TS-10, L-02]}
   - {id: S4, methods: [TS-07, TS-10, L-02, TS-20, TS-23]}
   - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28, TS-29]}

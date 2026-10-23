@@ -1,0 +1,10 @@
+groups:
+  - name: console-projections
+    rules:
+      - alert: ConsoleProjectionUpdateLatency
+        expr: histogram_quantile(0.99, sum by (le) (rate(psim_console_update_seconds_bucket[5m]))) > 0.1
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Console projection update p99 exceeds 100 milliseconds
+          description: Check Kafka consumer progress, PostgreSQL latency and writer readiness.

@@ -27,6 +27,7 @@ message ResponseEventRecord {
     NotificationRequested notification_requested = 8;
     PlanUnavailable plan_unavailable = 9;
     SlaPolicyPinned sla_policy_pinned = 10;
+    SiteDutyChanged site_duty_changed = 11;
   }
 }
 
@@ -115,4 +116,13 @@ message SlaPolicyPinned {
   google.protobuf.Timestamp created_at = 2;
   google.protobuf.Duration acknowledge_within = 3;
   google.protobuf.Duration resolve_within = 4;
+}
+
+// SiteDutyChanged publishes the current site responsibility after a committed replacement.
+message SiteDutyChanged {
+  string site_id = 1 [(buf.validate.field).string.uuid = true];
+  string user_id = 2;
+  string fallback_user_id = 3 [(buf.validate.field).string.uuid = true];
+  uint64 version = 4;
+  google.protobuf.Timestamp updated_at = 5;
 }

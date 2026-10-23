@@ -87,8 +87,8 @@ asio::awaitable<bool> transfer(Input* input_stream, beast::flat_buffer* pending_
 template <typename Client>
 asio::awaitable<bool> proxy(Client* connection, beast::flat_buffer* input_buffer,
                             http::request_parser<http::buffer_body>* request_parser, Endpoint endpoint,
-                            asio::ssl::context* context, std::string origin, bool floor_plan, bool* started,
-                            bool* invalid, bool* oversized) {
+                            asio::ssl::context* context, std::string origin, std::string epoch, bool floor_plan,
+                            bool* started, bool* invalid, bool* oversized) {
   auto& client = *connection;
   auto& incoming = *input_buffer;
   auto& parser = *request_parser;
@@ -116,6 +116,9 @@ asio::awaitable<bool> proxy(Client* connection, beast::flat_buffer* input_buffer
   }
   http::request<http::buffer_body> request(parser.get().method(), parser.get().target(), 11);
   request_fields(parser.get().base(), request.base());
+  if (request.target().starts_with("/v1/feed/")) {
+    request.set("X-Psim-Realtime-Epoch", epoch);
+  }
   request.set(http::field::host, endpoint.host + ":" + endpoint.port);
   request.keep_alive(false);
   if (const auto length = parser.content_length()) {

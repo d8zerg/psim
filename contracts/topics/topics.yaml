@@ -102,15 +102,15 @@ topics:
     consumers: [response-engine, projection-service, api-gateway]
 
   - name: psim.response.events.v1
-    title: Response runs, commands, notifications, SLA and escalations
+    title: Response runs, commands, notifications, SLA, escalations and site duty
     record: psim.response.v1.ResponseEventRecord
-    key: incident_id
+    key: incident_id or site_id
     partitions: {cluster: 12, single: 4}
     retention: P30D
     cleanup: delete
     semantics: Outbox
     producers: [response-engine, command-service, notification-service]
-    consumers: [incident-service, response-engine, command-service, projection-service, api-gateway, notification-service]
+    consumers: [incident-service, response-engine, command-service, projection-service, notification-service]
 
   - name: psim.commands.v1
     title: Commands routed to connector sessions
@@ -143,7 +143,7 @@ topics:
     cleanup: compact
     semantics: Outbox
     producers: [resource-catalog, connector-gateway]
-    consumers: [resource-catalog, normalizer, connector-gateway, correlation-engine, response-engine, command-service, projection-service, api-gateway]
+    consumers: [resource-catalog, normalizer, connector-gateway, correlation-engine, response-engine, command-service, projection-service]
 
   - name: psim.config.v1
     title: Active configuration objects
@@ -154,7 +154,7 @@ topics:
     cleanup: compact
     semantics: Outbox
     producers: [correlation-engine, normalizer, resource-catalog]
-    consumers: [normalizer, correlation-engine, event-history]
+    consumers: [normalizer, correlation-engine, event-history, projection-service]
 
   - name: psim.audit.v1
     title: Audit entries and checkpoints
