@@ -1,0 +1,30 @@
+version: '3'
+vars:
+  PROJECT: '{{.PROJECT | default "psim-realtime-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Two Gateways, WSS subscriptions, Kafka resume, operational state and 500 clients
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/realtime/check.py {{.PROJECT}} {{.PRESET}}
+  bench:
+    desc: Measure delivery p99 within 200 milliseconds to 500 simultaneous consoles
+    cmds:
+      - task: test
+        vars: {PROJECT: '{{.PROJECT}}-bench', PRESET: release}
+  sanitizers:
+    desc: Realtime transport and replay under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_api_gateway_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {PROJECT: '{{.PROJECT}}-{{.ITEM}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Realtime component coverage together with console projections, reports and M1
+    cmds:
+      - task: :projection:coverage
+        vars: {PROJECT: '{{.PROJECT}}'}

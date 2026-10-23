@@ -180,6 +180,7 @@ flowchart LR
     K4 --> PROJ[Projection Service]
     K5 --> PROJ
     K4 --> RT[API Gateway:<br/>REST + realtime]
+    K5 --> RT
     PROJ --> RT
     RT -- HTTPS / WSS --> WEB[Web Application]
     CAT[Resource Catalog] --> CATK

@@ -3,6 +3,7 @@
 #include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_future.hpp>
 #include <google/protobuf/util/json_util.h>
+#include <google/protobuf/util/time_util.h>
 #include <nlohmann/json.hpp>
 #include <psim/catalog/v1/catalog.pb.h>
 #include <psim/config/v1/config.pb.h>
@@ -87,10 +88,15 @@ asio::awaitable<int> run(Json input) {
     } else {
       throw std::runtime_error("unsupported fixture topic");
     }
-    if (!google::protobuf::util::JsonStringToMessage(item.at("value").dump(), value.get()).ok()) {
+    const auto schema = take(co_await registry.latest_id(topic + "-value"));
+    auto body = item.at("value");
+    if (input.value("stampProducedAt", false)) {
+      body["envelope"]["producedAt"] =
+          google::protobuf::util::TimeUtil::ToString(google::protobuf::util::TimeUtil::GetCurrentTime());
+    }
+    if (!google::protobuf::util::JsonStringToMessage(body.dump(), value.get()).ok()) {
       throw std::runtime_error("invalid fixture message");
     }
-    const auto schema = take(co_await registry.latest_id(topic + "-value"));
     std::string bytes;
     p::kafka::wire::write_header(bytes, schema, p::kafka::wire::message_indexes(*value->GetDescriptor()));
     value->AppendToString(&bytes);

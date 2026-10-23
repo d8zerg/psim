@@ -114,10 +114,18 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   });
   await expect(page.locator(`[data-event-id="${offline.at(-1)?.event_id ?? ""}"]`)).toBeVisible({ timeout: 30_000 });
   expect(snapshots).toBe(1);
+  const previousConnections = await page.evaluate(
+    () => (window as unknown as { testSockets: WebSocket[] }).testSockets.length,
+  );
   await marker("restart-ready");
-  await expect.poll(() => snapshots, { timeout: 30_000 }).toBeGreaterThan(1);
+  await expect
+    .poll(() => page.evaluate(() => (window as unknown as { testSockets: WebSocket[] }).testSockets.length), {
+      timeout: 30_000,
+    })
+    .toBeGreaterThan(previousConnections);
   await expect(page.getByTestId("connection-status")).toHaveText("open");
   await expect(page.getByTestId("incident-row").first()).toBeVisible();
+  expect(snapshots).toBe(1);
   await marker("after-restart-ready");
   const afterRestart = await inputs("after-restart");
   await expect(page.locator(`[data-event-id="${afterRestart[0]?.event_id ?? ""}"]`)).toBeVisible();

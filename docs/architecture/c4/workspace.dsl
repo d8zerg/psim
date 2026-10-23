@@ -128,7 +128,7 @@ workspace "Open-Source PSIM Platform" "C4-модель MVP. Шаг плана 0.
         psim.kafka -> psim.commandService "psim.commands.results.v1" "Kafka"
         psim.kafka -> psim.notificationService "psim.response.events.v1" "Kafka"
         psim.kafka -> psim.projectionService "incidents, response, normalized, ingest.state, catalog, config" "Kafka"
-        psim.kafka -> psim.apiGateway "incidents (realtime)" "Kafka"
+        psim.kafka -> psim.apiGateway "incidents and permitted response events (realtime)" "Kafka"
         psim.kafka -> psim.auditService "psim.audit.v1" "Kafka"
         psim.resourceCatalog -> psim.kafka "psim.catalog.v1 (outbox)" "Kafka"
 

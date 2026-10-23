@@ -43,6 +43,8 @@ tasks:
       - PSIM_CATALOG_KEEP_ENV=1 python3 -I tools/catalog/check.py {{.PROJECT}}-coverage coverage 100
       - task: :flow:test
         vars: {PROJECT: '{{.PROJECT}}-coverage', PRESET: coverage}
+      - task: :realtime:test
+        vars: {PROJECT: '{{.PROJECT}}-realtime-coverage', PRESET: coverage}
       - task: :cpp:_run
         vars:
           CMD: >-

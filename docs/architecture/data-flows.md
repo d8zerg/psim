@@ -141,7 +141,7 @@
 | Свойство | Значение |
 |---|---|
 | Производители | Response Engine, Command Service, Notification Service (outbox) |
-| Потребители | Incident Service (`blocking_steps`, хронология), Response Engine (результаты команд), Command Service (запросы сценариев), Projection Service, Notification Service |
+| Потребители | Incident Service (`blocking_steps`, хронология), Response Engine (результаты команд), Command Service (запросы сценариев), Projection Service, Notification Service, API Gateway realtime (все партиции, только разрешённые варианты) |
 | Ключ | `incident_id`; для дежурства - `site_id`; для команд и уведомлений вне инцидента - `command_id` или `notification_id` |
 | Порядок | В пределах инцидента |
 | Семантика | Outbox; потребители - EOS-DB или по версии агрегата |

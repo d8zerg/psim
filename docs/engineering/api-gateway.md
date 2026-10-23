@@ -1,6 +1,6 @@
 # API Gateway
 
-API Gateway предоставляет REST v1 и сохраняет существующий WebSocket `/v1/realtime`. Маршруты формируются из HTTP-аннотаций Protobuf. Владельцы ресурсов проверяют области доступа и фиксируют изменения.
+API Gateway предоставляет REST v1 и обслуживает WebSocket `/v1/realtime`. Маршруты формируются из HTTP-аннотаций Protobuf. Владельцы ресурсов проверяют области доступа и фиксируют изменения.
 
 ## Настройка
 
@@ -47,3 +47,7 @@ task api:coverage
 Проверка поднимает отдельное Compose-окружение с реальными Keycloak, Kafka, PostgreSQL, Valkey, Catalog и S3. Результат записывается в `build/resource-catalog/<preset>/api-result.json`; журналы Gateway - в соседний `api-servers.log`.
 
 Архитектурные границы и временные ограничения описаны в [ADR-058](../adr/0058-api-gateway-and-configuration.md).
+
+## Realtime
+
+Подписки, фильтры, возможности клиента, возобновление из Kafka, оперативные образы и параметры `realtime_*` описаны в [руководстве realtime](realtime.md). Gateway читает оба доменных топика целиком, а оперативные образы получает у Projection Service с исходным JWT.

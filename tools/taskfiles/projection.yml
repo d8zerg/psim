@@ -41,6 +41,8 @@ tasks:
         vars: {REPORTS_PROJECT: '{{.PROJECT}}-reports-coverage', PRESET: coverage}
       - task: :flow:test
         vars: {PROJECT: '{{.PROJECT}}-coverage', PRESET: coverage}
+      - task: :realtime:test
+        vars: {PROJECT: '{{.PROJECT}}-realtime-coverage', PRESET: coverage}
       - task: :cpp:_run
         vars:
           CMD: >-

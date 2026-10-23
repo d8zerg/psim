@@ -57,7 +57,7 @@ class FakeTimers implements Timers {
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
-function setup(options: { keepalive?: boolean } = {}) {
+function setup(options: { keepalive?: boolean; supportedChangeTypes?: readonly string[] } = {}) {
   const sockets: FakeSocket[] = [];
   const timers = new FakeTimers();
   const statuses: ConnectionStatus[] = [];
@@ -65,6 +65,7 @@ function setup(options: { keepalive?: boolean } = {}) {
     onDelta: vi.fn(),
     onResync: vi.fn(),
     onError: vi.fn(),
+    onCapabilities: vi.fn(),
     onStatus: (s: ConnectionStatus) => statuses.push(s),
   };
   const client = new RealtimeClient({
@@ -76,6 +77,7 @@ function setup(options: { keepalive?: boolean } = {}) {
       return socket;
     },
     handlers,
+    supportedChangeTypes: options.supportedChangeTypes ?? [],
     timers,
     backoff: { initialMs: 100, maxMs: 1_000, random: () => 1 },
     ...(options.keepalive ? { keepalive: { pingIntervalMs: 25_000, pongTimeoutMs: 10_000 } } : {}),
@@ -121,6 +123,40 @@ describe("RealtimeClient", () => {
     expect(env.statuses).toEqual(["connecting", "authenticating", "open"]);
   });
 
+  it("negotiates operational changes on authentication and token refresh", async () => {
+    const modern = setup({ supportedChangeTypes: ["incident_event", "location_status"] });
+    modern.client.start();
+    await modern.open();
+    expect(modern.socket().sent[0]).toEqual({
+      requestId: "r1",
+      authenticate: {
+        accessToken: "token-1",
+        supportedChangeTypes: ["incident_event", "location_status"],
+      },
+    });
+    modern.socket().server({
+      authenticated: {
+        supportedStreams: ["STREAM_INCIDENTS", "STREAM_LOCATION_STATUS"],
+        supportedChangeTypes: ["incident_event", "location_status"],
+      },
+    });
+    expect(modern.handlers.onCapabilities).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        supportedStreams: [Stream.INCIDENTS, Stream.LOCATION_STATUS],
+        supportedChangeTypes: ["incident_event", "location_status"],
+      }),
+    );
+    await modern.client.reauthenticate();
+    expect(modern.socket().lastSent()).toEqual({
+      requestId: "r2",
+      authenticate: {
+        accessToken: "token-1",
+        supportedChangeTypes: ["incident_event", "location_status"],
+      },
+    });
+    modern.client.stop();
+  });
+
   it("delivers deltas and tracks the latest resume token", async () => {
     env.client.subscribe({ id: "feed", stream: Stream.INCIDENTS, resumeToken: "snap-1" });
     env.client.start();
@@ -131,6 +167,22 @@ describe("RealtimeClient", () => {
 
     expect(env.handlers.onDelta).toHaveBeenCalledOnce();
     expect(env.client.resumeToken("feed")).toBe("t2");
+  });
+
+  it("replays an unapplied delta after a handler failure", async () => {
+    env.client.subscribe({ id: "feed", stream: Stream.INCIDENTS, resumeToken: "snap-1" });
+    env.client.start();
+    await env.open();
+    env.handlers.onDelta.mockImplementationOnce(() => {
+      throw new Error("apply failed");
+    });
+    env.socket().server({ delta: { subscriptionId: "feed", resumeToken: "unapplied", incidentEvent: {} } });
+    expect(env.client.resumeToken("feed")).toBe("snap-1");
+    expect(env.socket().closed?.code).toBe(4002);
+    expect(env.handlers.onError).toHaveBeenCalledWith("REALTIME_DELTA_APPLY_FAILED", expect.any(String));
+    env.timers.fire();
+    await env.open();
+    expect(env.socket().lastSent()).toMatchObject({ subscribe: { resumeToken: "snap-1" } });
   });
 
   it("reconnects with backoff and resumes from the last token", async () => {
@@ -302,6 +354,30 @@ describe("RealtimeClient edge cases", () => {
     await flush();
 
     expect(sockets[0]?.sent).toEqual([]);
+  });
+
+  it("discards a token refresh completed after the connection closed", async () => {
+    let release: (token: string) => void = () => undefined;
+    const socket = new FakeSocket();
+    const client = new RealtimeClient({
+      url: "wss://psim.test/v1/realtime",
+      getAccessToken: vi
+        .fn()
+        .mockReturnValueOnce("initial")
+        .mockImplementationOnce(() => new Promise<string>((resolve) => (release = resolve))),
+      socketFactory: () => socket,
+      handlers: { onDelta: vi.fn(), onResync: vi.fn() },
+      timers: new FakeTimers(),
+    });
+    client.start();
+    socket.onopen?.();
+    await flush();
+    socket.server({ authenticated: { userId: "u1" } });
+    const refreshing = client.reauthenticate();
+    client.stop();
+    release("late-token");
+    await refreshing;
+    expect(socket.sent).toHaveLength(1);
   });
 
   it("works with the default timers and backoff", async () => {

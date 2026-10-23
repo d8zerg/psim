@@ -671,6 +671,27 @@ channels:
       cluster: 3
       single: 1
     x-psim-semantics: ALO
+  dlqRealtimeV1:
+    address: psim.dlq.realtime.v1
+    title: Dead letters of stage realtime
+    description: 'Key: original key. Semantics: ALO.'
+    messages:
+      DeadLetter:
+        $ref: '#/components/messages/DeadLetter'
+    bindings:
+      kafka:
+        topic: psim.dlq.realtime.v1
+        partitions: 3
+        replicas: 3
+        topicConfiguration:
+          cleanup.policy:
+          - delete
+          retention.ms: 1209600000
+        bindingVersion: 0.5.0
+    x-psim-partitions:
+      cluster: 3
+      single: 1
+    x-psim-semantics: ALO
 operations:
   connectorGatewaySendIngestRawV1:
     action: send
@@ -889,6 +910,13 @@ operations:
     messages:
     - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
     x-psim-service: notification-service
+  apiGatewayReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: api-gateway
   commandServiceSendCommandsV1:
     action: send
     channel:

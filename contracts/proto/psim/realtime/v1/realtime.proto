@@ -3,6 +3,7 @@ syntax = "proto3";
 package psim.realtime.v1;
 
 import "buf/validate/validate.proto";
+import "psim/api/v1/feed.proto";
 import "psim/incident/v1/events.proto";
 import "psim/response/v1/events.proto";
 
@@ -40,6 +41,8 @@ message ServerFrame {
 // Authenticate authenticates the connection; also sent on token refresh.
 message Authenticate {
   string access_token = 1 [(buf.validate.field).string.min_len = 1];
+  // Empty means the legacy incident_event capability.
+  repeated string supported_change_types = 2;
 }
 
 // Authenticated confirms authentication.
@@ -47,6 +50,8 @@ message Authenticated {
   string user_id = 1;
   // Seconds until the token expires; the client must re-authenticate before.
   uint32 expires_in = 2;
+  repeated Stream supported_streams = 3;
+  repeated string supported_change_types = 4;
 }
 
 // Subscribe opens a subscription from a resume token.
@@ -68,6 +73,8 @@ enum Stream {
   STREAM_INCIDENTS = 1;
   // Changes of one incident (filter.incident_id required).
   STREAM_INCIDENT = 2;
+  // Current authoritative location image; intermediate state images may be coalesced.
+  STREAM_LOCATION_STATUS = 3;
 }
 
 // FeedFilter narrows a subscription; the access scope is always applied by the server.
@@ -76,6 +83,7 @@ message FeedFilter {
   repeated string zone_ids = 2;
   string incident_id = 3;
   bool include_closed = 4;
+  string location_id = 5;
 }
 
 // Unsubscribe closes a subscription.
@@ -104,6 +112,8 @@ message Delta {
     option (buf.validate.oneof).required = true;
     psim.incident.v1.IncidentEventRecord incident_event = 3;
     psim.response.v1.ResponseEventRecord response_event = 4;
+    // Replace the complete location image, including removed resources and expired freshness.
+    psim.api.v1.GetLocationStatusResponse location_status = 5;
   }
 }
 

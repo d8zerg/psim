@@ -7,7 +7,7 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 14 | 15 | 0 | 2 | 31 |
+| Наборы тестов | 15 | 15 | 0 | 2 | 32 |
 | Нагрузка | 0 | 3 | 8 | 0 | 11 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
@@ -15,7 +15,7 @@
 | Fitness functions | 18 | 1 | 2 | 0 | 21 |
 | Безопасность | 4 | 2 | 3 | 0 | 9 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 41 | 27 | 29 | 2 | **99** |
+| **Всего** | 42 | 27 | 29 | 2 | **100** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -23,7 +23,7 @@
 |---|---|---|---|
 | G-01 | Пропускная способность | 50 000 событий/с устойчиво в течение 24 ч, пиковый ×1,5 в течение 10 мин | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
 | G-02 | Задержка событие -> сигнал | p99 ≤ 300 мс | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
-| G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (nightly), FF-05 (release), TS-31 (pr) |
+| G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (nightly), FF-05 (release), TS-31 (pr), TS-32 (pr) |
 | G-04 | Задержка отклика REST API | p99 ≤ 200 мс для операций чтения консоли | L-05 (release) |
 | G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
 | G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
@@ -55,12 +55,12 @@
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
 | [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
 | [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), TS-28 (pr), TS-29 (pr) |
-| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly) |
+| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly), TS-32 (pr) |
 | [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr) |
 | [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr) |
 | [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr) |
 | [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr) |
-| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr) |
+| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
 | [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (nightly), M-05 (release) |
 
@@ -101,6 +101,7 @@
 | TS-28 | Incident Service и авторизация | Два HTTPS-экземпляра, настоящие Kafka, PostgreSQL и Keycloak; переходы, версии, повторы, окно группировки, история, область доступа и подтверждённая передача сохраняют инварианты; SIGKILL и повтор сигналов не теряют и не дублируют эффекты. Назначение: Жизненный цикл инцидентов, общая авторизация и сохранение ответственности. | E-CI | pr | `task incidents:test` | 5.3 |
 | TS-29 | История событий и связи инцидентов | Реальные загрузчики, Kafka, ClickHouse и PostgreSQL; поиск и статистика ограничены областью; сигналы продлевают TTL; SIGKILL и повторы сохраняют полное множество связей без логических дубликатов. Назначение: Полный контекст инцидента, поиск и долговечное продление хранения. | E-CI | pr | `task history:test` | 5.4 |
 | TS-31 | Общие модели консоли и восстановление Kafka | Настоящие Kafka, PostgreSQL, Valkey и HTTPS; области доступа, независимые курсоры наблюдений и отчётов, дежурство, обслуживание, fallback к PostgreSQL, равенство перестроения и отказ неполной истории; локальный p99 обновления не выше 100 мс. Назначение: Согласованные снимки консоли, актуальность состояния и безопасное восстановление. | E-CI | pr | `task projection:test` | 7.3 |
+| TS-32 | Realtime подписки, восстановление и 500 клиентов | Два Gateway, 500 WSS-клиентов и 10000 доставок без потерь; локальный p99 не выше 200 мс; восстановление 500 подписок после перезапуска узла без нового снимка; фильтры, JWT, старый клиент, несколько подписок, приватные варианты, актуальное состояние после lease expiry и отключение медленного получателя. Назначение: Совместимая доставка изменений, независимое от узла возобновление и ограничение очередей. | E-CI | pr | `task realtime:test` | 7.2 |
 
 ### Нагрузка
 
@@ -244,7 +245,7 @@
 | 6.4 | TS-13 |
 | 6.5 | TS-30, L-09 |
 | 7.1 | TS-05 |
-| 7.2 | L-05, TS-19 |
+| 7.2 | L-05, TS-19, TS-32 |
 | 7.3 | TS-19, TS-26, TS-31 |
 | 7.4 | TS-12 |
 | 8.1 | TS-16 |

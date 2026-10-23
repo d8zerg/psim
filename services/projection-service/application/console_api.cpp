@@ -106,7 +106,21 @@ boost::asio::awaitable<platform::Result<Response>> console_request(ConsoleStore*
   if (!epoch.empty() && !platform::stream::uuid(epoch)) {
     co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid realtime epoch");
   }
-  nlohmann::json token{{"generation", snapshot->generation}, {"epoch", epoch}, {"tenant", principal.tenant}};
+  nlohmann::json token{{"version", 2},
+                       {"generation", snapshot->generation},
+                       {"epoch", epoch},
+                       {"tenant", principal.tenant},
+                       {"issuedAtMs", std::chrono::duration_cast<std::chrono::milliseconds>(
+                                          std::chrono::system_clock::now().time_since_epoch())
+                                          .count()}};
+  std::map<std::string, std::int64_t> response_positions;
+  for (const auto& [key, value] : snapshot->offsets) {
+    const std::string prefix = "psim.response.events.v1:";
+    if (key.starts_with(prefix)) {
+      response_positions[key.substr(prefix.size())] = value;
+    }
+  }
+  token["responseOffsets"] = response_positions;
   std::string body;
   if (feed) {
     std::map<std::string, std::int64_t> positions;
@@ -127,6 +141,7 @@ boost::asio::awaitable<platform::Result<Response>> console_request(ConsoleStore*
     body = platform::stream::json(snapshot->feed);
   } else {
     token["stateOffsets"] = snapshot->offsets;
+    token["locationId"] = identity;
     snapshot->location.set_resume_token(token.dump());
     snapshot->operators.set_resume_token(token.dump());
     body = location ? platform::stream::json(snapshot->location) : platform::stream::json(snapshot->operators);

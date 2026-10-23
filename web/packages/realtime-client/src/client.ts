@@ -5,6 +5,7 @@ import { create, fromJsonString, type MessageInitShape, toJsonString } from "@bu
 
 import {
   ClientFrameSchema,
+  type Authenticated,
   type Delta,
   type FeedFilterSchema,
   ServerFrameSchema,
@@ -42,6 +43,7 @@ export interface RealtimeHandlers {
   /** The server cannot resume: take a new snapshot and subscribe again with its token. */
   onResync(subscriptionId: string, reason: string): void;
   onStatus?(status: ConnectionStatus): void;
+  onCapabilities?(capabilities: Authenticated): void;
   onError?(code: string, message: string): void;
 }
 
@@ -50,6 +52,8 @@ export interface RealtimeClientOptions {
   readonly getAccessToken: () => string | Promise<string>;
   readonly socketFactory: (url: string) => SocketLike;
   readonly handlers: RealtimeHandlers;
+  /** Empty or absent preserves the incident-only protocol of existing clients. */
+  readonly supportedChangeTypes?: readonly string[];
   readonly timers?: Timers;
   /** Reconnect delay: doubles from initialMs up to maxMs; random() adds jitter. */
   readonly backoff?: { readonly initialMs: number; readonly maxMs: number; readonly random?: () => number };
@@ -121,7 +125,14 @@ export class RealtimeClient {
   /** Send a fresh access token over the open connection (ADR-019, item 8). */
   async reauthenticate(): Promise<void> {
     if (this.currentStatus === "open") {
-      this.send({ case: "authenticate", value: { accessToken: await this.options.getAccessToken() } });
+      const socket = this.socket;
+      const accessToken = await this.options.getAccessToken();
+      if (this.socket === socket) {
+        this.send({
+          case: "authenticate",
+          value: { accessToken, supportedChangeTypes: [...(this.options.supportedChangeTypes ?? [])] },
+        });
+      }
     }
   }
 
@@ -149,7 +160,10 @@ export class RealtimeClient {
   private async authenticate(socket: SocketLike): Promise<void> {
     const accessToken = await this.options.getAccessToken();
     if (this.socket === socket) {
-      this.send({ case: "authenticate", value: { accessToken } });
+      this.send({
+        case: "authenticate",
+        value: { accessToken, supportedChangeTypes: [...(this.options.supportedChangeTypes ?? [])] },
+      });
     }
   }
 
@@ -164,6 +178,7 @@ export class RealtimeClient {
     const body = frame.frame;
     switch (body.case) {
       case "authenticated":
+        this.options.handlers.onCapabilities?.(body.value);
         if (this.currentStatus === "authenticating") {
           this.attempt = 0;
           this.setStatus("open");
@@ -177,8 +192,17 @@ export class RealtimeClient {
         this.updateToken(body.value.subscriptionId, body.value.resumeToken);
         break;
       case "delta":
+        try {
+          this.options.handlers.onDelta(body.value);
+        } catch {
+          this.socket?.close(4002, "delta apply failed");
+          this.options.handlers.onError?.(
+            "REALTIME_DELTA_APPLY_FAILED",
+            "delta handler failed; resuming from the prior token",
+          );
+          break;
+        }
         this.updateToken(body.value.subscriptionId, body.value.resumeToken);
-        this.options.handlers.onDelta(body.value);
         break;
       case "resyncRequired":
         this.subscriptions.delete(body.value.subscriptionId);

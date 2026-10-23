@@ -89,6 +89,8 @@
 
 - Безопасность платформы: TLS/mTLS, JWT/JWKS, секреты и внешняя PKI - [ADR-043](adr/0043-platform-security.md), [интерфейсы](../libs/platform/security/README.md), [регламент доверия](security/platform-trust.md)
 
+- Realtime, возобновление из Kafka и оперативные образы - [ADR-060](adr/0060-realtime-delivery.md), [руководство](engineering/realtime.md)
+
 ## Участие и поддержка
 
 - [Участие в проекте](../CONTRIBUTING.md)

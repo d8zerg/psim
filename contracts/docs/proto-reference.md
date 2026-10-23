@@ -8431,6 +8431,7 @@ Authenticate authenticates the connection; also sent on token refresh.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | access_token | [string](#string) |  |  |
+| supported_change_types | [string](#string) | repeated | Empty means the legacy incident_event capability. |
 
 
 
@@ -8447,6 +8448,8 @@ Authenticated confirms authentication.
 | ----- | ---- | ----- | ----------- |
 | user_id | [string](#string) |  |  |
 | expires_in | [uint32](#uint32) |  | Seconds until the token expires; the client must re-authenticate before. |
+| supported_streams | [Stream](#psim-realtime-v1-Stream) | repeated |  |
+| supported_change_types | [string](#string) | repeated |  |
 
 
 
@@ -8484,6 +8487,7 @@ Delta is one change; apply only if the aggregate version is newer than known.
 | resume_token | [string](#string) |  | Token to resume after this delta. |
 | incident_event | [psim.incident.v1.IncidentEventRecord](#psim-incident-v1-IncidentEventRecord) |  |  |
 | response_event | [psim.response.v1.ResponseEventRecord](#psim-response-v1-ResponseEventRecord) |  |  |
+| location_status | [psim.api.v1.GetLocationStatusResponse](#psim-api-v1-GetLocationStatusResponse) |  | Replace the complete location image, including removed resources and expired freshness. |
 
 
 
@@ -8519,6 +8523,7 @@ FeedFilter narrows a subscription; the access scope is always applied by the ser
 | zone_ids | [string](#string) | repeated |  |
 | incident_id | [string](#string) |  |  |
 | include_closed | [bool](#bool) |  |  |
+| location_id | [string](#string) |  |  |
 
 
 
@@ -8643,6 +8648,7 @@ Stream selects what to receive.
 | STREAM_UNSPECIFIED | 0 |  |
 | STREAM_INCIDENTS | 1 | Incident and response changes within the user scope. |
 | STREAM_INCIDENT | 2 | Changes of one incident (filter.incident_id required). |
+| STREAM_LOCATION_STATUS | 3 | Current authoritative location image; intermediate state images may be coalesced. |
 
 
 
