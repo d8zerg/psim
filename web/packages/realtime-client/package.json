@@ -5,7 +5,8 @@
   "description": "Realtime channel client: WebSocket protocol of contracts/proto/psim/realtime/v1 (ADR-019, ADR-037)",
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./enums": "./src/enums.ts"
   },
   "scripts": {
     "gen": "buf generate --template buf.gen.yaml",

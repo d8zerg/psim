@@ -155,3 +155,47 @@ describe("incident feed", () => {
     expect(channel.start).not.toHaveBeenCalled();
   });
 });
+
+it("retains row references while reconnecting and during an identical pending snapshot", async () => {
+  const { controller, handlers, fetch } = fixture();
+  await controller.start();
+  const original = controller.getSnapshot().rows;
+  handlers().onStatus?.("reconnecting");
+  expect(controller.getSnapshot().rows).toBe(original);
+  let complete: (response: Response) => void = () => undefined;
+  fetch.mockReturnValueOnce(
+    new Promise<Response>((resolve) => {
+      complete = resolve;
+    }),
+  );
+  handlers().onResync("feed", "gap");
+  expect(controller.getSnapshot().rows).toBe(original);
+  expect(controller.getSnapshot().loading).toBe(true);
+  complete(
+    new Response(
+      JSON.stringify({
+        incidents: [
+          {
+            incidentId: "incident",
+            version: "1",
+            title: "Old alarm",
+            priority: "PRIORITY_P2",
+            state: "INCIDENT_STATE_NEW",
+          },
+        ],
+        resumeToken: "new-snapshot",
+      }),
+    ),
+  );
+  await vi.waitFor(() => {
+    expect(controller.getSnapshot().loading).toBe(false);
+  });
+  expect(controller.getSnapshot().rows).toBe(original);
+  fetch.mockRejectedValueOnce(new Error("offline"));
+  handlers().onResync("feed", "gap");
+  await vi.waitFor(() => {
+    expect(controller.getSnapshot().error).toBe("Could not reload incidents.");
+  });
+  expect(controller.getSnapshot().rows).toBe(original);
+  expect(controller.getSnapshot().loading).toBe(false);
+});

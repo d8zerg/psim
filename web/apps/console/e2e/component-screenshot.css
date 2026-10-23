@@ -1,0 +1,5 @@
+/* Floating shell elements are outside the component reference area. */
+.section-nav,
+.skip-link {
+  visibility: hidden !important;
+}

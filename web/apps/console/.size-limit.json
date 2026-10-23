@@ -1,8 +1,8 @@
 [
   {
-    "name": "JavaScript, all chunks (gzip); routes beyond the shell are code-split (F8)",
-    "path": "dist/assets/*.js",
-    "limit": "150 kB",
+    "name": "JavaScript, console and design previews (gzip)",
+    "path": ["dist/assets/*.js", "dist/*.js"],
+    "limit": "260 kB",
     "gzip": true
   },
   {

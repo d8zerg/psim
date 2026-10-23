@@ -22,9 +22,9 @@ describe("Button", () => {
     );
     const button = screen.getByRole("button", { name: "Escalate" });
     expect(button.getAttribute("type")).toBe("submit");
-    expect(button.className).toContain("bg-danger");
+    expect(button.className).toContain("bg-danger-solid");
     expect(button.className).toContain("px-2");
-    expect(button.className).not.toContain("px-6");
+    expect(button.className).not.toContain("px-5");
   });
 
   it("renders the child element with button styles", () => {
@@ -42,4 +42,14 @@ describe("cn", () => {
   it("drops falsy values and resolves Tailwind conflicts", () => {
     expect(cn("p-2", false, undefined, "p-4")).toBe("p-4");
   });
+});
+
+it("forwards a slotted anchor ref without changing the native button ref contract", () => {
+  const anchor: { current: HTMLAnchorElement | null } = { current: null };
+  render(
+    <Button asChild ref={anchor}>
+      <a href="#source">Source</a>
+    </Button>,
+  );
+  expect(anchor.current).toBe(screen.getByRole("link", { name: "Source" }));
 });

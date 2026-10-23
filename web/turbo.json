@@ -21,7 +21,7 @@
       "outputs": ["dist/**"]
     },
     "size": {
-      "dependsOn": ["build"]
+      "dependsOn": ["gen", "^gen", "build"]
     },
     "e2e": {
       "dependsOn": ["build"],

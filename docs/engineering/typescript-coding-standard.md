@@ -12,7 +12,7 @@
 | Линтер | ESLint (typescript-eslint `strictTypeChecked`, react-hooks, jsx-a11y), `--max-warnings 0` |
 | Формат | Prettier без изменений |
 | Тесты и покрытие | Vitest; ≥ 80% строк, ветвей, функций и выражений на пакет ([strategy.md](../quality/strategy.md#6-покрытие)) |
-| Бюджеты бандла | size-limit: JavaScript консоли ≤ 150 КБ gzip, CSS ≤ 15 КБ |
+| Бюджеты бандла | size-limit: весь JavaScript с витриной ≤ 260 КБ gzip, начальная загрузка консоли ≤ 150 КБ gzip, CSS ≤ 15 КБ ([ADR-065](../adr/0065-ui-loading-budgets.md)) |
 | Сгенерированные клиенты | REST - из OpenAPI, realtime - из proto; генерируются при каждой сборке в `src/gen`, в git не хранятся |
 | E2E | Playwright по собранной консоли (`task web:e2e`) |
 

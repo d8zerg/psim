@@ -76,6 +76,8 @@
 - Барьеры качества и fitness functions - [ADR-033](adr/0033-code-quality-gates.md); toolchain - [ADR-032](adr/0032-cpp-toolchain.md)
 - Локальный конвейер CI/CD, пакеты, образы, SBOM и подписи - [ADR-034](adr/0034-local-ci-and-supply-chain.md)
 - Портал документации (`task docs:portal`, `task docs:serve`) - [ADR-038](adr/0038-documentation-portal.md)
+- Дизайн-система и обновления без мерцания - [ADR-062](adr/0062-design-system-and-stable-updates.md), [руководство](engineering/design-system.md), [расширенный объём и приёмка](engineering/design-system-acceptance.md)
+- [Термины интерфейса ru/en](engineering/ui-glossary.md)
 - Веб-монорепозиторий (консоль, дизайн-система, клиенты REST и realtime) - [ADR-037](adr/0037-web-monorepo.md), [web/](../web/README.md)
 - Локальное окружение (Kafka, Schema Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, наблюдаемость, Toxiproxy) - [ADR-035](adr/0035-local-environment.md), [deploy/](../deploy/README.md)
 

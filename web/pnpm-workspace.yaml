@@ -7,6 +7,10 @@ packages:
 # @bufbuild/buf: postinstall links the platform binary of buf.
 allowBuilds:
   "@bufbuild/buf": true
+  # The catalogue uses packaged native binaries; worker installation and fallback downloads are disabled.
+  "@swc/core": false
+  "esbuild": false
+  "msw": false
 
 # openapi-typescript 7 declares TypeScript 5; it only prints types and works with TypeScript 6
 # (checked by `pnpm gen` and the type check of @psim/api-client). Revisit with openapi-typescript 8.

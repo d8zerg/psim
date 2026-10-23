@@ -10,6 +10,6 @@ describe("console shell", () => {
   it("renders the home page with the connection state", async () => {
     render(<RouterProvider router={createAppRouter()} />);
     expect(await screen.findByRole("heading", { name: "Open-Source PSIM Platform" })).toBeDefined();
-    expect(screen.getByTestId("connection-status").textContent).toBe("offline");
+    expect(screen.getByTestId("connection-status").getAttribute("data-status")).toBe("offline");
   });
 });

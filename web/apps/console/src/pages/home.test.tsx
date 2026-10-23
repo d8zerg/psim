@@ -2,7 +2,7 @@ import type * as FeedModule from "../feed/controller";
 import { Priority } from "@psim/realtime-client";
 import { createApiClient } from "@psim/api-client";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { auth } from "../auth";
 import { createFeed, FeedController } from "../feed/controller";
 import type { Delta } from "@psim/realtime-client";
@@ -21,6 +21,10 @@ function change(): Delta {
   } as Delta;
 }
 import { HomePage } from "./home";
+import { setPreferences } from "../ui/preferences";
+beforeEach(() => {
+  setPreferences({ language: "en" });
+});
 vi.mock("../auth", () => ({ auth: { token: vi.fn(), login: vi.fn() } }));
 vi.mock("../feed/controller", async (original) => ({
   ...(await original<typeof FeedModule>()),

@@ -1,0 +1,35 @@
+@import "../src/styles.css";
+@source "../src";
+@source "../stories";
+@source "./components.tsx";
+
+.catalogue {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: var(--space-4);
+  color: var(--foreground);
+  background: var(--background);
+}
+.catalogue-settings,
+.catalogue-stack {
+  display: grid;
+  gap: var(--space-4);
+}
+.catalogue-settings {
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  margin-block: var(--space-4);
+}
+.catalogue-component {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--card);
+}
+.catalogue-examples {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}

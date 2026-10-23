@@ -28,15 +28,23 @@ tasks:
         vars: {CMD: pnpm install --no-frozen-lockfile}
 
   check:
-    desc: 'All web checks: format, generated clients, lint, types, tests with coverage, build, bundle budgets'
+    desc: 'All web checks: format, generated clients, lint, types, tests with coverage, build, bundle budgets, visual regression and accessibility'
     cmds:
       - task: install
       - task: _run
         vars:
-          CMD: pnpm format && pnpm exec turbo run gen lint typecheck test build size --output-logs=errors-only
+          CMD: pnpm format && node --test eslint-rules/tokens-only.check.js && pnpm exec turbo run gen lint typecheck test build size --output-logs=errors-only
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/console exec playwright test --grep @gate
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/design-system exec playwright test --grep @gate
 
   gen:
-    desc: Generate the API client (OpenAPI) and the realtime protocol types (proto)
+    desc: Generate API and realtime clients, presentation tokens and local font assets
     cmds:
       - task: install
       - task: _run
@@ -57,7 +65,7 @@ tasks:
         vars: {CMD: pnpm format:fix}
 
   e2e:
-    desc: End-to-end tests of the built console in Chromium (Playwright)
+    desc: End-to-end checks of the built console and component catalogue in Chromium
     cmds:
       - task: install
       - task: _run
@@ -65,11 +73,104 @@ tasks:
           IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
           CMD: pnpm exec turbo run e2e --output-logs=errors-only
 
+  a11y:
+    desc: Accessibility of console layouts and component stories across all presentations, with keyboard checks
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/console exec playwright test --grep @a11y
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/design-system exec playwright test --grep @a11y
+
+  visual:update:
+    desc: Regenerate component visual baselines for review
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/console exec playwright test --grep @visual --update-snapshots
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/design-system exec playwright test --grep @visual --update-snapshots
+
+  catalogue:
+    desc: Ladle component catalogue on http://localhost:61000
+    interactive: true
+    cmds:
+      - task: gen
+      - task: _run
+        vars:
+          TTY: -it -p 127.0.0.1:61000:61000
+          CMD: pnpm --filter @psim/design-system catalogue
+
+  catalogue:check:
+    desc: Build and check component stories, interactions, accessibility and screenshots
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --filter=@psim/design-system --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: >-
+            pnpm --filter @psim/design-system exec playwright test --grep '{{.GREP | default "@gate"}}'
+
+  catalogue:visual:update:
+    desc: Generate component catalogue visual baselines for review
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --filter=@psim/design-system --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: >-
+            pnpm --filter @psim/design-system exec playwright test --grep '{{.GREP | default "@visual"}}' --update-snapshots
+
+  benchmark:
+    desc: Compare deterministic collection rendering in an isolated Chromium worker
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --filter=@psim/design-system --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/design-system exec playwright test --config benchmark.config.ts
+
+  changeset:status:
+    desc: Inspect the release plan without updating versions, tags or commits
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm changeset:status}
+
+  stability:
+    desc: Check retained rows, focus and layout during refresh and connection loss
+    cmds:
+      - task: install
+      - task: _run
+        vars: {CMD: pnpm exec turbo run gen build --output-logs=errors-only}
+      - task: _run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/console exec playwright test --grep 'retains DOM|status layout'
+
   dev:
     desc: Vite dev server of the console on http://localhost:5173
     interactive: true
     cmds:
-      - task: install
+      - task: gen
       - task: _run
         vars:
           TTY: -it -p 127.0.0.1:5173:5173

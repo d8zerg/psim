@@ -1,6 +1,7 @@
 // ESLint of the PSIM web monorepo (ADR-037). Zero warnings is the
 // gate: every package runs `eslint --max-warnings 0`. Type-aware rules use each package tsconfig.
 import js from "@eslint/js";
+import tokensOnly from "./eslint-rules/tokens-only.js";
 import jsxA11y from "eslint-plugin-jsx-a11y";
 import reactHooks from "eslint-plugin-react-hooks";
 import globals from "globals";
@@ -36,7 +37,13 @@ export default tseslint.config(
     languageOptions: { globals: { ...globals.node } },
   },
   {
-    files: ["**/*.js"],
+    files: ["**/*.{js,mjs}"],
     ...tseslint.configs.disableTypeChecked,
+  },
+  {
+    files: ["apps/console/src/**/*.{ts,tsx}"],
+    ignores: ["**/*.test.{ts,tsx}", "**/src/gen/**"],
+    plugins: { psim: { rules: { "tokens-only": tokensOnly } } },
+    rules: { "psim/tokens-only": "error" },
   },
 );

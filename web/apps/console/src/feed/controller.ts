@@ -11,6 +11,8 @@ export interface FeedRow {
   readonly eventId: string;
 }
 export interface FeedState {
+  readonly loading: boolean;
+  readonly loaded: boolean;
   readonly rows: readonly FeedRow[];
   readonly status: string;
   readonly error: string;
@@ -26,7 +28,7 @@ export class FeedController {
   private readonly listeners = new Set<() => void>();
   private channel: Channel | undefined;
   private running = false;
-  private state: FeedState = { rows: [], status: "offline", error: "" };
+  private state: FeedState = { rows: [], status: "offline", error: "", loading: false, loaded: false };
   constructor(
     private readonly api: ApiClient,
     private readonly makeChannel: (handlers: RealtimeClientOptions["handlers"]) => Channel,
@@ -37,8 +39,13 @@ export class FeedController {
     return () => this.listeners.delete(listener);
   };
   private update(status = this.state.status, error = ""): void {
+    const rows = [...this.rows.values()].sort((left, right) => right.id.localeCompare(left.id));
     this.state = {
-      rows: [...this.rows.values()].sort((left, right) => right.id.localeCompare(left.id)),
+      ...this.state,
+      rows:
+        rows.length === this.state.rows.length && rows.every((row, index) => row === this.state.rows[index])
+          ? this.state.rows
+          : rows,
       status,
       error,
     };
@@ -54,7 +61,7 @@ export class FeedController {
       },
       onResync: () => {
         void this.snapshot().catch(() => {
-          this.update("offline", "Could not reload incidents.");
+          this.fail(new Error("Could not reload incidents."));
         });
       },
       onStatus: (status) => {
@@ -73,6 +80,8 @@ export class FeedController {
     return this.running;
   }
   private async snapshot(): Promise<void> {
+    this.state = { ...this.state, loading: true };
+    this.update();
     const response = await this.api.GET("/v1/feed/incidents");
     if (response.data === undefined) {
       throw new Error("Could not load incidents.");
@@ -80,21 +89,33 @@ export class FeedController {
     if (!this.running) {
       return;
     }
+    const previous = new Map(this.rows);
     this.rows.clear();
     for (const incident of response.data.incidents ?? []) {
       const id = incident.incidentId ?? "";
       const version = incident.version ?? "0";
       this.gate.seed(id, BigInt(version));
-      this.rows.set(id, {
+      const row = {
         id,
         version,
         title: incident.title ?? "Incident",
         priority: incident.priority ?? "",
         state: incident.state ?? "",
         eventId: "",
-      });
+      };
+      const saved = previous.get(id);
+      this.rows.set(
+        id,
+        saved?.version === row.version &&
+          saved.title === row.title &&
+          saved.priority === row.priority &&
+          saved.state === row.state
+          ? saved
+          : row,
+      );
     }
     this.channel?.subscribe({ id: "feed", stream: Stream.INCIDENTS, resumeToken: response.data.resumeToken ?? "" });
+    this.state = { ...this.state, loading: false, loaded: true };
     this.update();
   }
   delta(delta: Delta): void {
@@ -133,6 +154,7 @@ export class FeedController {
     this.channel?.stop();
   }
   fail(error: unknown): void {
+    this.state = { ...this.state, loading: false };
     this.update("offline", error instanceof Error ? error.message : "Connection failed.");
   }
 }

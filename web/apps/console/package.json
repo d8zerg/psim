@@ -8,10 +8,10 @@
     "dev": "vite --host 0.0.0.0 --port 5173 --strictPort",
     "build": "tsc --project tsconfig.json && vite build",
     "preview": "vite preview --host 0.0.0.0 --port 4173 --strictPort",
-    "lint": "eslint --max-warnings 0 .",
-    "typecheck": "tsc --project tsconfig.json",
+    "lint": "eslint --max-warnings 0 . && node scripts/check-style-tokens.js",
+    "typecheck": "node scripts/check-enum-labels.js && tsc --project tsconfig.json",
     "test": "vitest run --coverage",
-    "size": "size-limit",
+    "size": "size-limit && node scripts/initial-budget.js",
     "e2e": "playwright test"
   },
   "dependencies": {
@@ -22,9 +22,11 @@
     "@tanstack/react-router": "1.170.41",
     "react": "19.3.0",
     "react-dom": "19.3.0",
-    "zustand": "5.0.15"
+    "zustand": "5.0.15",
+    "intl-messageformat": "12.1.4"
   },
   "devDependencies": {
+    "@axe-core/playwright": "4.14.0",
     "@playwright/test": "1.63.0",
     "@size-limit/file": "14.1.0",
     "@tailwindcss/vite": "4.3.3",

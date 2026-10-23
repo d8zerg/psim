@@ -37,6 +37,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
     }
   });
   await page.addInitScript(() => {
+    localStorage.setItem("psim.ui", JSON.stringify({ language: "en" }));
     const sockets: WebSocket[] = [];
     const NativeSocket = window.WebSocket;
     window.WebSocket = class extends NativeSocket {
@@ -67,7 +68,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   const tokenResponse = page.waitForResponse((response) => response.url().endsWith("/protocol/openid-connect/token"));
   await page.locator("#kc-login").click();
   const userToken = (await (await tokenResponse).json()) as { access_token: string };
-  await expect(page.getByTestId("connection-status")).toHaveText("open", { timeout: 30_000 });
+  await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "open", { timeout: 30_000 });
   expect(page.url()).not.toContain("code=");
   expect((await request.get("http://api-gateway:8080/v1/feed/incidents")).status()).toBe(401);
   expect(
@@ -123,7 +124,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
       timeout: 30_000,
     })
     .toBeGreaterThan(previousConnections);
-  await expect(page.getByTestId("connection-status")).toHaveText("open");
+  await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "open");
   await expect(page.getByTestId("incident-row").first()).toBeVisible();
   expect(snapshots).toBe(1);
   await marker("after-restart-ready");

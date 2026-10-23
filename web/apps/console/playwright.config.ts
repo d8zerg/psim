@@ -5,6 +5,8 @@ export default defineConfig({
   testDir: "e2e",
   forbidOnly: true,
   retries: 0,
+  workers: 4,
+  fullyParallel: true,
   reporter: [["list"]],
   use: { baseURL: "http://localhost:4173", trace: "retain-on-failure" },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

@@ -1,41 +1,82 @@
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
-import type { ButtonHTMLAttributes, Ref } from "react";
+import type { ButtonHTMLAttributes, MouseEventHandler, Ref } from "react";
 
 import { cn } from "../cn";
 
+// Heights follow the density tokens, so sizes stay proportional in comfortable and compact modes.
 export const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium transition-colors " +
-    "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary " +
-    "disabled:pointer-events-none disabled:opacity-50",
+  "ds-button relative inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-md border " +
+    "font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 " +
+    "focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "bg-primary text-primary-foreground hover:bg-primary/90",
-        secondary: "border border-border bg-muted text-foreground hover:bg-muted/80",
-        danger: "bg-danger text-danger-foreground hover:bg-danger/90",
-        ghost: "text-foreground hover:bg-muted",
+        primary:
+          "border-[var(--button-border)] bg-[var(--button-background)] text-[var(--button-foreground)] hover:bg-primary/85",
+        secondary: "border-input bg-card text-foreground hover:bg-muted",
+        danger: "border-danger-solid bg-danger-solid text-danger-solid-foreground hover:bg-danger-solid/85",
+        ghost: "border-transparent text-foreground hover:bg-muted",
       },
       size: {
-        sm: "h-8 px-3",
-        md: "h-9 px-4",
-        lg: "h-10 px-6",
+        sm: "min-h-[calc(var(--control-height)-0.5rem)] px-2.5 text-[0.8125rem]",
+        md: "min-h-[var(--control-height)] px-3.5 text-sm",
+        lg: "min-h-[calc(var(--control-height)+0.5rem)] px-5 text-[0.9375rem]",
       },
     },
     defaultVariants: { variant: "primary", size: "md" },
   },
 );
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
-  /** Render the child element (for example a router link) with the button styles. */
-  readonly asChild?: boolean;
-  readonly ref?: Ref<HTMLButtonElement>;
+interface ButtonBaseProps
+  extends Omit<ButtonHTMLAttributes<HTMLButtonElement>, "onClickCapture">, VariantProps<typeof buttonVariants> {
+  readonly onClickCapture?: MouseEventHandler<HTMLElement>;
+  /** Keep the action name and dimensions while preventing duplicate submission. */
+  readonly loading?: boolean;
 }
+export type ButtonProps = ButtonBaseProps &
+  (
+    | { readonly asChild?: false; readonly ref?: Ref<HTMLButtonElement> }
+    | { readonly asChild: true; readonly ref?: Ref<HTMLElement> }
+  );
 
-export function Button({ className, variant, size, asChild = false, type, ...props }: ButtonProps) {
+export type NativeButtonProps = Extract<ButtonProps, { readonly asChild?: false }>;
+
+export function Button(allProps: ButtonProps) {
+  const { className, variant, size, asChild, loading = false, type, ref, ...props } = allProps;
   const classes = cn(buttonVariants({ variant, size }), className);
   if (asChild) {
-    return <Slot className={classes} {...props} />;
+    return (
+      <Slot
+        className={classes}
+        data-variant={variant ?? "primary"}
+        {...props}
+        ref={ref}
+        aria-busy={loading || undefined}
+        aria-disabled={loading || props.disabled ? true : undefined}
+        onClickCapture={(event) => {
+          if (loading || props.disabled) {
+            event.preventDefault();
+            event.stopPropagation();
+            return;
+          }
+          props.onClickCapture?.(event);
+        }}
+      />
+    );
   }
-  return <button type={type ?? "button"} className={classes} {...props} />;
+  return (
+    <button
+      type={type ?? "button"}
+      className={classes}
+      data-variant={variant ?? "primary"}
+      {...props}
+      ref={(node) => {
+        if (typeof ref === "function") return ref(node);
+        if (ref) ref.current = node;
+      }}
+      disabled={loading || props.disabled}
+      aria-busy={loading || undefined}
+    />
+  );
 }
