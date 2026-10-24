@@ -150,6 +150,8 @@
     - [GetCommandResponse](#psim-api-v1-GetCommandResponse)
     - [ListCommandsRequest](#psim-api-v1-ListCommandsRequest)
     - [ListCommandsResponse](#psim-api-v1-ListCommandsResponse)
+    - [PreviewCommandRequest](#psim-api-v1-PreviewCommandRequest)
+    - [PreviewCommandResponse](#psim-api-v1-PreviewCommandResponse)
     - [RejectCommandRequest](#psim-api-v1-RejectCommandRequest)
     - [RejectCommandResponse](#psim-api-v1-RejectCommandResponse)
     - [RequestCommandRequest](#psim-api-v1-RequestCommandRequest)
@@ -253,11 +255,14 @@
     - [SiteDutyService](#psim-api-v1-SiteDutyService)
 
 - [psim/incident/v1/incident.proto](#psim_incident_v1_incident-proto)
+    - [AlarmControl](#psim-incident-v1-AlarmControl)
     - [Incident](#psim-incident-v1-Incident)
     - [IncidentTransfer](#psim-incident-v1-IncidentTransfer)
     - [IncidentType](#psim-incident-v1-IncidentType)
     - [IncidentType.PriorityMatrixEntry](#psim-incident-v1-IncidentType-PriorityMatrixEntry)
     - [Link](#psim-incident-v1-Link)
+    - [OperationalState](#psim-incident-v1-OperationalState)
+    - [PresenceLease](#psim-incident-v1-PresenceLease)
     - [StepRef](#psim-incident-v1-StepRef)
     - [TimelineEntry](#psim-incident-v1-TimelineEntry)
     - [TimelineEntry.DetailsEntry](#psim-incident-v1-TimelineEntry-DetailsEntry)
@@ -274,6 +279,8 @@
     - [GetIncidentFeedResponse](#psim-api-v1-GetIncidentFeedResponse)
     - [GetLocationStatusRequest](#psim-api-v1-GetLocationStatusRequest)
     - [GetLocationStatusResponse](#psim-api-v1-GetLocationStatusResponse)
+    - [GetOperationalSnapshotRequest](#psim-api-v1-GetOperationalSnapshotRequest)
+    - [GetOperationalSnapshotResponse](#psim-api-v1-GetOperationalSnapshotResponse)
     - [GetOperatorLoadRequest](#psim-api-v1-GetOperatorLoadRequest)
     - [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse)
     - [OperatorLoad](#psim-api-v1-OperatorLoad)
@@ -358,6 +365,32 @@
 
     - [NotificationContactService](#psim-api-v1-NotificationContactService)
     - [NotificationService](#psim-api-v1-NotificationService)
+
+- [psim/api/v1/operations.proto](#psim_api_v1_operations-proto)
+    - [ActExerciseRequest](#psim-api-v1-ActExerciseRequest)
+    - [ActExerciseResponse](#psim-api-v1-ActExerciseResponse)
+    - [AskAssistantRequest](#psim-api-v1-AskAssistantRequest)
+    - [AskAssistantResponse](#psim-api-v1-AskAssistantResponse)
+    - [AssistantClaim](#psim-api-v1-AssistantClaim)
+    - [CreateExerciseRequest](#psim-api-v1-CreateExerciseRequest)
+    - [CreateExerciseResponse](#psim-api-v1-CreateExerciseResponse)
+    - [ExerciseState](#psim-api-v1-ExerciseState)
+    - [GetExerciseRequest](#psim-api-v1-GetExerciseRequest)
+    - [GetExerciseResponse](#psim-api-v1-GetExerciseResponse)
+    - [GetIncidentRecoveryRequest](#psim-api-v1-GetIncidentRecoveryRequest)
+    - [GetIncidentRecoveryResponse](#psim-api-v1-GetIncidentRecoveryResponse)
+    - [GetIncidentSnapshotsRequest](#psim-api-v1-GetIncidentSnapshotsRequest)
+    - [GetIncidentSnapshotsResponse](#psim-api-v1-GetIncidentSnapshotsResponse)
+    - [GetOperationsRequest](#psim-api-v1-GetOperationsRequest)
+    - [GetOperationsResponse](#psim-api-v1-GetOperationsResponse)
+    - [IncidentSnapshot](#psim-api-v1-IncidentSnapshot)
+    - [OperationSource](#psim-api-v1-OperationSource)
+    - [SetPresenceRequest](#psim-api-v1-SetPresenceRequest)
+    - [SetPresenceResponse](#psim-api-v1-SetPresenceResponse)
+    - [UpdateAlarmRequest](#psim-api-v1-UpdateAlarmRequest)
+    - [UpdateAlarmResponse](#psim-api-v1-UpdateAlarmResponse)
+
+    - [OperationalService](#psim-api-v1-OperationalService)
 
 - [psim/api/v1/reports.proto](#psim_api_v1_reports-proto)
     - [ExportIncidentReportRequest](#psim-api-v1-ExportIncidentReportRequest)
@@ -490,6 +523,7 @@
     - [IncidentEventRecord](#psim-incident-v1-IncidentEventRecord)
     - [IncidentLinkAdded](#psim-incident-v1-IncidentLinkAdded)
     - [IncidentNotificationUpdated](#psim-incident-v1-IncidentNotificationUpdated)
+    - [IncidentOperationalUpdated](#psim-incident-v1-IncidentOperationalUpdated)
     - [IncidentPriorityChanged](#psim-incident-v1-IncidentPriorityChanged)
     - [IncidentReopened](#psim-incident-v1-IncidentReopened)
     - [IncidentResolved](#psim-incident-v1-IncidentResolved)
@@ -1019,6 +1053,7 @@ Capability is a command or mode a device supports.
 | code | [string](#string) |  | For example &#34;lock&#34;, &#34;unlock&#34;, &#34;arm&#34;, &#34;ptz.preset&#34;. |
 | name | [string](#string) |  |  |
 | critical | [bool](#bool) |  | Critical commands require approval by a second user (CM3). |
+| consequence | [string](#string) |  | Operator-facing consequence configured by the administrator; empty means unknown. |
 | parameters | [ParameterSpec](#psim-catalog-v1-ParameterSpec) | repeated |  |
 
 
@@ -2641,6 +2676,7 @@ ApproveCommandRequest is the request of ApproveCommand.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | command_id | [string](#string) |  |  |
+| preview_fingerprint | [string](#string) |  | Optional binding to a preview of this exact command and current catalog versions. |
 
 
 
@@ -2757,6 +2793,43 @@ ListCommandsResponse is the response of ListCommands.
 
 
 
+<a name="psim-api-v1-PreviewCommandRequest"></a>
+
+### PreviewCommandRequest
+PreviewCommandRequest uses the exact proposed request, without production side effects.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| command | [RequestCommandRequest](#psim-api-v1-RequestCommandRequest) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-PreviewCommandResponse"></a>
+
+### PreviewCommandResponse
+PreviewCommandResponse identifies the configured consequence and current resource versions.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| device_id | [string](#string) |  |  |
+| capability | [string](#string) |  |  |
+| consequence | [string](#string) |  |  |
+| consequence_unknown | [bool](#bool) |  |  |
+| requires_second_supervisor | [bool](#bool) |  |  |
+| device_version | [uint64](#uint64) |  |  |
+| device_type_version | [uint64](#uint64) |  |  |
+| fingerprint | [string](#string) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-RejectCommandRequest"></a>
 
 ### RejectCommandRequest
@@ -2803,6 +2876,7 @@ RequestCommandRequest is the request of RequestCommand.
 | incident_id | [string](#string) |  |  |
 | run_id | [string](#string) |  |  |
 | step_id | [string](#string) |  |  |
+| preview_fingerprint | [string](#string) |  | Optional preview binding; a changed catalog rejects the proposed request. |
 
 
 
@@ -2853,6 +2927,7 @@ CommandService manages commands to devices. Owner: Command Service. Scenario S8.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
+| PreviewCommand | [PreviewCommandRequest](#psim-api-v1-PreviewCommandRequest) | [PreviewCommandResponse](#psim-api-v1-PreviewCommandResponse) | PreviewCommand validates scope, parameters and device capability without dispatch. |
 | RequestCommand | [RequestCommandRequest](#psim-api-v1-RequestCommandRequest) | [RequestCommandResponse](#psim-api-v1-RequestCommandResponse) | RequestCommand requests a command; Idempotency-Key header equals command_id. |
 | GetCommand | [GetCommandRequest](#psim-api-v1-GetCommandRequest) | [GetCommandResponse](#psim-api-v1-GetCommandResponse) | GetCommand returns one command. |
 | ListCommands | [ListCommandsRequest](#psim-api-v1-ListCommandsRequest) | [ListCommandsResponse](#psim-api-v1-ListCommandsResponse) | ListCommands lists commands by incident, device or state. |
@@ -4279,6 +4354,23 @@ SiteDutyService assigns explicit site responsibility. Owner: Response Engine.
 
 
 
+<a name="psim-incident-v1-AlarmControl"></a>
+
+### AlarmControl
+AlarmControl records an independent, bounded visibility control.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| reason | [string](#string) |  |  |
+| actor_id | [string](#string) |  |  |
+| until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
 <a name="psim-incident-v1-Incident"></a>
 
 ### Incident
@@ -4316,6 +4408,7 @@ Incident groups signals and tracks the response lifecycle (ADR-027).
 | signal_count | [uint64](#uint64) |  | Total identities in the paginated signal collection. |
 | signal_ids_truncated | [bool](#bool) |  | The preview is bounded to 1000 identities. |
 | escalation_policy_id | [string](#string) |  | Policy identity fixed with the incident type version. |
+| operational | [OperationalState](#psim-incident-v1-OperationalState) |  | Independent alarm condition, acknowledgements and temporary visibility controls. |
 
 
 
@@ -4392,6 +4485,49 @@ Link is an external reference attached to an incident (video clip, document).
 | link_id | [string](#string) |  |  |
 | url | [string](#string) |  |  |
 | title | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-incident-v1-OperationalState"></a>
+
+### OperationalState
+OperationalState preserves condition independently from the incident lifecycle.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| active | [bool](#bool) |  |  |
+| acknowledged | [bool](#bool) |  |  |
+| acknowledged_by | [string](#string) |  |  |
+| condition_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| shelved | [AlarmControl](#psim-incident-v1-AlarmControl) |  |  |
+| suppressed | [AlarmControl](#psim-incident-v1-AlarmControl) |  |  |
+| presence | [PresenceLease](#psim-incident-v1-PresenceLease) | repeated |  |
+| acknowledge_due | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| resolve_due | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| condition_known | [bool](#bool) |  | False for pre-existing incidents whose process condition has never been observed. |
+
+
+
+
+
+
+<a name="psim-incident-v1-PresenceLease"></a>
+
+### PresenceLease
+PresenceLease is advisory and never grants authorization or blocks an incident action.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| actor_id | [string](#string) |  |  |
+| session_id | [string](#string) |  |  |
+| lease_id | [string](#string) |  |  |
+| until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| editing | [bool](#bool) |  |  |
 
 
 
@@ -4649,6 +4785,43 @@ GetLocationStatusResponse is the response of GetLocationStatus.
 
 
 
+<a name="psim-api-v1-GetOperationalSnapshotRequest"></a>
+
+### GetOperationalSnapshotRequest
+GetOperationalSnapshotRequest selects a historical view without realtime subscription.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| location_id | [string](#string) |  |  |
+| site_ids | [string](#string) | repeated |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetOperationalSnapshotResponse"></a>
+
+### GetOperationalSnapshotResponse
+GetOperationalSnapshotResponse is read-only and never confirms current connectivity.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| feed | [GetIncidentFeedResponse](#psim-api-v1-GetIncidentFeedResponse) |  |  |
+| location | [GetLocationStatusResponse](#psim-api-v1-GetLocationStatusResponse) |  |  |
+| catalog_locations | [psim.catalog.v1.Location](#psim-catalog-v1-Location) | repeated |  |
+| catalog_devices | [psim.catalog.v1.Device](#psim-catalog-v1-Device) | repeated |  |
+| historical | [bool](#bool) |  |  |
+| available_from | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
 <a name="psim-api-v1-GetOperatorLoadRequest"></a>
 
 ### GetOperatorLoadRequest
@@ -4789,6 +4962,7 @@ FeedService serves console read models. Owner: Projection Service. Scenarios S6,
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
+| GetOperationalSnapshot | [GetOperationalSnapshotRequest](#psim-api-v1-GetOperationalSnapshotRequest) | [GetOperationalSnapshotResponse](#psim-api-v1-GetOperationalSnapshotResponse) | GetOperationalSnapshot returns feed and plan data at a historical server capture time. |
 | GetIncidentFeed | [GetIncidentFeedRequest](#psim-api-v1-GetIncidentFeedRequest) | [GetIncidentFeedResponse](#psim-api-v1-GetIncidentFeedResponse) | GetIncidentFeed returns active incidents of the caller scope and the resume token at which the snapshot is consistent (ADR-019). |
 | GetLocationStatus | [GetLocationStatusRequest](#psim-api-v1-GetLocationStatusRequest) | [GetLocationStatusResponse](#psim-api-v1-GetLocationStatusResponse) | GetLocationStatus returns the state of devices and zones of a location for the object view. |
 | GetOperatorLoad | [GetOperatorLoadRequest](#psim-api-v1-GetOperatorLoadRequest) | [GetOperatorLoadResponse](#psim-api-v1-GetOperatorLoadResponse) | GetOperatorLoad returns the current load of operators (supervisor). |
@@ -5841,6 +6015,417 @@ NotificationService serves in-app notifications of the caller. Owner: Notificati
 | ----------- | ------------ | ------------- | ------------|
 | ListMyNotifications | [ListMyNotificationsRequest](#psim-api-v1-ListMyNotificationsRequest) | [ListMyNotificationsResponse](#psim-api-v1-ListMyNotificationsResponse) | ListMyNotifications lists in-app notifications of the caller; newest first. |
 | MarkNotificationRead | [MarkNotificationReadRequest](#psim-api-v1-MarkNotificationReadRequest) | [MarkNotificationReadResponse](#psim-api-v1-MarkNotificationReadResponse) | MarkNotificationRead marks an in-app notification as read. |
+
+
+
+
+
+<a name="psim_api_v1_operations-proto"></a>
+<p align="right"><a href="#top">Top</a></p>
+
+## psim/api/v1/operations.proto
+
+
+
+<a name="psim-api-v1-ActExerciseRequest"></a>
+
+### ActExerciseRequest
+ActExerciseRequest accepts acknowledge, start-work, command or resolve in training order.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| exercise_id | [string](#string) |  |  |
+| action | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ActExerciseResponse"></a>
+
+### ActExerciseResponse
+ActExerciseResponse returns a versioned score and simulated state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| exercise | [ExerciseState](#psim-api-v1-ExerciseState) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-AskAssistantRequest"></a>
+
+### AskAssistantRequest
+AskAssistantRequest never accepts source bodies, model URLs or executable actions.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| question | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-AskAssistantResponse"></a>
+
+### AskAssistantResponse
+AskAssistantResponse preserves accessible evidence when the configured provider is unavailable.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| request_id | [string](#string) |  |  |
+| provider | [string](#string) |  |  |
+| model | [string](#string) |  |  |
+| sources | [OperationSource](#psim-api-v1-OperationSource) | repeated |  |
+| claims | [AssistantClaim](#psim-api-v1-AssistantClaim) | repeated |  |
+| unavailable | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-AssistantClaim"></a>
+
+### AssistantClaim
+AssistantClaim is an untrusted model suggestion associated with a server source.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| text | [string](#string) |  |  |
+| source_id | [string](#string) |  |  |
+| assumption | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CreateExerciseRequest"></a>
+
+### CreateExerciseRequest
+CreateExerciseRequest copies one authorized incident into an isolated, expiring session.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| title | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-CreateExerciseResponse"></a>
+
+### CreateExerciseResponse
+CreateExerciseResponse returns a private training session.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| exercise | [ExerciseState](#psim-api-v1-ExerciseState) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-ExerciseState"></a>
+
+### ExerciseState
+ExerciseState cannot be dispatched as a production command or response run.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| exercise_id | [string](#string) |  |  |
+| owner_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+| score | [uint32](#uint32) |  |  |
+| completed_actions | [string](#string) | repeated |  |
+| expires_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetExerciseRequest"></a>
+
+### GetExerciseRequest
+GetExerciseRequest selects a session belonging to the current user.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| exercise_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetExerciseResponse"></a>
+
+### GetExerciseResponse
+GetExerciseResponse returns a private session without production side effects.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| exercise | [ExerciseState](#psim-api-v1-ExerciseState) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentRecoveryRequest"></a>
+
+### GetIncidentRecoveryRequest
+GetIncidentRecoveryRequest compares the known version with the current aggregate.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| known_version | [uint64](#uint64) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentRecoveryResponse"></a>
+
+### GetIncidentRecoveryResponse
+GetIncidentRecoveryResponse bounds changes and explicitly requests a fresh snapshot on a gap.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+| changed_versions | [uint64](#uint64) |  |  |
+| snapshot_required | [bool](#bool) |  |  |
+| changes | [psim.incident.v1.TimelineEntry](#psim-incident-v1-TimelineEntry) | repeated |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentSnapshotsRequest"></a>
+
+### GetIncidentSnapshotsRequest
+GetIncidentSnapshotsRequest selects versions after a cursor or the latest snapshot at a time.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| after_version | [uint64](#uint64) |  |  |
+| page_size | [uint32](#uint32) |  |  |
+| at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetIncidentSnapshotsResponse"></a>
+
+### GetIncidentSnapshotsResponse
+GetIncidentSnapshotsResponse never represents history as live device availability.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| snapshots | [IncidentSnapshot](#psim-api-v1-IncidentSnapshot) | repeated |  |
+| next_version | [uint64](#uint64) |  |  |
+| historical | [bool](#bool) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetOperationsRequest"></a>
+
+### GetOperationsRequest
+GetOperationsRequest selects one current incident.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-GetOperationsResponse"></a>
+
+### GetOperationsResponse
+GetOperationsResponse combines current state with explicit SLA risk and provenance.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+| sources | [OperationSource](#psim-api-v1-OperationSource) | repeated |  |
+| sla_risk | [string](#string) |  |  |
+| evaluated_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-IncidentSnapshot"></a>
+
+### IncidentSnapshot
+IncidentSnapshot contains immutable state with its server capture time.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+| captured_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-OperationSource"></a>
+
+### OperationSource
+OperationSource identifies server-owned evidence and its exact version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| source_id | [string](#string) |  |  |
+| version | [uint64](#uint64) |  |  |
+| obtained_at | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+| stale | [bool](#bool) |  |  |
+| text | [string](#string) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetPresenceRequest"></a>
+
+### SetPresenceRequest
+SetPresenceRequest acquires or renews a session lease; release requires its current lease_id.
+Empty lease_id acquires a new lease. TTL is bounded to 60 seconds and JWT expiry.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| session_id | [string](#string) |  |  |
+| lease_id | [string](#string) |  |  |
+| editing | [bool](#bool) |  |  |
+| release | [bool](#bool) |  |  |
+| ttl_seconds | [uint32](#uint32) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-SetPresenceResponse"></a>
+
+### SetPresenceResponse
+SetPresenceResponse returns the versioned collaboration state.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-UpdateAlarmRequest"></a>
+
+### UpdateAlarmRequest
+UpdateAlarmRequest accepts acknowledge, activate, return, shelve, unshelve, suppress or unsuppress.
+Suppression and condition changes require a supervisor. Visibility controls require an end.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident_id | [string](#string) |  |  |
+| action | [string](#string) |  |  |
+| reason | [string](#string) |  |  |
+| until | [google.protobuf.Timestamp](#google-protobuf-Timestamp) |  |  |
+
+
+
+
+
+
+<a name="psim-api-v1-UpdateAlarmResponse"></a>
+
+### UpdateAlarmResponse
+UpdateAlarmResponse returns the committed aggregate version.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [psim.incident.v1.Incident](#psim-incident-v1-Incident) |  |  |
+
+
+
+
+
+
+
+
+
+
+
+
+<a name="psim-api-v1-OperationalService"></a>
+
+### OperationalService
+OperationalService owns alarm controls, collaboration, history and isolated exercises.
+Owner: Incident Service. All source data is resolved using the caller&#39;s current scope.
+
+| Method Name | Request Type | Response Type | Description |
+| ----------- | ------------ | ------------- | ------------|
+| GetOperations | [GetOperationsRequest](#psim-api-v1-GetOperationsRequest) | [GetOperationsResponse](#psim-api-v1-GetOperationsResponse) | GetOperations evaluates current authorization before accessing persisted state. |
+| UpdateAlarm | [UpdateAlarmRequest](#psim-api-v1-UpdateAlarmRequest) | [UpdateAlarmResponse](#psim-api-v1-UpdateAlarmResponse) | UpdateAlarm evaluates current authorization before accessing persisted state. |
+| SetPresence | [SetPresenceRequest](#psim-api-v1-SetPresenceRequest) | [SetPresenceResponse](#psim-api-v1-SetPresenceResponse) | SetPresence evaluates current authorization before accessing persisted state. |
+| GetIncidentSnapshots | [GetIncidentSnapshotsRequest](#psim-api-v1-GetIncidentSnapshotsRequest) | [GetIncidentSnapshotsResponse](#psim-api-v1-GetIncidentSnapshotsResponse) | GetIncidentSnapshots evaluates current authorization before accessing persisted state. |
+| GetIncidentRecovery | [GetIncidentRecoveryRequest](#psim-api-v1-GetIncidentRecoveryRequest) | [GetIncidentRecoveryResponse](#psim-api-v1-GetIncidentRecoveryResponse) | GetIncidentRecovery evaluates current authorization before accessing persisted state. |
+| AskAssistant | [AskAssistantRequest](#psim-api-v1-AskAssistantRequest) | [AskAssistantResponse](#psim-api-v1-AskAssistantResponse) | AskAssistant evaluates current authorization before accessing persisted state. |
+| CreateExercise | [CreateExerciseRequest](#psim-api-v1-CreateExerciseRequest) | [CreateExerciseResponse](#psim-api-v1-CreateExerciseResponse) | CreateExercise evaluates current authorization before accessing persisted state. |
+| GetExercise | [GetExerciseRequest](#psim-api-v1-GetExerciseRequest) | [GetExerciseResponse](#psim-api-v1-GetExerciseResponse) | GetExercise evaluates current authorization before accessing persisted state. |
+| ActExercise | [ActExerciseRequest](#psim-api-v1-ActExerciseRequest) | [ActExerciseResponse](#psim-api-v1-ActExerciseResponse) | ActExercise evaluates current authorization before accessing persisted state. |
 
 
 
@@ -7690,6 +8275,7 @@ Every event carries the incident state after the change; envelope.sequence = inc
 | incident_transfer_confirmed | [IncidentTransferConfirmed](#psim-incident-v1-IncidentTransferConfirmed) |  |  |
 | incident_command_updated | [IncidentCommandUpdated](#psim-incident-v1-IncidentCommandUpdated) |  |  |
 | incident_notification_updated | [IncidentNotificationUpdated](#psim-incident-v1-IncidentNotificationUpdated) |  |  |
+| incident_operational_updated | [IncidentOperationalUpdated](#psim-incident-v1-IncidentOperationalUpdated) |  |  |
 
 
 
@@ -7722,6 +8308,22 @@ IncidentNotificationUpdated appends a notification receipt or delivery state.
 | ----- | ---- | ----- | ----------- |
 | incident | [Incident](#psim-incident-v1-Incident) |  |  |
 | entry | [TimelineEntry](#psim-incident-v1-TimelineEntry) |  |  |
+
+
+
+
+
+
+<a name="psim-incident-v1-IncidentOperationalUpdated"></a>
+
+### IncidentOperationalUpdated
+IncidentOperationalUpdated carries the full state for projections and reconnect replay.
+
+
+| Field | Type | Label | Description |
+| ----- | ---- | ----- | ----------- |
+| incident | [Incident](#psim-incident-v1-Incident) |  |  |
+| action | [string](#string) |  |  |
 
 
 

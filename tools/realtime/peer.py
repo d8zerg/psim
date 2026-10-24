@@ -170,7 +170,7 @@ async def replay(config):
 
 async def protocol(config):
     legacy = await Client.open(config['token'])
-    modern = await Client.open(config['token'], types=['incident_event', 'response_event', 'location_status', 'future_payload'])
+    modern = await Client.open(config['token'], types=['incident_event', 'response_event', 'location_status', 'incident_operational_updated', 'future_payload'])
     foreign = await Client.open(config['foreignToken'], types=['incident_event', 'response_event'])
     tenant = await Client.open(config['tenantToken'])
     clients = [legacy, modern, foreign, tenant]
@@ -213,6 +213,23 @@ async def protocol(config):
         except TimeoutError:
             pass
         checks.append('legacy clients receive only incident_event; response_event requires negotiation')
+        operational = json.loads(json.dumps(config['records'][0]))
+        snapshot = operational['value'].pop('incidentCreated')['incident']
+        snapshot['version'] = '2'
+        snapshot['operational'] = {'active': True, 'conditionKnown': True, 'acknowledged': True}
+        operational['value']['envelope']['messageId'] = str(uuid.uuid4())
+        operational['value']['envelope']['sequence'] = '2'
+        operational['value']['incidentOperationalUpdated'] = {'incident': snapshot, 'action': 'operational.update-alarm'}
+        await emit(config, [operational])
+        for _ in range(2):
+            delta = (await modern.receive())['delta']
+            assert delta['incidentEvent']['incidentOperationalUpdated']['incident']['operational']['acknowledged']
+        try:
+            unexpected = await legacy.receive(.3)
+            raise AssertionError(('legacy received operational payload', unexpected))
+        except TimeoutError:
+            pass
+        checks.append('operational alarm images require negotiation and preserve legacy incident consumers')
         await modern.send({'unsubscribe': {'subscriptionId': 'zone'}})
         await modern.send({'unsubscribe': {'subscriptionId': 'incident'}})
         await emit(config, [config['marker']])
@@ -301,8 +318,13 @@ async def boundaries(config):
         await slow.subscribe(config['resumeToken'])
         await emit(config, config['records'])
         deadline = time.monotonic() + 15
-        while metric('psim_realtime_slow_consumers_total') <= before or metric('psim_realtime_connections') != 0:
-            assert time.monotonic() < deadline, 'slow receiver was not disconnected within its queue/write budget'
+        while True:
+            rejected = metric('psim_realtime_slow_consumers_total')
+            connections = metric('psim_realtime_connections')
+            if rejected > before and connections == 0:
+                break
+            assert time.monotonic() < deadline, ('slow receiver was not disconnected within its queue/write budget',
+                {'before': before, 'rejected': rejected, 'connections': connections, 'records': len(config['records'])})
             await asyncio.sleep(.1)
     finally:
         await slow.close()

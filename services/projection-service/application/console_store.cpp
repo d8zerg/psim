@@ -216,18 +216,34 @@ asio::awaitable<p::Result<void>> ConsoleStore::initialize() {
       &**lease,
       {{.version = 1,
         .name = "console read models",
+        .expand =
+            {("CREATE TABLE console.resources(replica text NOT NULL,tenant uuid NOT NULL,kind text "
+              "NOT NULL,id uuid NOT NULL,version bigint NOT NULL,confirmed timestamptz,session text NOT "
+              "NULL,body jsonb NOT NULL,PRIMARY KEY(replica,tenant,kind,id))"),
+             ("CREATE TABLE console.positions(replica text NOT NULL,topic text NOT NULL,partition "
+              "integer NOT NULL,next_offset bigint NOT NULL,PRIMARY KEY(replica,topic,partition))"),
+             "CREATE TABLE console.generations(id text PRIMARY KEY,revision bigint NOT NULL DEFAULT 0)",
+             "INSERT INTO console.generations(id) VALUES('initial')",
+             "CREATE TABLE console.active(singleton boolean PRIMARY KEY CHECK(singleton),generation text NOT NULL)",
+             "INSERT INTO console.active VALUES(true,'initial')",
+             ("CREATE INDEX console_resource_scope ON "
+              "console.resources(replica,tenant,kind,(body->>'siteId'),(body->>'zoneId'))")}},
+       {.version = 2,
+        .name = "historical console state",
         .expand = {
-            ("CREATE TABLE console.resources(replica text NOT NULL,tenant uuid NOT NULL,kind text "
-             "NOT NULL,id uuid NOT NULL,version bigint NOT NULL,confirmed timestamptz,session text NOT "
-             "NULL,body jsonb NOT NULL,PRIMARY KEY(replica,tenant,kind,id))"),
-            ("CREATE TABLE console.positions(replica text NOT NULL,topic text NOT NULL,partition "
-             "integer NOT NULL,next_offset bigint NOT NULL,PRIMARY KEY(replica,topic,partition))"),
-            "CREATE TABLE console.generations(id text PRIMARY KEY,revision bigint NOT NULL DEFAULT 0)",
-            "INSERT INTO console.generations(id) VALUES('initial')",
-            "CREATE TABLE console.active(singleton boolean PRIMARY KEY CHECK(singleton),generation text NOT NULL)",
-            "INSERT INTO console.active VALUES(true,'initial')",
-            ("CREATE INDEX console_resource_scope ON "
-             "console.resources(replica,tenant,kind,(body->>'siteId'),(body->>'zoneId'))")}}});
+            ("CREATE TABLE console.history(sequence bigserial PRIMARY KEY,tenant uuid NOT NULL,kind text NOT NULL,id "
+             "uuid NOT NULL,captured timestamptz NOT NULL,confirmed timestamptz,body jsonb NOT NULL)"),
+            "CREATE INDEX console_history_lookup ON console.history(tenant,kind,id,captured DESC,sequence DESC)",
+            "CREATE INDEX console_history_retention ON console.history(captured)",
+            ("INSERT INTO console.history(tenant,kind,id,captured,confirmed,body) SELECT "
+             "tenant,kind,id,clock_timestamp(),confirmed,body FROM console.resources WHERE replica=(SELECT generation "
+             "FROM console.active)"),
+            ("CREATE FUNCTION console.capture_history() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+             "IF NEW.replica=(SELECT generation FROM console.active) THEN "
+             "INSERT INTO console.history(tenant,kind,id,captured,confirmed,body) "
+             "VALUES(NEW.tenant,NEW.kind,NEW.id,clock_timestamp(),NEW.confirmed,NEW.body); END IF; RETURN NEW; END $$"),
+            ("CREATE TRIGGER console_resource_history AFTER INSERT OR UPDATE ON console.resources FOR EACH ROW EXECUTE "
+             "FUNCTION console.capture_history()")}}});
 }
 
 asio::awaitable<p::Result<void>> ConsoleStore::apply(const p::kafka::Message* message) {
@@ -284,7 +300,8 @@ asio::awaitable<p::Result<void>> ConsoleStore::apply(const p::kafka::Message* me
 }
 
 asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Principal principal, std::string location,
-                                                                 std::set<std::string> sites) {
+                                                                 std::set<std::string> sites,
+                                                                 std::optional<std::int64_t> at) {
   struct Stored {
     std::map<std::string, Json> locations, devices, connectors, observations, reports, connections, maintenance, duties;
     std::vector<incident::v1::Incident> incidents;
@@ -294,7 +311,7 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
   auto stored = co_await p::pg::in_transaction<Stored>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited closure.
-      [this, &principal, &sites](p::pg::Transaction* tx) -> asio::awaitable<p::Result<Stored>> {
+      [this, &principal, &sites, &at](p::pg::Transaction* tx) -> asio::awaitable<p::Result<Stored>> {
         Stored data;
         auto current = co_await tx->connection().query({.sql = "SELECT a.generation,g.revision FROM console.active a "
                                                                "JOIN console.generations g ON g.id=a.generation"});
@@ -305,7 +322,7 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
         const auto revision = std::to_string(*current->integer(0, 1));
         data.result.generation = generation;
         Json material;
-        if (leases_) {
+        if (leases_ && !at) {
           auto cached = co_await p::redis::Cache(leases_, {"projection-service", principal.tenant})
                             .get(generation + ":" + revision);
           if (cached && *cached) {
@@ -319,11 +336,20 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
           if (misses_) {
             misses_->Increment();
           }
-          auto rows = co_await tx->connection().query(
-              {.sql = "SELECT kind,id::text,body::text,COALESCE(to_char(confirmed AT TIME ZONE "
-                      "'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'),'') FROM console.resources WHERE replica=$1 AND "
-                      "tenant=$2::uuid ORDER BY kind,id LIMIT 100001",
-               .parameters = {Param::text(generation), Param::text(principal.tenant)}});
+          auto rows = at ? co_await tx->connection().query(
+                               {.sql = "SELECT kind,id::text,body::text,COALESCE(to_char(confirmed AT TIME ZONE "
+                                       "'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'),'') FROM "
+                                       "(SELECT DISTINCT ON(kind,id) kind,id,body,confirmed FROM console.history WHERE "
+                                       "tenant=$1::uuid "
+                                       "AND captured<=to_timestamp($2::double precision/1000) ORDER BY "
+                                       "kind,id,captured DESC,sequence DESC) state ORDER BY kind,id LIMIT 100001",
+                                .parameters = {Param::text(principal.tenant), Param::integer(*at)}})
+                         : co_await tx->connection().query(
+                               {.sql = "SELECT kind,id::text,body::text,COALESCE(to_char(confirmed AT TIME ZONE "
+                                       "'UTC','YYYY-MM-DD\"T\"HH24:MI:SS.US\"Z\"'),'') FROM console.resources WHERE "
+                                       "replica=$1 AND "
+                                       "tenant=$2::uuid ORDER BY kind,id LIMIT 100001",
+                                .parameters = {Param::text(generation), Param::text(principal.tenant)}});
           if (!rows) {
             co_return std::unexpected(rows.error());
           }
@@ -337,7 +363,7 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
                                 {"body", Json::parse(rows->value(i, 2).value_or(""))},
                                 {"confirmedAt", rows->value(i, 3).value_or("")}});
           }
-          if (leases_) {
+          if (leases_ && !at) {
             auto bytes = material.dump();
             if (bytes.size() <= p::redis::kMaxPayloadBytes) {
               auto cached = co_await p::redis::Cache(leases_, {"projection-service", principal.tenant})
@@ -383,6 +409,21 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
             data.connections[id] = std::move(body);
           }
         }
+        if (at) {
+          auto first =
+              co_await tx->connection().query({.sql = "SELECT (EXTRACT(EPOCH FROM MIN(captured))*1000)::bigint::text "
+                                                      "FROM console.history WHERE tenant=$1::uuid",
+                                               .parameters = {Param::text(principal.tenant)}});
+          if (!first) {
+            co_return std::unexpected(first.error());
+          }
+          if (!first->value(0, 0) || std::stoll(std::string(*first->value(0, 0))) > *at) {
+            co_return p::fail(p::ErrorCode::kCommonNotFound, "historical state unavailable for this time");
+          }
+          *data.result.history.mutable_available_from() =
+              Time::MillisecondsToTimestamp(std::stoll(std::string(*first->value(0, 0))));
+          data.result.history.set_historical(true);
+        }
         auto positions = co_await tx->connection().query(
             {.sql = "SELECT topic,partition,next_offset FROM console.positions WHERE replica=$1",
              .parameters = {Param::text(generation)}});
@@ -400,10 +441,31 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
     co_return std::unexpected(stored.error());
   }
   auto& result = stored->result;
-  const auto now = Time::GetCurrentTime();
+  const auto now = at ? Time::MillisecondsToTimestamp(*at) : Time::GetCurrentTime();
   *result.location.mutable_snapshot_at() = now;
   *result.operators.mutable_snapshot_at() = now;
   *result.feed.mutable_snapshot_at() = now;
+  if (at) {
+    for (const auto& [id, body] : stored->locations) {
+      if ((sites.empty() || sites.contains(body.value("siteId", "")))
+          && p::authz::scoped(principal, {principal.tenant, body.value("siteId", ""), id})) {
+        catalog::v1::Location entry;
+        if (google::protobuf::util::JsonStringToMessage(body.dump(), &entry).ok()) {
+          *result.history.add_catalog_locations() = entry;
+        }
+      }
+    }
+    for (const auto& [id, body] : stored->devices) {
+      (void)id;
+      if ((sites.empty() || sites.contains(body.value("siteId", "")))
+          && p::authz::scoped(principal, {principal.tenant, body.value("siteId", ""), body.value("zoneId", "")})) {
+        catalog::v1::Device entry;
+        if (google::protobuf::util::JsonStringToMessage(body.dump(), &entry).ok()) {
+          *result.history.add_catalog_devices() = entry;
+        }
+      }
+    }
+  }
   for (const auto& incident : stored->incidents) {
     *result.feed.add_incidents() = incident;
   }
@@ -524,7 +586,7 @@ asio::awaitable<p::Result<StateSnapshot>> ConsoleStore::snapshot(p::security::Pr
     if (!sessions.contains(connector)) {
       std::optional<p::redis::Session> session;
       bool registry_ok = false;
-      if (leases_) {
+      if (leases_ && !at) {
         auto found =
             co_await p::redis::SessionRegistry(leases_, {"connector-gateway", principal.tenant}).lookup(connector);
         if (found) {

@@ -118,6 +118,8 @@ message Capability {
   string name = 2;
   // Critical commands require approval by a second user (CM3).
   bool critical = 3;
+  // Operator-facing consequence configured by the administrator; empty means unknown.
+  string consequence = 5;
   repeated ParameterSpec parameters = 4;
 }
 

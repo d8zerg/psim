@@ -13,6 +13,10 @@ import "psim/incident/v1/incident.proto";
 
 // FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.
 service FeedService {
+  // GetOperationalSnapshot returns feed and plan data at a historical server capture time.
+  rpc GetOperationalSnapshot(GetOperationalSnapshotRequest) returns (GetOperationalSnapshotResponse) {
+    option (google.api.http) = {get: "/v1/feed/snapshot"};
+  }
   // GetIncidentFeed returns active incidents of the caller scope and the resume token
   // at which the snapshot is consistent (ADR-019).
   rpc GetIncidentFeed(GetIncidentFeedRequest) returns (GetIncidentFeedResponse) {
@@ -140,4 +144,21 @@ message SourceRuntimeStatus {
   string availability = 8;
   google.protobuf.Timestamp availability_confirmed_at = 9;
   DataQuality availability_quality = 10;
+}
+
+// GetOperationalSnapshotRequest selects a historical view without realtime subscription.
+message GetOperationalSnapshotRequest {
+  google.protobuf.Timestamp at = 1;
+  string location_id = 2;
+  repeated string site_ids = 3;
+}
+
+// GetOperationalSnapshotResponse is read-only and never confirms current connectivity.
+message GetOperationalSnapshotResponse {
+  GetIncidentFeedResponse feed = 1;
+  GetLocationStatusResponse location = 2;
+  repeated psim.catalog.v1.Location catalog_locations = 3;
+  repeated psim.catalog.v1.Device catalog_devices = 4;
+  bool historical = 5;
+  google.protobuf.Timestamp available_from = 6;
 }

@@ -35,12 +35,13 @@ def load(path):
 
 
 def step_key(step):
-    return tuple(int(x) for x in step.split("."))
+    major, minor, suffix = re.fullmatch(r"(\d+)\.(\d+)([a-z]?)", step).groups()
+    return int(major), int(minor), suffix
 
 
 def plan(root):
     text = open(os.path.join(root, "docs/psim-mvp-development-plan.md"), encoding="utf-8").read()
-    steps = set(re.findall(r"^### Шаг (\d+\.\d+) ", text, re.M))
+    steps = set(re.findall(r"^### Шаг (\d+\.\d+[a-z]?) ", text, re.M))
     tables = {}
     for section, nxt in (("### 1.3", "### 1.4"), ("### 1.4", "## 2.")):
         part = text[text.index(section):text.index(nxt, text.index(section))]

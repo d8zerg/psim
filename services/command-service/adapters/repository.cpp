@@ -62,6 +62,11 @@ p::Result<T> parse(const Json& input) {
   return value;
 }
 
+std::string preview_fingerprint(Json request, const catalog::v1::Device& device, const catalog::v1::DeviceType& type) {
+  request.erase("previewFingerprint");
+  return p::stream::sha256(request.dump() + json(device).dump() + json(type).dump());
+}
+
 p::security::Principal system(const std::string& tenant) {
   return {.subject = "command-service", .tenant = tenant, .expires_at = std::chrono::system_clock::time_point::max()};
 }
@@ -92,7 +97,7 @@ p::Result<void> access(const p::security::Principal& actor, std::string_view act
 
 asio::awaitable<p::Result<Json>> resource(pg::Transaction* tx, std::string tenant, std::string kind, std::string id) {
   auto rows = co_await tx->connection().query(
-      {.sql = "SELECT body::text FROM command.resources WHERE tenant=$1::uuid AND kind=$2 AND id=$3::uuid",
+      {.sql = "SELECT body::text FROM command.resources WHERE tenant=$1::uuid AND kind=$2 AND id=$3::uuid FOR SHARE",
        .parameters = {Param::text(tenant), Param::text(kind), Param::text(id)}});
   if (!rows) {
     co_return std::unexpected(rows.error());
@@ -510,7 +515,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         std::string action = "command.confirm";
         if (operation == "get" || operation == "list") {
           action = "command.read";
-        } else if (operation == "request") {
+        } else if (operation == "request" || operation == "preview") {
           action = "command.request";
         } else if (operation == "cancel") {
           action = "command.cancel";
@@ -607,7 +612,8 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
         }
         auto previous = co_await load(tx, principal.tenant, id);
         Value value;
-        if (operation == "request" && !previous && previous.error().code() == Code::kCommonNotFound) {
+        if (operation == "preview"
+            || (operation == "request" && !previous && previous.error().code() == Code::kCommonNotFound)) {
           auto input = parse<api::v1::RequestCommandRequest>(body);
           if (!input) {
             co_return std::unexpected(input.error());
@@ -686,11 +692,29 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
           if (!supported) {
             co_return std::unexpected(supported.error());
           }
+          const auto preview = preview_fingerprint(body, *device, *type);
+          if (!input->preview_fingerprint().empty() && input->preview_fingerprint() != preview) {
+            co_return p::fail(Code::kCommonConcurrentModification, "command preview configuration changed");
+          }
           command.set_critical(*supported);
           command.set_state(*supported ? response::v1::COMMAND_STATE_AWAITING_APPROVAL
                                        : response::v1::COMMAND_STATE_REQUESTED);
           if (device->state() != catalog::v1::RESOURCE_STATE_ACTIVE) {
             co_return p::fail(Code::kCommandCapabilityUnsupported, "device disabled");
+          }
+          if (operation == "preview") {
+            const auto definition =
+                std::ranges::find(type->capabilities(), command.capability(), &catalog::v1::Capability::code);
+            const auto consequence =
+                definition == type->capabilities().end() ? std::string{} : definition->consequence();
+            co_return Json{{"deviceId", device->device_id()},
+                           {"capability", command.capability()},
+                           {"consequence", consequence},
+                           {"consequenceUnknown", consequence.empty()},
+                           {"requiresSecondSupervisor", *supported},
+                           {"deviceVersion", std::to_string(device->version())},
+                           {"deviceTypeVersion", std::to_string(type->version())},
+                           {"fingerprint", preview}};
           }
           if (!*supported) {
             auto sent = co_await dispatch(tx, &value);
@@ -735,6 +759,35 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
             change = d::Action::kCancel;
           } else {
             co_return p::fail(Code::kCommonNotFound, "unknown operation");
+          }
+          if (operation == "approve" && !body.value("previewFingerprint", std::string{}).empty()) {
+            auto raw = co_await resource(tx, principal.tenant, "device", value.command.device_id());
+            if (!raw) {
+              co_return std::unexpected(raw.error());
+            }
+            auto device = parse<catalog::v1::Device>(*raw);
+            if (!device) {
+              co_return std::unexpected(device.error());
+            }
+            auto raw_type = co_await resource(tx, principal.tenant, "type", device->device_type_id());
+            if (!raw_type) {
+              co_return std::unexpected(raw_type.error());
+            }
+            auto type = parse<catalog::v1::DeviceType>(*raw_type);
+            if (!type) {
+              co_return std::unexpected(type.error());
+            }
+            api::v1::RequestCommandRequest proposed;
+            proposed.set_command_id(value.command.command_id());
+            proposed.set_device_id(value.command.device_id());
+            proposed.set_capability(value.command.capability());
+            *proposed.mutable_parameters() = value.command.parameters();
+            proposed.set_incident_id(value.command.incident_id());
+            proposed.set_run_id(value.command.run_id());
+            proposed.set_step_id(value.command.step_id());
+            if (body["previewFingerprint"] != preview_fingerprint(json(proposed), *device, *type)) {
+              co_return p::fail(Code::kCommonConcurrentModification, "command preview configuration changed");
+            }
           }
           auto changed = transition(value, change, principal.subject);
           if (!changed) {

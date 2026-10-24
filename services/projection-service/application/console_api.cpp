@@ -1,5 +1,8 @@
 #include "console_api.hpp"
 
+#include <google/protobuf/timestamp.pb.h>
+#include <google/protobuf/util/time_util.h>
+
 #include <charconv>
 #include <chrono>
 #include <cstddef>
@@ -73,6 +76,80 @@ boost::asio::awaitable<platform::Result<Response>> console_request(ConsoleStore*
                                                                    platform::security::Principal principal) {
   const auto target = request->target();
   const auto path = target.substr(0, target.find('?'));
+  if (path == "/v1/feed/snapshot") {
+    if (request->method() != http::verb::get || !request->body().empty()) {
+      co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "bodyless GET required");
+    }
+    const auto allowed = platform::authz::decide_role(principal, "feed.read", std::chrono::system_clock::now());
+    if (!allowed) {
+      co_return std::unexpected(allowed.error());
+    }
+    const std::string query(target);
+    const auto question = query.find('?');
+    google::protobuf::Timestamp at;
+    std::string location;
+    std::string filters = "/v1/feed/incidents";
+    if (question == std::string::npos) {
+      co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "historical time required");
+    }
+    auto rest = std::string_view(query).substr(question + 1);
+    while (!rest.empty()) {
+      const auto amp = rest.find('&');
+      const auto pair = rest.substr(0, amp);
+      if (pair.starts_with("at=")) {
+        std::string decoded;
+        const auto encoded = pair.substr(3);
+        for (std::size_t index = 0; index < encoded.size(); ++index) {
+          if (encoded[index] != '%') {
+            decoded += encoded[index];
+            continue;
+          }
+          unsigned int byte = 0;
+          if (index + 2 >= encoded.size()) {
+            co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid time encoding");
+          }
+          const auto text = encoded.substr(index + 1, 2);
+          const auto parsed = std::from_chars(text.begin(), text.end(), byte, 16);
+          if (parsed.ec != std::errc{} || parsed.ptr != text.end() || byte == 0) {
+            co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid time encoding");
+          }
+          decoded += static_cast<char>(byte);
+          index += 2;
+        }
+        if (at.seconds() != 0 || !google::protobuf::util::TimeUtil::FromString(decoded, &at)) {
+          co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid historical time");
+        }
+      } else if (pair.starts_with("locationId=")) {
+        if (!location.empty() || !platform::stream::uuid(pair.substr(11))) {
+          co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid historical location");
+        }
+        location = pair.substr(11);
+      } else {
+        filters += filters.find('?') == std::string::npos ? "?" : "&";
+        filters += pair;
+      }
+      rest = amp == std::string_view::npos ? std::string_view{} : rest.substr(amp + 1);
+    }
+    const auto millis = google::protobuf::util::TimeUtil::TimestampToMilliseconds(at);
+    if (at.seconds() <= 0 || at.seconds() > google::protobuf::util::TimeUtil::GetCurrentTime().seconds()) {
+      co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "historical time out of range");
+    }
+    auto filter = feed_filter(filters, false);
+    if (!filter) {
+      co_return std::unexpected(filter.error());
+    }
+    auto snapshot = co_await store->snapshot(principal, location, std::move(filter->sites), millis);
+    if (!snapshot) {
+      co_return std::unexpected(snapshot.error());
+    }
+    *snapshot->history.mutable_feed() = snapshot->feed;
+    *snapshot->history.mutable_location() = snapshot->location;
+    Response result(http::status::ok, 11);
+    result.set(http::field::content_type, "application/json");
+    result.body() = platform::stream::json(snapshot->history);
+    result.prepare_payload();
+    co_return result;
+  }
   const bool feed = path == "/v1/feed/incidents";
   const bool operators = path == "/v1/feed/operators";
   const bool location = path.starts_with("/v1/feed/locations/") && path.ends_with("/status");

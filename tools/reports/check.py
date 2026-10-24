@@ -145,9 +145,12 @@ class Check(HistoryCheck):
         self.send([self.record(self.incidents[0]) | {"malformed": True}])
         self.wait(lambda: self.pg("SELECT count(*) FROM psim_clickhouse.pending_batches") == "0")
         self.mark("stale versions and malformed input do not change report totals")
+        # Source-owned SLA publication advances aggregate versions before fixture mutations.
+        self.wait(lambda: self.pg(f"SELECT count(*) FROM incident.incidents WHERE tenant_id='{self.tenant}' AND body->'operational'->>'resolveDue' IS NOT NULL") == "10")
+        self.incidents = [json.loads(self.pg(f"SELECT body::text FROM incident.incidents WHERE incident_id='{item['incidentId']}'")) for item in self.incidents]
 
     def lifecycle(self):
-        reopened = self.incidents[0] | {"version": "3", "state": "INCIDENT_STATE_IN_PROGRESS", "assigneeId": "operator-b"}
+        reopened = self.incidents[0] | {"version": str(int(self.incidents[0]["version"]) + 1), "state": "INCIDENT_STATE_IN_PROGRESS", "assigneeId": "operator-b"}
         reopened.pop("resolvedAt")
         reopened.pop("resolution")
         self.incidents[0] = reopened
@@ -159,7 +162,7 @@ class Check(HistoryCheck):
         assert result["resolveSlaCompliance"] == 0.9 and result["mttr"] == "120s", result
         assert self.rq(grouping="REPORT_GROUPING_OPERATOR")["rows"][0]["incidentsCreated"] == "5"
         self.pg(f"UPDATE escalation.policies SET body=jsonb_set(body,'{{sla,0,acknowledgeWithin}}','\"999s\"'::jsonb) WHERE id='{self.policy}'")
-        changed = self.incidents[1] | {"version": "3", "priority": "PRIORITY_P4"}
+        changed = self.incidents[1] | {"version": str(int(self.incidents[1]["version"]) + 1), "priority": "PRIORITY_P4"}
         self.incidents[1] = changed
         self.pg(f"UPDATE incident.incidents SET body='{json.dumps(changed)}'::jsonb WHERE incident_id='{changed['incidentId']}'")
         self.send([self.record(changed)])

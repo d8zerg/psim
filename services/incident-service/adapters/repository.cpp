@@ -167,12 +167,41 @@ boost::asio::awaitable<p::Result<void>> Repository::initialize() {
            {.version = 7,
             .name = "notification timeline versions",
             .expand = {"CREATE TABLE incident.notification_versions(tenant uuid NOT NULL,id uuid NOT NULL,version "
-                       "bigint NOT NULL,PRIMARY KEY(tenant,id,version))"}}});
+                       "bigint NOT NULL,PRIMARY KEY(tenant,id,version))"}},
+           {.version = 8,
+            .name = "operational state and immutable snapshots",
+            .expand = {
+                "ALTER TABLE incident.incidents ADD COLUMN operational_until timestamptz",
+                ("CREATE INDEX incident_operational_expiry ON incident.incidents(operational_until) WHERE "
+                 "operational_until IS NOT NULL"),
+                ("CREATE TABLE incident.snapshots(tenant uuid NOT NULL,incident uuid NOT NULL,version bigint NOT "
+                 "NULL,captured timestamptz NOT NULL,body jsonb NOT NULL,PRIMARY KEY(tenant,incident,version))"),
+                "CREATE INDEX incident_snapshot_time ON incident.snapshots(tenant,incident,captured)",
+                ("INSERT INTO incident.snapshots SELECT "
+                 "tenant_id,incident_id,(body->>'version')::bigint,clock_timestamp(),body FROM incident.incidents"),
+                ("CREATE FUNCTION incident.capture_snapshot() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+                 "INSERT INTO incident.snapshots "
+                 "VALUES(NEW.tenant_id,NEW.incident_id,(NEW.body->>'version')::bigint,clock_timestamp(),NEW.body) ON "
+                 "CONFLICT DO NOTHING; "
+                 "RETURN NEW; END $$"),
+                ("CREATE TRIGGER incident_snapshot AFTER INSERT OR UPDATE OF body ON incident.incidents FOR EACH ROW "
+                 "WHEN ((NEW.body->>'version')::bigint > 0) EXECUTE FUNCTION incident.capture_snapshot()"),
+                ("CREATE FUNCTION incident.next_operational_expiry() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN "
+                 "NEW.operational_until=LEAST((NEW.body#>>'{operational,shelved,until}')::timestamptz,(NEW.body#>>'{"
+                 "operational,suppressed,until}')::timestamptz,"
+                 "(SELECT MIN((entry->>'until')::timestamptz) FROM "
+                 "jsonb_array_elements(COALESCE(NEW.body#>'{operational,presence}','[]'::jsonb)) entry)); RETURN NEW; "
+                 "END $$"),
+                ("CREATE TRIGGER incident_operational_deadline BEFORE INSERT OR UPDATE OF body ON incident.incidents "
+                 "FOR EACH ROW EXECUTE FUNCTION incident.next_operational_expiry()"),
+                ("CREATE TABLE incident.exercises(tenant uuid NOT NULL,actor text NOT NULL,id uuid NOT NULL,incident "
+                 "uuid NOT NULL,expires timestamptz NOT NULL,body jsonb NOT NULL,PRIMARY KEY(tenant,actor,id))"),
+                "CREATE INDEX incident_exercise_expiry ON incident.exercises(expires)"}}});
 }
 
 asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::security::Principal principal,
                                                    std::string action, std::string id, std::string site, bool refused,
-                                                   std::string attempted) {
+                                                   std::string attempted, Json details) {
   audit::v1::AuditEventRecord record;
   envelope(record.mutable_envelope(), principal);
   auto* entry = record.mutable_audit_entry();
@@ -183,6 +212,9 @@ asio::awaitable<p::Result<void>> Repository::audit(pg::Transaction* tx, p::secur
   entry->set_site_id(std::move(site));
   if (refused) {
     (*entry->mutable_details())["attempted_action"] = std::move(attempted);
+  }
+  for (const auto& [name, value] : details.items()) {
+    (*entry->mutable_details())[name] = value.is_string() ? value.get<std::string>() : value.dump();
   }
   entry->set_outcome(refused ? audit::v1::AUDIT_OUTCOME_DENIED : audit::v1::AUDIT_OUTCOME_SUCCESS);
   co_return co_await messages_.append(
@@ -203,6 +235,22 @@ asio::awaitable<p::Result<void>> Repository::save(pg::Transaction* tx, p::securi
                                                   incident::v1::Incident value, std::string action, std::string ref,
                                                   std::string text, std::string previous, const Encode* outgoing,
                                                   const common::v1::Envelope* cause) {
+  if (!value.operational().has_condition_at()) {
+    auto* state = value.mutable_operational();
+    state->set_active(value.state() < incident::v1::INCIDENT_STATE_RESOLVED);
+    state->set_acknowledged(value.has_acknowledged_at());
+    *state->mutable_condition_at() = value.created_at();
+  }
+  if (action == "signal" && !value.operational().active()) {
+    value.mutable_operational()->set_active(true);
+    value.mutable_operational()->set_acknowledged(false);
+    value.mutable_operational()->clear_acknowledged_by();
+    *value.mutable_operational()->mutable_condition_at() = Time::GetCurrentTime();
+  }
+  if (action == "signal" || action == "created") {
+    value.mutable_operational()->set_condition_known(true);
+    *value.mutable_operational()->mutable_condition_at() = cause ? cause->occurred_at() : Time::GetCurrentTime();
+  }
   auto updated = co_await tx->connection().query(
       {.sql = "UPDATE incident.incidents SET body=$3::jsonb,grouping_active=grouping_active AND $4::boolean WHERE "
               "tenant_id=$1::uuid AND incident_id=$2::uuid",
@@ -254,6 +302,10 @@ asio::awaitable<p::Result<void>> Repository::save(pg::Transaction* tx, p::securi
     change_value->set_previous_assignee_id(previous);
     change_value->set_transfer_id(ref);
     change = change_value;
+  } else if (action.starts_with("operational.")) {
+    auto* operational_change = record.mutable_incident_operational_updated();
+    operational_change->set_action(action);
+    change = operational_change;
   } else if (action == "blocking") {
     change = record.mutable_incident_blocking_steps_changed();
   } else if (action == "escalate") {
@@ -301,6 +353,7 @@ asio::awaitable<p::Result<void>> Repository::save(pg::Transaction* tx, p::securi
   }
   entry.set_kind(kind);
   (*entry.mutable_details())["action"] = action;
+  (*entry.mutable_details())["version"] = std::to_string(value.version());
   if (action == "comment") {
     *record.mutable_incident_comment_added()->mutable_entry() = entry;
   }
@@ -317,7 +370,30 @@ asio::awaitable<p::Result<void>> Repository::save(pg::Transaction* tx, p::securi
   if (!emitted) {
     co_return emitted;
   }
-  co_return co_await audit(tx, principal, "incident." + action, value.incident_id(), value.site_id());
+  Json details = Json::object();
+  if (action.starts_with("operational.")) {
+    const auto& state = value.operational();
+    details = {{"version", std::to_string(value.version())},
+               {"reason", text},
+               {"reference", ref},
+               {"active", state.active()},
+               {"acknowledged", state.acknowledged()},
+               {"presence_count", state.presence_size()}};
+    if (state.has_shelved()) {
+      details["shelved_until"] = Time::ToString(state.shelved().until());
+    }
+    if (state.has_suppressed()) {
+      details["suppressed_until"] = Time::ToString(state.suppressed().until());
+    }
+    if (state.has_acknowledge_due()) {
+      details["acknowledge_due"] = Time::ToString(state.acknowledge_due());
+    }
+    if (state.has_resolve_due()) {
+      details["resolve_due"] = Time::ToString(state.resolve_due());
+    }
+  }
+  co_return co_await audit(tx, principal, "incident." + action, value.incident_id(), value.site_id(), false, {},
+                           details);
 }
 
 asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord signal, Encode outgoing) {
@@ -448,6 +524,9 @@ asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord 
           *value.mutable_created_at() = Time::GetCurrentTime();
           value.set_title(source.summary());
           value.set_related_incident_id(related);
+          value.mutable_operational()->set_active(true);
+          value.mutable_operational()->set_condition_known(true);
+          *value.mutable_operational()->mutable_condition_at() = value.created_at();
           auto inserted = co_await tx->connection().query(
               {.sql = "INSERT INTO "
                       "incident.incidents(tenant_id,incident_id,grouping_key,group_until_ns,body,grouping_active) "
@@ -510,16 +589,51 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
     co_return p::fail(Code::kCommonInvalidArgument, "invalid identity");
   }
   const bool writing = operation != "get" && operation != "list" && operation != "timeline" && operation != "signals"
-                       && operation != "types.list";
+                       && operation != "types.list" && operation != "operations" && operation != "snapshots"
+                       && operation != "recovery" && operation != "get-exercise";
   const bool mutation = writing && !key.empty();
   if (writing && key.empty() && operation != "types.update") {
     co_return p::fail(Code::kCommonInvalidArgument, "UUID Idempotency-Key required");
   }
+  Json prepared;
+  if (operation == "ask-assistant") {
+    auto snapshot = co_await request(principal, "get", id, Json::object());
+    if (!snapshot) {
+      co_return std::unexpected(snapshot.error());
+    }
+    auto value = parse<incident::v1::Incident>(snapshot->at("incident"));
+    if (!value) {
+      co_return std::unexpected(value.error());
+    }
+    auto allowed =
+        p::authz::decide(principal, "incident.ask-assistant", {principal.tenant, value->site_id(), value->zone_id()},
+                         std::chrono::system_clock::now());
+    if (!allowed) {
+      co_return std::unexpected(allowed.error());
+    }
+    if (!expected || *expected != value->version()) {
+      auto logged = co_await denied(principal, "assistant.source-version", id);
+      if (!logged) {
+        co_return std::unexpected(logged.error());
+      }
+      co_return p::fail(expected ? Code::kCommonConcurrentModification : Code::kCommonPreconditionRequired,
+                        "assistant source version required");
+    }
+    auto answer = co_await prepare_assistant(principal, *value, body);
+    if (!answer) {
+      auto logged = co_await denied(principal, "ask-assistant", id);
+      if (!logged) {
+        co_return std::unexpected(logged.error());
+      }
+      co_return std::unexpected(answer.error());
+    }
+    prepared = std::move(*answer);
+  }
   auto result = co_await pg::in_transaction<Json>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited owned closure.
-      [this, &principal, &operation, &id, &body, &key, &expected,
-       mutation](pg::Transaction* tx) -> asio::awaitable<p::Result<Json>> {
+      [this, &principal, &operation, &id, &body, &key, &expected, mutation,
+       &prepared](pg::Transaction* tx) -> asio::awaitable<p::Result<Json>> {
         // The request lock serializes repeats across instances without serializing all tenant writes.
         if (mutation) {
           auto locked =
@@ -561,10 +675,47 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
             if (!allowed) {
               co_return std::unexpected(allowed.error());
             }
-            co_return Json::parse(cached->value(0, 1).value_or(""));
+            auto response = Json::parse(cached->value(0, 1).value_or(""));
+            if (operation == "update-alarm") {
+              const auto action = body.value("action", std::string{});
+              if (action == "activate" || action == "return" || action == "suppress" || action == "unsuppress") {
+                auto permitted =
+                    p::authz::decide(principal, "incident.alarm-control", resource, std::chrono::system_clock::now());
+                if (!permitted) {
+                  co_return std::unexpected(permitted.error());
+                }
+              }
+            }
+            if (operation == "set-presence" && !body.value("release", false) && current) {
+              bool live = false;
+              for (const auto& lease : current->operational().presence()) {
+                if (lease.actor_id() == principal.subject && lease.session_id() == body.value("sessionId", "")
+                    && Time::TimestampToMilliseconds(lease.until())
+                           > Time::TimestampToMilliseconds(Time::GetCurrentTime())) {
+                  const auto& returned = response.at("incident").at("operational").at("presence");
+                  live = std::ranges::any_of(returned, [&lease](const Json& item) {
+                    return item.value("leaseId", std::string{}) == lease.lease_id();
+                  });
+                }
+              }
+              if (!live) {
+                co_return p::fail(Code::kCommonConcurrentModification, "presence lease expired");
+              }
+            }
+            if (operation == "ask-assistant" && current && expected != current->version()) {
+              co_return p::fail(Code::kCommonConcurrentModification, "assistant source changed");
+            }
+            if (response.contains("exercise")) {
+              google::protobuf::Timestamp until;
+              if (!Time::FromString(response["exercise"].value("expiresAt", ""), &until)
+                  || Time::TimestampToMilliseconds(until) <= Time::TimestampToMilliseconds(Time::GetCurrentTime())) {
+                co_return p::fail(Code::kCommonNotFound, "exercise expired");
+              }
+            }
+            co_return response;
           }
         }
-        auto response = co_await execute(tx, principal, operation, id, body, expected);
+        auto response = co_await execute(tx, principal, operation, id, body, expected, prepared);
         if (!response) {
           co_return response;
         }
@@ -581,7 +732,8 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
       });
   if (!result
       && (result.error().code() == Code::kAuthForbidden || result.error().code() == Code::kAuthScopeDenied
-          || result.error().code() == Code::kIncidentResolutionForbidden)) {
+          || result.error().code() == Code::kIncidentResolutionForbidden
+          || (operation == "ask-assistant" && result.error().code() == Code::kCommonConcurrentModification))) {
     auto recorded = co_await denied(principal, operation, id);
     if (!recorded) {
       co_return std::unexpected(recorded.error());
@@ -592,7 +744,7 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
 
 asio::awaitable<p::Result<Json>> Repository::execute(pg::Transaction* tx, p::security::Principal principal,
                                                      std::string operation, std::string id, Json body,
-                                                     std::optional<std::uint64_t> expected) {
+                                                     std::optional<std::uint64_t> expected, Json prepared) {
   const auto now = std::chrono::system_clock::now();
   if (operation.starts_with("types.")) {
     auto allowed = p::authz::decide(
@@ -751,11 +903,18 @@ asio::awaitable<p::Result<Json>> Repository::execute(pg::Transaction* tx, p::sec
   auto value = std::move(*loaded);
   auto allowed = p::authz::decide(principal,
                                   operation == "get" || operation == "timeline" || operation == "signals"
+                                          || operation == "operations" || operation == "snapshots"
+                                          || operation == "recovery" || operation == "get-exercise"
                                       ? "incident.read"
                                       : "incident." + operation,
                                   {principal.tenant, value.site_id(), value.zone_id()}, now);
   if (!allowed) {
     co_return std::unexpected(allowed.error());
+  }
+  if (operation == "operations" || operation == "snapshots" || operation == "recovery" || operation == "get-exercise"
+      || operation == "update-alarm" || operation == "set-presence" || operation == "ask-assistant"
+      || operation == "create-exercise" || operation == "act-exercise") {
+    co_return co_await operational(tx, principal, operation, std::move(value), body, expected, std::move(prepared));
   }
   if (operation == "get") {
     co_return Json{{"incident", json(value)}};
@@ -974,6 +1133,10 @@ asio::awaitable<p::Result<void>> Repository::tick() {
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited owned closure.
       [this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+        auto expired = co_await expire_operations(tx);
+        if (!expired) {
+          co_return expired;
+        }
         auto rows = co_await tx->connection().query(
             {.sql =
                  "SELECT tenant_id::text,body::text FROM incident.incidents WHERE "
@@ -1007,11 +1170,13 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
     co_return p::fail(Code::kProcessingPayloadInvalid, "invalid response identity");
   }
   if (!input.has_run_updated() && !input.has_escalation_level_triggered() && !input.has_command_updated()
-      && !input.has_plan_unavailable() && !input.has_notification_updated()) {
+      && !input.has_plan_unavailable() && !input.has_notification_updated() && !input.has_sla_policy_pinned()) {
     co_return p::Result<void>{};
   }
   std::string id;
-  if (input.has_notification_updated()) {
+  if (input.has_sla_policy_pinned()) {
+    id = input.sla_policy_pinned().incident_id();
+  } else if (input.has_notification_updated()) {
     id = input.notification_updated().notification().incident_id();
   } else if (input.has_command_updated()) {
     id = input.command_updated().command().incident_id();
@@ -1046,6 +1211,26 @@ asio::awaitable<p::Result<void>> Repository::apply_response(response::v1::Respon
           co_return std::unexpected(loaded.error());
         }
         auto value = std::move(*loaded);
+        if (input.has_sla_policy_pinned()) {
+          const auto& pinned = input.sla_policy_pinned();
+          if (source.actor().id() != "response-engine" || source.actor().kind() != common::v1::ACTOR_KIND_SERVICE
+              || pinned.acknowledge_within().seconds() <= 0 || pinned.resolve_within().seconds() <= 0
+              || pinned.acknowledge_within().seconds() > 31536000 || pinned.resolve_within().seconds() > 31536000) {
+            co_return p::fail(Code::kProcessingPayloadInvalid, "invalid SLA publisher or targets");
+          }
+          if (value.operational().has_resolve_due()) {
+            co_return p::Result<void>{};
+          }
+          *value.mutable_operational()->mutable_acknowledge_due() =
+              Time::MillisecondsToTimestamp(Time::TimestampToMilliseconds(value.created_at())
+                                            + Time::DurationToMilliseconds(pinned.acknowledge_within()));
+          *value.mutable_operational()->mutable_resolve_due() =
+              Time::MillisecondsToTimestamp(Time::TimestampToMilliseconds(value.created_at())
+                                            + Time::DurationToMilliseconds(pinned.resolve_within()));
+          value.set_version(value.version() + 1);
+          co_return co_await save(tx, system(source.tenant_id()), value, "operational.sla", {}, {}, {},
+                                  outgoing ? &outgoing : nullptr, &source);
+        }
         if (input.has_plan_unavailable()) {
           if (source.actor().kind() != common::v1::ACTOR_KIND_SERVICE || source.actor().id() != "response-engine") {
             co_return p::fail(Code::kProcessingPayloadInvalid, "invalid plan availability publisher");

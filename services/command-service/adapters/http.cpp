@@ -111,7 +111,9 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
         throw std::invalid_argument("object required");
       }
     }
-    if (path == "/v1/commands") {
+    if (path == "/v1/commands:preview" && !read) {
+      operation = "preview";
+    } else if (path == "/v1/commands") {
       operation = read ? "list" : "request";
     } else if (path.starts_with("/v1/commands/")) {
       const auto tail = path.substr(13);
@@ -127,8 +129,9 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       }
     }
     const std::map<std::string, std::string> types = {
-        {"request", "RequestCommandRequest"}, {"get", "GetCommandRequest"},       {"list", "ListCommandsRequest"},
-        {"approve", "ApproveCommandRequest"}, {"reject", "RejectCommandRequest"}, {"cancel", "CancelCommandRequest"}};
+        {"preview", "PreviewCommandRequest"}, {"request", "RequestCommandRequest"}, {"get", "GetCommandRequest"},
+        {"list", "ListCommandsRequest"},      {"approve", "ApproveCommandRequest"}, {"reject", "RejectCommandRequest"},
+        {"cancel", "CancelCommandRequest"}};
     if (!types.contains(operation)) {
       co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown endpoint");
     }
@@ -149,8 +152,14 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       co_return p::fail(p::ErrorCode::kCommonInvalidArgument, "command exceeds connector frame limit");
     }
     body = Json::parse(p::stream::json(*parsed));
+    if (operation == "preview") {
+      if (!body.contains("command") || !body["command"].is_object()) {
+        throw std::invalid_argument("command required");
+      }
+      body = body["command"];
+    }
     std::optional<std::uint64_t> expected;
-    if (!read && operation != "request") {
+    if (!read && operation != "request" && operation != "preview") {
       const std::string text(request[http::field::if_match]);
       if (text.size() < 3 || text.front() != '"' || text.back() != '"') {
         co_return p::fail(p::ErrorCode::kCommonPreconditionRequired, "If-Match required");

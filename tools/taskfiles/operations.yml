@@ -1,0 +1,42 @@
+version: '3'
+vars:
+  OPERATIONS_PROJECT: '{{.OPERATIONS_PROJECT | default "psim-operations-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Operational alarms, distributed leases, historical snapshots, exercises and local assistant protocol
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - python3 -I tools/operations/check.py {{.OPERATIONS_PROJECT}} {{.PRESET}}
+  sanitizers:
+    desc: Operational boundaries with real infrastructure under ASan/UBSan and TSan
+    cmds:
+      - task: :cpp:test:sanitizers
+        vars: {LABELS: 'psim_domain_incident_test|psim_incident_test|psim_command_test|psim_projection_test|psim_api_gateway_test'}
+      - for: [asan, tsan]
+        task: test
+        vars: {OPERATIONS_PROJECT: '{{.OPERATIONS_PROJECT}}', PRESET: '{{.ITEM}}'}
+  coverage:
+    desc: Combined domain and service coverage of operations, commands, projections and realtime
+    cmds:
+      - task: :api:image
+      - task: :cpp:build
+        vars: {PRESET: coverage}
+      - rm -rf build/{{.PLATFORM}}/coverage/profiles
+      - mkdir -p build/{{.PLATFORM}}/coverage/profiles
+      - python3 -I tools/operations/check.py {{.OPERATIONS_PROJECT}}-coverage coverage
+      - python3 -I tools/incidents/check.py {{.OPERATIONS_PROJECT}}-incidents-coverage coverage 100
+      - python3 -I tools/commands/check.py {{.OPERATIONS_PROJECT}}-commands-coverage coverage 100
+      - python3 -I tools/projection/check.py {{.OPERATIONS_PROJECT}}-projection-coverage coverage
+      - python3 -I tools/realtime/check.py {{.OPERATIONS_PROJECT}}-realtime-coverage coverage
+      - task: :reports:test
+        vars: {REPORTS_PROJECT: '{{.OPERATIONS_PROJECT}}-reports-coverage', PRESET: coverage}
+      - task: :cpp:_run
+        vars:
+          CMD: >-
+            LLVM_PROFILE_FILE=/repo/build/{{.PLATFORM}}/coverage/profiles/%p-%m.profraw
+            ctest --test-dir build/{{.PLATFORM}}/coverage -LE '^component$' -j {{.JOBS}} --output-on-failure &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'libs/domain/incident' &&
+            python3 -I tools/cpp/coverage.py build/{{.PLATFORM}}/coverage tools/cpp/coverage.yaml 'services/incident-service services/command-service services/projection-service services/api-gateway' --component

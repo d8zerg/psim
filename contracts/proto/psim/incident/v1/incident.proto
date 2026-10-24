@@ -55,6 +55,8 @@ message Incident {
   bool signal_ids_truncated = 28;
   // Policy identity fixed with the incident type version.
   string escalation_policy_id = 29;
+  // Independent alarm condition, acknowledgements and temporary visibility controls.
+  OperationalState operational = 30;
 }
 
 // IncidentState is the lifecycle state of an incident.
@@ -149,4 +151,35 @@ message IncidentTransfer {
   string recipient_id = 3;
   string comment = 4;
   uint64 requested_version = 5;
+}
+
+// AlarmControl records an independent, bounded visibility control.
+message AlarmControl {
+  string reason = 1;
+  string actor_id = 2;
+  google.protobuf.Timestamp until = 3;
+}
+
+// PresenceLease is advisory and never grants authorization or blocks an incident action.
+message PresenceLease {
+  string actor_id = 1;
+  string session_id = 2;
+  string lease_id = 3;
+  google.protobuf.Timestamp until = 4;
+  bool editing = 5;
+}
+
+// OperationalState preserves condition independently from the incident lifecycle.
+message OperationalState {
+  bool active = 1;
+  bool acknowledged = 2;
+  string acknowledged_by = 3;
+  google.protobuf.Timestamp condition_at = 4;
+  AlarmControl shelved = 5;
+  AlarmControl suppressed = 6;
+  repeated PresenceLease presence = 7;
+  google.protobuf.Timestamp acknowledge_due = 8;
+  google.protobuf.Timestamp resolve_due = 9;
+  // False for pre-existing incidents whose process condition has never been observed.
+  bool condition_known = 10;
 }

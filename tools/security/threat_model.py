@@ -38,7 +38,8 @@ def risk(t):
 
 
 def step_key(step):
-    return tuple(int(x) for x in step.split("."))
+    major, minor, suffix = re.fullmatch(r"(\d+)\.(\d+)([a-z]?)", step).groups()
+    return int(major), int(minor), suffix
 
 
 def load(path):
@@ -126,7 +127,7 @@ def render(model):
 
 def plan_steps(root):
     plan = open(os.path.join(root, "docs/psim-mvp-development-plan.md"), encoding="utf-8").read()
-    return set(re.findall(r"^### Шаг (\d+\.\d+) ", plan, re.M))
+    return set(re.findall(r"^### Шаг (\d+\.\d+[a-z]?) ", plan, re.M))
 
 
 def verify(root, model):

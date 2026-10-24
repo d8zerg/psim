@@ -30,6 +30,7 @@ message IncidentEventRecord {
     IncidentTransferConfirmed incident_transfer_confirmed = 16;
     IncidentCommandUpdated incident_command_updated = 17;
     IncidentNotificationUpdated incident_notification_updated = 18;
+    IncidentOperationalUpdated incident_operational_updated = 19;
   }
 }
 
@@ -129,4 +130,10 @@ message IncidentCommandUpdated {
 message IncidentNotificationUpdated {
   Incident incident = 1;
   TimelineEntry entry = 2;
+}
+
+// IncidentOperationalUpdated carries the full state for projections and reconnect replay.
+message IncidentOperationalUpdated {
+  Incident incident = 1;
+  string action = 2;
 }

@@ -86,6 +86,48 @@
           "unit": "percentunit"
         }
       }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Operational requests by outcome",
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation,outcome) (rate(psim_incident_operations_total[5m]))"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Operational request p99",
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.99, sum by (le,operation) (rate(psim_incident_operations_seconds_bucket[5m])))"
+        }
+      ]
     }
   ]
 }

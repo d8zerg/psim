@@ -9,6 +9,7 @@
 #include <psim/api/v1/incidents.pb.h>
 #include <psim/api/v1/me.pb.h>
 #include <psim/api/v1/notifications.pb.h>
+#include <psim/api/v1/operations.pb.h>
 #include <psim/api/v1/reports.pb.h>
 #include <psim/api/v1/response.pb.h>
 #include <psim/api/v1/rules.pb.h>
@@ -60,7 +61,7 @@ std::pair<std::string, std::string> destination(std::string_view service, std::s
     if (read) {
       return {"commands", "command.read"};
     }
-    if (method == "RequestCommand") {
+    if (method == "RequestCommand" || method == "PreviewCommand") {
       return {"commands", "command.request"};
     }
     return {"commands", method == "CancelCommand" ? "command.cancel" : "command.confirm"};
@@ -95,6 +96,14 @@ std::pair<std::string, std::string> destination(std::string_view service, std::s
   }
   if (service == "SiteDutyService") {
     return {"response", read ? "response.duty.read" : "response.duty.write"};
+  }
+  if (service == "OperationalService") {
+    const std::map<std::string_view, std::string> actions = {{"UpdateAlarm", "update-alarm"},
+                                                             {"SetPresence", "set-presence"},
+                                                             {"AskAssistant", "ask-assistant"},
+                                                             {"CreateExercise", "create-exercise"},
+                                                             {"ActExercise", "act-exercise"}};
+    return {"incidents", read ? "incident.read" : "incident." + actions.at(method)};
   }
   if (service == "IncidentService") {
     if (method.find("IncidentType") != std::string_view::npos) {
@@ -144,7 +153,8 @@ bool matches(std::string_view pattern, std::string_view path) {
 const std::vector<Route>& routes() {
   static const auto kRoutes = [] {
     std::vector<Route> result;
-    const std::array files = {api::v1::GetSettingsRequest::descriptor()->file(),
+    const std::array files = {api::v1::GetOperationsRequest::descriptor()->file(),
+                              api::v1::GetSettingsRequest::descriptor()->file(),
                               api::v1::GetMeRequest::descriptor()->file(),
                               api::v1::GetIncidentFeedRequest::descriptor()->file(),
                               api::v1::GetIncidentRequest::descriptor()->file(),

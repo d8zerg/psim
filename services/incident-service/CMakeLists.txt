@@ -1,4 +1,4 @@
-add_library(psim_incident_repository STATIC adapters/repository.cpp adapters/http.cpp)
+add_library(psim_incident_repository STATIC adapters/repository.cpp adapters/http.cpp adapters/operational.cpp)
 target_include_directories(psim_incident_repository PUBLIC adapters)
 target_link_libraries(psim_incident_repository PUBLIC psim::platform_stream psim::platform_authz psim::platform_identity psim::domain_incident)
 psim_target_defaults(psim_incident_repository)

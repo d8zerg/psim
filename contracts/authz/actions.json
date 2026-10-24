@@ -203,5 +203,29 @@
   ],
   "feed.operators.read": [
     "supervisor"
+  ],
+  "incident.update-alarm": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.set-presence": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.ask-assistant": [
+    "operator",
+    "supervisor",
+    "auditor"
+  ],
+  "incident.create-exercise": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.act-exercise": [
+    "operator",
+    "supervisor"
+  ],
+  "incident.alarm-control": [
+    "supervisor"
   ]
 }

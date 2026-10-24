@@ -1,5 +1,5 @@
-add_library(psim_domain_incident STATIC src/model.cpp)
+add_library(psim_domain_incident STATIC src/model.cpp src/operational.cpp)
 add_library(psim::domain_incident ALIAS psim_domain_incident)
 target_include_directories(psim_domain_incident PUBLIC include)
 psim_target_defaults(psim_domain_incident)
-psim_add_test(psim_domain_incident_test SOURCES tests/model_test.cpp LIBS psim::domain_incident)
+psim_add_test(psim_domain_incident_test SOURCES tests/model_test.cpp tests/operational_test.cpp LIBS psim::domain_incident)

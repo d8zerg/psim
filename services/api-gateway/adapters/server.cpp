@@ -375,6 +375,8 @@ class Gateway final : public p::stream::Worker {
     found->second.positions[event.partition] = event.offset + 1;
     const bool supported = event.value.has_incident_event()
                                ? session->capabilities.contains("incident_event")
+                                     && (!event.value.incident_event().has_incident_operational_updated()
+                                         || session->capabilities.contains("incident_operational_updated"))
                                : event.value.has_response_event() && session->capabilities.contains("response_event");
     const bool response_access =
         !event.value.has_response_event()
@@ -1136,7 +1138,8 @@ asio::awaitable<void> Session<Stream>::run() {
         }
         std::set<std::string> negotiated;
         for (const auto& type : frame.authenticate().supported_change_types()) {
-          if (type == "incident_event" || type == "response_event" || type == "location_status") {
+          if (type == "incident_event" || type == "response_event" || type == "location_status"
+              || type == "incident_operational_updated") {
             negotiated.insert(type);
           }
         }

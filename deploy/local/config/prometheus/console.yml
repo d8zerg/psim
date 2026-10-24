@@ -8,3 +8,17 @@ groups:
         annotations:
           summary: Console projection update p99 exceeds 100 milliseconds
           description: Check Kafka consumer progress, PostgreSQL latency and writer readiness.
+      - alert: OperationalInterfaceFailures
+        expr: sum(rate(psim_incident_operations_total{outcome="failed"}[5m])) / clamp_min(sum(rate(psim_incident_operations_total[5m])), 0.001) > 0.1
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Operational request failure ratio exceeds ten percent
+          description: Check incident versions, PostgreSQL availability and current authorization state.
+      - alert: LocalAssistantUnavailable
+        expr: sum(rate(psim_incident_operations_total{operation="ask-assistant",outcome="unavailable"}[5m])) > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: Local assistant cannot return validated claims
+          description: Check the configured model endpoint, source identifiers and provider response limits.

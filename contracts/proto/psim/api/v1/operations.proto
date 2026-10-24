@@ -1,0 +1,219 @@
+syntax = "proto3";
+
+package psim.api.v1;
+
+import "google/api/annotations.proto";
+import "google/protobuf/timestamp.proto";
+import "psim/incident/v1/incident.proto";
+
+// OperationalService owns alarm controls, collaboration, history and isolated exercises.
+// Owner: Incident Service. All source data is resolved using the caller's current scope.
+service OperationalService {
+  // GetOperations evaluates current authorization before accessing persisted state.
+  rpc GetOperations(GetOperationsRequest) returns (GetOperationsResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/operations"};
+  }
+  // UpdateAlarm evaluates current authorization before accessing persisted state.
+  rpc UpdateAlarm(UpdateAlarmRequest) returns (UpdateAlarmResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:update-alarm"
+      body: "*"
+    };
+  }
+  // SetPresence evaluates current authorization before accessing persisted state.
+  rpc SetPresence(SetPresenceRequest) returns (SetPresenceResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:set-presence"
+      body: "*"
+    };
+  }
+  // GetIncidentSnapshots evaluates current authorization before accessing persisted state.
+  rpc GetIncidentSnapshots(GetIncidentSnapshotsRequest) returns (GetIncidentSnapshotsResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/snapshots"};
+  }
+  // GetIncidentRecovery evaluates current authorization before accessing persisted state.
+  rpc GetIncidentRecovery(GetIncidentRecoveryRequest) returns (GetIncidentRecoveryResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/recovery"};
+  }
+  // AskAssistant evaluates current authorization before accessing persisted state.
+  rpc AskAssistant(AskAssistantRequest) returns (AskAssistantResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:ask-assistant"
+      body: "*"
+    };
+  }
+  // CreateExercise evaluates current authorization before accessing persisted state.
+  rpc CreateExercise(CreateExerciseRequest) returns (CreateExerciseResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}:create-exercise"
+      body: "*"
+    };
+  }
+  // GetExercise evaluates current authorization before accessing persisted state.
+  rpc GetExercise(GetExerciseRequest) returns (GetExerciseResponse) {
+    option (google.api.http) = {get: "/v1/incidents/{incident_id}/exercises/{exercise_id}"};
+  }
+  // ActExercise evaluates current authorization before accessing persisted state.
+  rpc ActExercise(ActExerciseRequest) returns (ActExerciseResponse) {
+    option (google.api.http) = {
+      post: "/v1/incidents/{incident_id}/exercises/{exercise_id}:act"
+      body: "*"
+    };
+  }
+}
+
+// OperationSource identifies server-owned evidence and its exact version.
+message OperationSource {
+  string source_id = 1;
+  uint64 version = 2;
+  google.protobuf.Timestamp obtained_at = 3;
+  bool stale = 4;
+  string text = 5;
+}
+
+// GetOperationsRequest selects one current incident.
+message GetOperationsRequest {
+  string incident_id = 1;
+}
+
+// GetOperationsResponse combines current state with explicit SLA risk and provenance.
+message GetOperationsResponse {
+  psim.incident.v1.Incident incident = 1;
+  repeated OperationSource sources = 2;
+  string sla_risk = 3;
+  google.protobuf.Timestamp evaluated_at = 4;
+}
+
+// UpdateAlarmRequest accepts acknowledge, activate, return, shelve, unshelve, suppress or unsuppress.
+// Suppression and condition changes require a supervisor. Visibility controls require an end.
+message UpdateAlarmRequest {
+  string incident_id = 1;
+  string action = 2;
+  string reason = 3;
+  google.protobuf.Timestamp until = 4;
+}
+
+// UpdateAlarmResponse returns the committed aggregate version.
+message UpdateAlarmResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// SetPresenceRequest acquires or renews a session lease; release requires its current lease_id.
+// Empty lease_id acquires a new lease. TTL is bounded to 60 seconds and JWT expiry.
+message SetPresenceRequest {
+  string incident_id = 1;
+  string session_id = 2;
+  string lease_id = 3;
+  bool editing = 4;
+  bool release = 5;
+  uint32 ttl_seconds = 6;
+}
+
+// SetPresenceResponse returns the versioned collaboration state.
+message SetPresenceResponse {
+  psim.incident.v1.Incident incident = 1;
+}
+
+// GetIncidentSnapshotsRequest selects versions after a cursor or the latest snapshot at a time.
+message GetIncidentSnapshotsRequest {
+  string incident_id = 1;
+  uint64 after_version = 2;
+  uint32 page_size = 3;
+  google.protobuf.Timestamp at = 4;
+}
+
+// IncidentSnapshot contains immutable state with its server capture time.
+message IncidentSnapshot {
+  psim.incident.v1.Incident incident = 1;
+  google.protobuf.Timestamp captured_at = 2;
+}
+
+// GetIncidentSnapshotsResponse never represents history as live device availability.
+message GetIncidentSnapshotsResponse {
+  repeated IncidentSnapshot snapshots = 1;
+  uint64 next_version = 2;
+  bool historical = 3;
+}
+
+// GetIncidentRecoveryRequest compares the known version with the current aggregate.
+message GetIncidentRecoveryRequest {
+  string incident_id = 1;
+  uint64 known_version = 2;
+}
+
+// GetIncidentRecoveryResponse bounds changes and explicitly requests a fresh snapshot on a gap.
+message GetIncidentRecoveryResponse {
+  psim.incident.v1.Incident incident = 1;
+  uint64 changed_versions = 2;
+  bool snapshot_required = 3;
+  repeated psim.incident.v1.TimelineEntry changes = 4;
+}
+
+// AskAssistantRequest never accepts source bodies, model URLs or executable actions.
+message AskAssistantRequest {
+  string incident_id = 1;
+  string question = 2;
+}
+
+// AssistantClaim is an untrusted model suggestion associated with a server source.
+message AssistantClaim {
+  string text = 1;
+  string source_id = 2;
+  bool assumption = 3;
+}
+
+// AskAssistantResponse preserves accessible evidence when the configured provider is unavailable.
+message AskAssistantResponse {
+  string request_id = 1;
+  string provider = 2;
+  string model = 3;
+  repeated OperationSource sources = 4;
+  repeated AssistantClaim claims = 5;
+  bool unavailable = 6;
+}
+
+// CreateExerciseRequest copies one authorized incident into an isolated, expiring session.
+message CreateExerciseRequest {
+  string incident_id = 1;
+  string title = 2;
+}
+
+// ExerciseState cannot be dispatched as a production command or response run.
+message ExerciseState {
+  string exercise_id = 1;
+  string owner_id = 2;
+  uint64 version = 3;
+  psim.incident.v1.Incident incident = 4;
+  uint32 score = 5;
+  repeated string completed_actions = 6;
+  google.protobuf.Timestamp expires_at = 7;
+}
+
+// CreateExerciseResponse returns a private training session.
+message CreateExerciseResponse {
+  ExerciseState exercise = 1;
+}
+
+// GetExerciseRequest selects a session belonging to the current user.
+message GetExerciseRequest {
+  string incident_id = 1;
+  string exercise_id = 2;
+}
+
+// GetExerciseResponse returns a private session without production side effects.
+message GetExerciseResponse {
+  ExerciseState exercise = 1;
+}
+
+// ActExerciseRequest accepts acknowledge, start-work, command or resolve in training order.
+message ActExerciseRequest {
+  string incident_id = 1;
+  string exercise_id = 2;
+  string action = 3;
+  string reason = 4;
+}
+
+// ActExerciseResponse returns a versioned score and simulated state.
+message ActExerciseResponse {
+  ExerciseState exercise = 1;
+}

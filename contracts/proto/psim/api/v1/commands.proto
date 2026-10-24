@@ -8,6 +8,13 @@ import "psim/response/v1/command.proto";
 
 // CommandService manages commands to devices. Owner: Command Service. Scenario S8.
 service CommandService {
+  // PreviewCommand validates scope, parameters and device capability without dispatch.
+  rpc PreviewCommand(PreviewCommandRequest) returns (PreviewCommandResponse) {
+    option (google.api.http) = {
+      post: "/v1/commands:preview"
+      body: "*"
+    };
+  }
   // RequestCommand requests a command; Idempotency-Key header equals command_id.
   rpc RequestCommand(RequestCommandRequest) returns (RequestCommandResponse) {
     option (google.api.http) = {
@@ -55,6 +62,8 @@ message RequestCommandRequest {
   string incident_id = 5;
   string run_id = 6;
   string step_id = 7;
+  // Optional preview binding; a changed catalog rejects the proposed request.
+  string preview_fingerprint = 8;
 }
 
 // RequestCommandResponse is the response of RequestCommand.
@@ -90,6 +99,8 @@ message ListCommandsResponse {
 // ApproveCommandRequest is the request of ApproveCommand.
 message ApproveCommandRequest {
   string command_id = 1 [(buf.validate.field).string.uuid = true];
+  // Optional binding to a preview of this exact command and current catalog versions.
+  string preview_fingerprint = 2;
 }
 
 // ApproveCommandResponse is the response of ApproveCommand.
@@ -116,4 +127,21 @@ message CancelCommandRequest {
 // CancelCommandResponse is the response of CancelCommand.
 message CancelCommandResponse {
   psim.response.v1.Command command = 1;
+}
+
+// PreviewCommandRequest uses the exact proposed request, without production side effects.
+message PreviewCommandRequest {
+  RequestCommandRequest command = 1;
+}
+
+// PreviewCommandResponse identifies the configured consequence and current resource versions.
+message PreviewCommandResponse {
+  string device_id = 1;
+  string capability = 2;
+  string consequence = 3;
+  bool consequence_unknown = 4;
+  bool requires_second_supervisor = 5;
+  uint64 device_version = 6;
+  uint64 device_type_version = 7;
+  string fingerprint = 8;
 }

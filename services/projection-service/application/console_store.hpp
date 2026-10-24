@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <map>
+#include <optional>
 #include <set>
 #include <string>
 #include <utility>
@@ -24,6 +25,7 @@ struct StateSnapshot {
   std::string generation;
   api::v1::GetOperatorLoadResponse operators;
   std::map<std::string, std::int64_t> offsets;
+  api::v1::GetOperationalSnapshotResponse history;
 };
 
 class ConsoleStore {
@@ -43,7 +45,8 @@ class ConsoleStore {
   boost::asio::awaitable<platform::Result<void>> apply(const platform::kafka::Message* message);
   boost::asio::awaitable<platform::Result<StateSnapshot>> snapshot(platform::security::Principal principal,
                                                                    std::string location,
-                                                                   std::set<std::string> sites = {});
+                                                                   std::set<std::string> sites = {},
+                                                                   std::optional<std::int64_t> at = {});
 
  private:
   platform::pg::Pool* pool_;

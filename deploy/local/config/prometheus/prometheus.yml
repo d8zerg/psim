@@ -21,3 +21,8 @@ scrape_configs:
       - names: [api-gateway]
         type: A
         port: 9100
+  - job_name: incident-service
+    dns_sd_configs:
+      - names: [incident-service, incident-2]
+        type: A
+        port: 9100

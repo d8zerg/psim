@@ -5,6 +5,7 @@ from pathlib import Path
 import re
 import runpy
 import sys
+import urllib.parse
 
 ROOT = Path(__file__).resolve().parents[2]
 api = runpy.run_path(str(ROOT / "tools/api-gateway/check.py"))
@@ -34,6 +35,21 @@ class Check(Base):
 
     def positions(self, topic):
         return int(self.sql("SELECT COALESCE(sum(next_offset),0) FROM console.positions WHERE replica=(SELECT generation FROM console.active) AND topic='" + topic + "'"))
+
+    def history(self):
+        at = helpers["utc"]()
+        path = "/v1/feed/snapshot?" + urllib.parse.urlencode({"at": at, "locationId": self.floor["locationId"]})
+        result = self.request("GET", path, role="operator")
+        assert result["historical"] and result["availableFrom"]
+        assert result["catalogDevices"] and result["catalogLocations"]
+        assert not result["feed"].get("resumeToken") and not result["location"].get("resumeToken")
+        assert all(not row.get("online", False) for row in result["location"].get("devices", []))
+        self.request("GET", path, role="foreign_operator", expected=403)
+        before = self.positions("psim.events.normalized.v1")
+        self.probe([self.event(12)])
+        self.wait(lambda: self.positions("psim.events.normalized.v1") > before, 30)
+        assert self.request("GET", path, role="operator") == result
+        self.mark("historical feed and plan catalog preserve versions without live leases or resume tokens")
 
     def metrics_text(self):
         return self.env_command("python3 -c 'import urllib.request; print(urllib.request.urlopen(\"http://projection-service:9100/metrics\").read().decode())'")
@@ -245,6 +261,7 @@ def main():
         check.snapshots()
         check.feeds()
         check.prepare_models()
+        check.history()
         check.cache_fallback()
         check.reconstruction()
         check.latency()

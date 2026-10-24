@@ -56,6 +56,13 @@ asio::awaitable<p::Result<void>> ConsoleStore::activate(bool compare) {
         if (!changed) {
           co_return std::unexpected(changed.error());
         }
+        auto captured = co_await tx->connection().query(
+            {.sql = "INSERT INTO console.history(tenant,kind,id,captured,confirmed,body) SELECT "
+                    "tenant,kind,id,clock_timestamp(),confirmed,body FROM console.resources WHERE replica=$1",
+             .parameters = {Param::text(replica_)}});
+        if (!captured) {
+          co_return std::unexpected(captured.error());
+        }
         co_return p::Result<void>{};
       });
 }

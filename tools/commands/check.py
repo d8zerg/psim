@@ -131,6 +131,24 @@ class Check(IncidentCheck):
         self.wait(lambda: any(entry.get("refId") == identity and entry["kind"] == "TIMELINE_ENTRY_KIND_COMMAND" for entry in self.request("GET", "/v1/incidents/" + self.incident_id + "/timeline")["entries"]))
         self.mark("catalog parameters, access scopes, repeat requests and Kafka delivery, execution result and incident timeline")
 
+    def preview(self):
+        identity = uid()
+        command = {"commandId": identity, "deviceId": self.device, "capability": "unlock", "incidentId": self.incident_id}
+        before = self.executions()
+        value = self.request("POST", "/v1/commands:preview", {"command": command}, key=uid(), service="command-service")
+        assert value["requiresSecondSupervisor"] and value["consequenceUnknown"]
+        assert value["deviceVersion"] == self.device_body["version"]
+        assert not self.sql("SELECT id::text FROM command.commands WHERE id='" + identity + "'")
+        self.request("POST", "/v1/commands:preview", {"command": command}, key=uid(), role="other", expected=403, service="command-2")
+        assert self.executions() == before
+        bad = command | {"previewFingerprint": "outdated"}
+        self.request("POST", "/v1/commands", bad, key=identity, expected=412, service="command-service")
+        requested = self.request("POST", "/v1/commands", command | {"previewFingerprint": value["fingerprint"]}, key=identity, service="command-service")["command"]
+        self.request("POST", "/v1/commands/" + identity + ":approve", {"previewFingerprint": "outdated"}, role="chief", key=uid(), version=requested["version"], expected=412, service="command-2")
+        self.request("POST", "/v1/commands/" + identity + ":approve", {"previewFingerprint": value["fingerprint"]}, role="chief", key=uid(), version=requested["version"], service="command-2")
+        self.final(identity)
+        self.mark("command consequence preview validates scope and capability without dispatch or persistence")
+
     def approvals(self):
         own = self.send("unlock", role="chief")["command"]
         assert own["state"] == "COMMAND_STATE_AWAITING_APPROVAL" and own["critical"]
@@ -310,6 +328,7 @@ def main():
         check.failures_commands()
         check.outbox_recovery()
         check.basics_commands()
+        check.preview()
         check.approvals()
         check.projections_and_results()
         check.performance_commands()

@@ -2,8 +2,10 @@
 
 #include <google/protobuf/util/json_util.h>
 #include <psim/api/v1/incidents.pb.h>
+#include <psim/api/v1/operations.pb.h>
 
 #include <charconv>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <exception>
@@ -71,6 +73,7 @@ Response Api::problem(const p::Error& error) {
 }
 
 asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::Principal principal) {
+  const auto started = std::chrono::steady_clock::now();
   try {
     const std::string target(request.target());
     const auto question = target.find('?');
@@ -181,15 +184,38 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       if (operation == "links") {
         operation = "link";
       }
-      if ((read && operation != "get" && operation != "timeline" && operation != "signals")
-          || (!read && (operation == "get" || operation == "timeline" || operation == "signals"))) {
+      if (operation.starts_with("exercises/")) {
+        auto exercise = operation.substr(10);
+        const auto action = exercise.find(':');
+        if ((read && action != std::string::npos) || body.contains("exerciseId") || body.contains("exercise_id")) {
+          throw std::invalid_argument("exercise path identity");
+        }
+        body["exerciseId"] = exercise.substr(0, action);
+        if (!read && (action == std::string::npos || exercise.substr(action + 1) != "act")) {
+          throw std::invalid_argument("exercise action");
+        }
+        operation = read ? "get-exercise" : "act-exercise";
+      }
+      const bool operational_read = operation == "operations" || operation == "snapshots" || operation == "recovery"
+                                    || operation == "get-exercise";
+      if ((read && !operational_read && operation != "get" && operation != "timeline" && operation != "signals")
+          || (!read && (operational_read || operation == "get" || operation == "timeline" || operation == "signals"))) {
         co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown endpoint");
       }
     } else {
       co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown endpoint");
     }
     // Decode against the published request schema before touching storage.
-    const std::map<std::string, std::string> messages = {{"list", "ListIncidentsRequest"},
+    const std::map<std::string, std::string> messages = {{"operations", "GetOperationsRequest"},
+                                                         {"update-alarm", "UpdateAlarmRequest"},
+                                                         {"set-presence", "SetPresenceRequest"},
+                                                         {"snapshots", "GetIncidentSnapshotsRequest"},
+                                                         {"recovery", "GetIncidentRecoveryRequest"},
+                                                         {"ask-assistant", "AskAssistantRequest"},
+                                                         {"create-exercise", "CreateExerciseRequest"},
+                                                         {"get-exercise", "GetExerciseRequest"},
+                                                         {"act-exercise", "ActExerciseRequest"},
+                                                         {"list", "ListIncidentsRequest"},
                                                          {"get", "GetIncidentRequest"},
                                                          {"timeline", "ListTimelineRequest"},
                                                          {"signals", "ListIncidentSignalsRequest"},
@@ -224,7 +250,8 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       }
       body = Json::parse(normalized);
       body.erase("incidentId");
-      if (read) {
+      if (read
+          && (operation == "list" || operation == "timeline" || operation == "signals" || operation == "types.list")) {
         if (!body.contains("pageSize")) {
           body["pageSize"] = 100;
         }
@@ -233,6 +260,24 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
       co_return p::fail(p::ErrorCode::kCommonNotFound, "unknown action");
     }
     auto result = co_await repository_->request(principal, operation, id, body, key, expected);
+    std::string outcome = "success";
+    if (!result) {
+      outcome = "failed";
+      if (result.error().code() == p::ErrorCode::kAuthForbidden
+          || result.error().code() == p::ErrorCode::kAuthScopeDenied) {
+        outcome = "denied";
+      }
+    } else if (result->value("unavailable", false)) {
+      outcome = "unavailable";
+    }
+    if (operations_) {
+      operations_->Add({{"operation", operation}, {"outcome", outcome}}).Increment();
+    }
+    if (latency_) {
+      latency_
+          ->Add({{"operation", operation}}, prometheus::Histogram::BucketBoundaries{0.005, 0.02, 0.1, 0.2, 1, 5, 10})
+          .Observe(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
+    }
     if (!result) {
       co_return std::unexpected(result.error());
     }

@@ -138,6 +138,9 @@ includes:
   commands:
     taskfile: ./tools/taskfiles/commands.yml
     dir: .
+  operations:
+    taskfile: ./tools/taskfiles/operations.yml
+    dir: .
   incidents:
     taskfile: ./tools/taskfiles/incidents.yml
     dir: .

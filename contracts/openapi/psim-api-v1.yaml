@@ -441,6 +441,39 @@ paths:
         '422': *id011
         '428': *id012
       summary: RejectCommand rejects a critical command
+  /v1/commands:preview:
+    post:
+      tags:
+      - CommandService
+      description: PreviewCommand validates scope, parameters and device capability without dispatch.
+      operationId: CommandService_PreviewCommand
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.PreviewCommandRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.PreviewCommandResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      parameters: *id013
+      summary: PreviewCommand validates scope, parameters and device capability without dispatch
   /v1/connectors:
     get:
       tags:
@@ -1364,6 +1397,44 @@ paths:
         '500': *id007
         '503': *id008
       summary: GetOperatorLoad returns the current load of operators (supervisor)
+  /v1/feed/snapshot:
+    get:
+      tags:
+      - FeedService
+      description: GetOperationalSnapshot returns feed and plan data at a historical server capture time.
+      operationId: FeedService_GetOperationalSnapshot
+      parameters:
+      - name: at
+        in: query
+        schema:
+          type: string
+          format: date-time
+      - name: locationId
+        in: query
+        schema:
+          type: string
+      - name: siteIds
+        in: query
+        schema:
+          type: array
+          items:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetOperationalSnapshotResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+      summary: GetOperationalSnapshot returns feed and plan data at a historical server capture time
   /v1/imports:
     post:
       tags:
@@ -1756,6 +1827,84 @@ paths:
         '500': *id007
         '503': *id008
       summary: ListIncidentEvents returns source events of all signals of an incident
+  /v1/incidents/{incidentId}/exercises/{exerciseId}:
+    get:
+      tags:
+      - OperationalService
+      description: GetExercise evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_GetExercise
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: exerciseId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetExerciseResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+      summary: GetExercise evaluates current authorization before accessing persisted state
+  /v1/incidents/{incidentId}/exercises/{exerciseId}:act:
+    post:
+      tags:
+      - OperationalService
+      description: ActExercise evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_ActExercise
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: exerciseId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id014
+      - *id015
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.ActExerciseRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.ActExerciseResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      summary: ActExercise evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}/links:
     post:
       tags:
@@ -1796,6 +1945,66 @@ paths:
         '422': *id011
         '428': *id012
       summary: AddIncidentLink attaches an external link
+  /v1/incidents/{incidentId}/operations:
+    get:
+      tags:
+      - OperationalService
+      description: GetOperations evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_GetOperations
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetOperationsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+      summary: GetOperations evaluates current authorization before accessing persisted state
+  /v1/incidents/{incidentId}/recovery:
+    get:
+      tags:
+      - OperationalService
+      description: GetIncidentRecovery evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_GetIncidentRecovery
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: knownVersion
+        in: query
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentRecoveryResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+      summary: GetIncidentRecovery evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}/run:
     get:
       tags:
@@ -1861,6 +2070,48 @@ paths:
         '500': *id007
         '503': *id008
       summary: ListIncidentSignals returns signals attached to the incident
+  /v1/incidents/{incidentId}/snapshots:
+    get:
+      tags:
+      - OperationalService
+      description: GetIncidentSnapshots evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_GetIncidentSnapshots
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: afterVersion
+        in: query
+        schema:
+          type: string
+      - name: pageSize
+        in: query
+        schema:
+          type: integer
+          format: uint32
+      - name: at
+        in: query
+        schema:
+          type: string
+          format: date-time
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.GetIncidentSnapshotsResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+      summary: GetIncidentSnapshots evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}/timeline:
     get:
       tags:
@@ -1938,6 +2189,46 @@ paths:
         '422': *id011
         '428': *id012
       summary: AcknowledgeIncident accepts an incident; the caller becomes the assignee
+  /v1/incidents/{incidentId}:ask-assistant:
+    post:
+      tags:
+      - OperationalService
+      description: AskAssistant evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_AskAssistant
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id014
+      - *id015
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.AskAssistantRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.AskAssistantResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      summary: AskAssistant evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}:assign:
     post:
       tags:
@@ -2018,6 +2309,46 @@ paths:
         '422': *id011
         '428': *id012
       summary: CloseIncident closes a resolved incident before the auto-close timer (supervisor)
+  /v1/incidents/{incidentId}:create-exercise:
+    post:
+      tags:
+      - OperationalService
+      description: CreateExercise evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_CreateExercise
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id014
+      - *id015
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.CreateExerciseRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.CreateExerciseResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      summary: CreateExercise evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}:reopen:
     post:
       tags:
@@ -2098,6 +2429,46 @@ paths:
         '422': *id011
         '428': *id012
       summary: ResolveIncident resolves an incident; fails while mandatory steps are pending (I7)
+  /v1/incidents/{incidentId}:set-presence:
+    post:
+      tags:
+      - OperationalService
+      description: SetPresence evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_SetPresence
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id014
+      - *id015
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.SetPresenceRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.SetPresenceResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      summary: SetPresence evaluates current authorization before accessing persisted state
   /v1/incidents/{incidentId}:set-priority:
     post:
       tags:
@@ -2178,6 +2549,46 @@ paths:
         '422': *id011
         '428': *id012
       summary: StartIncidentWork moves an incident to in_progress
+  /v1/incidents/{incidentId}:update-alarm:
+    post:
+      tags:
+      - OperationalService
+      description: UpdateAlarm evaluates current authorization before accessing persisted state.
+      operationId: OperationalService_UpdateAlarm
+      parameters:
+      - name: incidentId
+        in: path
+        required: true
+        schema:
+          type: string
+      - *id014
+      - *id015
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/psim.api.v1.UpdateAlarmRequest'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/psim.api.v1.UpdateAlarmResponse'
+        '400': *id001
+        '401': *id002
+        '403': *id003
+        '404': *id004
+        '413': *id005
+        '429': *id006
+        '500': *id007
+        '503': *id008
+        '409': *id009
+        '412': *id010
+        '422': *id011
+        '428': *id012
+      summary: UpdateAlarm evaluates current authorization before accessing persisted state
   /v1/incidents:transfer:
     post:
       tags:
@@ -3966,6 +4377,24 @@ components:
         incident:
           $ref: '#/components/schemas/psim.incident.v1.Incident'
       description: AcknowledgeIncidentResponse is the response of AcknowledgeIncident.
+    psim.api.v1.ActExerciseRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        exerciseId:
+          type: string
+        action:
+          type: string
+        reason:
+          type: string
+      description: ActExerciseRequest accepts acknowledge, start-work, command or resolve in training order.
+    psim.api.v1.ActExerciseResponse:
+      type: object
+      properties:
+        exercise:
+          $ref: '#/components/schemas/psim.api.v1.ExerciseState'
+      description: ActExerciseResponse returns a versioned score and simulated state.
     psim.api.v1.ActivateRuleSetRequest:
       type: object
       properties:
@@ -4019,6 +4448,9 @@ components:
       properties:
         commandId:
           type: string
+        previewFingerprint:
+          type: string
+          description: Optional binding to a preview of this exact command and current catalog versions.
       description: ApproveCommandRequest is the request of ApproveCommand.
     psim.api.v1.ApproveCommandResponse:
       type: object
@@ -4062,6 +4494,34 @@ components:
         rule:
           $ref: '#/components/schemas/psim.processing.v1.CorrelationRule'
       description: ArchiveRuleResponse is the response of ArchiveRule.
+    psim.api.v1.AskAssistantRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        question:
+          type: string
+      description: AskAssistantRequest never accepts source bodies, model URLs or executable actions.
+    psim.api.v1.AskAssistantResponse:
+      type: object
+      properties:
+        requestId:
+          type: string
+        provider:
+          type: string
+        model:
+          type: string
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.OperationSource'
+        claims:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.AssistantClaim'
+        unavailable:
+          type: boolean
+      description: AskAssistantResponse preserves accessible evidence when the configured provider is unavailable.
     psim.api.v1.AssignIncidentRequest:
       type: object
       properties:
@@ -4078,6 +4538,16 @@ components:
         incident:
           $ref: '#/components/schemas/psim.incident.v1.Incident'
       description: AssignIncidentResponse is the response of AssignIncident.
+    psim.api.v1.AssistantClaim:
+      type: object
+      properties:
+        text:
+          type: string
+        sourceId:
+          type: string
+        assumption:
+          type: boolean
+      description: AssistantClaim is an untrusted model suggestion associated with a server source.
     psim.api.v1.CancelCommandRequest:
       type: object
       properties:
@@ -4195,6 +4665,20 @@ components:
         policy:
           $ref: '#/components/schemas/psim.response.v1.EscalationPolicy'
       description: CreateEscalationPolicyResponse is the response of CreateEscalationPolicy.
+    psim.api.v1.CreateExerciseRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        title:
+          type: string
+      description: CreateExerciseRequest copies one authorized incident into an isolated, expiring session.
+    psim.api.v1.CreateExerciseResponse:
+      type: object
+      properties:
+        exercise:
+          $ref: '#/components/schemas/psim.api.v1.ExerciseState'
+      description: CreateExerciseResponse returns a private training session.
     psim.api.v1.CreateIncidentTypeResponse:
       type: object
       properties:
@@ -4323,6 +4807,28 @@ components:
           items:
             $ref: '#/components/schemas/psim.api.v1.MaintenanceVersionRef'
       description: DryRunDecision preserves suppressed results and the reason for suppression.
+    psim.api.v1.ExerciseState:
+      type: object
+      properties:
+        exerciseId:
+          type: string
+        ownerId:
+          type: string
+        version:
+          type: string
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+        score:
+          type: integer
+          format: uint32
+        completedActions:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+      description: ExerciseState cannot be dispatched as a production command or response run.
     psim.api.v1.FieldViolation:
       type: object
       properties:
@@ -4386,6 +4892,12 @@ components:
         event:
           $ref: '#/components/schemas/psim.api.v1.StoredEvent'
       description: GetEventResponse is the response of GetEvent.
+    psim.api.v1.GetExerciseResponse:
+      type: object
+      properties:
+        exercise:
+          $ref: '#/components/schemas/psim.api.v1.ExerciseState'
+      description: GetExerciseResponse returns a private session without production side effects.
     psim.api.v1.GetImportResponse:
       type: object
       properties:
@@ -4407,6 +4919,20 @@ components:
           format: date-time
       description: "GetIncidentFeedResponse is the response of GetIncidentFeed.\n Not paginated: the console needs the whole\
         \ feed (up to 10 000 incidents)."
+    psim.api.v1.GetIncidentRecoveryResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+        changedVersions:
+          type: string
+        snapshotRequired:
+          type: boolean
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.TimelineEntry'
+      description: GetIncidentRecoveryResponse bounds changes and explicitly requests a fresh snapshot on a gap.
     psim.api.v1.GetIncidentReportResponse:
       type: object
       properties:
@@ -4436,6 +4962,18 @@ components:
           - $ref: '#/components/schemas/psim.response.v1.ResponsePlan'
           description: The plan version used by the run.
       description: GetIncidentRunResponse is the response of GetIncidentRun.
+    psim.api.v1.GetIncidentSnapshotsResponse:
+      type: object
+      properties:
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.IncidentSnapshot'
+        nextVersion:
+          type: string
+        historical:
+          type: boolean
+      description: GetIncidentSnapshotsResponse never represents history as live device availability.
     psim.api.v1.GetLocationResponse:
       type: object
       properties:
@@ -4515,6 +5053,42 @@ components:
         locale:
           type: string
       description: GetMeResponse is the response of GetMe.
+    psim.api.v1.GetOperationalSnapshotResponse:
+      type: object
+      properties:
+        feed:
+          $ref: '#/components/schemas/psim.api.v1.GetIncidentFeedResponse'
+        location:
+          $ref: '#/components/schemas/psim.api.v1.GetLocationStatusResponse'
+        catalogLocations:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Location'
+        catalogDevices:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.catalog.v1.Device'
+        historical:
+          type: boolean
+        availableFrom:
+          type: string
+          format: date-time
+      description: GetOperationalSnapshotResponse is read-only and never confirms current connectivity.
+    psim.api.v1.GetOperationsResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.api.v1.OperationSource'
+        slaRisk:
+          type: string
+        evaluatedAt:
+          type: string
+          format: date-time
+      description: GetOperationsResponse combines current state with explicit SLA risk and provenance.
     psim.api.v1.GetOperatorLoadResponse:
       type: object
       properties:
@@ -4651,6 +5225,15 @@ components:
           type: string
           format: date-time
       description: IncidentSignal is a signal attached to an incident.
+    psim.api.v1.IncidentSnapshot:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+        capturedAt:
+          type: string
+          format: date-time
+      description: IncidentSnapshot contains immutable state with its server capture time.
     psim.api.v1.ListCommandsResponse:
       type: object
       properties:
@@ -4861,6 +5444,21 @@ components:
         version:
           type: string
       description: NotificationContact supplies destinations; account roles and scope come from the identity provider.
+    psim.api.v1.OperationSource:
+      type: object
+      properties:
+        sourceId:
+          type: string
+        version:
+          type: string
+        obtainedAt:
+          type: string
+          format: date-time
+        stale:
+          type: boolean
+        text:
+          type: string
+      description: OperationSource identifies server-owned evidence and its exact version.
     psim.api.v1.OperatorLoad:
       type: object
       properties:
@@ -4899,6 +5497,32 @@ components:
         run:
           $ref: '#/components/schemas/psim.response.v1.ResponseRun'
       description: OverrideStepResponse is the response of OverrideStep.
+    psim.api.v1.PreviewCommandRequest:
+      type: object
+      properties:
+        command:
+          $ref: '#/components/schemas/psim.api.v1.RequestCommandRequest'
+      description: PreviewCommandRequest uses the exact proposed request, without production side effects.
+    psim.api.v1.PreviewCommandResponse:
+      type: object
+      properties:
+        deviceId:
+          type: string
+        capability:
+          type: string
+        consequence:
+          type: string
+        consequenceUnknown:
+          type: boolean
+        requiresSecondSupervisor:
+          type: boolean
+        deviceVersion:
+          type: string
+        deviceTypeVersion:
+          type: string
+        fingerprint:
+          type: string
+      description: PreviewCommandResponse identifies the configured consequence and current resource versions.
     psim.api.v1.PublishMappingRuleSetResponse:
       type: object
       properties:
@@ -4973,6 +5597,9 @@ components:
           type: string
         stepId:
           type: string
+        previewFingerprint:
+          type: string
+          description: Optional preview binding; a changed catalog rejects the proposed request.
       description: RequestCommandRequest is the request of RequestCommand.
     psim.api.v1.RequestCommandResponse:
       type: object
@@ -5172,6 +5799,30 @@ components:
         contact:
           $ref: '#/components/schemas/psim.api.v1.NotificationContact'
       description: SetNotificationContactResponse contains the stored destinations.
+    psim.api.v1.SetPresenceRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        sessionId:
+          type: string
+        leaseId:
+          type: string
+        editing:
+          type: boolean
+        release:
+          type: boolean
+        ttlSeconds:
+          type: integer
+          format: uint32
+      description: "SetPresenceRequest acquires or renews a session lease; release requires its current lease_id.\n Empty\
+        \ lease_id acquires a new lease. TTL is bounded to 60 seconds and JWT expiry."
+    psim.api.v1.SetPresenceResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: SetPresenceResponse returns the versioned collaboration state.
     psim.api.v1.SetSiteDutyResponse:
       type: object
       properties:
@@ -5366,6 +6017,26 @@ components:
           items:
             $ref: '#/components/schemas/psim.api.v1.TransferIncidentResult'
       description: TransferIncidentsResponse preserves input order and reports each atomic result.
+    psim.api.v1.UpdateAlarmRequest:
+      type: object
+      properties:
+        incidentId:
+          type: string
+        action:
+          type: string
+        reason:
+          type: string
+        until:
+          type: string
+          format: date-time
+      description: "UpdateAlarmRequest accepts acknowledge, activate, return, shelve, unshelve, suppress or unsuppress.\n\
+        \ Suppression and condition changes require a supervisor. Visibility controls require an end."
+    psim.api.v1.UpdateAlarmResponse:
+      type: object
+      properties:
+        incident:
+          $ref: '#/components/schemas/psim.incident.v1.Incident'
+      description: UpdateAlarmResponse returns the committed aggregate version.
     psim.api.v1.UpdateDeviceResponse:
       type: object
       properties:
@@ -5607,6 +6278,9 @@ components:
         critical:
           type: boolean
           description: Critical commands require approval by a second user (CM3).
+        consequence:
+          type: string
+          description: Operator-facing consequence configured by the administrator; empty means unknown.
         parameters:
           type: array
           items:
@@ -5993,6 +6667,17 @@ components:
         version:
           type: string
       description: RetentionSettings are data retention periods of a tenant.
+    psim.incident.v1.AlarmControl:
+      type: object
+      properties:
+        reason:
+          type: string
+        actorId:
+          type: string
+        until:
+          type: string
+          format: date-time
+      description: AlarmControl records an independent, bounded visibility control.
     psim.incident.v1.Incident:
       type: object
       properties:
@@ -6106,6 +6791,10 @@ components:
         escalationPolicyId:
           type: string
           description: Policy identity fixed with the incident type version.
+        operational:
+          allOf:
+          - $ref: '#/components/schemas/psim.incident.v1.OperationalState'
+          description: Independent alarm condition, acknowledgements and temporary visibility controls.
       description: Incident groups signals and tracks the response lifecycle (ADR-027).
     psim.incident.v1.IncidentTransfer:
       type: object
@@ -6176,6 +6865,51 @@ components:
         title:
           type: string
       description: Link is an external reference attached to an incident (video clip, document).
+    psim.incident.v1.OperationalState:
+      type: object
+      properties:
+        active:
+          type: boolean
+        acknowledged:
+          type: boolean
+        acknowledgedBy:
+          type: string
+        conditionAt:
+          type: string
+          format: date-time
+        shelved:
+          $ref: '#/components/schemas/psim.incident.v1.AlarmControl'
+        suppressed:
+          $ref: '#/components/schemas/psim.incident.v1.AlarmControl'
+        presence:
+          type: array
+          items:
+            $ref: '#/components/schemas/psim.incident.v1.PresenceLease'
+        acknowledgeDue:
+          type: string
+          format: date-time
+        resolveDue:
+          type: string
+          format: date-time
+        conditionKnown:
+          type: boolean
+          description: False for pre-existing incidents whose process condition has never been observed.
+      description: OperationalState preserves condition independently from the incident lifecycle.
+    psim.incident.v1.PresenceLease:
+      type: object
+      properties:
+        actorId:
+          type: string
+        sessionId:
+          type: string
+        leaseId:
+          type: string
+        until:
+          type: string
+          format: date-time
+        editing:
+          type: boolean
+      description: PresenceLease is advisory and never grants authorization or blocks an incident action.
     psim.incident.v1.StepRef:
       type: object
       properties:
@@ -7178,6 +7912,9 @@ tags:
   description: 'NotificationContactService manages channel destinations. Owner: Notification Service.'
 - name: NotificationService
   description: 'NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.'
+- name: OperationalService
+  description: "OperationalService owns alarm controls, collaboration, history and isolated exercises.\n Owner: Incident Service.\
+    \ All source data is resolved using the caller's current scope."
 - name: ReportService
   description: "ReportService builds incident reports (ADR-028: analytics in ClickHouse).\n Owner: Projection Service. Scenario\
     \ S13."

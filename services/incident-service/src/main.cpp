@@ -19,6 +19,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "directory.hpp"
@@ -44,8 +45,9 @@ namespace {
 std::string settings() {
   auto schema = Json::parse(p::stream::kSettings);
   auto& fields = schema["properties"];
-  for (const auto* name : {"tls_ca_file", "tls_certificate_file", "tls_private_key_file", "jwks_ca_file",
-                           "directory_base", "directory_client", "directory_roles_client"}) {
+  for (const auto* name :
+       {"tls_ca_file", "tls_certificate_file", "tls_private_key_file", "jwks_ca_file", "directory_base",
+        "directory_client", "directory_roles_client", "assistant_endpoint", "assistant_model"}) {
     fields[name] = {{"type", "string"}, {"default", ""}};
   }
   fields["directory_secret_file"] = {{"type", "string"}, {"x-psim-secret", true}};
@@ -104,12 +106,27 @@ class Worker final : public p::stream::Worker {
           return record(std::move(topic), std::move(key), message, {});
         },
         [this](std::string subject) { return directory_->lookup(std::move(subject)); },
-        config.get<bool>("settings.legacy_types"));
+        config.get<bool>("settings.legacy_types"),
+        AssistantOptions{.endpoint = config.get<std::string>("settings.assistant_endpoint"),
+                         .model = config.get<std::string>("settings.assistant_model"),
+                         .http = {.tls = {.ca_file = config.get<std::string>("settings.jwks_ca_file"),
+                                          .require_client_certificate = false},
+                                  .timeout = std::chrono::milliseconds(5000),
+                                  .max_body_bytes = 32768,
+                                  .allow_plaintext = config.get<bool>("settings.allow_plaintext")}});
     auto initialized = co_await repository_->initialize();
     if (!initialized) {
       co_return initialized;
     }
-    api_ = std::make_unique<Api>(repository_.get());
+    auto& operations = prometheus::BuildCounter()
+                           .Name("psim_incident_operations_total")
+                           .Help("Authorized operational requests by operation and outcome")
+                           .Register(context().metrics().registry());
+    auto& operations_latency = prometheus::BuildHistogram()
+                                   .Name("psim_incident_operations_seconds")
+                                   .Help("Operational request latency including provider transport")
+                                   .Register(context().metrics().registry());
+    api_ = std::make_unique<Api>(repository_.get(), &operations, &operations_latency);
     auto tls = co_await context().blocking().run([&config] {
       const auto directory = config.get<std::string>("settings.tls_directory");
       const auto certificate = config.get<std::string>("settings.tls_certificate_file");
@@ -249,7 +266,19 @@ class Worker final : public p::stream::Worker {
         if (body) {
           response = Api::problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "invalid or oversized body"));
         } else {
-          auto result = co_await api_->handle(parser.release(), std::move(*principal));
+          auto request = parser.release();
+          const bool assistant = request.target().find(":ask-assistant") != std::string_view::npos;
+          auto result = co_await api_->handle(std::move(request), *principal);
+          if (result && assistant) {
+            auto current = co_await verifier_->verify(authorization.substr(7));
+            if (!current || current->subject != principal->subject || current->tenant != principal->tenant
+                || current->roles != principal->roles || current->scopes != principal->scopes) {
+              auto logged = co_await repository_->denied(*principal, "assistant.delivery", {});
+              result =
+                  logged ? p::Result<Response>(p::fail(p::ErrorCode::kAuthForbidden, "assistant authorization changed"))
+                         : p::Result<Response>(std::unexpected(logged.error()));
+            }
+          }
           response = result ? std::move(*result) : Api::problem(result.error());
         }
       }
