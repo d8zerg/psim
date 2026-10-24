@@ -26,7 +26,7 @@ struct RealtimeEvent {
 
 platform::Result<RealtimeEvent> realtime_event(const platform::kafka::Message& message);
 std::string scope_key(const platform::security::Principal& principal);
-std::string resume_token(const platform::kafka::Offsets& positions, std::string tenant);
+std::string resume_token(const platform::kafka::Offsets& positions, std::string tenant, std::string context = {});
 platform::Result<platform::kafka::Offsets> resume_positions(std::string_view token, std::string_view tenant);
 bool realtime_filter(const platform::security::Principal& principal, const realtime::v1::Subscribe& subscription,
                      const RealtimeEvent& event);

@@ -67,7 +67,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   await page.locator("#password").fill("psim-dev-Passw0rd");
   const tokenResponse = page.waitForResponse((response) => response.url().endsWith("/protocol/openid-connect/token"));
   await page.locator("#kc-login").click();
-  const userToken = (await (await tokenResponse).json()) as { access_token: string };
+  let userToken = (await (await tokenResponse).json()) as { access_token: string };
   await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "open", { timeout: 30_000 });
   expect(page.url()).not.toContain("code=");
   expect((await request.get("http://api-gateway:8080/v1/feed/incidents")).status()).toBe(401);
@@ -79,7 +79,7 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   const credentials = await request.post("http://keycloak:8080/realms/psim/protocol/openid-connect/token", {
     form: { grant_type: "client_credentials", client_id: "psim-services", client_secret: "psim-dev-services-secret" },
   });
-  const serviceToken = (await credentials.json()) as { access_token: string };
+  let serviceToken = (await credentials.json()) as { access_token: string };
   expect(
     (
       await request.get("http://api-gateway:8080/v1/feed/incidents", {
@@ -109,7 +109,30 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   });
   await marker("offline-ready");
   const offline = await inputs("offline");
+  const outage = Number(process.env.PSIM_SHELL_OUTAGE_MS ?? 0);
+  const outageStarted = Date.now();
+  await writeFile(`${directory}/outage-started.json`, JSON.stringify({ requestedMs: outage }));
+  if (outage > 0) await new Promise((resolve) => setTimeout(resolve, outage));
+  const refreshed =
+    outage >= 300000
+      ? page.waitForResponse((response) => response.url().endsWith("/protocol/openid-connect/token") && response.ok(), {
+          timeout: 45000,
+        })
+      : undefined;
   await context.setOffline(false);
+  if (refreshed) {
+    userToken = (await (await refreshed).json()) as { access_token: string };
+    const renewedService = await request.post("http://keycloak:8080/realms/psim/protocol/openid-connect/token", {
+      form: { grant_type: "client_credentials", client_id: "psim-services", client_secret: "psim-dev-services-secret" },
+    });
+    expect(renewedService.ok()).toBe(true);
+    serviceToken = (await renewedService.json()) as { access_token: string };
+  }
+  expect(Date.now() - outageStarted).toBeGreaterThanOrEqual(outage);
+  await writeFile(
+    `${directory}/outage.json`,
+    JSON.stringify({ requestedMs: outage, elapsedMs: Date.now() - outageStarted }),
+  );
   await page.evaluate(() => {
     window.dispatchEvent(new Event("online"));
   });

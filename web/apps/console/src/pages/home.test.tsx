@@ -1,68 +1,64 @@
-import type * as FeedModule from "../feed/controller";
-import { Priority } from "@psim/realtime-client";
-import { createApiClient } from "@psim/api-client";
+import { useSyncExternalStore } from "react";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { auth } from "../auth";
-import { createFeed, FeedController } from "../feed/controller";
+import { afterEach, expect, it, vi } from "vitest";
+import { HomePage } from "./home";
+import { FeedController } from "../feed/controller";
+import { createApiClient } from "@psim/api-client";
+import { Priority } from "@psim/realtime-client";
 import type { Delta } from "@psim/realtime-client";
 function change(): Delta {
   return {
     change: {
       case: "incidentEvent",
       value: {
-        envelope: { correlationId: "event" },
         payload: {
           case: "incidentCreated",
-          value: { incident: { incidentId: "incident", version: 2n, title: "Intrusion alarm", priority: Priority.P2 } },
+          value: { incident: { incidentId: "incident", version: 2n, title: "Alarm", priority: Priority.P2 } },
         },
       },
     },
   } as Delta;
 }
-import { HomePage } from "./home";
 import { setPreferences } from "../ui/preferences";
-beforeEach(() => {
+afterEach(cleanup);
+it("keeps live rows visible during connection loss and offers explicit recovery", async () => {
   setPreferences({ language: "en" });
-});
-vi.mock("../auth", () => ({ auth: { token: vi.fn(), login: vi.fn() } }));
-vi.mock("../feed/controller", async (original) => ({
-  ...(await original<typeof FeedModule>()),
-  createFeed: vi.fn(),
-}));
-afterEach(() => {
-  cleanup();
-  vi.resetAllMocks();
-});
-function fixture() {
   const fetch = vi
     .fn<typeof globalThis.fetch>()
-    .mockResolvedValue(new Response(JSON.stringify({ incidents: [], resumeToken: "empty" })));
-  const controller = new FeedController(
+    .mockResolvedValue(new Response(JSON.stringify({ incidents: [], resumeToken: "snapshot" })));
+  const feed = new FeedController(
     createApiClient({ baseUrl: "https://test", getAccessToken: () => undefined, fetch }),
     () => ({ start: vi.fn(), stop: vi.fn(), subscribe: vi.fn() }),
   );
-  vi.mocked(createFeed).mockReturnValue(controller);
-  return controller;
-}
-it("shows an empty authenticated feed then renders an incoming incident", async () => {
-  const controller = fixture();
-  vi.mocked(auth.token).mockResolvedValue("token");
-  render(<HomePage />);
-  expect(await screen.findByText(/No active incidents/)).toBeDefined();
+  const retry = vi.fn();
+  function View() {
+    const state = useSyncExternalStore(feed.subscribe, feed.getSnapshot);
+    return <HomePage state={state} retry={retry} />;
+  }
+  await feed.start();
+  render(<View />);
+  expect(screen.getByText("No active incidents")).toBeDefined();
   act(() => {
-    controller.delta(change());
+    feed.delta(change());
   });
-  const row = screen.getByTestId("incident-row");
-  expect(row.textContent).toContain("Intrusion alarm");
-  expect(row.dataset.version).toBe("2");
-  expect(Number(row.dataset.renderedAt)).toBeGreaterThan(0);
+  expect(screen.getByTestId("incident-row").dataset.version).toBe("2");
+  act(() => {
+    feed.fail(new Error("offline"));
+  });
+  expect(screen.getByTestId("incident-row")).toBeDefined();
+  fireEvent.click(screen.getByRole("button", { name: "Refresh data" }));
+  expect(retry).toHaveBeenCalledOnce();
+  feed.stop();
 });
-it("shows a sign-in error without exposing credentials", async () => {
-  fixture();
-  vi.mocked(auth.token).mockResolvedValue(undefined);
-  vi.mocked(auth.login).mockRejectedValue(new Error("Sign-in failed"));
-  render(<HomePage />);
-  fireEvent.click(await screen.findByRole("button", { name: "Sign in" }));
-  expect((await screen.findByRole("alert")).textContent).toBe("Sign-in failed");
+
+it("does not present an unavailable initial snapshot as an empty live feed", () => {
+  setPreferences({ language: "en" });
+  render(
+    <HomePage
+      state={{ rows: [], loaded: false, loading: false, status: "offline", error: "network" }}
+      retry={vi.fn()}
+    />,
+  );
+  expect(screen.queryByText("No active incidents")).toBeNull();
+  expect(screen.getByText("Unavailable")).toBeDefined();
 });

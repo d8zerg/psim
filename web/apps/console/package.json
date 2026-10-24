@@ -11,7 +11,7 @@
     "lint": "eslint --max-warnings 0 . && node scripts/check-style-tokens.js",
     "typecheck": "node scripts/check-enum-labels.js && tsc --project tsconfig.json",
     "test": "vitest run --coverage",
-    "size": "size-limit && node scripts/initial-budget.js",
+    "size": "size-limit && node scripts/initial-budget.js && node scripts/entry-budgets.js",
     "e2e": "playwright test"
   },
   "dependencies": {

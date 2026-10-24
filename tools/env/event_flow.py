@@ -11,6 +11,7 @@ import time
 
 ROOT = Path(__file__).resolve().parents[2]
 PRESET = os.environ.get("PSIM_PRESET", "debug")
+OUTAGE = int(os.environ.get("PSIM_SHELL_OUTAGE_MS", "0"))
 REPORT = ROOT / "build/event-flow-test"
 SERVICES = ["connector-gateway", "normalizer", "correlation-engine", "incident-service", "projection-service", "api-gateway"]
 PLAYWRIGHT = "mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27"
@@ -73,7 +74,7 @@ def main(project):
     cache = ROOT / ".cache/web"
     command = ["docker", "run", "--rm", "--name", project + "-browser", "--network", "container:" + project + "-console-1", "--ipc=host",
                "-u", f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/cache/home", "-e", "COREPACK_HOME=/cache/corepack",
-               "-e", "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright", "-v", f"{ROOT}:/repo", "-v", f"{cache}:/cache",
+               "-e", "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright", "-e", f"PSIM_SHELL_OUTAGE_MS={OUTAGE}", "-v", f"{ROOT}:/repo", "-v", f"{cache}:/cache",
                "-w", "/repo/web", PLAYWRIGHT, "bash", "-c",
                "node apps/console/node_modules/@playwright/test/cli.js test -c apps/console/playwright.event-flow.config.ts"]
     with (REPORT / "playwright.log").open("w") as output:
@@ -83,7 +84,7 @@ def main(project):
                 if browser.poll() is not None:
                     raise RuntimeError((REPORT / "playwright.log").read_text())
                 return (REPORT / name).exists()
-            wait(ready)
+            wait(ready, max(90, OUTAGE / 1000 + 90))
         try:
             checkpoint("warmup-ready")
             emit(project, "warmup", 3)
@@ -142,7 +143,7 @@ def main(project):
     rendered = [row["browser_ms"] for row in browser_rows]
     assert all(value >= 0 for value in signal + rendered)
     late = max(event["late_ms"] for event in measured)
-    report = {"preset": PRESET, "samples": len(measured), "warmup": 3, "interval_ms": 200, "repeat": 2,
+    report = {"outage": json.loads((REPORT / "outage.json").read_text()), "preset": PRESET, "samples": len(measured), "warmup": 3, "interval_ms": 200, "repeat": 2,
         "generator_late_ms": late, "baseline_valid": late <= 10, "clock": "single host, shared kernel clock",
         "accounting": accounting["counts"], "durable_effects": expected, "trace_services": SERVICES + ["simulator"],
         "event_to_signal_ms": {"p50": percentile(signal, .5), "p99": percentile(signal, .99), "max": max(signal)},

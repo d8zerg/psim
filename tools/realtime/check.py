@@ -16,6 +16,7 @@ class Check(Base):
         self.peer_output = ROOT / 'build/realtime' / preset
         self.peer_output.mkdir(parents=True, exist_ok=True)
         config = json.loads((self.output / 'api.json').read_text())
+        config.setdefault('log', {})['level'] = 'debug'
         config['settings']['ip_rate_per_second'] = 10000
         config['settings']['ip_rate_burst'] = 10000
         config['settings']['incidents_port'] = '8080'
@@ -26,7 +27,7 @@ class Check(Base):
         self.override.write_text(content)
 
     def principal_cases(self):
-        return super().principal_cases() | {'foreign_operator': ('operator', [self.foreign_site], helpers['TENANT']), 'tenant_operator': ('operator', ['*'], helpers['OTHER_TENANT']), 'short': ('operator', [self.site_id], helpers['TENANT'])}
+        return super().principal_cases() | {'peer_operator': ('operator', [self.site_id], helpers['TENANT']), 'foreign_operator': ('operator', [self.foreign_site], helpers['TENANT']), 'tenant_operator': ('operator', ['*'], helpers['OTHER_TENANT']), 'short': ('operator', [self.site_id], helpers['TENANT'])}
 
     def ready(self, service):
         def probe():
@@ -80,7 +81,7 @@ class Check(Base):
         private = {'topic': 'psim.response.events.v1', 'key': uid(), 'value': {'envelope': self.event()['value']['envelope'], 'notificationRequested': {'requestId': uid(), 'incidentId': own['key'], 'siteId': self.site_id}}}
         resolved = [{'topic': 'psim.response.events.v1', 'key': record['key'], 'value': {'envelope': self.event()['value']['envelope'], 'planUnavailable': {'incidentId': record['key']}}} for record in (own, foreign)]
         response = self.duty()
-        result = self.peer('protocol', [own, other, foreign, tenant], extra={'foreignToken': self.token('foreign_operator'), 'tenantToken': self.token('tenant_operator'), 'otherZone': self.zones[1]['locationId'], 'response': response, 'resolved': resolved, 'private': private, 'marker': self.event(), 'stateToken': snapshot['resumeToken'], 'location': self.floor['locationId'], 'device': device['deviceId'], 'stateReport': state, 'lease': self.runtime_lease})
+        result = self.peer('protocol', [own, other, foreign, tenant], extra={'peerToken': self.token('peer_operator'), 'foreignToken': self.token('foreign_operator'), 'foreignResumeToken': self.request('GET', '/v1/feed/incidents', role='foreign_operator')['resumeToken'], 'tenantToken': self.token('tenant_operator'), 'otherZone': self.zones[1]['locationId'], 'response': response, 'resolved': resolved, 'private': private, 'marker': self.event(), 'stateToken': snapshot['resumeToken'], 'location': self.floor['locationId'], 'device': device['deviceId'], 'stateReport': state, 'lease': self.runtime_lease})
         for check in result['checks']:
             self.mark(check)
 

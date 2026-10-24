@@ -2,3 +2,30 @@
 
 /* Workspace packages are linked through node_modules, which Tailwind does not scan by default. */
 @source "../../../packages/design-system/src";
+
+.shell-account {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.shell-header .app-nav {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+.shell-header .app-nav a {
+  min-height: var(--control-height);
+}
+
+.shell-connection {
+  display: inline-grid;
+}
+.shell-connection > * {
+  grid-area: 1 / 1;
+  justify-self: start;
+}
+.shell-connection-reserve {
+  visibility: hidden;
+  pointer-events: none;
+}

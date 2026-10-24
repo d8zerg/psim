@@ -23,6 +23,8 @@ def main(base, issuer=None):
         "grant_type": "password", "client_id": "admin-cli", "username": "admin",
         "password": "psim-dev-keycloak-admin"}, form=True)["access_token"]
     realm = request(base, "/admin/realms/psim", auth)
+    realm["revokeRefreshToken"] = True
+    realm["refreshTokenMaxReuse"] = 0
     realm["attributes"] = realm.get("attributes", {}) | {"frontendUrl": (issuer or base).split("/realms/")[0]}
     request(base, "/admin/realms/psim", auth, realm, method="PUT")
     desired = json.loads(Path("deploy/local/config/keycloak/psim-realm.json").read_text())

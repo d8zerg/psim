@@ -45,6 +45,7 @@ export interface RealtimeHandlers {
   onStatus?(status: ConnectionStatus): void;
   onCapabilities?(capabilities: Authenticated): void;
   onError?(code: string, message: string): void;
+  onAccessDenied?(code: string): void;
 }
 
 export interface RealtimeClientOptions {
@@ -79,6 +80,8 @@ export class RealtimeClient {
   private pingTimer: unknown = null;
   private pongTimer: unknown = null;
   private requestSeq = 0;
+  private refreshTimer: unknown = null;
+  private connectionTimer: unknown = null;
 
   constructor(options: RealtimeClientOptions) {
     this.options = options;
@@ -122,48 +125,74 @@ export class RealtimeClient {
     }
   }
 
-  /** Send a fresh access token over the open connection (ADR-019, item 8). */
+  /** Retry immediately after the browser regains connectivity. */
+  reconnect(): void {
+    if (this.currentStatus === "reconnecting") {
+      this.clearTimers();
+      this.connect();
+    }
+  }
+
+  /** The server clears subscriptions on reauthentication. Resume them after its acknowledgement. */
   async reauthenticate(): Promise<void> {
-    if (this.currentStatus === "open") {
-      const socket = this.socket;
-      const accessToken = await this.options.getAccessToken();
-      if (this.socket === socket) {
-        this.send({
-          case: "authenticate",
-          value: { accessToken, supportedChangeTypes: [...(this.options.supportedChangeTypes ?? [])] },
-        });
-      }
+    const socket = this.socket;
+    if (this.currentStatus === "open" && socket) {
+      this.setStatus("authenticating");
+      this.timers.clearTimeout(this.connectionTimer);
+      this.connectionTimer = this.timers.setTimeout(() => {
+        if (this.socket === socket) socket.close(4001, "authentication timeout");
+      }, 15000);
+      await this.authenticate(socket);
     }
   }
 
   private connect(): void {
     this.setStatus(this.attempt === 0 ? "connecting" : "reconnecting");
-    const socket = this.options.socketFactory(this.options.url);
+    let socket: SocketLike;
+    try {
+      socket = this.options.socketFactory(this.options.url);
+    } catch {
+      this.retry();
+      return;
+    }
     this.socket = socket;
+    this.connectionTimer = this.timers.setTimeout(() => {
+      if (this.socket === socket) socket.close(4001, "connection timeout");
+    }, 15000);
     socket.onopen = () => {
+      if (this.socket !== socket) return;
       this.setStatus("authenticating");
       void this.authenticate(socket);
     };
     socket.onmessage = (event) => {
-      if (typeof event.data === "string") {
-        this.receive(event.data);
-      }
+      if (this.socket === socket && typeof event.data === "string") this.receive(event.data);
     };
     socket.onclose = () => {
       this.onDisconnected(socket);
     };
     socket.onerror = () => {
-      socket.close();
+      if (this.socket === socket) socket.close();
     };
   }
 
   private async authenticate(socket: SocketLike): Promise<void> {
-    const accessToken = await this.options.getAccessToken();
-    if (this.socket === socket) {
+    try {
+      const accessToken = await this.options.getAccessToken();
+      if (this.socket !== socket) return;
+      if (!accessToken) {
+        this.stop();
+        this.options.handlers.onAccessDenied?.("COMMON_UNAUTHORIZED");
+        return;
+      }
       this.send({
         case: "authenticate",
         value: { accessToken, supportedChangeTypes: [...(this.options.supportedChangeTypes ?? [])] },
       });
+    } catch {
+      if (this.socket === socket) {
+        socket.close(4001, "credentials unavailable");
+        this.options.handlers.onError?.("REALTIME_AUTH_UNAVAILABLE", "Credentials unavailable; retrying connection");
+      }
     }
   }
 
@@ -180,6 +209,18 @@ export class RealtimeClient {
       case "authenticated":
         this.options.handlers.onCapabilities?.(body.value);
         if (this.currentStatus === "authenticating") {
+          this.timers.clearTimeout(this.connectionTimer);
+          this.connectionTimer = null;
+          this.timers.clearTimeout(this.refreshTimer);
+          this.refreshTimer =
+            body.value.expiresIn > 0
+              ? this.timers.setTimeout(
+                  () => {
+                    void this.reauthenticate();
+                  },
+                  Math.max(1000, (body.value.expiresIn - 30) * 1000),
+                )
+              : null;
           this.attempt = 0;
           this.setStatus("open");
           this.subscriptions.forEach((subscription) => {
@@ -192,6 +233,7 @@ export class RealtimeClient {
         this.updateToken(body.value.subscriptionId, body.value.resumeToken);
         break;
       case "delta":
+        if (this.currentStatus !== "open" || !this.subscriptions.has(body.value.subscriptionId)) break;
         try {
           this.options.handlers.onDelta(body.value);
         } catch {
@@ -215,7 +257,18 @@ export class RealtimeClient {
         break;
       case "error":
         this.options.handlers.onError?.(body.value.code, body.value.message);
-        if (body.value.fatal) {
+        if (
+          [
+            "COMMON_UNAUTHORIZED",
+            "COMMON_FORBIDDEN",
+            "AUTH_SCOPE_DENIED",
+            "AUTH_UNAUTHENTICATED",
+            "AUTH_FORBIDDEN",
+          ].includes(body.value.code)
+        ) {
+          this.stop();
+          this.options.handlers.onAccessDenied?.(body.value.code);
+        } else if (body.value.fatal) {
           this.socket?.close(4000, body.value.code);
         }
         break;
@@ -269,6 +322,10 @@ export class RealtimeClient {
     }
     // stop() detaches the socket before closing it, so a close of the current socket is a disconnect.
     this.socket = null;
+    this.retry();
+  }
+
+  private retry(): void {
     this.clearTimers();
     this.attempt += 1;
     this.setStatus("reconnecting");
@@ -286,12 +343,18 @@ export class RealtimeClient {
   }
 
   private clearTimers(): void {
-    for (const timer of [this.reconnectTimer, this.pingTimer, this.pongTimer]) {
+    for (const timer of [
+      this.reconnectTimer,
+      this.pingTimer,
+      this.pongTimer,
+      this.refreshTimer,
+      this.connectionTimer,
+    ]) {
       if (timer !== null) {
         this.timers.clearTimeout(timer);
       }
     }
-    this.reconnectTimer = this.pingTimer = this.pongTimer = null;
+    this.reconnectTimer = this.pingTimer = this.pongTimer = this.refreshTimer = this.connectionTimer = null;
   }
 
   private setStatus(status: ConnectionStatus): void {

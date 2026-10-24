@@ -34,6 +34,9 @@ struct Principal {
   std::chrono::system_clock::time_point checked_until{};
 };
 
+/// Canonical identity and effective access scope; excludes token lifetime and cache timestamps.
+[[nodiscard]] std::string authorization_context(const Principal& principal);
+
 /// A bounded, immutable JWKS snapshot. Duplicate kids, private keys and malformed supported keys
 /// fail the entire replacement; RSA >= 2048, ES256 P-256, signatures through OpenSSL EVP only.
 class JwtVerifier {

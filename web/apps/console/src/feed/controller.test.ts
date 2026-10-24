@@ -199,3 +199,21 @@ it("retains row references while reconnecting and during an identical pending sn
   expect(controller.getSnapshot().rows).toBe(original);
   expect(controller.getSnapshot().loading).toBe(false);
 });
+
+it("clears old scope rows before loading the new authorized snapshot", async () => {
+  const { controller, handlers, fetch } = fixture();
+  await controller.start();
+  let finish: (response: Response) => void = () => undefined;
+  fetch.mockReturnValueOnce(
+    new Promise((resolve) => {
+      finish = resolve;
+    }),
+  );
+  handlers().onResync("feed", "access scope changed");
+  expect(controller.getSnapshot().rows).toEqual([]);
+  finish(new Response(JSON.stringify({ incidents: [], resumeToken: "new-scope" })));
+  await vi.waitFor(() => {
+    expect(controller.getSnapshot().loading).toBe(false);
+  });
+  controller.stop();
+});

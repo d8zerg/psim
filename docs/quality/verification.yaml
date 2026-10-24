@@ -12,6 +12,16 @@ version: 1
 
 methods:
   # --- Test suites ----------------------------------------------------------
+  - id: TS-34
+    kind: test
+    name: Сессия и ролевые маршруты оболочки
+    criteria: PKCE, проверка ID token, одиночный refresh, очистка при выходе, прямой вход, ролевые границы и поздние ответы
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task web:check
+    purpose: Проверить изоляцию сессий и общую оболочку без смешивания рабочих данных пользователей
+    steps: ['8.2']
   - id: TS-33
     kind: test
     name: Серверные операции оперативного интерфейса
@@ -146,7 +156,7 @@ methods:
     env: E-CI
     gate: nightly
     barrier: automated
-    task: task web:e2e:resilience
+    task: task shell:test
     steps: ['8.2', '8.6']
   - id: TS-15
     kind: test
@@ -807,12 +817,15 @@ methods:
   - id: M-01
     kind: manual
     name: Установка и подключение коннектора сторонним инженером
-    criteria: По документации без помощи разработчиков; время и замечания фиксируются
+    criteria: По каждой полной версии EN и RU независимо, с английским по умолчанию,
+      без помощи разработчиков и без доступа к плану, прогрессу и стартовым диаграммам разработки;
+      проверяются конечное состояние платформы и отсутствие прямых и косвенных ссылок на удалённые материалы;
+      время и замечания фиксируются
     env: E-LOCAL
     gate: release
     barrier: manual
     task: '-'
-    steps: ['11.2']
+    steps: ['11.2', '11.2a']
   - id: M-02
     kind: manual
     name: Учения по восстановлению из резервной копии
@@ -1063,7 +1076,7 @@ goals:
   - {id: G-16, source: '1.4', attribute: 'Совместимость контрактов', methods: [TS-04, FF-04, TS-05]}
   - {id: G-17, source: '1.4', attribute: 'Регрессия производительности', methods: [B-05, B-02, FF-05, L-01]}
   - {id: G-18, source: '1.4', attribute: 'Сборки', methods: [FF-13, FF-14, FF-15, SEC-02]}
-  - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09]}
+  - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09, M-01]}
 
 scenarios:
   - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29]}

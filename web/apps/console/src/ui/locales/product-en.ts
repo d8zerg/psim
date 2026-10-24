@@ -1,4 +1,18 @@
 export const strings = {
+  administration: "Administration",
+  administrationHint: "Manage catalogs, rules and response policies.",
+  integrations: "Integrations",
+  integrationsHint: "Connect and configure external systems.",
+  audit: "Audit",
+  auditHint: "Review recorded actions and access decisions.",
+  reportsModuleHint: "Review incident processing results.",
+  signOut: "Sign out",
+  checkingSession: "Checking session",
+  notFound: "Page not found",
+  notFoundHint: "Choose a module from navigation.",
+  appError: "Could not open this page",
+  appErrorHint: "Retry or choose another module.",
+
   localeLoadError: "Could not load the language. The current screen remains available. Reload the page to try again.",
   console: "Operations console",
   library: "Design system",

@@ -19,6 +19,7 @@
 #include <functional>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
 #include <string>
 #include <string_view>
@@ -308,6 +309,14 @@ boost::asio::awaitable<Result<std::string>> fetch_keys(std::string url, HttpOpti
 }
 }  // namespace
 
+std::string authorization_context(const Principal& principal) {
+  return Json{{"subject", principal.subject},
+              {"tenant", principal.tenant},
+              {"roles", principal.roles},
+              {"scopes", principal.scopes}}
+      .dump();
+}
+
 namespace {
 std::string form_encode(std::string_view input) {
   constexpr std::string_view kHex = "0123456789ABCDEF";
@@ -330,6 +339,8 @@ std::string form_encode(std::string_view input) {
 struct JwtVerifier::State {
   JwtOptions options;
   std::map<std::string, Key, std::less<>> keys;
+  mutable std::mutex verified_mutex;
+  mutable std::map<std::string, std::pair<std::chrono::system_clock::time_point, Principal>, std::less<>> verified;
 };
 
 Result<JwtVerifier> JwtVerifier::create(JwtOptions options, std::string_view jwks) {
@@ -402,6 +413,16 @@ Result<bool> JwtVerifier::knows_key(std::string_view token) const {
 }
 
 Result<Principal> JwtVerifier::verify(std::string_view token, std::chrono::system_clock::time_point now) const {
+  if (token.size() > 16384) {
+    return denied();
+  }
+  {
+    const std::scoped_lock lock(state_->verified_mutex);
+    const auto found = state_->verified.find(token);
+    if (found != state_->verified.end() && now >= found->second.first && now < found->second.second.expires_at) {
+      return found->second.second;
+    }
+  }
   auto parsed = parse_token(token);
   if (!parsed) {
     return std::unexpected(parsed.error());
@@ -469,10 +490,19 @@ Result<Principal> JwtVerifier::verify(std::string_view token, std::chrono::syste
   if (!scopes || !scope_set || scope_set->size() > 128 || (!scope_set->empty() && !scopes->empty())) {
     return denied();
   }
-  return Principal{std::move(*subject),   std::move(*tenant),
-                   std::move(*party),     std::move(roles),
-                   std::move(*scopes),    std::chrono::system_clock::time_point(std::chrono::seconds(*expires)),
-                   std::move(*scope_set), std::chrono::system_clock::time_point(std::chrono::seconds(*expires))};
+  Principal principal{std::move(*subject),   std::move(*tenant),
+                      std::move(*party),     std::move(roles),
+                      std::move(*scopes),    std::chrono::system_clock::time_point(std::chrono::seconds(*expires)),
+                      std::move(*scope_set), std::chrono::system_clock::time_point(std::chrono::seconds(*expires))};
+  if (now < principal.expires_at) {
+    const std::scoped_lock lock(state_->verified_mutex);
+    std::erase_if(state_->verified, [now](const auto& item) { return item.second.second.expires_at <= now; });
+    if (state_->verified.size() >= 1024) {
+      state_->verified.erase(state_->verified.begin());
+    }
+    state_->verified.insert_or_assign(std::string(token), std::pair(now, principal));
+  }
+  return principal;
 }
 
 JwksCache::JwksCache(JwksOptions options, Fetch fetch, Now now, Inspect inspect)
@@ -502,8 +532,11 @@ Result<std::unique_ptr<JwksCache>> JwksCache::create(JwksOptions options, Fetch 
                                   "client_id=" + form_encode(client) + "&client_secret=" + form_encode(secret)
                                       + "&token=" + form_encode(token) + "&token_type_hint=access_token",
                                   "application/x-www-form-urlencoded");
-        if (!response || response->status != 200) {
-          co_return fail(ErrorCode::kCommonUnavailable, "token introspection unavailable");
+        if (!response) {
+          co_return fail(ErrorCode::kCommonUnavailable, "token introspection transport: " + response.error().message());
+        }
+        if (response->status != 200) {
+          co_return fail(ErrorCode::kCommonUnavailable, "token introspection HTTP " + std::to_string(response->status));
         }
         co_return std::move(response->body);
       };
@@ -562,6 +595,16 @@ boost::asio::awaitable<Result<void>> JwksCache::refresh() {
 }
 
 boost::asio::awaitable<Result<Principal>> JwksCache::verify(std::string token) {
+  const auto checked = now_();
+  if (verifier_ && checked >= loaded_ && checked - loaded_ < options_.refresh_interval) {
+    auto principal = verifier_->verify(token, checked);
+    if (principal) {
+      if (!inspect_) {
+        co_return principal;
+      }
+      co_return co_await inspect(std::move(token), std::move(*principal));
+    }
+  }
   // Validate hostile input before permitting it to cause a network request.
   auto parsed = parse_token(token);
   if (!parsed) {

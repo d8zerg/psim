@@ -1,5 +1,19 @@
 import type { strings as source, messages as sourceMessages } from "./product-en";
 export const strings = {
+  administration: "Администрирование",
+  administrationHint: "Управление каталогами, правилами и политиками реагирования.",
+  integrations: "Интеграции",
+  integrationsHint: "Подключение и настройка внешних систем.",
+  audit: "Аудит",
+  auditHint: "Просмотр зарегистрированных действий и решений о доступе.",
+  reportsModuleHint: "Результаты обработки инцидентов.",
+  signOut: "Выйти",
+  checkingSession: "Проверка сессии",
+  notFound: "Страница не найдена",
+  notFoundHint: "Выберите модуль в навигации.",
+  appError: "Не удалось открыть страницу",
+  appErrorHint: "Повторите попытку или выберите другой модуль.",
+
   localeLoadError: "Не удалось загрузить язык. Текущий экран остаётся доступен. Для повтора перезагрузите страницу.",
   console: "Рабочее место оператора",
   library: "Дизайн-система",

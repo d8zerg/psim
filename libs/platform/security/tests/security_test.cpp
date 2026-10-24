@@ -16,6 +16,7 @@
 #include <string>
 #include <thread>
 #include <utility>
+#include <vector>
 
 #include "psim/platform/error.hpp"
 #include "psim/platform/error_codes.hpp"
@@ -209,6 +210,33 @@ TEST(SecurityJwt, RejectsAlgConfusionTokenSelectedKeysDuplicateFieldsAndTamperin
   EXPECT_FALSE(take(verifier.knows_key(sign(native.get(), claims(now), "unknown"))));
   const auto foreign = key(true);
   EXPECT_FALSE(verifier.verify(sign(foreign.get(), claims(now)), now));
+}
+
+TEST(SecurityJwt, CachedSignaturesRespectClockExpiryTokenBytesAndKeyReplacement) {
+  const auto native = key();
+  const auto now = std::chrono::system_clock::now();
+  const auto token = sign(native.get(), claims(now));
+  const auto verifier = take(JwtVerifier::create(jwt_options(), jwks(native.get())));
+  EXPECT_TRUE(verifier.verify(token, now));
+  {
+    std::vector<std::jthread> readers;
+    readers.reserve(4);
+    for (int index = 0; index < 4; ++index) {
+      readers.emplace_back([&verifier, &token, now] {
+        for (int attempt = 0; attempt < 100; ++attempt) {
+          EXPECT_TRUE(verifier.verify(token, now + std::chrono::seconds(1)));
+        }
+      });
+    }
+  }
+  EXPECT_FALSE(verifier.verify(token, now - std::chrono::hours(1)));
+  const auto expired = verifier.verify(token, now + std::chrono::seconds(330));
+  ASSERT_FALSE(expired);
+  EXPECT_EQ(expired.error().code(), ErrorCode::kAuthTokenExpired);
+  const auto foreign = key();
+  EXPECT_FALSE(verifier.verify(sign(foreign.get(), claims(now)), now));
+  const auto replacement = take(JwtVerifier::create(jwt_options(), jwks(foreign.get())));
+  EXPECT_FALSE(replacement.verify(token, now));
 }
 
 TEST(SecurityJwt, RejectsMalformedAndOversizedTokenAndInvalidUtf8) {
@@ -777,3 +805,30 @@ TEST(SecurityHttp, RejectsPrivateResolvedAddressesAndReservedApplicationHeaders)
 }
 }  // namespace
 }  // namespace psim::platform::security
+
+TEST(AuthorizationContext, BindsIdentityAndScopeWithoutTokenLifetime) {
+  const psim::platform::security::Principal first{
+      .subject = "actor", .tenant = "tenant", .roles = {"operator"}, .scopes = {"site"}};
+  auto changed = first;
+  changed.expires_at = std::chrono::system_clock::now();
+  EXPECT_EQ(psim::platform::security::authorization_context(first),
+            psim::platform::security::authorization_context(changed));
+  for (const auto& field : {"subject", "tenant", "role", "scope"}) {
+    changed = first;
+    const std::string name(field);
+    if (name == "subject") {
+      changed.subject = "other";
+    }
+    if (name == "tenant") {
+      changed.tenant = "other";
+    }
+    if (name == "role") {
+      changed.roles.insert("admin");
+    }
+    if (name == "scope") {
+      changed.scopes.insert("other");
+    }
+    EXPECT_NE(psim::platform::security::authorization_context(first),
+              psim::platform::security::authorization_context(changed));
+  }
+}

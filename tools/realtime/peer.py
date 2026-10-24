@@ -107,7 +107,9 @@ async def load(config):
             client = await Client.open(config['token'], host='api-gateway' if index % 2 == 0 else 'api-2')
             await client.subscribe(config['resumeToken'])
             return client
+    print(f'load: connecting {count} WSS clients', flush=True)
     clients = await asyncio.gather(*(connect(i) for i in range(count)))
+    print(f'load: {len(clients)} WSS subscriptions established', flush=True)
     measured = []
     records = config['records']
     expected = {row['value']['incidentCreated']['incident']['incidentId'] for row in records}
@@ -127,9 +129,10 @@ async def load(config):
         return delta['resumeToken']
     tasks = [asyncio.create_task(read(client)) for client in clients]
     try:
-        for record in records:
+        for index, record in enumerate(records):
             await emit(config, [record])
             await asyncio.sleep(0.2)
+            print(f'load: published {index + 1}/{len(records)}, received {len(measured)}', flush=True)
         tokens = await asyncio.gather(*tasks)
         assert len(measured) == count * len(records)
         ordered = sorted(measured)
@@ -181,7 +184,21 @@ async def protocol(config):
         await modern.subscribe(config['resumeToken'], 'zone', filter={'zoneIds': [config['otherZone']]})
         selected = config['records'][0]['value']['incidentCreated']['incident']['incidentId']
         await modern.subscribe(config['resumeToken'], 'incident', 'STREAM_INCIDENT', {'incidentId': selected})
-        await foreign.subscribe(config['resumeToken'])
+        await foreign.send({'subscribe': {'subscriptionId': 'old-scope', 'stream': 'STREAM_INCIDENTS', 'resumeToken': config['resumeToken']}})
+        assert (await foreign.receive())['resyncRequired']['reason'] == 'access scope changed'
+        await foreign.subscribe(config['foreignResumeToken'])
+        checks.append('resume cursor binds the effective identity and scope; a changed context requires a new snapshot')
+        peer = await Client.open(config['token'])
+        try:
+            await peer.subscribe(config['resumeToken'])
+            await peer.send({'authenticate': {'accessToken': config['peerToken']}})
+            assert (await peer.receive())['resyncRequired']['subscriptionId'] == 'feed'
+            assert 'authenticated' in await peer.receive()
+            await peer.send({'subscribe': {'subscriptionId': 'previous-user', 'stream': 'STREAM_INCIDENTS', 'resumeToken': config['resumeToken']}})
+            assert (await peer.receive())['resyncRequired']['reason'] == 'access scope changed'
+        finally:
+            await peer.close()
+        checks.append('changing identity with identical roles and scope clears subscriptions and rejects the former cursor')
         await tenant.send({'subscribe': {'subscriptionId': 'wrong-tenant', 'stream': 'STREAM_INCIDENTS', 'resumeToken': config['resumeToken']}})
         assert 'resyncRequired' in await tenant.receive()
         await emit(config, config['records'])
@@ -271,7 +288,7 @@ async def protocol(config):
         await modern.send({'subscribe': {'subscriptionId': 'state', 'stream': 'STREAM_LOCATION_STATUS', 'filter': {'locationId': config['location']}, 'resumeToken': config['stateToken']}})
         assert 'resyncRequired' in await modern.receive()
         checks.append('reauthentication clears prior subscriptions and state owner rejects the previous access scope')
-        for key, value in [('issuedAtMs', 0), ('offsets', {'unknown-partition': 0}), ('offsets', {'0': 9223372036854775807})]:
+        for key, value in [('accessContext', 'different-scope'), ('issuedAtMs', 0), ('offsets', {'unknown-partition': 0}), ('offsets', {'0': 9223372036854775807})]:
             token = json.loads(config['resumeToken'])
             token[key] = value
             await legacy.send({'subscribe': {'subscriptionId': 'invalid', 'stream': 'STREAM_INCIDENTS', 'resumeToken': json.dumps(token)}})
@@ -304,6 +321,8 @@ async def boundaries(config):
         try:
             if token:
                 await client.send({'authenticate': {'accessToken': token}})
+                denied = await client.receive(8)
+                assert denied['error']['code'] == 'AUTH_UNAUTHENTICATED' and denied['error']['fatal']
             try:
                 await client.receive(8)
                 raise AssertionError('unauthenticated connection remained open')

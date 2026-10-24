@@ -97,7 +97,7 @@ std::string scope_key(const p::security::Principal& principal) {
   return Json{{"tenant", principal.tenant}, {"roles", principal.roles}, {"scopes", principal.scopes}}.dump();
 }
 
-std::string resume_token(const p::kafka::Offsets& positions, std::string tenant) {
+std::string resume_token(const p::kafka::Offsets& positions, std::string tenant, std::string context) {
   Json offsets = Json::object();
   Json response = Json::object();
   for (const auto& [partition, offset] : positions) {
@@ -105,6 +105,7 @@ std::string resume_token(const p::kafka::Offsets& positions, std::string tenant)
   }
   return Json{{"version", 2},
               {"tenant", std::move(tenant)},
+              {"accessContext", std::move(context)},
               {"issuedAtMs", std::chrono::duration_cast<std::chrono::milliseconds>(
                                  std::chrono::system_clock::now().time_since_epoch())
                                  .count()},

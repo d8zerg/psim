@@ -19,7 +19,7 @@ tasks:
     desc: Realtime transport and replay under ASan/UBSan and TSan
     cmds:
       - task: :cpp:test:sanitizers
-        vars: {LABELS: 'psim_api_gateway_test'}
+        vars: {LABELS: 'psim_(api_gateway|platform_security|projection)_test'}
       - for: [asan, tsan]
         task: test
         vars: {PROJECT: '{{.PROJECT}}-{{.ITEM}}', PRESET: '{{.ITEM}}'}

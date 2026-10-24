@@ -61,7 +61,7 @@ tasks:
       - defer: {task: down, vars: {PROJECT: '{{.PROJECT}}'}}
       - task: _start
         vars: {PROJECT: '{{.PROJECT}}', PRESET: '{{.PRESET}}', ISSUER: 'http://keycloak:8080/realms/psim', PUBLISH: 'false'}
-      - PSIM_PRESET={{.PRESET}} python3 -I tools/env/event_flow.py test {{.PROJECT}}
+      - PSIM_SHELL_OUTAGE_MS={{.OUTAGE_MS | default "0"}} PSIM_PRESET={{.PRESET}} python3 -I tools/env/event_flow.py test {{.PROJECT}}
   down:
     desc: Stop the event flow and keep its database and broker data
     cmds:

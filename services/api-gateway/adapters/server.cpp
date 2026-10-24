@@ -103,6 +103,7 @@ class SessionBase {
   asio::cancellation_signal cancel;
   std::optional<p::security::Principal> principal;
   std::string bearer;
+  std::string access_context;
   std::map<std::string, Subscription> subscriptions;
   std::set<std::string> capabilities{"incident_event"};
   bool closed = false;
@@ -392,7 +393,8 @@ class Gateway final : public p::stream::Worker {
     realtime::v1::ServerFrame frame;
     *frame.mutable_delta() = event.value;
     frame.mutable_delta()->set_subscription_id(id);
-    frame.mutable_delta()->set_resume_token(resume_token(found->second.positions, session->principal->tenant));
+    frame.mutable_delta()->set_resume_token(
+        resume_token(found->second.positions, session->principal->tenant, session->access_context));
     session->send(frame);
   }
 
@@ -459,6 +461,14 @@ class Gateway final : public p::stream::Worker {
     const auto id = request.subscription_id();
     if (!session->principal || id.empty() || id.size() > 128 || session->subscriptions.size() >= max_subscriptions_) {
       resync(session, id, "subscription limit or invalid identity");
+      co_return;
+    }
+    const auto cursor = Json::parse(request.resume_token(), nullptr, false);
+    if (cursor.is_object() && cursor.contains("accessContext")
+        && (!cursor["accessContext"].is_string()
+            || (!cursor["accessContext"].get_ref<const std::string&>().empty()
+                && cursor["accessContext"] != session->access_context))) {
+      resync(session, id, "access scope changed");
       co_return;
     }
     const auto& filter = request.filter();
@@ -607,6 +617,7 @@ class Gateway final : public p::stream::Worker {
           journal_.pop_front();
         }
         const std::vector<std::shared_ptr<SessionBase>> sessions(sessions_.begin(), sessions_.end());
+        std::size_t deliveries = 0;
         for (const auto& session : sessions) {
           std::vector<std::string> ids;
           for (const auto& [id, sub] : session->subscriptions) {
@@ -616,6 +627,9 @@ class Gateway final : public p::stream::Worker {
           }
           for (const auto& id : ids) {
             co_await deliver(session.get(), id, *event);
+            if (++deliveries % 32 == 0) {
+              co_await asio::post(executor(), asio::use_awaitable);
+            }
           }
         }
         co_await asio::post(executor(), asio::use_awaitable);
@@ -864,6 +878,10 @@ class Gateway final : public p::stream::Worker {
 
   void slow() { slow_consumers_->Increment(); }
 
+  void trace_close(std::string reason) {
+    context().logger().debug("Realtime connection closed", {{"reason", std::move(reason)}});
+  }
+
   const std::string& epoch() const { return epoch_; }
 
  private:
@@ -924,10 +942,7 @@ void Session<Stream>::send(const realtime::v1::ServerFrame& frame) {
   if (closed || closing) {
     return;
   }
-  if (principal && principal->checked_until <= std::chrono::system_clock::now()) {
-    stop();
-    return;
-  }
+  // The writer refreshes authorization before transmission, including frames queued during that refresh.
   auto text = p::stream::json(frame);
   if (queue.size() >= gateway->queue_messages() || queued_bytes + text.size() > gateway->queue_bytes()
       || !gateway->reserve(text.size())) {
@@ -967,15 +982,18 @@ void Session<Stream>::fail(std::string code) {
 template <typename Stream>
 asio::awaitable<void> Session<Stream>::write() {
   while (!closed) {
-    if (!gateway->ready()) {
+    if (!closing && !gateway->ready()) {
+      gateway->trace_close("gateway-not-ready");
       stop();
       break;
     }
-    if (principal && principal->expires_at <= std::chrono::system_clock::now()) {
+    if (!closing && principal && principal->expires_at <= std::chrono::system_clock::now()) {
+      gateway->trace_close("token-expired");
       stop();
       break;
     }
-    if (principal && std::chrono::system_clock::now() >= principal->checked_until - std::chrono::milliseconds(400)) {
+    if (!closing && principal
+        && std::chrono::system_clock::now() >= principal->checked_until - std::chrono::milliseconds(400)) {
       const auto checked_bearer = bearer;
       auto refreshed = co_await gateway->authenticate(checked_bearer);
       if (closed) {
@@ -986,6 +1004,14 @@ asio::awaitable<void> Session<Stream>::write() {
       }
       if (!refreshed || refreshed->checked_until <= std::chrono::system_clock::now()
           || scope_key(*principal) != scope_key(*refreshed)) {
+        if (!refreshed) {
+          gateway->trace_close("authorization-refresh-failed:" + std::string(refreshed.error().name()) + ":"
+                               + refreshed.error().message());
+        } else if (refreshed->checked_until <= std::chrono::system_clock::now()) {
+          gateway->trace_close("authorization-refresh-expired");
+        } else {
+          gateway->trace_close("authorization-scope-changed");
+        }
         stop();
         break;
       }
@@ -1014,6 +1040,9 @@ asio::awaitable<void> Session<Stream>::write() {
     (void)size;
     gateway->release(text.size());
     if (error) {
+      if (!closed) {
+        gateway->trace_close(error == asio::error::operation_aborted ? "write-timeout" : "write-error");
+      }
       if (error == asio::error::operation_aborted && !closed) {
         gateway->slow();
       }
@@ -1134,6 +1163,13 @@ asio::awaitable<void> Session<Stream>::run() {
           auto logged = co_await gateway->denied(authenticated ? std::optional(*authenticated) : std::nullopt,
                                                  "realtime.authenticate");
           (void)logged;
+          fail(authenticated ? "AUTH_FORBIDDEN" : std::string(authenticated.error().name()));
+          asio::steady_timer flush(socket.get_executor());
+          const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+          while (!closed && std::chrono::steady_clock::now() < deadline) {
+            flush.expires_after(std::chrono::milliseconds(10));
+            co_await flush.async_wait(asio::as_tuple(asio::use_awaitable));
+          }
           break;
         }
         std::set<std::string> negotiated;
@@ -1146,7 +1182,8 @@ asio::awaitable<void> Session<Stream>::run() {
         if (frame.authenticate().supported_change_types().empty()) {
           negotiated.insert("incident_event");
         }
-        if (principal && (scope_key(*principal) != scope_key(*authenticated) || negotiated != capabilities)) {
+        const auto next_context = p::stream::sha256(p::security::authorization_context(*authenticated));
+        if (principal && (access_context != next_context || negotiated != capabilities)) {
           gateway->release(queued_bytes);
           queue.clear();
           queued_bytes = 0;
@@ -1160,6 +1197,7 @@ asio::awaitable<void> Session<Stream>::run() {
           }
         }
         principal = std::move(*authenticated);
+        access_context = next_context;
         bearer = frame.authenticate().access_token();
         capabilities = std::move(negotiated);
         if (capabilities.contains("incident_event") || capabilities.contains("response_event")) {

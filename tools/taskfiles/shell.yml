@@ -1,0 +1,16 @@
+version: '3'
+vars:
+  SHELL_PROJECT: '{{.SHELL_PROJECT | default "psim-shell-test"}}'
+  PRESET: '{{.PRESET | default "debug"}}'
+tasks:
+  test:
+    desc: Browser shell with real PKCE, expired access token, five-minute outage, replay and Gateway restart
+    cmds:
+      - task: :cpp:_run
+        vars: {CMD: sh tools/env/s3_test_tls.sh}
+      - defer: {task: ':env:down', vars: {PROJECT: '{{.SHELL_PROJECT}}'}}
+      - PSIM_UID={{.UID}} PSIM_GID={{.GID}} docker compose -p {{.SHELL_PROJECT}} -f deploy/local/compose.yaml up -d --wait --wait-timeout 300 --quiet-pull
+      - python3 -I tools/env/envctl.py wait {{.SHELL_PROJECT}}
+      - python3 -I tools/env/envctl.py topics {{.SHELL_PROJECT}} single
+      - task: :flow:test
+        vars: {PROJECT: '{{.SHELL_PROJECT}}', PRESET: '{{.PRESET}}', OUTAGE_MS: '300000'}

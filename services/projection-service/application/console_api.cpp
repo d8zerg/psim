@@ -183,13 +183,15 @@ boost::asio::awaitable<platform::Result<Response>> console_request(ConsoleStore*
   if (!epoch.empty() && !platform::stream::uuid(epoch)) {
     co_return platform::fail(platform::ErrorCode::kCommonInvalidArgument, "invalid realtime epoch");
   }
-  nlohmann::json token{{"version", 2},
-                       {"generation", snapshot->generation},
-                       {"epoch", epoch},
-                       {"tenant", principal.tenant},
-                       {"issuedAtMs", std::chrono::duration_cast<std::chrono::milliseconds>(
-                                          std::chrono::system_clock::now().time_since_epoch())
-                                          .count()}};
+  nlohmann::json token{
+      {"version", 2},
+      {"generation", snapshot->generation},
+      {"epoch", epoch},
+      {"tenant", principal.tenant},
+      {"accessContext", platform::stream::sha256(platform::security::authorization_context(principal))},
+      {"issuedAtMs",
+       std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+           .count()}};
   std::map<std::string, std::int64_t> response_positions;
   for (const auto& [key, value] : snapshot->offsets) {
     const std::string prefix = "psim.response.events.v1:";

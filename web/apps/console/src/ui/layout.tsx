@@ -2,7 +2,17 @@ import { useLayoutEffect, type ReactNode } from "react";
 import { DisplaySettings } from "./settings";
 import { usePreferences } from "./preferences";
 import { useStrings } from "./strings";
-export function AppLayout({ children, design = false }: { readonly children: ReactNode; readonly design?: boolean }) {
+export function AppLayout({
+  children,
+  design = false,
+  navigation,
+  account,
+}: {
+  readonly children: ReactNode;
+  readonly design?: boolean;
+  readonly navigation?: ReactNode;
+  readonly account?: ReactNode;
+}) {
   const t = useStrings();
   const mode = usePreferences((state) => state.mode);
   useLayoutEffect(() => {
@@ -29,7 +39,7 @@ export function AppLayout({ children, design = false }: { readonly children: Rea
       <a className="skip-link" href="#main-content">
         {t.skip}
       </a>
-      <header className="app-header">
+      <header className={navigation === undefined ? "app-header" : "app-header shell-header"}>
         <a href="/" className="brand" aria-label={t.title}>
           <span className="brand-mark" aria-hidden="true">
             <svg viewBox="0 0 16 16" width="1em" height="1em" fill="none" stroke="currentColor" aria-hidden="true">
@@ -39,9 +49,11 @@ export function AppLayout({ children, design = false }: { readonly children: Rea
           PSIM
         </a>
         <nav className="app-nav" aria-label={t.console}>
-          <a href="/" aria-current={design ? undefined : "page"}>
-            {t.console}
-          </a>
+          {navigation ?? (
+            <a href="/" aria-current={design ? undefined : "page"}>
+              {t.console}
+            </a>
+          )}
           {design && (
             <a href="/design-system.html" aria-current="page">
               {t.library}
@@ -52,6 +64,7 @@ export function AppLayout({ children, design = false }: { readonly children: Rea
           <span className="mode-label">{{ crisis: t.crisis, training: t.training, wall: t.wall }[mode]}</span>
         )}
         <DisplaySettings design={design} />
+        {account}
       </header>
       {children}
     </>

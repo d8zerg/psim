@@ -405,3 +405,62 @@ describe("RealtimeClient edge cases", () => {
     }
   });
 });
+
+it("refreshes credentials before expiry and restores subscriptions from the confirmed cursor", async () => {
+  const env = setup();
+  env.client.subscribe({ id: "feed", stream: Stream.INCIDENTS, resumeToken: "snapshot" });
+  env.client.start();
+  await env.open();
+  env.socket().server({ delta: { subscriptionId: "feed", resumeToken: "latest", incidentEvent: {} } });
+  expect(env.timers.fire()).toBe(270000);
+  await flush();
+  expect(env.client.status).toBe("authenticating");
+  env.socket().server({ authenticated: { userId: "u1", expiresIn: 300 } });
+  expect(env.socket().lastSent()).toMatchObject({ subscribe: { resumeToken: "latest" } });
+  env.client.stop();
+});
+it("ignores frames from a detached connection and cancels reconnect on stop", async () => {
+  const env = setup();
+  env.client.subscribe({ id: "feed", stream: Stream.INCIDENTS, resumeToken: "snapshot" });
+  env.client.start();
+  await env.open();
+  const old = env.socket();
+  old.close();
+  env.client.reconnect();
+  await env.open();
+  old.server({ delta: { subscriptionId: "feed", resumeToken: "stale", incidentEvent: {} } });
+  expect(env.handlers.onDelta).not.toHaveBeenCalled();
+  expect(env.client.resumeToken("feed")).toBe("snapshot");
+  env.client.stop();
+  expect(env.timers.pending.size).toBe(0);
+});
+it("reports credential transport failures without unhandled rejection", async () => {
+  const sockets: FakeSocket[] = [];
+  const handlers = { onDelta: vi.fn(), onResync: vi.fn(), onError: vi.fn() };
+  const client = new RealtimeClient({
+    url: "wss://test",
+    getAccessToken: () => Promise.reject(new Error("network")),
+    socketFactory: () => {
+      const socket = new FakeSocket();
+      sockets.push(socket);
+      return socket;
+    },
+    handlers,
+  });
+  client.start();
+  sockets[0]?.onopen?.();
+  await flush();
+  expect(client.status).toBe("reconnecting");
+  expect(handlers.onError).toHaveBeenCalledWith("REALTIME_AUTH_UNAVAILABLE", expect.any(String));
+  client.stop();
+});
+
+it("bounds the wait for a refreshed authentication acknowledgement", async () => {
+  const env = setup();
+  env.client.start();
+  await env.open();
+  await env.client.reauthenticate();
+  expect(env.timers.fire()).toBe(15000);
+  expect(env.client.status).toBe("reconnecting");
+  env.client.stop();
+});

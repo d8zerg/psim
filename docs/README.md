@@ -96,6 +96,7 @@
 - Realtime, возобновление из Kafka и оперативные образы - [ADR-060](adr/0060-realtime-delivery.md), [руководство](engineering/realtime.md)
 
 - [Серверная поддержка оперативного интерфейса](engineering/operational-interface.md)
+- [Оболочка приложения и восстановление сессии](engineering/application-shell.md)
 
 ## Участие и поддержка
 
