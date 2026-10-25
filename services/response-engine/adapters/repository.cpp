@@ -726,7 +726,11 @@ asio::awaitable<p::Result<Json>> Repository::request(p::security::Principal prin
             if (!rows) {
               co_return std::unexpected(rows.error());
             }
-            plan->set_version(static_cast<std::uint32_t>(std::stoul(std::string(rows->value(0, 0).value_or("")))));
+            const auto next_version = std::stoull(std::string(rows->value(0, 0).value_or("")));
+            if (expected && *expected != next_version - 1) {
+              co_return p::fail(Code::kCommonConcurrentModification, "plan version changed");
+            }
+            plan->set_version(static_cast<std::uint32_t>(next_version));
             plan->set_state(response::v1::PLAN_STATE_DRAFT);
             plan->clear_published_at();
             plan->clear_published_by();

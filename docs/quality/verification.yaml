@@ -11,6 +11,15 @@
 version: 1
 
 methods:
+  - id: TS-36
+    kind: test
+    name: Администрирование через публичный интерфейс
+    criteria: Реальный PKCE с MFA, регистрация и продление сертификата, отображение нового типа коннектора, иерархия и импорт, обслуживание, SLA, правило с пробным прогоном, публикация сценария, запрет чужой площадки и недопустимых загрузок
+    env: E-LOCAL
+    gate: pr
+    barrier: automated
+    task: task admin:test
+    steps: ['8.4']
   - id: TS-35
     kind: test
     name: Рабочая консоль оператора
@@ -1098,8 +1107,8 @@ goals:
   - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09, M-01]}
 
 scenarios:
-  - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29]}
-  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29, TS-31]}
+  - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29, TS-36]}
+  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29, TS-31, TS-36]}
   - {id: S3, methods: [TS-09, TS-10, L-02]}
   - {id: S4, methods: [TS-07, TS-10, L-02, TS-20, TS-23]}
   - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28, TS-29]}

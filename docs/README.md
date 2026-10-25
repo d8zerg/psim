@@ -97,6 +97,8 @@
 
 - [Серверная поддержка оперативного интерфейса](engineering/operational-interface.md)
 - [Оболочка приложения и восстановление сессии](engineering/application-shell.md)
+- [Администрирование](engineering/administration.md)
+- [Размер поставки администрирования](engineering/administration-assets.md)
 
 ## Участие и поддержка
 

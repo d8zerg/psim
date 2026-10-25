@@ -81,3 +81,60 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   }
 }
+
+.admin-workspace,
+.admin-fields,
+.admin-editor {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.admin-nav,
+.admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: end;
+}
+.admin-field,
+.admin-entry {
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+}
+.admin-collection {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr);
+}
+.admin-records {
+  display: grid;
+  gap: var(--space-2);
+  max-height: 32rem;
+  overflow: auto;
+}
+.admin-preview img {
+  max-width: 100%;
+}
+.admin-checkbox {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: var(--control-height);
+}
+@media (min-width: 80rem) {
+  .admin-collection {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  }
+}
+.admin-result-fields > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--space-2);
+  padding-block: var(--space-1);
+}
+.admin-result-fields dd {
+  margin: 0;
+}

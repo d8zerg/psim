@@ -69,6 +69,9 @@ includes:
   env:
     taskfile: ./tools/taskfiles/env.yml
     dir: .
+  admin:
+    taskfile: ./tools/taskfiles/admin.yml
+    dir: .
   operator:
     taskfile: ./tools/taskfiles/operator.yml
     dir: .
@@ -251,6 +254,8 @@ tasks:
       - task: web:e2e                         # Playwright smoke of the built console
         if: '[ "{{.WEB}}" = true ]'
       - task: operator:test                   # native operator browser acceptance
+        if: '[ "{{.WEB}}" = true ]'
+      - task: admin:test
         if: '[ "{{.WEB}}" = true ]'
       - task: docs:check                      # FF-08
         if: '[ "{{.DOCS}}" = true ]'

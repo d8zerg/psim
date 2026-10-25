@@ -5,6 +5,7 @@ import { useShell } from "./context";
 import { allowedModules, modules } from "./modules";
 import { useStrings } from "../ui/strings";
 const Home = lazy(async () => ({ default: (await import("../operator/page")).OperatorPage }));
+const Administration = lazy(async () => ({ default: (await import("../admin/page")).AdministrationPage }));
 export function ModulePage() {
   const { session } = useShell();
   const t = useStrings();
@@ -30,6 +31,18 @@ export function ModulePage() {
         }
       >
         <Home key={session.profile?.context} />
+      </Suspense>
+    );
+  if (module.key === "administration" || module.key === "integrations")
+    return (
+      <Suspense
+        fallback={
+          <main id="main-content" tabIndex={-1} className="workbench">
+            <p role="status">{t.loading}</p>
+          </main>
+        }
+      >
+        <Administration integration={module.key === "integrations"} />
       </Suspense>
     );
   const descriptions = {

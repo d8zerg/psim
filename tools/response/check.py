@@ -124,6 +124,10 @@ class Check(CommandCheck):
         self.rq("POST", "/v1/plans", invalid, role="admin", expected=400)
         simple = self.plan([{"stepId": "a", "title": "A", "instruction": {}}])
         draft = self.rq("POST", "/v1/plans", simple, role="admin")["plan"]
+        updated = self.rq("POST", "/v1/plans", simple, role="admin", version=draft["version"])["plan"]
+        assert updated["version"] == draft["version"] + 1
+        self.rq("POST", "/v1/plans", simple, role="admin", version=draft["version"], expected=412)
+        draft = updated
         self.rq("POST", "/v1/plans/" + draft["planId"] + ":publish", {"version": 999}, role="admin", expected=404)
         pub = self.rq("POST", "/v1/plans/" + draft["planId"] + ":publish", {"version": draft["version"]}, role="admin")["plan"]
         conflicting = self.rq("POST", "/v1/plans", simple | {"planId": uid()}, role="admin")["plan"]

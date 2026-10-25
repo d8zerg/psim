@@ -215,7 +215,8 @@ asio::awaitable<p::Result<Response>> Api::handle(Request request, p::security::P
     body = Json::parse(p::stream::json(*parsed));
     std::optional<std::uint64_t> expected;
     if (operation == "complete" || operation == "skip" || operation == "retry" || operation == "override"
-        || operation == "policy.update" || (operation == "duty.set" && !request[http::field::if_match].empty())) {
+        || operation == "policy.update" || (operation == "draft" && !request[http::field::if_match].empty())
+        || (operation == "duty.set" && !request[http::field::if_match].empty())) {
       const std::string text(request[http::field::if_match]);
       if (text.size() < 3 || text.front() != '"' || text.back() != '"') {
         co_return p::fail(p::ErrorCode::kCommonPreconditionRequired, "If-Match required");
