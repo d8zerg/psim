@@ -1726,6 +1726,7 @@ GetDeviceResponse is the response of GetDevice.
 | Field | Type | Label | Description |
 | ----- | ---- | ----- | ----------- |
 | device | [psim.catalog.v1.Device](#psim-catalog-v1-Device) |  |  |
+| device_type | [psim.catalog.v1.DeviceType](#psim-catalog-v1-DeviceType) |  | Capabilities are disclosed in the scope of the authorized device. |
 
 
 

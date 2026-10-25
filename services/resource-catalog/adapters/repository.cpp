@@ -182,6 +182,29 @@ asio::awaitable<p::Result<Json>> Repository::get(p::security::Principal principa
       });
 }
 
+asio::awaitable<p::Result<Json>> Repository::device_view(p::security::Principal principal, std::string id) {
+  if (!canonical_uuid(id) || !canonical_uuid(principal.tenant)) {
+    co_return p::fail(Code::kCommonInvalidArgument, "invalid device identity");
+  }
+  co_return co_await pg::in_transaction<Json>(
+      pool_,
+      // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
+      [&principal, &id](pg::Transaction* tx) -> asio::awaitable<p::Result<Json>> {
+        auto device = co_await load(tx, principal.tenant, "device", id);
+        if (!device) {
+          co_return std::unexpected(device.error());
+        }
+        if (!allowed(principal, device->value("siteId", ""), false, device->value("zoneId", ""))) {
+          co_return p::fail(Code::kAuthScopeDenied, "device outside access scope");
+        }
+        auto type = co_await load(tx, principal.tenant, "device_type", device->at("deviceTypeId"));
+        if (!type) {
+          co_return std::unexpected(type.error());
+        }
+        co_return Json{{"device", std::move(*device)}, {"deviceType", std::move(*type)}};
+      });
+}
+
 asio::awaitable<p::Result<Page>> Repository::list(p::security::Principal principal, std::string kind, Json filters,
                                                   std::size_t size, std::string after) {
   if (!canonical_uuid(principal.tenant) || size == 0 || size > 1000 || (!after.empty() && !canonical_uuid(after))) {

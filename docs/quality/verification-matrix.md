@@ -7,15 +7,15 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 17 | 15 | 0 | 2 | 34 |
+| Наборы тестов | 17 | 15 | 0 | 3 | 35 |
 | Нагрузка | 0 | 3 | 8 | 0 | 11 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
-| Бенчмарки | 5 | 1 | 0 | 0 | 6 |
+| Бенчмарки | 5 | 1 | 0 | 1 | 7 |
 | Fitness functions | 19 | 1 | 2 | 0 | 22 |
 | Безопасность | 4 | 2 | 3 | 0 | 9 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 45 | 27 | 29 | 2 | **103** |
+| **Всего** | 45 | 27 | 29 | 4 | **105** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -55,10 +55,10 @@
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
 | [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
 | [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), TS-28 (pr), TS-29 (pr) |
-| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly), TS-32 (pr) |
-| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr) |
-| [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr) |
-| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr) |
+| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly), TS-32 (pr), TS-35 (on-demand) |
+| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr), TS-35 (on-demand) |
+| [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr), TS-35 (on-demand) |
+| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr), TS-35 (on-demand) |
 | [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr) |
 | [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
@@ -70,6 +70,7 @@
 
 | ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
 |---|---|---|---|---|---|---|
+| TS-35 | Рабочая консоль оператора | Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности. | E-LOCAL | on-demand | `task operator:test` | 8.3 |
 | TS-34 | Сессия и ролевые маршруты оболочки | PKCE, проверка ID token, одиночный refresh, очистка при выходе, прямой вход, ролевые границы и поздние ответы. Назначение: Проверить изоляцию сессий и общую оболочку без смешивания рабочих данных пользователей. | E-CI | pr | `task web:check` | 8.2 |
 | TS-33 | Серверные операции оперативного интерфейса | Независимая тревога, права, версии, повторы, lease между экземплярами, история, изоляция учений и разрешённые источники ассистента. Назначение: Проверить серверные операции оперативного интерфейса без использования имитатора витрины. | E-CI | pr | `task operations:test` | 8.1a |
 | TS-01 | Unit-тесты доменного ядра | Все проходят; каждый инвариант aggregates.md и каждый переход state-models.md покрыт тестом. | E-CI | pr | `task cpp:test` | 1.2, 5.3, 6.1, 6.2 |
@@ -151,6 +152,7 @@
 
 | ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
 |---|---|---|---|---|---|---|
+| B-07 | Виртуализированная лента оператора | 10000 инцидентов, прокрутка не ниже 50 кадров/с, realtime -> DOM не выше 1 с p99; сырые серии и один браузерный worker. Назначение: Проверить отзывчивость рабочей ленты без подмены полного SLO входного конвейера. | E-CI | on-demand | `task operator:benchmark` | 8.3 |
 | B-01 | Слой Kafka | ≥ 200 000 сообщений/с на продюсер и потребитель на эталонном стенде. | E-LOCAL | nightly | `task bench:kafka` | 2.3 |
 | B-02 | Асинхронные примитивы | Накладные расходы зафиксированы как базовая линия. | E-CI | pr | `task bench:async` | 2.2 |
 | B-03 | Normalizer на ядро | Пропускная способность на ядро и p99 этапа ≤ 30 мс на базовой линии. | E-CI | pr | `task bench:normalizer` | 4.5 |
@@ -254,7 +256,7 @@
 | 8.1 | TS-16 |
 | 8.1a | TS-33 |
 | 8.2 | TS-34, TS-14 |
-| 8.3 | TS-11, TS-15, TS-19, TS-21 |
+| 8.3 | TS-35, B-07, TS-11, TS-15, TS-19, TS-21 |
 | 8.4 | TS-11, TS-20 |
 | 8.5 | TS-11 |
 | 8.6 | TS-11, TS-14, TS-15 |

@@ -1,6 +1,13 @@
 import { browserSocket } from "./socket";
 import { createApiClient, ApiProblemError, type ApiClient, type components } from "@psim/api-client";
-import { RealtimeClient, Stream, VersionGate, type Delta, type RealtimeClientOptions } from "@psim/realtime-client";
+import {
+  RealtimeClient,
+  Stream,
+  VersionGate,
+  type Delta,
+  type RealtimeClientOptions,
+  type Subscription,
+} from "@psim/realtime-client";
 export type Incident = components["schemas"]["psim.incident.v1.Incident"];
 export interface FeedRow {
   readonly id: string;
@@ -9,8 +16,14 @@ export interface FeedRow {
   readonly priority: string;
   readonly state: string;
   readonly eventId: string;
+  readonly siteId?: string;
+  readonly zoneId?: string;
+  readonly assigneeId?: string;
+  readonly acknowledged?: boolean;
+  readonly audible?: boolean;
 }
 export interface FeedState {
+  readonly revision?: number;
   readonly loading: boolean;
   readonly loaded: boolean;
   readonly rows: readonly FeedRow[];
@@ -21,7 +34,8 @@ export interface Channel {
   start: () => void;
   stop: () => void;
   reconnect?: () => void;
-  subscribe: (subscription: { id: string; stream: Stream; resumeToken: string }) => void;
+  subscribe: (subscription: Subscription) => void;
+  unsubscribe?: (id: string) => void;
 }
 export class FeedController {
   private gate = new VersionGate();
@@ -71,12 +85,17 @@ export class FeedController {
       onDelta: (delta) => {
         if (this.running && this.epoch === epoch) this.delta(delta);
       },
-      onResync: (_id, reason) => {
+      onResync: (id, reason) => {
         if (this.running && this.epoch === epoch) {
           if (reason === "access scope changed" || reason === "authentication scope or capabilities changed") {
             this.rows.clear();
             this.gate = new VersionGate();
             this.state = { ...this.state, rows: [], loaded: false };
+          }
+          this.state = { ...this.state, revision: (this.state.revision ?? 0) + 1 };
+          if (id !== "feed" && this.state.loaded) {
+            this.update();
+            return;
           }
           this.resyncRequired = true;
           void this.reload();
@@ -177,6 +196,15 @@ export class FeedController {
         priority: incident.priority ?? "",
         state: incident.state ?? "",
         eventId: "",
+        siteId: incident.siteId ?? "",
+        zoneId: incident.zoneId ?? "",
+        assigneeId: incident.assigneeId ?? "",
+        acknowledged: incident.operational?.acknowledged ?? false,
+        audible:
+          incident.operational?.conditionKnown === true &&
+          !incident.operational.acknowledged &&
+          !incident.operational.shelved &&
+          !incident.operational.suppressed,
       };
       const saved = previous.get(id);
       this.rows.set(
@@ -184,7 +212,12 @@ export class FeedController {
         saved?.version === row.version &&
           saved.title === row.title &&
           saved.priority === row.priority &&
-          saved.state === row.state
+          saved.state === row.state &&
+          saved.siteId === row.siteId &&
+          saved.zoneId === row.zoneId &&
+          saved.assigneeId === row.assigneeId &&
+          saved.acknowledged === row.acknowledged &&
+          saved.audible === row.audible
           ? saved
           : row,
       );
@@ -195,7 +228,9 @@ export class FeedController {
   }
   delta(delta: Delta): void {
     const change = delta.change;
+    this.state = { ...this.state, revision: (this.state.revision ?? 0) + 1 };
     if (change.case !== "incidentEvent") {
+      this.update();
       return;
     }
     const payload = change.value.payload;
@@ -221,8 +256,21 @@ export class FeedController {
         ][incident.state] ?? "INCIDENT_STATE_UNSPECIFIED",
       priority: `PRIORITY_P${String(incident.priority)}`,
       eventId: change.value.envelope?.correlationId ?? "",
+      siteId: incident.siteId,
+      zoneId: incident.zoneId,
+      assigneeId: incident.assigneeId,
+      acknowledged: incident.operational?.acknowledged ?? false,
+      audible:
+        incident.operational?.conditionKnown === true &&
+        !incident.operational.acknowledged &&
+        !incident.operational.shelved &&
+        !incident.operational.suppressed,
     });
     this.update();
+  }
+  watchLocation(locationId: string, resumeToken: string): () => void {
+    this.channel?.subscribe({ id: "location", stream: Stream.LOCATION_STATUS, filter: { locationId }, resumeToken });
+    return () => this.channel?.unsubscribe?.("location");
   }
   stop(): void {
     this.running = false;
@@ -250,7 +298,7 @@ export function createFeed(
         getAccessToken: async () => (await getAccessToken()) ?? "",
         socketFactory: browserSocket,
         handlers,
-        supportedChangeTypes: ["incident_event", "incident_operational_updated"],
+        supportedChangeTypes: ["incident_event", "incident_operational_updated", "response_event", "location_status"],
         keepalive: { pingIntervalMs: 5000, pongTimeoutMs: 3000 },
       }),
     accessDenied,

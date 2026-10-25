@@ -12,13 +12,19 @@ interface DemoDictionary {
   readonly messages: typeof demoMessages;
 }
 const productImports = { en: () => import("./product-en"), ru: () => import("./product-ru") };
-const demoImports = { en: () => import("./demo-en"), ru: () => import("./demo-ru") };
+type DemoImports = Record<Locale, () => Promise<DemoDictionary>>;
+let demoImports: DemoImports | undefined;
+/** Only the design entry registers sample dictionaries; product graphs never import them. */
+export function registerDemoImports(imports: DemoImports): void {
+  demoImports = imports;
+}
 const products = new Map<Locale, ProductDictionary>();
 const demos = new Map<Locale, DemoDictionary>();
 const previews = new Map<Locale, DemoStrings>();
 /** The selected locale is loaded before the first render or an atomic language change. */
 export async function loadStrings(locale: Locale, design = false): Promise<void> {
-  const [product, demo] = await Promise.all([productImports[locale](), design ? demoImports[locale]() : undefined]);
+  const [product, demo] = await Promise.all([productImports[locale](), design ? demoImports?.[locale]() : undefined]);
+  if (design && !demo) throw new Error("Preview dictionaries are not registered");
   products.set(locale, product);
   if (demo) {
     demos.set(locale, demo);

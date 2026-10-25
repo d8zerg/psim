@@ -104,6 +104,7 @@ export class ShellController {
     this.context = undefined;
     this.state = { session: this.auth.getSnapshot(), feed: emptyFeed };
   }
+  watchLocation = (id: string, token: string): (() => void) => this.feed?.watchLocation(id, token) ?? (() => undefined);
   reconnect = (): void => {
     if (this.feed) this.feed.retry();
     else this.sync();

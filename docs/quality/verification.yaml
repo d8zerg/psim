@@ -11,6 +11,25 @@
 version: 1
 
 methods:
+  - id: TS-35
+    kind: test
+    name: Рабочая консоль оператора
+    criteria: Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности
+    env: E-LOCAL
+    gate: on-demand
+    barrier: automated
+    task: task operator:test
+    steps: ['8.3']
+  - id: B-07
+    kind: benchmark
+    name: Виртуализированная лента оператора
+    criteria: 10000 инцидентов, прокрутка не ниже 50 кадров/с, realtime -> DOM не выше 1 с p99; сырые серии и один браузерный worker
+    env: E-CI
+    gate: on-demand
+    barrier: automated
+    task: task operator:benchmark
+    purpose: Проверить отзывчивость рабочей ленты без подмены полного SLO входного конвейера
+    steps: ['8.3']
   # --- Test suites ----------------------------------------------------------
   - id: TS-34
     kind: test
@@ -1084,10 +1103,10 @@ scenarios:
   - {id: S3, methods: [TS-09, TS-10, L-02]}
   - {id: S4, methods: [TS-07, TS-10, L-02, TS-20, TS-23]}
   - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28, TS-29]}
-  - {id: S6, methods: [L-05, TS-11, TS-12, TS-19, TS-32]}
-  - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29]}
-  - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29]}
-  - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21, TS-28]}
+  - {id: S6, methods: [L-05, TS-11, TS-12, TS-19, TS-32, TS-35]}
+  - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29, TS-35]}
+  - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29, TS-35]}
+  - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21, TS-28, TS-35]}
   - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28]}
   - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24, TS-32]}
   - {id: S12, methods: [C-12]}

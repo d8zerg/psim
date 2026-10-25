@@ -468,6 +468,15 @@ boost::asio::awaitable<p::Result<Response>> Api::route(Request request, p::secur
     co_return json_response({{wrapper(kind, true), page->items}, {"nextPageToken", page->next}});
   }
   if (request.method() == http::verb::get && !id.empty() && action.empty()) {
+    if (kind == "device") {
+      auto view = co_await repository_->device_view(principal, id);
+      if (!view) {
+        co_return std::unexpected(view.error());
+      }
+      auto response = json_response(*view);
+      response.set(http::field::etag, '"' + view->at("device").at("version").get<std::string>() + '"');
+      co_return response;
+    }
     auto resource = co_await repository_->get(principal, kind, id);
     if (!resource) {
       co_return std::unexpected(resource.error());

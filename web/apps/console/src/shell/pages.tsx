@@ -4,9 +4,9 @@ import { Button } from "@psim/design-system";
 import { useShell } from "./context";
 import { allowedModules, modules } from "./modules";
 import { useStrings } from "../ui/strings";
-const Home = lazy(async () => ({ default: (await import("../pages/home")).HomePage }));
+const Home = lazy(async () => ({ default: (await import("../operator/page")).OperatorPage }));
 export function ModulePage() {
-  const { session, feed, shell } = useShell();
+  const { session } = useShell();
   const t = useStrings();
   const path = useLocation({ select: (location) => location.pathname });
   const available = allowedModules(session.profile);
@@ -29,7 +29,7 @@ export function ModulePage() {
           </main>
         }
       >
-        <Home state={feed} retry={shell.reconnect} />
+        <Home key={session.profile?.context} />
       </Suspense>
     );
   const descriptions = {

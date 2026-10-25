@@ -3,6 +3,7 @@ import { defineConfig, devices } from "@playwright/test";
 // End-to-end smoke tests of the built console.
 export default defineConfig({
   testDir: "e2e",
+  testIgnore: "**/operator-performance.spec.ts",
   forbidOnly: true,
   retries: 0,
   workers: 4,

@@ -1,0 +1,25 @@
+version: '3'
+vars:
+  OPERATOR_PROJECT: '{{.OPERATOR_PROJECT | default "psim-operator-test"}}'
+  PLAYWRIGHT_IMAGE: mcr.microsoft.com/playwright:v1.63.0-noble@sha256:eff16c30e6f3f4af0a03fa4b706120d5e9b0891c344a27d64559aff5900a4a27
+  PRESET: '{{.PRESET | default "release"}}'
+tasks:
+  test:
+    desc: Operator browser with real PKCE, native services, response steps, device commands and SLA escalation
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :web:gen
+      - task: :web:_run
+        vars: {CMD: pnpm --filter @psim/console build}
+      - python3 -I tools/operator/check.py {{.OPERATOR_PROJECT}} {{.PRESET}}
+  benchmark:
+    desc: Isolated browser measurement of 10000 incidents, scroll frames and realtime rendering latency
+    cmds:
+      - task: :web:gen
+      - task: :web:_run
+        vars: {CMD: pnpm --filter @psim/console build}
+      - task: :web:_run
+        vars:
+          IMAGE: '{{.PLAYWRIGHT_IMAGE}}'
+          CMD: pnpm --filter @psim/console exec playwright test -c playwright.operator-benchmark.config.ts

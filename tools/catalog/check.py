@@ -377,6 +377,17 @@ class Check:
         self.request("PUT", "/v1/device-types/" + self.type["deviceTypeId"], self.type | {"sourceTemplates": []}, version=1, expected=409)
         self.request("POST", "/v1/locations/" + self.zones[0]["locationId"] + ":archive", {}, version=1, expected=409)
         self.rows = rows
+        view_path = "/v1/devices/" + rows[0]["deviceId"]
+        view = self.request("GET", view_path, role="operator")
+        assert view["device"]["deviceId"] == rows[0]["deviceId"]
+        assert view["deviceType"]["deviceTypeId"] == self.type["deviceTypeId"]
+        assert view["deviceType"]["capabilities"][0]["code"] == "arm"
+        self.request("GET", "/v1/device-types/" + self.type["deviceTypeId"], role="operator", expected=403)
+        self.request("GET", view_path, role="other", expected=403)
+        self.request("GET", view_path, role="tenant", expected=404)
+        self.request("GET", "/v1/devices/not-an-identity", role="operator", expected=400)
+        self.request("GET", "/v1/devices/" + uid(), role="operator", expected=404)
+        self.mark("device-scoped capabilities preserve global type restrictions and tenant boundaries")
         self.mark(f"import {self.count} devices in {elapsed:.3f}s, consumer identity reconciliation, repeat import and row errors")
 
     def maintenance(self):

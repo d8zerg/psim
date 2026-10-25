@@ -35,6 +35,7 @@ class Repository {
 
   asio::awaitable<p::Result<void>> initialize();
   asio::awaitable<p::Result<Json>> get(p::security::Principal principal, std::string kind, std::string id);
+  asio::awaitable<p::Result<Json>> device_view(p::security::Principal principal, std::string id);
   asio::awaitable<p::Result<Page>> list(p::security::Principal principal, std::string kind, Json filters,
                                         std::size_t size, std::string after);
   asio::awaitable<p::Result<Json>> change(Resource resource, Mutation mutation);

@@ -4,7 +4,7 @@ inputs:
   - directory: ../../../contracts
     paths: [../../../contracts/proto/psim/realtime/v1]
 plugins:
-  - local: protoc-gen-es
+  - local: [node, scripts/client-codegen.mjs]
     out: src/gen
     include_imports: true
     opt: [target=ts, import_extension=none]

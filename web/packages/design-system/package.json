@@ -16,6 +16,7 @@
     "./overlays": "./src/components/overlays.tsx",
     "./navigation": "./src/components/navigation.tsx",
     "./forms": "./src/components/forms.tsx",
+    "./tree": "./src/components/tree.tsx",
     "./collections": "./src/components/collections.tsx",
     "./domain": "./src/components/domain.tsx"
   },

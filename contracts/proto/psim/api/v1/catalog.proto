@@ -337,6 +337,8 @@ message GetDeviceRequest {
 // GetDeviceResponse is the response of GetDevice.
 message GetDeviceResponse {
   psim.catalog.v1.Device device = 1;
+  // Capabilities are disclosed in the scope of the authorized device.
+  psim.catalog.v1.DeviceType device_type = 2;
 }
 
 // CreateDeviceRequest is the request of CreateDevice.

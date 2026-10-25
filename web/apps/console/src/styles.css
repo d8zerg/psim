@@ -29,3 +29,55 @@
   visibility: hidden;
   pointer-events: none;
 }
+
+.operator-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+}
+.operator-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-2);
+}
+.operator-feed-scroll {
+  height: 24rem;
+  overflow: auto;
+  overflow-anchor: none;
+}
+.operator-feed-space {
+  position: relative;
+}
+.operator-feed-row {
+  position: absolute;
+  width: 100%;
+  overflow: hidden;
+}
+.operator-panels {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.operator-plan-scroll {
+  overflow: auto;
+  max-height: 32rem;
+}
+.operator-plan {
+  position: relative;
+  min-width: 100%;
+  background: var(--muted);
+}
+.operator-plan img {
+  display: block;
+  width: 100%;
+}
+.operator-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+}
+@media (min-width: 80rem) {
+  .operator-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+}

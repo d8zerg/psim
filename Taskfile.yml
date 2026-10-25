@@ -69,6 +69,9 @@ includes:
   env:
     taskfile: ./tools/taskfiles/env.yml
     dir: .
+  operator:
+    taskfile: ./tools/taskfiles/operator.yml
+    dir: .
   web:
     taskfile: ./tools/taskfiles/web.yml
     dir: .
@@ -230,6 +233,8 @@ tasks:
       - task: bench:compare                   # B-05; before the environment loads the machine
         vars: {BENCHES: '{{.BENCHES}}'}
         if: '[ "{{.BENCH}}" = true ]'
+      - task: operator:benchmark              # isolated browser measurements
+        if: '[ "{{.WEB}}" = true ]'
       - task: env:ci-test                     # fresh environment: smoke tests, FF-06, FF-04, TS-03 (B-01 nightly)
         vars: {NIGHTLY: '{{.NIGHTLY}}'}
         if: '[ "{{.ENV}}" = true ]'
@@ -244,6 +249,8 @@ tasks:
       - task: web:check                       # format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'
       - task: web:e2e                         # Playwright smoke of the built console
+        if: '[ "{{.WEB}}" = true ]'
+      - task: operator:test                   # native operator browser acceptance
         if: '[ "{{.WEB}}" = true ]'
       - task: docs:check                      # FF-08
         if: '[ "{{.DOCS}}" = true ]'

@@ -99,11 +99,15 @@ it("renders a generic route failure without internal error details", () => {
 
 it("recovers an unavailable operator snapshot without presenting a false empty feed", async () => {
   const f = fixture("operator");
+  let available = false;
   const fetch = vi
     .fn<typeof globalThis.fetch>()
-    .mockResolvedValueOnce(new Response("{}", { status: 503 }))
     .mockImplementation(() =>
-      Promise.resolve(new Response(JSON.stringify({ incidents: [], resumeToken: "snapshot" }))),
+      Promise.resolve(
+        available
+          ? new Response(JSON.stringify({ incidents: [], resumeToken: "snapshot" }))
+          : new Response("{}", { status: 503 }),
+      ),
     );
   f.factory.mockReturnValue(
     new FeedController(
@@ -120,6 +124,7 @@ it("recovers an unavailable operator snapshot without presenting a false empty f
   render(<RouterProvider router={createAppRouter(f.shell)} />);
   expect(await screen.findByText("Unavailable")).toBeDefined();
   expect(screen.queryByText("No active incidents")).toBeNull();
+  available = true;
   fireEvent.click(screen.getByRole("button", { name: "Refresh data" }));
   expect(await screen.findByText("No active incidents")).toBeDefined();
   expect(f.factory).toHaveBeenCalledOnce();

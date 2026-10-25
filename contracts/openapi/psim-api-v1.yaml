@@ -4863,6 +4863,10 @@ components:
       properties:
         device:
           $ref: '#/components/schemas/psim.catalog.v1.Device'
+        deviceType:
+          allOf:
+          - $ref: '#/components/schemas/psim.catalog.v1.DeviceType'
+          description: Capabilities are disclosed in the scope of the authorized device.
       description: GetDeviceResponse is the response of GetDevice.
     psim.api.v1.GetDeviceTypeResponse:
       type: object
