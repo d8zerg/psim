@@ -17,6 +17,12 @@ async function session(page: Page, roles: string[], path = "/") {
       body: JSON.stringify(route.request().url().endsWith("/certs") ? jwks : credentials),
     }),
   );
+  await page.route("**/v1/me", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({ userId: "operator", roles, siteIds: ["*"], actions: [] }),
+    }),
+  );
   await page.route("**/v1/feed/incidents", (route) => {
     snapshots += 1;
     return route.fulfill({
@@ -84,7 +90,7 @@ test("@gate shell preserves its live feed through navigation, back and logout", 
   await expect(page.getByTestId("incident-row")).toHaveText(/Live incident/u);
   await expect(page.getByTestId("connection-status")).toHaveAttribute("data-status", "open");
   await page.getByRole("link", { name: "Incident report", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Incident report" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Incident reports" })).toBeVisible();
   await page.goBack();
   await expect(page.getByTestId("incident-row")).toBeVisible();
   expect(f.snapshots()).toBe(1);
@@ -118,7 +124,7 @@ test("@gate shell preserves its live feed through navigation, back and logout", 
 });
 test("@gate manager deep links reject manual module access without opening incident APIs", async ({ page }) => {
   const f = await session(page, ["manager"], "/reports");
-  await expect(page.getByRole("heading", { name: "Incident report" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Incident reports" })).toBeVisible();
   expect(f.snapshots()).toBe(0);
   expect(f.sockets()).toBe(0);
   await page.evaluate(() => {

@@ -99,6 +99,8 @@
 - [Оболочка приложения и восстановление сессии](engineering/application-shell.md)
 - [Администрирование](engineering/administration.md)
 - [Размер поставки администрирования](engineering/administration-assets.md)
+- [Аудит и отчёты в интерфейсе](engineering/audit-and-reporting.md)
+- [Размер поставки аудита и отчётов](engineering/audit-and-reporting-assets.md)
 
 ## Участие и поддержка
 

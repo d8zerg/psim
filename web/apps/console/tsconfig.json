@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["vite/client"]
   },
-  "include": ["src", "e2e", "e2e-event-flow", "e2e-operator", "e2e-admin", "*.config.ts"]
+  "include": ["src", "e2e", "e2e-event-flow", "e2e-operator", "e2e-admin", "e2e-insights", "*.config.ts"]
 }

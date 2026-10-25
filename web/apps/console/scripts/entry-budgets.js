@@ -4,7 +4,7 @@ import { gzipSync } from "node:zlib";
 import process from "node:process";
 const root = resolve(import.meta.dirname, "../dist");
 const manifest = JSON.parse(readFileSync(resolve(root, ".vite/manifest.json"), "utf8"));
-const consoleLimit = Number(process.argv[2] ?? 240000);
+const consoleLimit = Number(process.argv[2] ?? 250000);
 if (!Number.isFinite(consoleLimit) || consoleLimit <= 0) throw new Error("Invalid console budget");
 const measurements = {};
 for (const [entry, limit] of [

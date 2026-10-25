@@ -1,0 +1,14 @@
+version: '3'
+vars:
+  INSIGHTS_PROJECT: '{{.INSIGHTS_PROJECT | default "psim-insights-test"}}'
+  PRESET: '{{.PRESET | default "release"}}'
+tasks:
+  test:
+    desc: Audit and reporting browser with real PKCE, signed exports, database tampering and reference metrics
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: '{{.PRESET}}'}
+      - task: :web:gen
+      - task: :web:_run
+        vars: {CMD: pnpm --filter @psim/console build}
+      - python3 -I tools/insights/check.py {{.INSIGHTS_PROJECT}} {{.PRESET}}

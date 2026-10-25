@@ -6,6 +6,7 @@ import { allowedModules, modules } from "./modules";
 import { useStrings } from "../ui/strings";
 const Home = lazy(async () => ({ default: (await import("../operator/page")).OperatorPage }));
 const Administration = lazy(async () => ({ default: (await import("../admin/page")).AdministrationPage }));
+const Insights = lazy(async () => ({ default: (await import("../insights/page")).InsightsPage }));
 export function ModulePage() {
   const { session } = useShell();
   const t = useStrings();
@@ -45,18 +46,16 @@ export function ModulePage() {
         <Administration integration={module.key === "integrations"} />
       </Suspense>
     );
-  const descriptions = {
-    administration: t.administrationHint,
-    integrations: t.integrationsHint,
-    audit: t.auditHint,
-    reports: t.reportsModuleHint,
-  };
   return (
-    <main id="main-content" tabIndex={-1} className="workbench">
-      <p className="eyebrow">{t.title}</p>
-      <h1>{t[module.key]}</h1>
-      <p>{descriptions[module.key]}</p>
-    </main>
+    <Suspense
+      fallback={
+        <main id="main-content" tabIndex={-1} className="workbench">
+          <p role="status">{t.loading}</p>
+        </main>
+      }
+    >
+      <Insights audit={module.key === "audit"} />
+    </Suspense>
   );
 }
 export function RouteError({ reset }: { readonly reset: () => void }) {

@@ -1,6 +1,6 @@
 # Эксплуатационные функции MVP
 
-Решение владельца продукта · [ADR-042](../adr/0042-operational-capabilities.md) · [границы MVP](../product/mvp-scope.md)
+Принято · [ADR-042](../adr/0042-operational-capabilities.md) · [границы MVP](../product/mvp-scope.md)
 
 Документ определяет дополнения к плану. Их реализация относится к указанным шагам; статус готовности ведётся в [progress.md](../progress.md).
 

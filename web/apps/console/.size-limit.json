@@ -2,7 +2,7 @@
   {
     "name": "Application shell and design previews (gzip)",
     "path": ["dist/assets/*.js", "dist/*.js"],
-    "limit": "294 kB",
+    "limit": "300 kB",
     "gzip": true
   },
   {

@@ -11,6 +11,15 @@
 version: 1
 
 methods:
+  - id: TS-37
+    kind: test
+    name: Аудит и отчёт руководителя через публичный интерфейс
+    criteria: Реальный PKCE с TOTP, поиск и страницы аудита, независимая проверка скачанного JSONL, точное обнаружение изменения и удаления записи в PostgreSQL, запрет чужой площадки, отзыв роли при прежнем JWT, эталонные метрики за 30 суток менее чем за три секунды и совпадающий CSV
+    env: E-LOCAL
+    gate: pr
+    barrier: automated
+    task: task insights:test
+    steps: ['8.5']
   - id: TS-36
     kind: test
     name: Администрирование через публичный интерфейс
@@ -1116,7 +1125,7 @@ scenarios:
   - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29, TS-35]}
   - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29, TS-35]}
   - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21, TS-28, TS-35]}
-  - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28]}
+  - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28, TS-37]}
   - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24, TS-32]}
   - {id: S12, methods: [C-12]}
-  - {id: S13, methods: [L-09, TS-30, TS-10, TS-11, M-05]}
+  - {id: S13, methods: [L-09, TS-30, TS-10, TS-11, M-05, TS-37]}

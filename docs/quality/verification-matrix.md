@@ -7,7 +7,7 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 18 | 15 | 0 | 3 | 36 |
+| Наборы тестов | 19 | 15 | 0 | 3 | 37 |
 | Нагрузка | 0 | 3 | 8 | 0 | 11 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
@@ -15,7 +15,7 @@
 | Fitness functions | 19 | 1 | 2 | 0 | 22 |
 | Безопасность | 4 | 2 | 3 | 0 | 9 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 46 | 27 | 29 | 4 | **106** |
+| **Всего** | 47 | 27 | 29 | 4 | **107** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -59,10 +59,10 @@
 | [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr), TS-35 (on-demand) |
 | [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr), TS-35 (on-demand) |
 | [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr), TS-35 (on-demand) |
-| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr) |
+| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr), TS-37 (pr) |
 | [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
-| [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (nightly), M-05 (release) |
+| [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (nightly), M-05 (release), TS-37 (pr) |
 
 ## 5. Каталог методов
 
@@ -70,6 +70,7 @@
 
 | ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
 |---|---|---|---|---|---|---|
+| TS-37 | Аудит и отчёт руководителя через публичный интерфейс | Реальный PKCE с TOTP, поиск и страницы аудита, независимая проверка скачанного JSONL, точное обнаружение изменения и удаления записи в PostgreSQL, запрет чужой площадки, отзыв роли при прежнем JWT, эталонные метрики за 30 суток менее чем за три секунды и совпадающий CSV. | E-LOCAL | pr | `task insights:test` | 8.5 |
 | TS-36 | Администрирование через публичный интерфейс | Реальный PKCE с MFA, регистрация и продление сертификата, отображение нового типа коннектора, иерархия и импорт, обслуживание, SLA, правило с пробным прогоном, публикация сценария, запрет чужой площадки и недопустимых загрузок. | E-LOCAL | pr | `task admin:test` | 8.4 |
 | TS-35 | Рабочая консоль оператора | Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности. | E-LOCAL | on-demand | `task operator:test` | 8.3 |
 | TS-34 | Сессия и ролевые маршруты оболочки | PKCE, проверка ID token, одиночный refresh, очистка при выходе, прямой вход, ролевые границы и поздние ответы. Назначение: Проверить изоляцию сессий и общую оболочку без смешивания рабочих данных пользователей. | E-CI | pr | `task web:check` | 8.2 |
@@ -259,7 +260,7 @@
 | 8.2 | TS-34, TS-14 |
 | 8.3 | TS-35, B-07, TS-11, TS-15, TS-19, TS-21 |
 | 8.4 | TS-36, TS-11, TS-20 |
-| 8.5 | TS-11 |
+| 8.5 | TS-37, TS-11 |
 | 8.6 | TS-11, TS-14, TS-15 |
 | 9.1 | L-06, C-15, TS-18, TS-22 |
 | 9.2 | C-12 |

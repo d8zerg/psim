@@ -138,3 +138,95 @@
 .admin-result-fields dd {
   margin: 0;
 }
+
+.insights-section {
+  display: grid;
+  gap: var(--space-3);
+  margin-block: var(--space-4);
+  min-width: 0;
+}
+.insights-fields {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  align-items: end;
+}
+.insights-fields label {
+  display: grid;
+  gap: var(--space-2);
+}
+.insights-fields select {
+  width: 100%;
+  min-height: var(--control-height);
+  color: var(--foreground);
+  background: var(--card);
+  border: 1px solid var(--border);
+  font: inherit;
+}
+.insights-actions {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.insights-table {
+  overflow: auto;
+  max-width: 100%;
+}
+.insights-table table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.insights-table th,
+.insights-table td {
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+.insights-details {
+  overflow-wrap: anywhere;
+  min-width: min(25rem, 100%);
+}
+.insights-details dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.insights-details > div {
+  margin-block: var(--space-2);
+}
+.insights-totals,
+.insights-charts {
+  display: grid;
+  gap: var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.insights-totals dd {
+  margin: 0;
+  font-weight: 600;
+}
+.insights-charts figure {
+  margin: 0;
+  min-width: 0;
+}
+.insights-charts svg {
+  width: 100%;
+  color: var(--foreground);
+}
+.insights-charts text {
+  fill: currentColor;
+  font-size: var(--body-size);
+}
+.insights-series-primary {
+  fill: var(--link);
+}
+.insights-series-secondary {
+  fill: var(--muted-foreground);
+}
+
+.insights-chart-scroll {
+  overflow: auto;
+}
+.insights-charts svg {
+  min-width: 40rem;
+}

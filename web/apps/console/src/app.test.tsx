@@ -66,7 +66,7 @@ it("loads an allowed deep link, gates manual navigation and clears the session o
   window.history.replaceState(null, "", "/reports");
   const router = createAppRouter(f.shell);
   render(<RouterProvider router={router} />);
-  expect(await screen.findByRole("heading", { name: "Incident report" })).toBeDefined();
+  expect(await screen.findByRole("heading", { name: "Incident reports" })).toBeDefined();
   expect(screen.queryByRole("link", { name: "Administration" })).toBeNull();
   await act(async () => {
     await router.navigate({ to: "/admin" });
@@ -79,7 +79,7 @@ it("loads an allowed deep link, gates manual navigation and clears the session o
 it.each([
   ["admin", "Administration"],
   ["integrator", "Integrations"],
-  ["auditor", "Audit"],
+  ["auditor", "Audit log"],
 ])("chooses the default module for %s", async (role, title) => {
   const f = fixture(role);
   render(<RouterProvider router={createAppRouter(f.shell)} />);
