@@ -345,7 +345,9 @@ class Check:
         return report, time.monotonic() - started
 
     def imports(self):
+        before = self.sql("SELECT (SELECT count(*) FROM catalog.resources)::text || ':' || (SELECT count(*) FROM catalog.sources)::text || ':' || (SELECT count(*) FROM catalog.psim_outbox WHERE topic='psim.catalog.v1')::text")
         dry, _ = self.import_job([self.device(-1)], True)
+        assert self.sql("SELECT (SELECT count(*) FROM catalog.resources)::text || ':' || (SELECT count(*) FROM catalog.sources)::text || ':' || (SELECT count(*) FROM catalog.psim_outbox WHERE topic='psim.catalog.v1')::text") == before
         assert dry["rowsCreated"] == 1 and dry["rowsFailed"] == 0
         assert self.request("GET", "/v1/devices?locationId=" + self.site_id)["devices"] == []
         rows = [self.device(index) for index in range(self.count)]

@@ -42,6 +42,7 @@ export function CommandsPanel({
     getNextPageParam: (page) => (page.nextPageToken?.length ? page.nextPageToken : undefined),
     enabled: live,
   });
+  const entries = commands.data?.pages.flatMap((page) => page.commands ?? []) ?? [];
   if ([401, 403].includes(statusOf(commands.error))) return <Notice tone="warning">{t.forbidden}</Notice>;
   return (
     <Card title={t.commands}>
@@ -53,21 +54,20 @@ export function CommandsPanel({
         writable={writable && !commands.isError}
         actions={actions}
         live={live}
+        knownCommands={entries}
       />
       {commands.isError && <Notice tone="warning">{t.detailsError}</Notice>}
       <ul>
-        {commands.data?.pages
-          .flatMap((page) => page.commands ?? [])
-          .map((command) => (
-            <CommandItem
-              key={command.commandId}
-              command={command}
-              api={api}
-              actions={actions}
-              writable={writable && !commands.isError}
-              profile={profile}
-            />
-          ))}
+        {entries.map((command) => (
+          <CommandItem
+            key={command.commandId}
+            command={command}
+            api={api}
+            actions={actions}
+            writable={writable && !commands.isError}
+            profile={profile}
+          />
+        ))}
       </ul>
       {commands.hasNextPage && (
         <Button
@@ -90,7 +90,9 @@ function CommandForm({
   writable,
   actions,
   live,
+  knownCommands,
 }: {
+  readonly knownCommands: readonly Command[];
   readonly api: OperatorApi;
   readonly incident: Incident;
   readonly run: Run | undefined;
@@ -109,17 +111,38 @@ function CommandForm({
     command: CommandRequest;
     preview: Awaited<ReturnType<OperatorApi["preview"]>>;
     signature: string;
+    run: Run | undefined;
+    items: readonly { command: CommandRequest; preview: Awaited<ReturnType<OperatorApi["preview"]>> }[];
   } | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  const [result, setResult] = useState<Command | null>(null);
+  const [results, setResults] = useState<readonly Command[]>([]);
+  const [resolvedIds, setResolvedIds] = useState<readonly string[]>([]);
+  const ids = proposal?.run
+    ? resolvedIds.length
+      ? resolvedIds
+      : (run?.steps?.find((entry) => entry.stepId === proposal.command.stepId)?.result?.commandIds ?? [])
+    : proposal?.command.commandId
+      ? [proposal.command.commandId]
+      : [];
+  const known = knownCommands.find((command) => ids.includes(command.commandId ?? ""));
+  const result = results.find((command) => ids.includes(command.commandId ?? ""));
+  const current = finished(known) ? known : finished(result) ? result : (known ?? result);
+  const settled =
+    ids.length > 0 &&
+    ids.every(
+      (id) =>
+        finished(knownCommands.find((command) => command.commandId === id)) ||
+        finished(results.find((command) => command.commandId === id)),
+    );
   const step = plan?.steps?.find((step) => step.stepId === stepId && run?.activeStepIds?.includes(stepId));
+  const group = step?.command?.targetExpression === "zone.devices";
   const deviceId = step?.command?.deviceId?.length ? step.command.deviceId : device;
   const commandCapability = step?.command?.capability?.length ? step.command.capability : capability;
   const deviceQuery = useQuery({
     ...queryDefaults,
     queryKey: ["device", deviceId],
     queryFn: ({ signal }) => api.device(deviceId, signal),
-    enabled: live && /^[0-9a-f-]{36}$/iu.test(deviceId),
+    enabled: live && !group && /^[0-9a-f-]{36}$/iu.test(deviceId),
   });
   const deviceDenied = [401, 403].includes(statusOf(deviceQuery.error));
   const capabilities = deviceDenied ? [] : (deviceQuery.data?.deviceType?.capabilities ?? []);
@@ -131,12 +154,14 @@ function CommandForm({
     effective,
     stepId,
     run?.runId,
+    stepId ? run?.version : undefined,
     incident.version,
     reason,
   ]);
-  const valid =
-    Boolean(chosen) &&
-    chosen?.parameters?.every((param) => !param.required || Boolean(effective[param.name ?? ""])) !== false;
+  const valid = group
+    ? Boolean(incident.zoneId && commandCapability)
+    : Boolean(chosen) &&
+      chosen?.parameters?.every((param) => !param.required || Boolean(effective[param.name ?? ""])) !== false;
   const allowed = writable && !deviceQuery.isError && valid && (!stepId || Boolean(step?.command));
   async function preview() {
     const command: CommandRequest = {
@@ -148,10 +173,28 @@ function CommandForm({
       ...(stepId ? { runId: run?.runId ?? "", stepId } : {}),
     };
     await actions.perform(async () => {
-      const response = await api.preview(command);
-      setProposal({ command, preview: response, signature });
+      const targets: string[] = [];
+      if (group) {
+        let token = "";
+        do {
+          const page = await api.devices(incident.zoneId ?? "", AbortSignal.timeout(15000), token);
+          for (const item of page.devices ?? []) if (item.deviceId) targets.push(item.deviceId);
+          if (targets.length > 128) throw new Error("Command target count exceeds limit");
+          token = page.nextPageToken ?? "";
+        } while (token);
+      } else targets.push(deviceId);
+      if (!targets.length) throw new Error("Command has no targets");
+      const items = [];
+      for (const target of targets) {
+        const request = { ...command, deviceId: target };
+        items.push({ command: request, preview: await api.preview(request) });
+      }
+      const first = items[0];
+      if (!first) throw new Error("Command has no preview");
+      setProposal({ ...first, signature, run: stepId ? run : undefined, items });
+      setResolvedIds([]);
       setSubmitted(false);
-      setResult(null);
+      setResults([]);
     });
   }
   return (
@@ -171,9 +214,9 @@ function CommandForm({
         }}
       />
       <Field
-        label={t.deviceId}
-        value={deviceId}
-        disabled={Boolean(step?.command?.deviceId) || submitted}
+        label={group ? t.zoneColumn : t.deviceId}
+        value={group ? (incident.zoneId ?? "") : deviceId}
+        disabled={Boolean(step?.command?.deviceId) || group || submitted}
         onChange={(event) => {
           setDevice(event.target.value);
           setCapability("");
@@ -186,7 +229,9 @@ function CommandForm({
         disabled={Boolean(step?.command) || submitted}
         options={[
           { value: "", label: t.capability },
-          ...capabilities.map((item) => ({ value: item.code ?? "", label: item.name ?? item.code ?? "" })),
+          ...(group
+            ? [{ value: commandCapability, label: commandCapability }]
+            : capabilities.map((item) => ({ value: item.code ?? "", label: item.name ?? item.code ?? "" }))),
         ]}
         onChange={(event) => {
           setCapability(event.target.value);
@@ -224,13 +269,17 @@ function CommandForm({
       </Button>
       {!deviceDenied && proposal && (
         <div>
-          <p>
-            {t.deviceId}: {proposal.command.deviceId} · {t.capability}: {proposal.command.capability}
-          </p>
-          <p>
-            {t.consequence}: {proposal.preview.consequenceUnknown ? t.unknownConsequence : proposal.preview.consequence}
-          </p>
-          {proposal.preview.requiresSecondSupervisor && <Notice live={false}>{t.requiresApproval}</Notice>}
+          {proposal.items.map((item) => (
+            <div key={item.command.deviceId}>
+              <p>
+                {t.deviceId}: {item.command.deviceId} · {t.capability}: {item.command.capability}
+              </p>
+              <p>
+                {t.consequence}: {item.preview.consequenceUnknown ? t.unknownConsequence : item.preview.consequence}
+              </p>
+              {item.preview.requiresSecondSupervisor && <Notice live={false}>{t.requiresApproval}</Notice>}
+            </div>
+          ))}
           {proposal.signature !== signature && !submitted && <Notice tone="warning">{t.previewExpired}</Notice>}
           <Button
             variant="danger"
@@ -240,11 +289,19 @@ function CommandForm({
               void actions.perform(async () => {
                 // Record the operational reason before dispatch; a lost dispatch response is reconciled by ID.
                 await api.comment(incident, reason);
-                const response = await api.send({
-                  ...proposal.command,
-                  previewFingerprint: proposal.preview.fingerprint ?? "",
-                });
-                setResult(response.command ?? null);
+                if (proposal.run && proposal.command.stepId) {
+                  const response = await api.step(proposal.run, proposal.command.stepId, "complete", { note: reason });
+                  setResolvedIds(
+                    response.run?.steps?.find((entry) => entry.stepId === proposal.command.stepId)?.result
+                      ?.commandIds ?? [],
+                  );
+                } else {
+                  const response = await api.send({
+                    ...proposal.command,
+                    previewFingerprint: proposal.preview.fingerprint ?? "",
+                  });
+                  setResults(response.command ? [response.command] : []);
+                }
               });
             }}
           >
@@ -253,22 +310,54 @@ function CommandForm({
           {submitted && (
             <>
               <p>
-                <code>{proposal.command.commandId}</code>
+                {ids.length ? (
+                  ids.map((id) => <code key={id}>{id} </code>)
+                ) : (
+                  <span>
+                    {t.run}: <code>{proposal.run?.runId}</code>
+                  </span>
+                )}
               </p>
               <Notice tone="warning" live={false}>
-                {result ? commandState(result, t) : t.outcomeUnknown}
+                {current ? commandState(current, t) : t.outcomeUnknown}
               </Notice>
               <Button
                 variant="secondary"
                 disabled={!live || actions.pending}
                 onClick={() => {
                   void actions.perform(async () => {
-                    const response = await api.command(proposal.command.commandId ?? "", AbortSignal.timeout(15000));
-                    setResult(response.command ?? null);
+                    let requested = ids;
+                    if (proposal.run) {
+                      const response = await api.run(incident.incidentId ?? "", AbortSignal.timeout(15000));
+                      requested =
+                        response.run?.steps?.find((entry) => entry.stepId === proposal.command.stepId)?.result
+                          ?.commandIds ?? [];
+                      setResolvedIds(requested);
+                    }
+                    const checked: Command[] = [];
+                    for (const id of requested) {
+                      const response = await api.command(id, AbortSignal.timeout(15000));
+                      if (response.command) checked.push(response.command);
+                    }
+                    setResults(checked);
                   });
                 }}
               >
                 {t.refreshCommand}
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!writable || !settled}
+                onClick={() => {
+                  setSubmitted(false);
+                  setProposal(null);
+                  setResults([]);
+                  setResolvedIds([]);
+                  setStepId("");
+                  setReason("");
+                }}
+              >
+                {t.newCommand}
               </Button>
             </>
           )}
@@ -276,6 +365,15 @@ function CommandForm({
       )}
     </div>
   );
+}
+function finished(command: Command | null | undefined): boolean {
+  return [
+    "COMMAND_STATE_EXECUTED",
+    "COMMAND_STATE_FAILED",
+    "COMMAND_STATE_REJECTED",
+    "COMMAND_STATE_TIMED_OUT",
+    "COMMAND_STATE_CANCELLED",
+  ].includes(command?.state ?? "");
 }
 function commandState(command: Command, t: ReturnType<typeof useStrings>): string {
   const labels = {

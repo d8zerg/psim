@@ -19,6 +19,7 @@ for (const [entry, limit] of [
     const asset = manifest[key];
     if (!asset) throw new Error(`Missing entry asset: ${key}`);
     if (asset.file.endsWith(".js")) files.add(asset.file);
+    for (const file of asset.assets ?? []) if (file.endsWith(".json")) files.add(file);
     for (const dependency of [...(asset.imports ?? []), ...(asset.dynamicImports ?? [])]) collect(dependency);
   }
   collect(entry);

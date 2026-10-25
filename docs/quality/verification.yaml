@@ -11,6 +11,16 @@
 version: 1
 
 methods:
+  - id: TS-38
+    kind: test
+    name: Загрузка и восстановление веб-модулей
+    criteria: Сравнение исходной сборки, статических модулей, отложенных редакторов, языковых словарей и отдельных входов; ru/en, реальные холодный и прогретый HTTP-кэш, полные графы с динамическими imports и данными словарей, запрет преждевременной загрузки закрытого маршрута, ошибка чанка, обновление артефакта и повтор загрузки перевода с сохранением ввода
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task web:loading
+    steps: ['8.6']
+    purpose: Сравнение способов загрузки и проверка действующих пределов до изменения поставки
   - id: TS-37
     kind: test
     name: Аудит и отчёт руководителя через публичный интерфейс
@@ -162,11 +172,11 @@ methods:
   - id: TS-11
     kind: test
     name: Сквозные UI-тесты Playwright
-    criteria: Сценарии S1, S2, S6-S10, S13 через интерфейс; замер событие -> отрисовка
+    criteria: Сценарии S1, S2, S6-S10, S13 через интерфейс с настоящими Keycloak, Kafka и сервисами; обязательные шаги, перезапуск и сохранение версии сценария, второе подтверждение команды, передача ответственности, завершение и закрытие инцидента
     env: E-CI
-    gate: nightly
+    gate: pr
     barrier: automated
-    task: task web:e2e
+    task: task web:native
     steps: ['8.3', '8.4', '8.5', '8.6']
   - id: TS-12
     kind: test
@@ -189,11 +199,11 @@ methods:
   - id: TS-14
     kind: test
     name: Устойчивость консоли к разрывам связи
-    criteria: Разрыв на 5 мин восстанавливается без потери изменений; RESYNC при выходе за окно
+    criteria: Разрыв не менее 5 мин восстанавливается без потери изменений; просроченный JWT с учётом допуска часов получает 401, новый токен отличается от прежнего; replay и перезапуск Gateway, RESYNC при выходе за окно
     env: E-CI
-    gate: nightly
+    gate: pr
     barrier: automated
-    task: task shell:test
+    task: task web:session
     steps: ['8.2', '8.6']
   - id: TS-15
     kind: test
@@ -1124,7 +1134,7 @@ scenarios:
   - {id: S6, methods: [L-05, TS-11, TS-12, TS-19, TS-32, TS-35]}
   - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29, TS-35]}
   - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29, TS-35]}
-  - {id: S9, methods: [TS-08, TS-10, TS-17, TS-21, TS-28, TS-35]}
+  - {id: S9, methods: [TS-08, TS-10, TS-11, TS-17, TS-21, TS-28, TS-35]}
   - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28, TS-37]}
   - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24, TS-32]}
   - {id: S12, methods: [C-12]}

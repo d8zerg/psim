@@ -1,7 +1,7 @@
 [
   {
-    "name": "Application shell and design previews (gzip)",
-    "path": ["dist/assets/*.js", "dist/*.js"],
+    "name": "Application code and dictionaries (gzip)",
+    "path": ["dist/assets/*.js", "dist/*.js", "dist/assets/*.json"],
     "limit": "300 kB",
     "gzip": true
   },

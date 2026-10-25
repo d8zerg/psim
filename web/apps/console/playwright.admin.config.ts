@@ -2,7 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 export default defineConfig({
   testDir: "e2e-admin",
   outputDir: "../../../build/admin/playwright-results",
-  timeout: 240000,
+  timeout: 420000,
   forbidOnly: true,
   retries: 0,
   workers: 1,

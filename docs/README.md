@@ -102,6 +102,9 @@
 - [Аудит и отчёты в интерфейсе](engineering/audit-and-reporting.md)
 - [Размер поставки аудита и отчётов](engineering/audit-and-reporting-assets.md)
 
+- [Квалификация веб-клиента](engineering/web-client-quality.md)
+- [Сравнение загрузки веб-клиента](engineering/web-client-loading.md)
+
 ## Участие и поддержка
 
 - [Участие в проекте](../CONTRIBUTING.md)

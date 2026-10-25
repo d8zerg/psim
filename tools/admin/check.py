@@ -89,6 +89,8 @@ def main(project, preset):
         (output / "fixture.json").write_text(json.dumps({"username": username, "password": password, "userId": user, "scopedUsername": scoped_username, "foreignFloorId": foreign_floor["locationId"], "renewedCertificatePem": renewed_pem.read_text(), "connectorId": connector, "connectorType": "admin-browser-" + connector, "certificatePem": pem.read_text(), "preset": preset}))
         check.run(["docker", "run", "--rm", "--name", project + "-admin-browser", "--network", "container:" + project + "-console-1", "--ipc=host", "-u", f"{os.getuid()}:{os.getgid()}", "-e", "HOME=/cache/home", "-e", "COREPACK_HOME=/cache/corepack", "-e", "PLAYWRIGHT_BROWSERS_PATH=/ms-playwright", "-e", "PSIM_ADMIN_PRESET=" + preset, "-v", str(ROOT) + ":/repo", "-v", str(ROOT / ".cache/web") + ":/cache", "-w", "/repo/web", PLAYWRIGHT, "node", "apps/console/node_modules/@playwright/test/cli.js", "test", "-c", "apps/console/playwright.admin.config.ts"])
         browser = json.loads((output / "browser.json").read_text())
+        assert browser["importRows"] == 50000 and browser["importMs"] <= 300000
+        assert len(browser["floorIds"]) == 3 and len(browser["zoneIds"]) == 20
         site = browser["siteId"]
         assert check.request("GET", "/v1/locations/" + browser["zoneId"])["location"]["siteId"] == site
         assert check.request("GET", "/v1/devices/" + browser["deviceId"])["device"]["connectorId"] == connector

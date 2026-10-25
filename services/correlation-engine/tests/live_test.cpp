@@ -17,6 +17,36 @@ namespace psim::correlation::live {
 namespace {
 using namespace test;
 
+TEST(LiveControl, CatalogAddsDistinctDevicesAndReplacesOnlyTheUpdatedDevice) {
+  constexpr auto kDevice = "55555555-5555-4555-8555-555555555555";
+  Control control({"intrusion.zone.alarm"});
+  catalog::v1::CatalogRecord record;
+  record.mutable_envelope()->set_tenant_id(kTenant);
+  auto* device = record.mutable_device();
+  device->set_device_id(kDevice);
+  device->set_version(1);
+  device->set_state(catalog::v1::RESOURCE_STATE_ACTIVE);
+  device->add_sources()->set_source_id(kRule);
+  ASSERT_TRUE(control.catalog(record));
+  device->set_device_id(kSite);
+  ASSERT_TRUE(control.catalog(record));
+  ASSERT_EQ(control.context(kTenant).subjects.size(), 2);
+  device->set_device_id(kDevice);
+  device->set_version(2);
+  device->mutable_sources(0)->set_source_id(kSite);
+  ASSERT_TRUE(control.catalog(record));
+  ASSERT_EQ(control.context(kTenant).subjects.size(), 2);
+  device->set_version(3);
+  device->set_state(catalog::v1::RESOURCE_STATE_DISABLED);
+  ASSERT_TRUE(control.catalog(record));
+  ASSERT_EQ(control.context(kTenant).subjects.size(), 1);
+  EXPECT_EQ(control.context(kTenant).subjects.front().event().device_id(), kSite);
+  device->set_version(1);
+  device->set_state(catalog::v1::RESOURCE_STATE_ACTIVE);
+  ASSERT_TRUE(control.catalog(record));
+  EXPECT_EQ(control.context(kTenant).subjects.size(), 1);
+}
+
 TEST(LiveCorrelation, SnapshotRestoresSuppressionAndDuplicateIdentity) {
   auto spec = rule();
   spec.mutable_suppression()->set_seconds(1);

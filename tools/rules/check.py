@@ -220,6 +220,7 @@ class Check(HttpCheck):
         for topic in ("psim.signals.v1", "psim.incidents.events.v1", "psim.commands.v1", "psim.response.events.v1"):
             assert before["ends"][topic] == after["ends"][topic], (topic, before, after)
         assert self.sql("SELECT count(*) FROM rules.dry_runs WHERE input IS NOT NULL AND finished AND tenant='" + self.tenant + "'") == "3"
+        assert self.sql("SELECT count(*) FROM rules.dry_runs WHERE jsonb_array_length(input->'subjects')=0 AND finished AND tenant='" + self.tenant + "'") == "3"
         self.mark("Kafka and ClickHouse agree; versioned suppression, private results, pagination and zero production writes")
 
     def models(self):
@@ -243,6 +244,9 @@ class Check(HttpCheck):
             saved = self.request("POST", "/v1/rules", body)["rule"]
             self.rule_id = saved["ruleId"]
             result = self.completed(self.dry_run())
+            inventory = kind == "absence" and "trigger" not in spec
+            present = self.sql("SELECT jsonb_array_length(input->'subjects')>0 FROM rules.dry_runs WHERE id='" + result["dryRun"]["dryRunId"] + "'")
+            assert present == ("t" if inventory else "f"), (kind, present)
             assert len(result["decisions"]) == count, (kind, result)
             if kind == "conjunction":
                 assert len(result["signals"][0]["eventIds"]) == 2

@@ -3,7 +3,7 @@
 - **Статус:** Принято
 - **Связанные:** [ADR-037](0037-web-monorepo.md), [ADR-062](0062-design-system-and-stable-updates.md)
 - **Дополнение:** [ADR-069](0069-application-shell-and-session-recovery.md) - общая поставка рабочей оболочки и витрины
-- **На рассмотрении:** [ADR-070](0070-lazy-loading-and-delivery-budgets.md) - варианты ленивой загрузки и сравнение перед изменением бюджетов
+- **Дополнение:** [ADR-070](0070-lazy-loading-and-delivery-budgets.md) - варианты ленивой загрузки и сравнение перед изменением бюджетов
 
 ## Решение
 

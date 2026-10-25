@@ -7,7 +7,7 @@
 
 | Вид | pr | nightly | release | on-demand | Всего |
 |---|---|---|---|---|---|
-| Наборы тестов | 19 | 15 | 0 | 3 | 37 |
+| Наборы тестов | 22 | 13 | 0 | 3 | 38 |
 | Нагрузка | 0 | 3 | 8 | 0 | 11 |
 | Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
 | Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
@@ -15,7 +15,7 @@
 | Fitness functions | 19 | 1 | 2 | 0 | 22 |
 | Безопасность | 4 | 2 | 3 | 0 | 9 |
 | Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 47 | 27 | 29 | 4 | **107** |
+| **Всего** | 50 | 25 | 29 | 4 | **108** |
 
 ## 2. Цели SLO (план, раздел 1.3)
 
@@ -23,14 +23,14 @@
 |---|---|---|---|
 | G-01 | Пропускная способность | 50 000 событий/с устойчиво в течение 24 ч, пиковый ×1,5 в течение 10 мин | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
 | G-02 | Задержка событие -> сигнал | p99 ≤ 300 мс | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
-| G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (nightly), FF-05 (release), TS-31 (pr), TS-32 (pr) |
+| G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (pr), FF-05 (release), TS-31 (pr), TS-32 (pr) |
 | G-04 | Задержка отклика REST API | p99 ≤ 200 мс для операций чтения консоли | L-05 (release) |
 | G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
 | G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
 | G-07 | RTO, кластерная топология | ≤ 60 с при отказе любого одного узла | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release), C-15 (release) |
 | G-08 | RPO для инцидентов | 0 в кластерной топологии | C-03 (release), C-11 (release) |
 | G-09 | Обновление | Без простоя обработки в кластерной топологии | C-12 (release) |
-| G-10 | Консоль | Плавная работа ленты с 10 000 активных инцидентов | TS-15 (nightly), TS-14 (nightly) |
+| G-10 | Консоль | Плавная работа ленты с 10 000 активных инцидентов | TS-15 (nightly), TS-14 (pr) |
 
 ## 3. Цели инженерного качества (план, раздел 1.4)
 
@@ -50,19 +50,19 @@
 
 | Сценарий | Методы |
 |---|---|
-| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (nightly), M-01 (release), TS-22 (nightly), TS-24 (pr), TS-28 (pr), TS-29 (pr), TS-36 (pr) |
-| [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), L-07 (nightly), TS-18 (nightly), TS-24 (pr), TS-29 (pr), TS-31 (pr), TS-36 (pr) |
+| [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (pr), M-01 (release), TS-22 (nightly), TS-24 (pr), TS-28 (pr), TS-29 (pr), TS-36 (pr) |
+| [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (pr), L-07 (nightly), TS-18 (nightly), TS-24 (pr), TS-29 (pr), TS-31 (pr), TS-36 (pr) |
 | [S3](../product/acceptance-spec.md) | TS-09 (pr), TS-10 (nightly), L-02 (release) |
 | [S4](../product/acceptance-spec.md) | TS-07 (on-demand), TS-10 (nightly), L-02 (release), TS-20 (nightly), TS-23 (nightly) |
 | [S5](../product/acceptance-spec.md) | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), C-02 (nightly), TS-28 (pr), TS-29 (pr) |
-| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (nightly), TS-12 (pr), TS-19 (nightly), TS-32 (pr), TS-35 (on-demand) |
-| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr), TS-35 (on-demand) |
-| [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (nightly), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr), TS-35 (on-demand) |
-| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-17 (nightly), TS-21 (nightly), TS-28 (pr), TS-35 (on-demand) |
-| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (nightly), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr), TS-37 (pr) |
-| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (nightly), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
+| [S6](../product/acceptance-spec.md) | L-05 (release), TS-11 (pr), TS-12 (pr), TS-19 (nightly), TS-32 (pr), TS-35 (on-demand) |
+| [S7](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (pr), TS-17 (nightly), L-08 (release), TS-21 (nightly), TS-28 (pr), TS-29 (pr), TS-35 (on-demand) |
+| [S8](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (pr), TS-12 (pr), C-10 (nightly), TS-23 (nightly), TS-29 (pr), TS-35 (on-demand) |
+| [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-11 (pr), TS-17 (nightly), TS-21 (nightly), TS-28 (pr), TS-35 (on-demand) |
+| [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (pr), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr), TS-37 (pr) |
+| [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (pr), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
-| [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (nightly), M-05 (release), TS-37 (pr) |
+| [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (pr), M-05 (release), TS-37 (pr) |
 
 ## 5. Каталог методов
 
@@ -70,6 +70,7 @@
 
 | ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
 |---|---|---|---|---|---|---|
+| TS-38 | Загрузка и восстановление веб-модулей | Сравнение исходной сборки, статических модулей, отложенных редакторов, языковых словарей и отдельных входов; ru/en, реальные холодный и прогретый HTTP-кэш, полные графы с динамическими imports и данными словарей, запрет преждевременной загрузки закрытого маршрута, ошибка чанка, обновление артефакта и повтор загрузки перевода с сохранением ввода. Назначение: Сравнение способов загрузки и проверка действующих пределов до изменения поставки. | E-CI | pr | `task web:loading` | 8.6 |
 | TS-37 | Аудит и отчёт руководителя через публичный интерфейс | Реальный PKCE с TOTP, поиск и страницы аудита, независимая проверка скачанного JSONL, точное обнаружение изменения и удаления записи в PostgreSQL, запрет чужой площадки, отзыв роли при прежнем JWT, эталонные метрики за 30 суток менее чем за три секунды и совпадающий CSV. | E-LOCAL | pr | `task insights:test` | 8.5 |
 | TS-36 | Администрирование через публичный интерфейс | Реальный PKCE с MFA, регистрация и продление сертификата, отображение нового типа коннектора, иерархия и импорт, обслуживание, SLA, правило с пробным прогоном, публикация сценария, запрет чужой площадки и недопустимых загрузок. | E-LOCAL | pr | `task admin:test` | 8.4 |
 | TS-35 | Рабочая консоль оператора | Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности. | E-LOCAL | on-demand | `task operator:test` | 8.3 |
@@ -85,10 +86,10 @@
 | TS-08 | Симуляция конвейера, длинный прогон | Ручной запуск 10 000 прогонов; ошибка воспроизводится по зерну, версии модели и параметрам; трасса сохраняется для регрессионного теста (ADR-044). | E-DEV | on-demand | `task sim:long` | 2.7, 5.2 |
 | TS-09 | Сквозной смоук-тест конвейера в Docker Compose | Событие симулятора порождает инцидент, видимый через API и realtime; одна трассировка на весь путь. | E-CI | pr | `task test:smoke` | 3.1 |
 | TS-10 | Приёмочные API-тесты сценариев | Сценарии acceptance-spec.md, выполнимые через API и протокол коннекторов, включая негативные проверки. | E-CI | nightly | `task test:acceptance` | 3.1, 11.3 |
-| TS-11 | Сквозные UI-тесты Playwright | Сценарии S1, S2, S6-S10, S13 через интерфейс; замер событие -> отрисовка. | E-CI | nightly | `task web:e2e` | 8.3, 8.4, 8.5, 8.6 |
+| TS-11 | Сквозные UI-тесты Playwright | Сценарии S1, S2, S6-S10, S13 через интерфейс с настоящими Keycloak, Kafka и сервисами; обязательные шаги, перезапуск и сохранение версии сценария, второе подтверждение команды, передача ответственности, завершение и закрытие инцидента. | E-CI | pr | `task web:native` | 8.3, 8.4, 8.5, 8.6 |
 | TS-12 | Матрица прав «роль × действие × область» | Все действия и шесть ролей, тенант, площадка и зона; запросы к сервисам и Gateway, компактные наборы областей и отзыв REST/WSS до истечения JWT; отказы в аудите. | E-CI | pr | `task test:authz` | 7.4 |
 | TS-13 | Тест целостности аудита | Изменение, удаление и вставка записи в БД обнаруживаются проверкой с точностью до записи. | E-CI | pr | `task test:audit-integrity` | 6.4 |
-| TS-14 | Устойчивость консоли к разрывам связи | Разрыв на 5 мин восстанавливается без потери изменений; RESYNC при выходе за окно. | E-CI | nightly | `task shell:test` | 8.2, 8.6 |
+| TS-14 | Устойчивость консоли к разрывам связи | Разрыв не менее 5 мин восстанавливается без потери изменений; просроченный JWT с учётом допуска часов получает 401, новый токен отличается от прежнего; replay и перезапуск Gateway, RESYNC при выходе за окно. | E-CI | pr | `task web:session` | 8.2, 8.6 |
 | TS-15 | Производительность ленты консоли | 10 000 активных инцидентов, прокрутка ≥ 50 кадров/с, применение дельты без блокировки интерфейса. | E-CI | nightly | `task web:perf` | 8.3, 8.6 |
 | TS-16 | Автоматическая проверка доступности интерфейса | axe-core без критичных нарушений на ключевых экранах. Назначение: DoD шага 8.1. | E-CI | nightly | `task web:a11y` | 8.1 |
 | TS-17 | Возобновление сценариев и таймеров после перезапуска | Перезапуск Response Engine посреди сценария и перед срабатыванием таймера; погрешность таймеров ≤ 1 с. | E-CI | nightly | `task test:timers` | 6.1, 6.3 |
@@ -261,7 +262,7 @@
 | 8.3 | TS-35, B-07, TS-11, TS-15, TS-19, TS-21 |
 | 8.4 | TS-36, TS-11, TS-20 |
 | 8.5 | TS-37, TS-11 |
-| 8.6 | TS-11, TS-14, TS-15 |
+| 8.6 | TS-38, TS-11, TS-14, TS-15 |
 | 9.1 | L-06, C-15, TS-18, TS-22 |
 | 9.2 | C-12 |
 | 9.3 | M-02, TS-18, TS-22 |

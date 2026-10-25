@@ -10,6 +10,7 @@ function collect(key, target = files) {
   if (!entry) throw new Error(`Missing initial asset: ${key}`);
   if (target.has(entry.file)) return;
   target.add(entry.file);
+  for (const file of entry.assets ?? []) if (file.endsWith(".json")) target.add(file);
   for (const dependency of entry.imports ?? []) collect(dependency, target);
 }
 collect("index.html");

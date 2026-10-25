@@ -33,7 +33,7 @@ struct Result {
 
 class Control {
  public:
-  explicit Control(std::set<std::string> taxonomy, std::size_t max_entries = 100000);
+  explicit Control(std::set<std::string> taxonomy, std::size_t max_entries = 120000);
   p::Result<void> config(const config::v1::ConfigRecord& record);
   p::Result<void> catalog(const catalog::v1::CatalogRecord& record);
   p::Result<std::shared_ptr<const rules::CompiledRule>> compiled(const std::string& tenant, const rules::Rule& rule);

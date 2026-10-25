@@ -114,6 +114,11 @@ asio::awaitable<p::Result<HistoricalInput>> History::read(Job job) {
   if (!request) {
     co_return std::unexpected(request.error());
   }
+  auto rule = parse<rules::Rule>(job.rule);
+  if (!rule) {
+    co_return std::unexpected(rule.error());
+  }
+  const bool inventory = rule->has_absence() && !rule->absence().has_trigger();
   const auto from = Time::TimestampToMilliseconds(request->from());
   const auto to = Time::TimestampToMilliseconds(request->to());
   const bool kafka = request->source() == api::v1::DRY_RUN_SOURCE_KAFKA;
@@ -204,13 +209,13 @@ asio::awaitable<p::Result<HistoricalInput>> History::read(Job job) {
           old = value->location();
         }
       }
-      if (value->has_device() && scoped(job, value->device().site_id(), value->device().zone_id())) {
+      if (inventory && value->has_device() && scoped(job, value->device().site_id(), value->device().zone_id())) {
         auto& old = devices[value->device().device_id()];
         if (value->device().version() > old.version()) {
           old = value->device();
         }
       }
-      if (devices.size() + input.context.locations.size() > 50000) {
+      if (devices.size() + input.context.locations.size() > 60000) {
         return p::fail(Code::kCommonRateLimited, "historical catalog limit exceeded");
       }
       return {};

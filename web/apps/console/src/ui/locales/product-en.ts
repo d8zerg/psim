@@ -52,6 +52,8 @@ export const strings = {
   timedOut: "Timed out",
   cancelled: "Cancelled",
   outcomeUnknown: "Outcome unknown. Do not resend.",
+  run: "Response run",
+  newCommand: "New command",
   refreshCommand: "Check command result",
   acceptTransfer: "Accept responsibility",
   reviewTransfer: "I reviewed this version of the incident and response run",

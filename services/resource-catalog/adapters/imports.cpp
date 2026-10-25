@@ -152,7 +152,7 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
                           .action = "import"};
         auto rows = co_await tx->connection().query(
             {.sql = "SELECT row,body::text FROM catalog.import_rows WHERE tenant=$1::uuid AND job=$2::uuid AND "
-                    "row>$3::integer ORDER BY row LIMIT 16",
+                    "row>$3::integer ORDER BY row LIMIT 64",
              .parameters = {Param::text(tenant), Param::text(id), Param::integer(processed)}});
         if (!rows) {
           co_return std::unexpected(rows.error());
@@ -201,7 +201,7 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
                 if (!savepoint) {
                   co_return std::unexpected(savepoint.error());
                 }
-                result = co_await apply(tx, std::move(*resource), mutation, std::chrono::system_clock::now());
+                result = co_await apply(tx, std::move(*resource), mutation, std::chrono::system_clock::now(), !dry_run);
                 if (!result || dry_run) {
                   auto rollback = co_await tx->connection().query({.sql = "ROLLBACK TO SAVEPOINT import_row"});
                   if (!rollback) {

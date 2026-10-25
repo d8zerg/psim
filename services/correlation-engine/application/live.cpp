@@ -153,8 +153,12 @@ p::Result<void> Control::catalog(const catalog::v1::CatalogRecord& record) {
     if (found != devices_.end() && found->second.version() >= device.version()) {
       return {};
     }
+    const bool replacing = found != devices_.end();
     devices_[id] = device;
-    std::erase_if(context.subjects, [&](const auto& value) { return value.event().device_id() == device.device_id(); });
+    if (replacing) {
+      std::erase_if(context.subjects,
+                    [&](const auto& value) { return value.event().device_id() == device.device_id(); });
+    }
     if (device.state() == catalog::v1::RESOURCE_STATE_ACTIVE) {
       for (const auto& source : device.sources()) {
         rules::Event subject;

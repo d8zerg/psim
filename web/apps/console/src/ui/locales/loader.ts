@@ -1,3 +1,4 @@
+import { loadModuleLocales } from "./modules";
 import type { strings as productStrings, messages as productMessages } from "./product-en";
 import type { strings as demoStrings, messages as demoMessages } from "./demo-en";
 export type Locale = "ru" | "en";
@@ -23,7 +24,11 @@ const demos = new Map<Locale, DemoDictionary>();
 const previews = new Map<Locale, DemoStrings>();
 /** The selected locale is loaded before the first render or an atomic language change. */
 export async function loadStrings(locale: Locale, design = false): Promise<void> {
-  const [product, demo] = await Promise.all([productImports[locale](), design ? demoImports?.[locale]() : undefined]);
+  const [product, demo] = await Promise.all([
+    productImports[locale](),
+    design ? demoImports?.[locale]() : undefined,
+    loadModuleLocales(locale),
+  ]);
   if (design && !demo) throw new Error("Preview dictionaries are not registered");
   products.set(locale, product);
   if (demo) {

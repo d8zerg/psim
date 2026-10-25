@@ -363,8 +363,8 @@ asio::awaitable<p::Result<void>> Repository::publish(pg::Transaction* tx, Resour
                            env->message_id());
 }
 
-asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, Resource resource, Mutation mutation,
-                                                   Time now) {
+asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, Resource resource, Mutation mutation, Time now,
+                                                   bool publish_changes) {
   auto old = co_await load(tx, mutation.principal.tenant, resource.kind, resource.id);
   if (!old && old.error().code() != Code::kCommonNotFound) {
     co_return std::unexpected(old.error());
@@ -669,9 +669,11 @@ asio::awaitable<p::Result<Json>> Repository::apply(pg::Transaction* tx, Resource
   if (!stored) {
     co_return std::unexpected(stored.error());
   }
-  auto published = co_await publish(tx, resource, mutation, now);
-  if (!published) {
-    co_return std::unexpected(published.error());
+  if (publish_changes) {
+    auto published = co_await publish(tx, resource, mutation, now);
+    if (!published) {
+      co_return std::unexpected(published.error());
+    }
   }
   co_return resource.body;
 }

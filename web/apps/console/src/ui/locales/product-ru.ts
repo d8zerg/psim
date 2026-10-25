@@ -53,6 +53,8 @@ export const strings = {
   timedOut: "Время истекло",
   cancelled: "Отменена",
   outcomeUnknown: "Исход неизвестен. Не отправляйте повторно.",
+  run: "Выполнение сценария",
+  newCommand: "Новая команда",
   refreshCommand: "Проверить результат команды",
   acceptTransfer: "Принять ответственность",
   reviewTransfer: "Я проверил эту версию инцидента и сценария",

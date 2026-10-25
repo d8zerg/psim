@@ -241,6 +241,8 @@ tasks:
         if: '[ "{{.BENCH}}" = true ]'
       - task: operator:benchmark              # isolated browser measurements
         if: '[ "{{.WEB}}" = true ]'
+      - task: web:loading
+        if: '[ "{{.WEB}}" = true ]'
       - task: env:ci-test                     # fresh environment: smoke tests, FF-06, FF-04, TS-03 (B-01 nightly)
         vars: {NIGHTLY: '{{.NIGHTLY}}'}
         if: '[ "{{.ENV}}" = true ]'
@@ -254,13 +256,9 @@ tasks:
         if: '[ "{{.CONNECTORS}}" = true ]'
       - task: web:check                       # format, generated clients, lint, types, tests, budgets
         if: '[ "{{.WEB}}" = true ]'
-      - task: web:e2e                         # Playwright smoke of the built console
+      - task: web:native
         if: '[ "{{.WEB}}" = true ]'
-      - task: operator:test                   # native operator browser acceptance
-        if: '[ "{{.WEB}}" = true ]'
-      - task: insights:test
-        if: '[ "{{.WEB}}" = true ]'
-      - task: admin:test
+      - task: web:session
         if: '[ "{{.WEB}}" = true ]'
       - task: docs:check                      # FF-08
         if: '[ "{{.DOCS}}" = true ]'

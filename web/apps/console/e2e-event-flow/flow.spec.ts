@@ -113,15 +113,37 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   const outageStarted = Date.now();
   await writeFile(`${directory}/outage-started.json`, JSON.stringify({ requestedMs: outage }));
   if (outage > 0) await new Promise((resolve) => setTimeout(resolve, outage));
+  const expiredToken = userToken.access_token;
+  let expiredTokenRejected = false;
+  let tokenRefreshed = false;
+  if (outage >= 300000) {
+    const claims = JSON.parse(Buffer.from(expiredToken.split(".")[1] ?? "", "base64url").toString("utf8")) as {
+      exp: number;
+    };
+    // Gateway permits up to 30 seconds of clock skew when checking expiry.
+    const expiryGuardMs = Math.max(0, (claims.exp + 31) * 1000 - Date.now());
+    expect(expiryGuardMs).toBeLessThanOrEqual(31000);
+    if (expiryGuardMs > 0) await new Promise((resolve) => setTimeout(resolve, expiryGuardMs));
+    expect(claims.exp).toBeLessThanOrEqual(Math.floor(Date.now() / 1000));
+    const rejected = await request.get("http://api-gateway:8080/v1/feed/incidents", {
+      headers: { Authorization: `Bearer ${expiredToken}` },
+    });
+    expiredTokenRejected = rejected.status() === 401;
+    expect(expiredTokenRejected).toBe(true);
+  }
   const refreshed =
     outage >= 300000
       ? page.waitForResponse((response) => response.url().endsWith("/protocol/openid-connect/token") && response.ok(), {
           timeout: 45000,
         })
       : undefined;
+  const offlineMs = Date.now() - outageStarted;
+  expect(offlineMs).toBeGreaterThanOrEqual(outage);
   await context.setOffline(false);
   if (refreshed) {
     userToken = (await (await refreshed).json()) as { access_token: string };
+    tokenRefreshed = userToken.access_token !== expiredToken;
+    expect(tokenRefreshed).toBe(true);
     const renewedService = await request.post("http://keycloak:8080/realms/psim/protocol/openid-connect/token", {
       form: { grant_type: "client_credentials", client_id: "psim-services", client_secret: "psim-dev-services-secret" },
     });
@@ -131,7 +153,13 @@ test("simulator reaches the browser through Kafka, resumes and resynchronizes af
   expect(Date.now() - outageStarted).toBeGreaterThanOrEqual(outage);
   await writeFile(
     `${directory}/outage.json`,
-    JSON.stringify({ requestedMs: outage, elapsedMs: Date.now() - outageStarted }),
+    JSON.stringify({
+      requestedMs: outage,
+      offlineMs,
+      elapsedMs: Date.now() - outageStarted,
+      expiredTokenRejected,
+      tokenRefreshed,
+    }),
   );
   await page.evaluate(() => {
     window.dispatchEvent(new Event("online"));

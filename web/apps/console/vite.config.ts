@@ -3,9 +3,13 @@ import { resolve } from "node:path";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig } from "vite";
+import { loadingVariant } from "./scripts/loading-variants.ts";
+const entry = process.env.PSIM_WEB_ENTRY ?? "combined";
+if (!["combined", "application", "design"].includes(entry)) throw new Error("Invalid web entry");
 const proxy = { "/v1": { target: process.env.PSIM_API_UPSTREAM ?? "http://localhost:8088", ws: true } };
 export default defineConfig({
   plugins: [
+    loadingVariant(process.env.PSIM_WEB_VARIANT ?? "inline"),
     react(),
     tailwindcss(),
     {
@@ -40,6 +44,13 @@ export default defineConfig({
     target: "es2023",
     sourcemap: true,
     manifest: true,
-    rolldownOptions: { input: { console: "index.html", design: "design-system.html" } },
+    rolldownOptions: {
+      input:
+        entry === "application"
+          ? { console: "index.html" }
+          : entry === "design"
+            ? { design: "design-system.html" }
+            : { console: "index.html", design: "design-system.html" },
+    },
   },
 });

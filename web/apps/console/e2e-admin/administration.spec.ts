@@ -115,19 +115,27 @@ test("S1-S2 administrator configures connector, mapping, catalog, import, rule a
   const buildingId = await location("BUILDING", "Browser building", siteId);
   const floorId = await location("FLOOR", "Browser floor", buildingId);
   const zoneId = await location("ZONE", "Browser zone", floorId);
-  await open(page, "Floor plans");
-  await page.getByLabel("Floor identifier").fill(floorId);
-  await page.getByRole("button", { name: "Select record", exact: true }).click();
-  await page.getByLabel("File", { exact: true }).setInputFiles(`${directory}/plan.png`);
-  await page.getByRole("button", { name: "Upload plan", exact: true }).click();
-  await expect(page.getByRole("button", { name: "View version 1" })).toBeVisible();
-  await page.getByRole("button", { name: "View version 1" }).click();
-  await expect(page.getByRole("img", { name: "Floor plans: 1" })).toBeVisible();
-  expect(
-    await page
-      .getByRole("img", { name: "Floor plans: 1" })
-      .evaluate((image: HTMLImageElement) => image.src.startsWith("blob:") && image.naturalWidth === 100),
-  ).toBe(true);
+  const floors = [floorId];
+  for (let index = 2; index <= 3; index++)
+    floors.push(await location("FLOOR", `Browser floor ${String(index)}`, buildingId));
+  const zones = [zoneId];
+  for (let index = 1; index < 20; index++)
+    zones.push(await location("ZONE", `Browser zone ${String(index)}`, floors[index % floors.length] ?? floorId));
+  for (const planFloor of floors) {
+    await open(page, "Floor plans");
+    await page.getByLabel("Floor identifier").fill(planFloor);
+    await page.getByRole("button", { name: "Select record", exact: true }).click();
+    await page.getByLabel("File", { exact: true }).setInputFiles(`${directory}/plan.png`);
+    await page.getByRole("button", { name: "Upload plan", exact: true }).click();
+    await expect(page.getByRole("button", { name: "View version 1" })).toBeVisible();
+    await page.getByRole("button", { name: "View version 1" }).click();
+    await expect(page.getByRole("img", { name: "Floor plans: 1" })).toBeVisible();
+    expect(
+      await page
+        .getByRole("img", { name: "Floor plans: 1" })
+        .evaluate((image: HTMLImageElement) => image.src.startsWith("blob:") && image.naturalWidth === 100),
+    ).toBe(true);
+  }
   const deviceType = await create(page, "Device types", "Browser device type");
   const deviceTypeId = await deviceType.getByLabel("Device type identifier", { exact: true }).inputValue();
   await deviceType.getByLabel("Code", { exact: true }).fill("browser-device-" + f.connectorId);
@@ -150,19 +158,64 @@ test("S1-S2 administrator configures connector, mapping, catalog, import, rule a
       sources: [{ kind: "alarm", externalRef: "browser-alarm", name: "Alarm" }],
     },
   ];
-  await open(page, "Device import");
-  await page.getByLabel("File", { exact: true }).setInputFiles({
-    name: "devices.json",
-    mimeType: "application/json",
-    buffer: Buffer.from(JSON.stringify(devices)),
-  });
-  await page.getByRole("button", { name: "Check import", exact: true }).click();
-  await expect(page.getByRole("button", { name: "Apply checked import", exact: true })).toBeEnabled();
-  await confirm(page, "Apply checked import");
-  await expect(page.getByTestId("admin-result").locator('[data-field="rowsCreated"]')).toHaveText("1");
+  async function importDevices(rows: readonly unknown[], created: string) {
+    await open(page, "Device import");
+    const started = Date.now();
+    await page
+      .getByLabel("File", { exact: true })
+      .setInputFiles({ name: "devices.json", mimeType: "application/json", buffer: Buffer.from(JSON.stringify(rows)) });
+    const checking = page.waitForRequest(
+      (request) => request.method() === "GET" && new URL(request.url()).pathname.startsWith("/v1/imports/"),
+    );
+    await page.getByRole("button", { name: "Check import", exact: true }).click();
+    const checked = (await checking).url();
+    await expect(page.getByRole("button", { name: "Apply checked import", exact: true })).toBeEnabled({
+      timeout: 300000,
+    });
+    const applied = page.waitForResponse((response) => {
+      const url = new URL(response.url());
+      return (
+        response.request().method() === "POST" &&
+        url.pathname === "/v1/imports" &&
+        url.searchParams.get("dryRun") === "false"
+      );
+    });
+    const selected = page.waitForResponse(
+      (response) =>
+        response.request().method() === "GET" &&
+        response.url() !== checked &&
+        new URL(response.url()).pathname.startsWith("/v1/imports/"),
+    );
+    await confirm(page, "Apply checked import");
+    expect((await applied).ok()).toBe(true);
+    const response = await selected;
+    expect(response.ok()).toBe(true);
+    await response.finished();
+    await expect(page.getByTestId("admin-result").locator('[data-field="state"]')).toHaveText("Completed", {
+      timeout: 300000,
+    });
+    await expect(page.getByTestId("admin-result").locator('[data-field="rowsCreated"]')).toHaveText(created, {
+      timeout: 300000,
+    });
+    return Date.now() - started;
+  }
+  await importDevices(devices, "1");
   await open(page, "Devices");
   await page.getByRole("button", { name: "Browser imported device " + f.connectorId, exact: true }).click();
   const deviceId = await page.getByLabel("Device identifier", { exact: true }).inputValue();
+  const first = devices[0];
+  if (!first) throw new Error("Missing import template");
+  for (let index = 1; index < 50000; index++)
+    devices.push({
+      ...first,
+      externalId: `qualification-device-${String(index)}`,
+      name: `Qualification device ${String(index).padStart(5, "0")}`,
+      zoneId: zones[index % zones.length] ?? zoneId,
+      sources: [{ kind: "alarm", externalRef: `qualification-alarm-${String(index)}`, name: "Alarm" }],
+    });
+  const importMs = await importDevices(devices, "49999");
+  await expect(page.getByTestId("admin-result").locator('[data-field="rowsUpdated"]')).toHaveText("1");
+  expect(importMs).toBeLessThanOrEqual(300000);
   await open(page, "Device import");
   await page
     .getByLabel("File", { exact: true })
@@ -245,6 +298,10 @@ test("S1-S2 administrator configures connector, mapping, catalog, import, rule a
     `${directory}/browser.json`,
     JSON.stringify(
       {
+        importMs,
+        importRows: devices.length,
+        floorIds: floors,
+        zoneIds: zones,
         siteId,
         incidentTypeId,
         zoneId,
@@ -259,7 +316,9 @@ test("S1-S2 administrator configures connector, mapping, catalog, import, rule a
           "unsupported upload rejected",
           "foreign floor denied to scoped administrator",
           "new connector normalization mapping",
-          "site/building/floor/zone creation",
+          "site, building, three floors and twenty zones",
+          "50000-row import through the browser within five minutes",
+          "existing import row updates without duplication",
           "private versioned floor plan",
           "validated device import",
           "incident type",

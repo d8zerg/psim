@@ -3,7 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { createApiClient } from "@psim/api-client";
 import type { ReactNode } from "react";
-import { OperatorApi, RequestFailure, type Incident, type Schema } from "./api";
+import { OperatorApi, RequestFailure, type Command, type Run, type Incident, type Schema } from "./api";
 import { IncidentPanel } from "./incident";
 import { ObjectPanel } from "./objects";
 import { CommandsPanel } from "./commands";
@@ -51,7 +51,7 @@ function fixture() {
     activeStepIds: ["instruction"],
     steps: [{ stepId: "instruction", state: "STEP_STATE_ACTIVE" }],
   };
-  const plan: Schema["psim.response.v1.ResponsePlan"] = {
+  let plan: Schema["psim.response.v1.ResponsePlan"] = {
     name: "Response plan",
     steps: [
       { stepId: "instruction", title: "Inspect object", mandatory: true, instruction: { text: "Verify safety" } },
@@ -59,6 +59,8 @@ function fixture() {
   };
   let fail = 0;
   let loseSend = false;
+  let partialCommands = false;
+  let commands: Command[] = [];
   const writes: { path: string; body: Record<string, unknown>; version: string | null }[] = [];
   const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async (input) => {
     // openapi-fetch always constructs a Request at this boundary.
@@ -101,7 +103,31 @@ function fixture() {
       });
     if (path.endsWith("/run")) return Response.json({ run, plan });
     if (path.startsWith("/v1/events/")) return Response.json({ event: { eventId: "event" } });
-    if (path === "/v1/commands" && get) return Response.json({ commands: [] });
+    if (path === "/v1/devices" && get)
+      return Response.json({
+        devices: [
+          { deviceId: url.searchParams.get("pageToken") ? "00000000-0000-4000-8000-000000000003" : deviceId },
+          ...(partialCommands && url.searchParams.get("pageToken")
+            ? [{ deviceId: "00000000-0000-4000-8000-000000000004" }]
+            : []),
+        ],
+        ...(!url.searchParams.get("pageToken") ? { nextPageToken: "next" } : {}),
+      });
+    if (path.startsWith("/v1/runs/") && !get) {
+      const step = plan.steps?.find((entry) => entry.stepId === run.activeStepIds?.[0]);
+      const commandIds = step?.command?.targetExpression
+        ? ["server-command-a", "server-command-b", ...(partialCommands ? ["server-command-c"] : [])]
+        : ["server-command-a"];
+      run = { ...run, steps: [{ stepId: step?.stepId ?? "command", result: { commandIds } }] };
+      commands = commandIds.map((commandId) => ({ commandId, state: "COMMAND_STATE_EXECUTED" }));
+      if (loseSend) throw new TypeError("response lost");
+      return Response.json({ run });
+    }
+    if (path === "/v1/commands" && get)
+      return Response.json({
+        commands: partialCommands ? commands.slice(0, 1) : commands,
+        ...(partialCommands ? { nextPageToken: "next" } : {}),
+      });
     if (path.startsWith("/v1/devices/"))
       return Response.json({
         device: { deviceId, deviceTypeId: "type" },
@@ -116,7 +142,12 @@ function fixture() {
       return Response.json({ command: { commandId: body.commandId, state: "COMMAND_STATE_EXECUTED" } });
     }
     if (path.startsWith("/v1/commands/"))
-      return Response.json({ command: { commandId: path.split("/")[3], state: "COMMAND_STATE_UNKNOWN" } });
+      return Response.json({
+        command: commands.find((command) => command.commandId === path.split("/")[3]) ?? {
+          commandId: path.split("/")[3],
+          state: "COMMAND_STATE_UNKNOWN",
+        },
+      });
     if (path === "/v1/incidents:transfer") {
       const items = body.items as { recipientId: string; transferId: string }[];
       incident = {
@@ -170,6 +201,16 @@ function fixture() {
     },
     setFail: (value: number) => {
       fail = value;
+    },
+    setResponse: (value: Run, definition: Schema["psim.response.v1.ResponsePlan"]) => {
+      run = value;
+      plan = definition;
+    },
+    setCommands: (value: Command[]) => {
+      commands = value;
+    },
+    partialCommands: () => {
+      partialCommands = true;
     },
     loseSend: () => {
       loseSend = true;
@@ -359,7 +400,7 @@ it("validates checklist and decision results, optional skip, failed retry and su
 it("binds command preview and blocks resend after an unknown delivery outcome", async () => {
   const f = fixture();
   f.loseSend();
-  mount((actions) => (
+  const { client } = mount((actions) => (
     <CommandsPanel
       api={f.api}
       incident={{ incidentId: id, version: "1" }}
@@ -384,10 +425,124 @@ it("binds command preview and blocks resend after an unknown delivery outcome", 
   await click("Confirm command");
   await screen.findByText(/The result is unknown/u);
   expect(screen.getByRole("button", { name: "Confirm command" }).hasAttribute("disabled")).toBe(true);
+  expect(screen.getByRole("button", { name: "New command" }).hasAttribute("disabled")).toBe(true);
   await click("Check command result");
+  expect(screen.getByRole("button", { name: "New command" }).hasAttribute("disabled")).toBe(true);
   expect(f.writes.filter((write) => write.path === "/v1/commands")).toHaveLength(1);
   expect(f.writes.find((write) => write.path === "/v1/commands")?.body.previewFingerprint).toBe("fingerprint");
+  const commandId = f.writes.find((write) => write.path === "/v1/commands")?.body.commandId;
+  if (typeof commandId !== "string") throw new Error("Missing command identifier");
+  f.setCommands([{ commandId, state: "COMMAND_STATE_EXECUTED" }]);
+  await act(async () => {
+    await client.invalidateQueries({ queryKey: ["commands"] });
+  });
+  await click("New command");
+  expect(screen.getByLabelText("Reason: Send device command")).toHaveProperty("value", "");
+  expect(screen.queryByRole("button", { name: "Confirm command" })).toBeNull();
+  fireEvent.change(screen.getByLabelText("Reason: Send device command"), { target: { value: "New verified intent" } });
+  await click("Preview command");
+  expect(f.writes.filter((write) => write.path === "/v1/commands:preview").at(-1)?.body.commandId).not.toBe(commandId);
+  expect(f.writes.filter((write) => write.path === "/v1/commands")).toHaveLength(1);
 });
+it("starts a distinct command only after a completed result and a fresh reason and preview", async () => {
+  const f = fixture();
+  mount((actions) => (
+    <CommandsPanel
+      api={f.api}
+      incident={{ incidentId: id, version: "1" }}
+      run={undefined}
+      plan={undefined}
+      live
+      writable
+      profile={profile}
+      actions={actions}
+    />
+  ));
+  fireEvent.change(screen.getByLabelText("Device", { exact: true }), { target: { value: deviceId } });
+  await screen.findByRole("option", { name: "Unlock door" });
+  fireEvent.change(screen.getByLabelText("Capability", { exact: true }), { target: { value: "unlock" } });
+  fireEvent.change(screen.getByLabelText(/Parameters: duration/u), { target: { value: "10" } });
+  fireEvent.change(screen.getByLabelText("Reason: Send device command"), { target: { value: "First intent" } });
+  await click("Preview command");
+  await click("Confirm command");
+  await click("New command");
+  expect(screen.getByRole("button", { name: "Preview command" }).hasAttribute("disabled")).toBe(true);
+  fireEvent.change(screen.getByLabelText("Reason: Send device command"), { target: { value: "Second intent" } });
+  await click("Preview command");
+  await click("Confirm command");
+  await click("New command");
+  const sent = f.writes.filter((write) => write.path === "/v1/commands");
+  expect(sent).toHaveLength(2);
+  expect(sent[0]?.body.commandId).not.toBe(sent[1]?.body.commandId);
+});
+it.each([
+  { group: false, lost: false },
+  { group: true, lost: false },
+  { group: false, lost: true },
+  { group: true, lost: true },
+])(
+  "dispatches a planned command through the response run and reconciles server identities, %o",
+  async ({ group, lost }) => {
+    const f = fixture();
+    if (lost) f.loseSend();
+    if (group && lost) f.partialCommands();
+    const run: Run = {
+      runId: "run",
+      version: "4",
+      activeStepIds: ["command"],
+      steps: [{ stepId: "command", state: "STEP_STATE_ACTIVE" }],
+    };
+    const plan: Schema["psim.response.v1.ResponsePlan"] = {
+      steps: [
+        {
+          stepId: "command",
+          title: "Operate",
+          command: {
+            capability: "unlock",
+            parameters: { duration: "10" },
+            ...(group ? { targetExpression: "zone.devices" } : { deviceId }),
+          },
+        },
+      ],
+    };
+    f.setResponse(run, plan);
+    mount((actions) => (
+      <CommandsPanel
+        api={f.api}
+        incident={{ incidentId: id, zoneId: "zone", version: "1" }}
+        run={run}
+        plan={plan}
+        live
+        writable
+        profile={profile}
+        actions={actions}
+      />
+    ));
+    fireEvent.change(screen.getByRole("combobox", { name: "Response plan" }), { target: { value: "command" } });
+    if (!group) await screen.findByRole("option", { name: "Unlock door" });
+    fireEvent.change(screen.getByLabelText("Reason: Send device command"), {
+      target: { value: "Verified response target" },
+    });
+    await click("Preview command");
+    expect(f.writes.filter((entry) => entry.path === "/v1/commands:preview")).toHaveLength(group ? (lost ? 3 : 2) : 1);
+    await click("Confirm command");
+    if (lost) {
+      expect(screen.getByRole("button", { name: "New command" }).hasAttribute("disabled")).toBe(true);
+      await click("Check command result");
+      expect(
+        f.fetch.mock.calls.some(([input]) => (input as Request).url.includes("/v1/commands/server-command-a")),
+      ).toBe(true);
+    }
+    if (group && lost)
+      expect(
+        f.fetch.mock.calls.some(([input]) => (input as Request).url.includes("/v1/commands/server-command-b")),
+      ).toBe(true);
+    await click("New command");
+    expect(f.writes.filter((entry) => entry.path === "/v1/commands")).toHaveLength(0);
+    expect(f.writes.find((entry) => entry.path === "/v1/runs/run/steps/command:complete")?.version).toBe('"4"');
+    expect(screen.queryByRole("button", { name: "Confirm command" })).toBeNull();
+  },
+);
 it("approves critical commands only after a fresh preview by another supervisor", async () => {
   const f = fixture();
   f.fetch.mockImplementation(async (input) => {
