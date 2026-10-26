@@ -99,7 +99,7 @@ topics:
     cleanup: delete
     semantics: Outbox
     producers: [incident-service]
-    consumers: [response-engine, projection-service, api-gateway]
+    consumers: [response-engine, command-service, event-history, projection-service, api-gateway]
 
   - name: psim.response.events.v1
     title: Response runs, commands, notifications, SLA, escalations and site duty
@@ -110,7 +110,7 @@ topics:
     cleanup: delete
     semantics: Outbox
     producers: [response-engine, command-service, notification-service]
-    consumers: [incident-service, response-engine, command-service, projection-service, notification-service, api-gateway]
+    consumers: [incident-service, response-engine, command-service, event-history, projection-service, notification-service, api-gateway]
 
   - name: psim.commands.v1
     title: Commands routed to connector sessions
@@ -153,8 +153,8 @@ topics:
     retention: infinite
     cleanup: compact
     semantics: Outbox
-    producers: [correlation-engine, normalizer, resource-catalog]
-    consumers: [normalizer, correlation-engine, event-history, projection-service]
+    producers: [correlation-engine, normalizer, resource-catalog, incident-service]
+    consumers: [normalizer, correlation-engine, event-history, projection-service, resource-catalog]
 
   - name: psim.audit.v1
     title: Audit entries and checkpoints

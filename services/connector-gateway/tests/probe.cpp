@@ -21,23 +21,55 @@
 #include <utility>
 #include <vector>
 
+#include "psim/platform/async/blocking_pool.hpp"
 #include "psim/platform/connector/client.hpp"
 #include "psim/platform/connector/grpc_process.hpp"
+#include "psim/platform/kafka/client.hpp"
 #include "psim/platform/kafka/consumer.hpp"
+#include "psim/platform/kafka/producer.hpp"
 #include "psim/platform/kafka/serde.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "support.hpp"
 
 namespace psim::connector_gateway::testing {
 namespace {
+p::kafka::ClientOptions reader_options() {
+  p::kafka::ClientOptions options{
+      .bootstrap = "kafka-1:19092", .client_id = "gateway-probe-reader", .allow_plaintext = true};
+  if (probe_configuration().contains("kafka")) {
+    const auto& kafka = probe_configuration().at("kafka");
+    options.bootstrap = kafka.at("brokers").get<std::string>();
+    options.allow_plaintext = false;
+    options.security =
+        p::kafka::TransportSecurity{.tls = {.ca_file = kafka.at("ca_file").get<std::string>(),
+                                            .certificate_file = kafka.at("certificate_file").get<std::string>(),
+                                            .private_key_file = kafka.at("private_key_file").get<std::string>()}};
+  }
+  return options;
+}
+
+asio::awaitable<void> fence(std::string identity, p::async::BlockingPool* blocking) {
+  const auto executor = co_await asio::this_coro::executor;
+  auto producer = p::kafka::Producer::create(
+      executor, {.client = reader_options(), .transactional_id = std::move(identity)}, {.blocking = blocking});
+  if (!producer) {
+    throw std::runtime_error("qualification producer unavailable");
+  }
+  auto initialized = co_await (*producer)->init_transactions(std::chrono::seconds(10));
+  if (!initialized) {
+    throw std::runtime_error("qualification producer fencing failed");
+  }
+  std::println("Transactional producer epoch advanced without publishing data");
+}
+
 asio::awaitable<void> verify(std::set<std::string> expected) {
   const auto total = expected.size();
   auto executor = co_await asio::this_coro::executor;
-  auto consumer = p::kafka::Consumer::create(
-      executor, {.client = {.bootstrap = "kafka-1:19092", .client_id = "gateway-probe-reader", .allow_plaintext = true},
-                 .group_id = "gateway-probe-" + p::stream::uuid7(),
-                 .topics = {"psim.ingest.raw.v1"},
-                 .group_protocol = "classic"});
+  auto options = reader_options();
+  auto consumer = p::kafka::Consumer::create(executor, {.client = std::move(options),
+                                                        .group_id = "gateway-probe-" + p::stream::uuid7(),
+                                                        .topics = {"psim.ingest.raw.v1"},
+                                                        .group_protocol = "classic"});
   if (!consumer) {
     throw std::runtime_error("probe consumer unavailable");
   }
@@ -62,12 +94,14 @@ asio::awaitable<void> verify(std::set<std::string> expected) {
   }
 }
 
-void bench(std::size_t per_client) {
+void bench(std::size_t per_client, bool require_rate = true) {
   constexpr int kClients = 16;
   for (int index = 0; index < kClients; ++index) {
-    enroll(index);
+    enroll(index, 1000000, std::chrono::seconds(20));
   }
-  std::barrier gate(kClients + 1);
+  std::chrono::steady_clock::time_point started;
+  std::barrier gate(kClients + 1, [&started]() noexcept { started = std::chrono::steady_clock::now(); });
+  std::vector<std::chrono::steady_clock::time_point> completed(kClients);
   std::vector<std::jthread> workers;
   std::mutex mutex;
   std::vector<std::string> errors;
@@ -105,6 +139,7 @@ void bench(std::size_t per_client) {
             throw std::runtime_error("load batch rejected");
           }
           accepted.fetch_add(ack.accepted());
+          completed.at(static_cast<std::size_t>(index)) = std::chrono::steady_clock::now();
           if (std::chrono::steady_clock::now() - heartbeat >= std::chrono::seconds(2)) {
             if (!stream.heartbeat()) {
               throw std::runtime_error("load heartbeat failed");
@@ -124,9 +159,10 @@ void bench(std::size_t per_client) {
     });
   }
   gate.arrive_and_wait();
-  const auto start = std::chrono::steady_clock::now();
   workers.clear();
-  const auto seconds = std::chrono::duration<double>(std::chrono::steady_clock::now() - start).count();
+  // Measure durable acknowledgements independently of client teardown and fixture destruction.
+  const auto finished = std::max(started, std::ranges::max(completed));
+  const auto seconds = std::max(0.001, std::chrono::duration<double>(finished - started).count());
   const auto rate = static_cast<double>(accepted.load()) / seconds;
   std::println("gateway benchmark: clients={}, instances=2, accepted={}, seconds={:.3f}, events_per_second={:.0f}",
                kClients, accepted.load(), seconds, rate);
@@ -137,16 +173,58 @@ void bench(std::size_t per_client) {
     throw std::runtime_error("gateway load did not acknowledge every event");
   }
   run(verify(std::move(expected)));
-  if (rate < 50000) {
+  if (require_rate && rate < 50000) {
     throw std::runtime_error("gateway rate is below 50000 events/s");
   }
 }
 
+void smoke() {
+  const auto directory = std::filesystem::path(fixture_directory()) / ("sdk-" + p::stream::uuid7());
+  p::connector::Client client({.endpoint = probe_configuration().value("sdk_endpoint", "toxiproxy:18080"),
+                               .ca_file = tls_directory() + "/ca.pem",
+                               .certificate_file = prefix(19) + ".pem",
+                               .private_key_file = prefix(19) + ".key",
+                               .buffer_directory = directory.string()});
+  auto started = client.start();
+  if (!started) {
+    throw std::runtime_error(started.error().message());
+  }
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(15);
+  while (!client.diagnostics().connected && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(20));
+  }
+  if (!client.diagnostics().connected) {
+    throw std::runtime_error("qualification SDK did not establish a session");
+  }
+  wire::ConnectorEvent input;
+  input.set_source_ref("door/alarm");
+  input.set_raw_code("ALARM");
+  *input.mutable_occurred_at() = Util::GetCurrentTime();
+  auto published = client.publish(std::move(input));
+  if (!published) {
+    throw std::runtime_error(published.error().message());
+  }
+  if (!client.flush(std::chrono::seconds(30))) {
+    throw std::runtime_error("qualification event was not durably acknowledged: " + client.diagnostics().last_error);
+  }
+  const auto diagnostics = client.diagnostics();
+  client.stop();
+  if (diagnostics.acknowledged != 1 || diagnostics.rejected != 0 || diagnostics.pending_events != 0) {
+    throw std::runtime_error("qualification SDK acknowledgement invariants failed");
+  }
+  std::ofstream output(std::filesystem::path(fixture_directory()) / "event.json");
+  output << nlohmann::json{{"event_id", published->event_id()}}.dump() << '\n';
+  if (!output) {
+    throw std::runtime_error("cannot write qualification event identity");
+  }
+  std::println("Connector SDK event durably acknowledged with no pending or rejected events");
+}
+
 void failover() {
-  enroll(18);
-  const auto directory = std::filesystem::path(".cache/gateway-test") / ("sdk-" + p::stream::uuid7());
-  p::connector::Client client({.endpoint = "toxiproxy:18080",
-                               .ca_file = ".cache/event-flow/ca.pem",
+  enroll(18, 1000000, std::chrono::seconds(20));
+  const auto directory = std::filesystem::path(fixture_directory()) / ("sdk-" + p::stream::uuid7());
+  p::connector::Client client({.endpoint = probe_configuration().value("sdk_endpoint", "toxiproxy:18080"),
+                               .ca_file = tls_directory() + "/ca.pem",
                                .certificate_file = prefix(18) + ".pem",
                                .private_key_file = prefix(18) + ".key",
                                .buffer_directory = directory.string(),
@@ -178,7 +256,7 @@ void failover() {
       throw std::runtime_error(stored.error().message());
     }
     expected.insert(stored->event_id());
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    std::this_thread::sleep_for(std::chrono::milliseconds(probe_configuration().value("failover_interval_ms", 1)));
   }
   if (!client.flush(std::chrono::seconds(45))) {
     throw std::runtime_error("SDK failed to drain through gateway failover: " + client.diagnostics().last_error);
@@ -201,10 +279,19 @@ int main(int argc, char** argv) {
     const psim::platform::connector::GrpcProcess grpc;
     const std::span<char*> args(argv, static_cast<std::size_t>(argc));
     if (argc < 2) {
-      throw std::runtime_error("usage: gateway-probe bench [events-per-client] | failover");
+      throw std::runtime_error("usage: gateway-probe bench [events-per-client] | failover | enroll | smoke | fence id");
     }
     if (std::string_view(args[1]) == "bench") {
       psim::connector_gateway::testing::bench(argc > 2 ? std::stoull(args[2]) : 25000);
+    } else if (std::string_view(args[1]) == "emit") {
+      psim::connector_gateway::testing::bench(argc > 2 ? std::stoull(args[2]) : 100, false);
+    } else if (std::string_view(args[1]) == "enroll") {
+      (void)psim::connector_gateway::testing::enroll(19, 1000000, std::chrono::seconds(20));
+    } else if (std::string_view(args[1]) == "smoke") {
+      psim::connector_gateway::testing::smoke();
+    } else if (std::string_view(args[1]) == "fence" && argc == 3) {
+      psim::platform::async::BlockingPool blocking(1, 4);
+      psim::connector_gateway::testing::run(psim::connector_gateway::testing::fence(args[2], &blocking));
     } else if (std::string_view(args[1]) == "failover") {
       psim::connector_gateway::testing::failover();
     } else if (std::string_view(args[1]) == "verify" && argc == 3) {

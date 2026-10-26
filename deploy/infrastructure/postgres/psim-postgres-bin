@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+. /opt/psim/pg-env.sh
+exec "/usr/lib/postgresql/18/bin/${0##*/}" "$@"

@@ -135,7 +135,7 @@ asio::awaitable<Result<void>> Loader::initialize(pg::Pool* journal) {
   if (!locked_bootstrap) {
     co_return std::unexpected(locked_bootstrap.error());
   }
-  auto schema = co_await (*lease)->query({.sql = "CREATE SCHEMA IF NOT EXISTS psim_clickhouse"});
+  auto schema = co_await pg::ensure_schema(&**lease, "psim_clickhouse");
   if (!schema) {
     co_return std::unexpected(schema.error());
   }

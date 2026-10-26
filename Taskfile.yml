@@ -51,6 +51,12 @@ vars:
   CI_SCOPE: build/{{.PLATFORM}}/ci-scope.json
 
 includes:
+  deploy:
+    taskfile: ./tools/taskfiles/deploy.yml
+    dir: .
+  vm:
+    taskfile: ./tools/taskfiles/vm.yml
+    dir: .
   toolchain:
     taskfile: ./tools/taskfiles/toolchain.yml
     dir: .
@@ -267,6 +273,8 @@ tasks:
       - task: release:package:test            # FF-18
         if: '[ "{{.RELEASE}}" = true ]'
       - task: release:images:test             # FF-19
+        if: '[ "{{.RELEASE}}" = true ]'
+      - task: deploy:check
         if: '[ "{{.RELEASE}}" = true ]'
 
   ci:nightly:

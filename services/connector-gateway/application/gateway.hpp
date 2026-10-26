@@ -20,7 +20,6 @@
 
 namespace psim::connector_gateway {
 struct SessionState;
-struct DeliveryBatch;
 
 class Gateway final : public platform::stream::Worker,
                       public connector::v1::ConnectorGatewayService::CallbackService,
@@ -57,7 +56,6 @@ class Gateway final : public platform::stream::Worker,
   boost::asio::awaitable<platform::Result<void>> state(std::shared_ptr<SessionState> session);
   boost::asio::awaitable<platform::Result<void>> result(std::shared_ptr<SessionState> session);
   boost::asio::awaitable<platform::Result<void>> deliver(std::vector<platform::kafka::Record> records);
-  boost::asio::awaitable<void> send_one(std::shared_ptr<DeliveryBatch> batch, platform::kafka::Record record);
   boost::asio::awaitable<platform::Result<void>> quota(std::shared_ptr<SessionState> session, std::uint32_t count);
   boost::asio::awaitable<platform::Result<connector::v1::ManageResponse>> manage(connector::v1::ManageRequest request,
                                                                                  std::string token);

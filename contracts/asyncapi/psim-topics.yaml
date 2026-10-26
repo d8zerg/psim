@@ -840,6 +840,20 @@ operations:
     messages:
     - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
     x-psim-service: response-engine
+  commandServiceReceiveIncidentsEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: command-service
+  eventHistoryReceiveIncidentsEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/incidentsEventsV1'
+    messages:
+    - $ref: '#/channels/incidentsEventsV1/messages/IncidentEventRecord'
+    x-psim-service: event-history
   projectionServiceReceiveIncidentsEventsV1:
     action: receive
     channel:
@@ -896,6 +910,13 @@ operations:
     messages:
     - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
     x-psim-service: command-service
+  eventHistoryReceiveResponseEventsV1:
+    action: receive
+    channel:
+      $ref: '#/channels/responseEventsV1'
+    messages:
+    - $ref: '#/channels/responseEventsV1/messages/ResponseEventRecord'
+    x-psim-service: event-history
   projectionServiceReceiveResponseEventsV1:
     action: receive
     channel:
@@ -1029,6 +1050,13 @@ operations:
     messages:
     - $ref: '#/channels/configV1/messages/ConfigRecord'
     x-psim-service: resource-catalog
+  incidentServiceSendConfigV1:
+    action: send
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: incident-service
   normalizerReceiveConfigV1:
     action: receive
     channel:
@@ -1057,6 +1085,13 @@ operations:
     messages:
     - $ref: '#/channels/configV1/messages/ConfigRecord'
     x-psim-service: projection-service
+  resourceCatalogReceiveConfigV1:
+    action: receive
+    channel:
+      $ref: '#/channels/configV1'
+    messages:
+    - $ref: '#/channels/configV1/messages/ConfigRecord'
+    x-psim-service: resource-catalog
   allServicesSendAuditV1:
     action: send
     channel:

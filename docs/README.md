@@ -104,6 +104,9 @@
 
 - [Квалификация веб-клиента](engineering/web-client-quality.md)
 - [Сравнение загрузки веб-клиента](engineering/web-client-loading.md)
+- [Поставка двух топологий](engineering/deployment-topologies.md)
+- [Локальный стенд KVM](engineering/local-vm-lab.md)
+- [Первоначальное доверие и учётные записи](engineering/deployment-pki.md)
 
 ## Участие и поддержка
 

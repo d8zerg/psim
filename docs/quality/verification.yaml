@@ -283,11 +283,11 @@ methods:
   - id: L-06
     kind: load
     name: Ввод через два экземпляра шлюза
-    criteria: 50 000 событий/с через 2 экземпляра Connector Gateway; падение экземпляра без потерь
+    criteria: 50 000 событий/с через 2 экземпляра Connector Gateway до подтверждения Kafka; прочие прикладные процессы на совмещённом локальном профиле временно остановлены; падение экземпляра без потерь
     env: E-CLUSTER
     gate: release
     barrier: automated
-    task: task gateway:verify
+    task: task deploy:gateway:qualify
     steps: ['4.2', '9.1']
   - id: L-07
     kind: load

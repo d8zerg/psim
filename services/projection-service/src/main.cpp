@@ -143,6 +143,9 @@ class Worker final : public p::stream::Worker {
       healthy_.store(false);
       running_ = false;
       done_.cancel();
+      if (!stopping_) {
+        context().request_failure();
+      }
     });
     co_return p::Result<void>{};
   }
@@ -152,7 +155,8 @@ class Worker final : public p::stream::Worker {
       auto result = co_await loader_->run_once();
       if (!result) {
         healthy_.store(false);
-        context().logger().warn("incident facts batch deferred", {{"code", std::string(result.error().name())}});
+        context().logger().warn("incident facts batch deferred", {{"code", std::string(result.error().name())},
+                                                                  {"error", std::string(result.error().message())}});
         if (output_->fatal()) {
           co_return;
         }

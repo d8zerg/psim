@@ -37,6 +37,7 @@
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/security/tls.hpp"
+#include "psim/platform/stream/redis.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/response/v1/command.pb.h"
 #include "psim/response/v1/events.pb.h"
@@ -74,16 +75,7 @@ asio::awaitable<p::Result<std::optional<std::string>>> lookup_session(p::redis::
 }
 
 p::redis::PoolOptions redis_options(const p::config::Config& config) {
-  p::redis::PoolOptions options;
-  options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
-  options.connection.endpoint.port = "6379";
-  options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
-  options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
-  options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
-  if (auto password = config.secret("settings.redis_password_file")) {
-    options.connection.credentials.password = std::string(*password);
-  }
-  options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
+  auto options = p::stream::redis_options(config);
   options.connection.connect_timeout = std::chrono::milliseconds(500);
   options.connection.command_timeout = std::chrono::milliseconds(500);
   return options;

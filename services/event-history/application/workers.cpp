@@ -312,6 +312,10 @@ class HttpWorker final : public p::stream::Worker {
     }
     Response response;
     if (!principal) {
+      if (principal.error().code() == p::ErrorCode::kCommonUnavailable) {
+        context().logger().warn("history authentication unavailable",
+                                {{"error", std::string(principal.error().message())}});
+      }
       response = Api::problem(principal.error());
     } else {
       const std::size_t limit = 1048576;
@@ -326,6 +330,10 @@ class HttpWorker final : public p::stream::Worker {
           response = Api::problem(p::Error(p::ErrorCode::kCommonInvalidArgument, "invalid or oversized body"));
         } else {
           auto result = co_await api_->handle(parser.release(), std::move(*principal));
+          if (!result) {
+            context().logger().warn("history query failed", {{"code", std::string(result.error().name())},
+                                                             {"error", std::string(result.error().message())}});
+          }
           response = result ? std::move(*result) : Api::problem(result.error());
         }
       }

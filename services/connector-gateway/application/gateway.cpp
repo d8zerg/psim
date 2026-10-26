@@ -60,6 +60,7 @@
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/security/secret.hpp"
+#include "psim/platform/stream/redis.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "registry.hpp"
 
@@ -282,14 +283,6 @@ class Reactor final : public grpc::ServerBidiReactor<Request, Response> {
   std::shared_ptr<SessionState> state_;
 };
 
-struct DeliveryBatch {
-  explicit DeliveryBatch(const asio::any_io_executor& executor, std::size_t count) : wake(executor), remaining(count) {}
-
-  asio::steady_timer wake;
-  std::size_t remaining;
-  std::optional<p::Error> error;
-};
-
 Gateway::Gateway(const p::runtime::Context& context)
     : p::stream::Worker(context, "ingest", ""),
       tick_(executor()),
@@ -405,15 +398,7 @@ asio::awaitable<p::Result<void>> Gateway::initialize() {
   }
   snapshot_ = std::move(*snapshot);
   verified_ = Steady::now();
-  p::redis::PoolOptions options;
-  options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
-  options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
-  options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
-  options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
-  options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
-  if (const auto password = config.secret("settings.redis_password_file")) {
-    options.connection.credentials.password = std::string(*password);
-  }
+  auto options = p::stream::redis_options(config);
   options.connection.command_timeout = std::chrono::milliseconds(500);
   options.connection.connect_timeout = std::chrono::milliseconds(500);
   redis_ = std::make_unique<p::redis::Pool>(std::move(options));
@@ -879,34 +864,8 @@ asio::awaitable<p::Result<void>> Gateway::events(std::shared_ptr<SessionState> s
   co_return p::Result<void>{};
 }
 
-asio::awaitable<void> Gateway::send_one(std::shared_ptr<DeliveryBatch> batch, p::kafka::Record record) {
-  try {
-    auto sent = co_await producer()->send(std::move(record));
-    if (!sent && !batch->error) {
-      batch->error = sent.error();
-    }
-  } catch (const std::exception&) {
-    if (!batch->error) {
-      batch->error = p::Error(p::ErrorCode::kCommonInternal, "Kafka delivery failed");
-    }
-  }
-  --batch->remaining;
-  batch->wake.cancel();
-}
-
 asio::awaitable<p::Result<void>> Gateway::deliver(std::vector<p::kafka::Record> records) {
-  auto batch = std::make_shared<DeliveryBatch>(executor(), records.size());
-  for (auto& value : records) {
-    asio::co_spawn(executor(), send_one(batch, std::move(value)), asio::detached);
-  }
-  while (batch->remaining != 0) {
-    batch->wake.expires_at(Steady::time_point::max());
-    co_await batch->wake.async_wait(asio::as_tuple(asio::use_awaitable));
-  }
-  if (batch->error) {
-    co_return std::unexpected(*batch->error);
-  }
-  co_return p::Result<void>{};
+  co_return co_await producer()->send_batch(std::move(records));
 }
 
 asio::awaitable<p::Result<void>> Gateway::state(std::shared_ptr<SessionState> session) {

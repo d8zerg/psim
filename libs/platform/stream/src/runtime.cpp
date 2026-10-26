@@ -201,6 +201,9 @@ asio::awaitable<void> Worker::run() {
   }
   running_ = false;
   stopped_.cancel();
+  if (!result) {
+    context_.request_failure();
+  }
 }
 
 asio::awaitable<Result<void>> Worker::start() {

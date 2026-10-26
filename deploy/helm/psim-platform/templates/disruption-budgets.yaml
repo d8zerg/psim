@@ -1,0 +1,19 @@
+{{- $counts := dict -}}
+{{- range .Values.instances -}}
+{{- $_ := set $counts .component (add1 (get $counts .component | default 0)) -}}
+{{- end -}}
+{{- range $component, $count := $counts -}}
+{{- if gt (int $count) 1 }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $component }}
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $component }}
+{{- end }}
+{{- end }}

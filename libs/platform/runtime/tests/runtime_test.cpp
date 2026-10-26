@@ -57,9 +57,11 @@ using psim::platform::runtime::ServiceDefinition;
 
 // Shared state observed by the tests; the component lives on the runtime thread.
 struct Probe {
+  std::atomic<const Context*> context{nullptr};
   std::atomic<bool> ready{true};
   std::atomic<bool> fail_start{false};
   std::atomic<bool> drained{false};
+  std::atomic<bool> fail_while_draining{false};
   std::atomic<int> reconfigured{0};
   std::chrono::milliseconds drain_time{std::chrono::milliseconds{50}};
 };
@@ -80,6 +82,9 @@ class FakeComponent final : public Component {
   bool ready() const override { return probe_.ready; }
 
   asio::awaitable<void> drain() override {
+    if (probe_.fail_while_draining) {
+      probe_.context.load()->request_failure();
+    }
     // Work in progress takes drain_time to finish.
     asio::steady_timer timer(executor_, probe_.drain_time);
     co_await timer.async_wait(asio::use_awaitable);
@@ -97,6 +102,7 @@ ServiceDefinition definition(Probe& probe) {
   return ServiceDefinition{.name = "fake-service",
                            .settings_schema = R"({"type": "object", "additionalProperties": false})",
                            .create = [&probe](Context& context) -> Result<Components> {
+                             probe.context.store(&context);
                              Components components;
                              components.push_back(std::make_unique<FakeComponent>(context, probe));
                              return components;
@@ -297,6 +303,31 @@ class ConfigFile {
  private:
   fs::path path_;
 };
+
+TEST(Runtime, TerminalComponentFailureDrainsAndReturnsFailureToTheSupervisor) {
+  Probe probe;
+  Started service(definition(probe), sources({}));
+  ASSERT_EQ(status_when(service.port(), "/health/ready", 200), 200U);
+  const auto* context = probe.context.load();
+  ASSERT_NE(context, nullptr);
+  context->request_failure();
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+  while (service.exit_code.load() < 0 && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  ASSERT_EQ(service.exit_code.load(), 1);
+  EXPECT_EQ(service.join(), 1);
+  EXPECT_TRUE(probe.drained.load());
+}
+
+TEST(Runtime, ComponentCancellationDuringNormalDrainKeepsACleanExit) {
+  Probe probe;
+  probe.fail_while_draining = true;
+  Started service(definition(probe), sources({}));
+  ASSERT_EQ(status_when(service.port(), "/health/ready", 200), 200U);
+  EXPECT_EQ(service.stop(), 0);
+  EXPECT_TRUE(probe.drained.load());
+}
 
 TEST(Runtime, ReloadAppliesRunTimeSettingsAndRejectsInvalidOnes) {
   const ConfigFile file("log:\n  level: info\n");

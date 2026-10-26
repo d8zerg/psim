@@ -1,0 +1,93 @@
+version: '3'
+tasks:
+  check:
+    desc: Validate deployment profiles, process isolation and Helm material isolation without VMs
+    cmds:
+      - python3 -I tools/deploy/check.py
+  images:
+    desc: Build release services and the configured infrastructure images
+    cmds:
+      - task: :release:images
+      - task: :web:install
+      - task: :web:_run
+        vars: {CMD: pnpm exec turbo run gen build --output-logs=errors-only}
+      - python3 -I tools/deploy/images.py --version {{.VERSION | default "0.1.0"}}
+  render:
+    desc: Generate an immutable public deployment bundle from an inventory
+    requires:
+      vars: [PROFILE, OUTPUT]
+    cmds:
+      - python3 -I tools/deploy/deploy.py render --profile {{.PROFILE}} --output {{.OUTPUT}}
+  vm:up:
+    desc: Install or resume the complete local VM deployment
+    cmds:
+      - python3 -I tools/deploy/lab.py up --topology {{.TOPOLOGY | default "cluster"}}
+  vm:down:
+    desc: Stop the local VM deployment while preserving disks and credentials
+    cmds:
+      - python3 -I tools/deploy/lab.py down
+  vm:destroy:
+    desc: Remove the owned VM deployment, disks, lab credentials and node payloads
+    cmds:
+      - python3 -I tools/deploy/lab.py destroy
+  vm:status:
+    desc: Show the owned deployment factory record
+    cmds:
+      - python3 -I tools/deploy/lab.py status
+  flow:
+    desc: Verify a fresh connector, floor, normalized event, incident and console projection
+    cmds:
+      - python3 -I tools/deploy/flow.py
+  storage:qualify:
+    desc: Verify private floor storage through every independent volume, filer and S3 process failure
+    cmds:
+      - python3 -I tools/deploy/storage.py
+  gateway:bench:
+    desc: Measure durable input on two gateways and reconcile all acknowledged events
+    cmds:
+      - python3 -I tools/deploy/gateway.py bench
+  gateway:failover:
+    desc: Kill the active gateway and verify SDK reconnection without lost events
+    cmds:
+      - python3 -I tools/deploy/gateway.py failover
+  gateway:qualify:
+    desc: Qualify two-gateway durable throughput and active-process loss
+    cmds:
+      - task: gateway:bench
+      - task: gateway:failover
+  postgres:qualify:
+    desc: Cut primary VM power and measure acknowledged-write recovery
+    cmds:
+      - python3 -I tools/deploy/ha.py
+  console:qualify:
+    desc: Suspend the console writer and verify standby promotion and resumed-writer fencing
+    cmds:
+      - python3 -I tools/deploy/qualify.py --bundle build/deployment/lab-cluster --output build/deployment/console-qualification.json console-failover
+  runtime:
+    desc: Switch PSIM applications between containers and Debian packages under systemd
+    cmds:
+      - python3 -I tools/deploy/native.py {{.RUNTIME | default "containers"}}
+  pki:request:
+    desc: Generate fresh private keys and export public requests for external authorities
+    requires: {vars: [BUNDLE, PRIVATE, REQUESTS]}
+    cmds:
+      - python3 -I tools/deploy/provision.py request --bundle "{{.BUNDLE}}" --private "{{.PRIVATE}}" --requests "{{.REQUESTS}}"
+  pki:complete:
+    desc: Validate external identities and complete per-role private material
+    requires: {vars: [BUNDLE, PRIVATE, TRUST, SIGNED]}
+    cmds:
+      - python3 -I tools/deploy/provision.py complete --bundle "{{.BUNDLE}}" --private "{{.PRIVATE}}" --trust "{{.TRUST}}" --signed "{{.SIGNED}}"
+  pki:package:
+    desc: Export isolated private payloads for externally provisioned nodes
+    requires: {vars: [BUNDLE, PRIVATE, PAYLOADS]}
+    cmds:
+      - python3 -I tools/deploy/provision.py package --bundle "{{.BUNDLE}}" --private "{{.PRIVATE}}" --payloads "{{.PAYLOADS}}"
+  account:
+    desc: Create the initial administrator with mandatory password change and TOTP
+    requires: {vars: [BUNDLE, PRIVATE, USERNAME]}
+    cmds:
+      - python3 -I tools/deploy/account.py --bundle "{{.BUNDLE}}" --private "{{.PRIVATE}}" --username "{{.USERNAME}}"
+  operators:qualify:
+    desc: Verify pinned infrastructure operator checksums and render their charts
+    cmds:
+      - python3 -I tools/deploy/operators.py

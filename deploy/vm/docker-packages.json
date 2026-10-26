@@ -1,0 +1,41 @@
+{
+  "format": 1,
+  "architecture": "amd64",
+  "packages": [
+    {
+      "name": "docker-ce",
+      "version": "5:29.9.2-1~debian.13~trixie",
+      "url": "https://download.docker.com/linux/debian/dists/trixie/pool/stable/amd64/docker-ce_29.9.2-1~debian.13~trixie_amd64.deb",
+      "sha256": "5971507b332598b0867e005adbe05117f7f97489c0f698d1f19581aa58992a18",
+      "size_bytes": 24547676
+    },
+    {
+      "name": "docker-ce-cli",
+      "version": "5:29.9.2-1~debian.13~trixie",
+      "url": "https://download.docker.com/linux/debian/dists/trixie/pool/stable/amd64/docker-ce-cli_29.9.2-1~debian.13~trixie_amd64.deb",
+      "sha256": "6a266cb8acafa475e87ce2414387707024b55fb169d6ca1fb6c3132f234d4cf1",
+      "size_bytes": 17595264
+    },
+    {
+      "name": "containerd.io",
+      "version": "2.4.2-3~debian.13~trixie",
+      "url": "https://download.docker.com/linux/debian/dists/trixie/pool/stable/amd64/containerd.io_2.4.2-3~debian.13~trixie_amd64.deb",
+      "sha256": "454998e47186869c1dae0858e9f167a68e47eba7df5794b7206cc845615aeeba",
+      "size_bytes": 23265728
+    },
+    {
+      "name": "docker-buildx-plugin",
+      "version": "0.38.1-1~debian.13~trixie",
+      "url": "https://download.docker.com/linux/debian/dists/trixie/pool/stable/amd64/docker-buildx-plugin_0.38.1-1~debian.13~trixie_amd64.deb",
+      "sha256": "ae22c3ed03f89492233bd506b6dc33e54765bf0155f51cfd1f964c16fb05d9db",
+      "size_bytes": 17801992
+    },
+    {
+      "name": "docker-compose-plugin",
+      "version": "5.6.1-1~debian.13~trixie",
+      "url": "https://download.docker.com/linux/debian/dists/trixie/pool/stable/amd64/docker-compose-plugin_5.6.1-1~debian.13~trixie_amd64.deb",
+      "sha256": "a27659da6d27a7177a69c4822a1be09e58cab342a68c9264a13b9914202ff667",
+      "size_bytes": 8083780
+    }
+  ]
+}

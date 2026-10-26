@@ -8,6 +8,7 @@ psim_add_test(psim_rules_test SOURCES tests/expression_test.cpp tests/validation
 psim_add_service(correlation-engine SOURCES src/main.cpp LIBS psim_correlation_rules SUMMARY "PSIM correlation-engine")
 
 install(FILES ${PROJECT_SOURCE_DIR}/contracts/taxonomy/v1/taxonomy.yaml DESTINATION share/psim RENAME correlation-taxonomy.yaml COMPONENT correlation-engine)
+set_property(GLOBAL PROPERTY PSIM_PACKAGE_DEPENDS_correlation-engine taxonomy)
 
 option(PSIM_RULE_FUZZING "Build the instrumented rule parser and validator" OFF)
 if(PSIM_RULE_FUZZING)

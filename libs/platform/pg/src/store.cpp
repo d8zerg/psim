@@ -69,9 +69,12 @@ asio::awaitable<Result<void>> MessageStore::initialize(Connection* connection) {
   if (!lock) {
     co_return std::unexpected(lock.error());
   }
+  auto schema = co_await ensure_schema(connection, schema_);
+  if (!schema) {
+    co_return schema;
+  }
   for (const auto* sql :
-       {"CREATE SCHEMA IF NOT EXISTS @schema@",
-        "CREATE TABLE IF NOT EXISTS @schema@.psim_inbox (consumer text NOT NULL, event_id text NOT NULL, fingerprint "
+       {"CREATE TABLE IF NOT EXISTS @schema@.psim_inbox (consumer text NOT NULL, event_id text NOT NULL, fingerprint "
         "text NOT NULL, received_at timestamptz NOT NULL DEFAULT clock_timestamp(), PRIMARY KEY (consumer, event_id))",
         "CREATE TABLE IF NOT EXISTS @schema@.psim_outbox (sequence bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, "
         "event_id text NOT NULL UNIQUE, topic text NOT NULL, key bytea NOT NULL, payload bytea NOT NULL, headers jsonb "

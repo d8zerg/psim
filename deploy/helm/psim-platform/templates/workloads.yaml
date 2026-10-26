@@ -1,0 +1,171 @@
+{{- $root := . -}}
+{{- $names := dict -}}
+{{- $secrets := dict -}}
+{{- range .Values.instances }}
+{{- if or (hasKey $names .name) (hasKey $secrets .materialSecret) }}{{ fail "instances require unique names and private material Secrets" }}{{ end -}}
+{{- $_ := set $names .name true -}}
+{{- $_ := set $secrets .materialSecret true -}}
+{{- $name := printf "%s-%s" $root.Release.Name .name }}
+{{- if gt (len $name) 63 }}{{ fail "release and instance name exceed the Kubernetes resource name limit" }}{{ end }}
+{{- if and .capabilities (ne .component "haproxy") }}{{ fail "only the public proxy may bind privileged ports" }}{{ end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+data:
+  service.json: {{ .config | toJson | quote }}
+  {{- range $file, $body := .configFiles }}
+  {{- if eq $file "service.json" }}{{ fail "service.json is reserved for the application configuration" }}{{ end }}
+  {{ $file }}: {{ $body | quote }}
+  {{- end }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+spec:
+  serviceName: {{ $name }}
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/instance: {{ $root.Release.Name }}, psim.instance: {{ .name }}}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ . | toJson | sha256sum }}
+      labels:
+        app.kubernetes.io/instance: {{ $root.Release.Name }}
+        app.kubernetes.io/name: psim-platform
+        app.kubernetes.io/component: {{ .component }}
+        psim.instance: {{ .name }}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 40
+      {{- with $root.Values.imagePullSecrets }}
+      imagePullSecrets: {{ toJson . }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: {{ .uid }}
+        runAsGroup: {{ .uid }}
+        fsGroup: {{ .uid }}
+        fsGroupChangePolicy: OnRootMismatch
+        seccompProfile: {type: RuntimeDefault}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/instance: {{ $root.Release.Name }}
+                  app.kubernetes.io/component: {{ .component }}
+              topologyKey: kubernetes.io/hostname
+      initContainers:
+        - name: material
+          image: {{ $root.Values.materialImage }}
+          command: [/bin/sh, -ec]
+          args: ['umask 077; cp -L /source/* /private/; chmod 0400 /private/*']
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: source, mountPath: /source, readOnly: true}
+            - {name: material, mountPath: /private}
+      containers:
+        - name: service
+          image: {{ .image }}
+          imagePullPolicy: IfNotPresent
+          {{- if hasKey . "args" }}
+          args: {{ toJson .args }}
+          {{- else }}
+          args: [--config, /etc/psim-platform/services/service.json]
+          {{- end }}
+          {{- with .environment }}
+          env: {{ toJson . }}
+          {{- end }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+              {{- with .capabilities }}
+              add: {{ toJson . }}
+              {{- end }}
+          ports:
+            - {name: admin, containerPort: {{ .adminPort }}}
+            {{- range .ports }}
+            - {name: {{ .name }}, containerPort: {{ .targetPort }}}
+            {{- end }}
+          startupProbe:
+            {{- if .probeExec }}
+            exec: {command: {{ toJson .probeExec }}}
+            {{- else }}
+            httpGet: {path: /health/ready, port: admin}
+            {{- end }}
+            timeoutSeconds: 3
+            periodSeconds: 2
+            failureThreshold: 150
+          readinessProbe:
+            {{- if .probeExec }}
+            exec: {command: {{ toJson .probeExec }}}
+            {{- else }}
+            httpGet: {path: /health/ready, port: admin}
+            {{- end }}
+            timeoutSeconds: 3
+            periodSeconds: 2
+          livenessProbe:
+            {{- if .probeExec }}
+            exec: {command: {{ toJson .probeExec }}}
+            {{- else }}
+            httpGet: {path: /health/live, port: admin}
+            {{- end }}
+            timeoutSeconds: 3
+            periodSeconds: 10
+          resources: {{ toJson .resources }}
+          volumeMounts:
+            - {name: config, mountPath: /etc/psim-platform/services, readOnly: true}
+            - {name: material, mountPath: /etc/psim-platform/{{ .component }}/secrets, readOnly: true}
+            - {name: tmp, mountPath: /tmp}
+            {{- range .storage }}
+            - {name: {{ .name }}, mountPath: {{ .path }}}
+            {{- end }}
+      volumes:
+        - {name: config, configMap: {name: {{ $name }}}}
+        - {name: source, secret: {secretName: {{ .materialSecret }}, defaultMode: 288}}
+        - {name: material, emptyDir: {medium: Memory, sizeLimit: 16Mi}}
+        - {name: tmp, emptyDir: {sizeLimit: 256Mi}}
+  {{- with .storage }}
+  volumeClaimTemplates:
+    {{- range . }}
+    - metadata: {name: {{ .name }}}
+      spec:
+        accessModes: [ReadWriteOnce]
+        {{- with .storageClass }}
+        storageClassName: {{ . }}
+        {{- end }}
+        resources: {requests: {storage: {{ .size }}}}
+    {{- end }}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+spec:
+  clusterIP: None
+  selector: {app.kubernetes.io/instance: {{ $root.Release.Name }}, psim.instance: {{ .name }}}
+  ports: [{name: admin, port: {{ .adminPort }}, targetPort: admin}]
+{{- end }}
+{{- range .Values.services }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .component }}
+spec:
+  type: {{ .type | default "ClusterIP" }}
+  selector:
+    app.kubernetes.io/instance: {{ $root.Release.Name }}
+    app.kubernetes.io/component: {{ .component }}
+  ports: {{ toJson .ports }}
+{{- end }}

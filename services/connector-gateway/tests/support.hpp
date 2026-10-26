@@ -49,23 +49,43 @@ inline std::string read(const std::string& path) {
   return {(std::istreambuf_iterator<char>(input)), {}};
 }
 
+inline const nlohmann::json& probe_configuration() {
+  static const auto kConfiguration = [] {
+    const auto* path =
+        std::getenv("PSIM_GATEWAY_PROBE_CONFIG");  // NOLINT(concurrency-mt-unsafe): configured before threads.
+    return path ? nlohmann::json::parse(read(path)) : nlohmann::json::object();
+  }();
+  return kConfiguration;
+}
+
 inline std::string endpoint(int index = 0) {
+  if (probe_configuration().contains("gateways")) {
+    return probe_configuration().at("gateways").at(static_cast<std::size_t>(index)).get<std::string>();
+  }
   return index == 0 ? "connector-gateway:8080" : "gateway-2:8080";
 }
 
+inline std::string fixture_directory() {
+  return probe_configuration().value("fixtures", ".cache/gateway-test");
+}
+
+inline std::string tls_directory() {
+  return probe_configuration().value("tls", ".cache/event-flow");
+}
+
 inline std::string identity(int index) {
-  return nlohmann::json::parse(read(".cache/gateway-test/identities.json"))
+  return nlohmann::json::parse(read(fixture_directory() + "/identities.json"))
       .at(static_cast<std::size_t>(index))
       .get<std::string>();
 }
 
 inline std::string prefix(int index, bool replacement = false) {
-  return ".cache/gateway-test/" + std::to_string(index) + (replacement ? "-replacement" : "");
+  return fixture_directory() + "/" + std::to_string(index) + (replacement ? "-replacement" : "");
 }
 
 inline std::shared_ptr<grpc::Channel> client(int index, int gateway = 0, bool replacement = false) {
   auto value = p::connector::channel({.endpoint = endpoint(gateway),
-                                      .ca_file = ".cache/event-flow/ca.pem",
+                                      .ca_file = tls_directory() + "/ca.pem",
                                       .certificate_file = prefix(index, replacement) + ".pem",
                                       .private_key_file = prefix(index, replacement) + ".key",
                                       .buffer_directory = "unused"});
@@ -77,9 +97,9 @@ inline std::shared_ptr<grpc::Channel> client(int index, int gateway = 0, bool re
 
 inline std::unique_ptr<wire::ConnectorAdministrationService::Stub> admin(int gateway = 0) {
   auto value = p::connector::channel({.endpoint = endpoint(gateway),
-                                      .ca_file = ".cache/event-flow/ca.pem",
-                                      .certificate_file = ".cache/event-flow/admin.pem",
-                                      .private_key_file = ".cache/event-flow/admin.key",
+                                      .ca_file = tls_directory() + "/ca.pem",
+                                      .certificate_file = tls_directory() + "/admin.pem",
+                                      .private_key_file = tls_directory() + "/admin.key",
                                       .buffer_directory = "unused"});
   if (!value) {
     throw std::runtime_error(value.error().message());
@@ -91,25 +111,35 @@ inline grpc::Status manage(const wire::ManageRequest& request, wire::ManageRespo
                            bool technical = false) {
   grpc::ClientContext context;
   context.set_deadline(std::chrono::system_clock::now() + std::chrono::seconds(25));
-  context.AddMetadata(
-      "authorization",
-      "Bearer " + read(technical ? ".cache/event-flow/technical.token" : ".cache/event-flow/operator.token"));
+  context.AddMetadata("authorization",
+                      "Bearer " + read(tls_directory() + (technical ? "/technical.token" : "/operator.token")));
   return admin(gateway)->Manage(&context, request, response);
 }
 
-inline wire::ManageResponse enroll(int index, std::uint32_t rate = 1000000) {
+inline wire::ManageResponse enroll(int index, std::uint32_t rate = 1000000,
+                                   std::chrono::milliseconds retry_for = std::chrono::milliseconds::zero()) {
   wire::ManageRequest request;
   request.set_request_id(p::stream::uuid7());
   request.set_action(wire::REGISTRATION_ACTION_REGISTER);
   auto* value = request.mutable_connector();
   value->set_connector_id(identity(index));
   value->set_name("Synthetic connector");
-  value->set_connector_type("test");
+  value->set_connector_type(probe_configuration().value("connector_type", "test"));
   value->mutable_limits()->set_max_events_per_second(rate);
   value->mutable_limits()->set_max_batch_events(1000);
   request.set_certificate_pem(read(prefix(index) + ".pem"));
   wire::ManageResponse response;
   auto status = manage(request, &response);
+  const auto deadline = std::chrono::steady_clock::now() + retry_for;
+  while (!status.ok()
+         && (status.error_code() == grpc::StatusCode::UNAVAILABLE
+             || status.error_code() == grpc::StatusCode::DEADLINE_EXCEEDED)
+         && std::chrono::steady_clock::now() < deadline) {
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    response.Clear();
+    // Preserve the request identity when a committed registration has an uncertain response.
+    status = manage(request, &response);
+  }
   if (!status.ok()) {
     throw std::runtime_error("registration failed: " + status.error_message());
   }
@@ -122,6 +152,7 @@ struct Stream {
   std::unique_ptr<grpc::ClientReaderWriter<wire::SessionRequest, wire::SessionResponse>> stream;
   wire::Registered registered;
   std::uint64_t sequence = 0;
+  bool finished = false;
 
   explicit Stream(int index, int gateway = 0, bool replacement = false)
       : stub(wire::ConnectorGatewayService::NewStub(client(index, gateway, replacement))) {
@@ -135,9 +166,11 @@ struct Stream {
   Stream& operator=(Stream&&) = delete;
 
   ~Stream() {
-    context.TryCancel();
-    stream->WritesDone();
-    (void)stream->Finish();
+    if (!finished) {
+      context.TryCancel();
+      stream->WritesDone();
+      (void)stream->Finish();
+    }
   }
 
   bool connect(bool state = true) {
@@ -192,7 +225,10 @@ struct Stream {
     }
     wire::SessionResponse response;
     if (!next(&response, wire::SessionResponse::kBatchAck)) {
-      throw std::runtime_error("test batch was not acknowledged");
+      stream->WritesDone();
+      const auto status = stream->Finish();
+      finished = true;
+      throw std::runtime_error("test batch was not acknowledged: " + status.error_message());
     }
     auto ack = response.batch_ack();
     if (!next(&response, wire::SessionResponse::kCredits)) {

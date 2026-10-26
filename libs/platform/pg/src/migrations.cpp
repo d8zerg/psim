@@ -36,11 +36,14 @@ asio::awaitable<Result<void>> Migrator::apply(Connection* connection, std::vecto
   if (!lock) {
     co_return std::unexpected(lock.error());
   }
-  constexpr auto* kCreateSchema = "CREATE SCHEMA IF NOT EXISTS @schema@";
+  auto schema = co_await ensure_schema(connection, schema_);
+  if (!schema) {
+    co_return schema;
+  }
   constexpr auto* kCreateMigrations =
       "CREATE TABLE IF NOT EXISTS @schema@.psim_migrations (version bigint NOT NULL, phase text NOT NULL, name text "
       "NOT NULL, checksum text NOT NULL, PRIMARY KEY (version, phase))";
-  for (const auto* schema_ddl : {kCreateSchema, kCreateMigrations}) {
+  for (const auto* schema_ddl : {kCreateMigrations}) {
     auto statement = detail::schema_sql(schema_, schema_ddl);
     const auto result = co_await connection->query({.sql = *statement});
     if (!result) {

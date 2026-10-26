@@ -1,0 +1,25 @@
+{
+  "format": 1,
+  "name": "psim-platform-single",
+  "topology": "single",
+  "version": "0.1.0",
+  "public_name": "localhost",
+  "public_port": 8443,
+  "security_tenant": "15518631-4bcc-4cfe-86e6-75afc582f66d",
+  "interface": "psim0",
+  "shards": 1,
+  "nodes": [
+    {
+      "name": "node-1",
+      "address": "10.91.0.11",
+      "failure_domain": "vm-1",
+      "roles": [
+        "infrastructure",
+        "application",
+        "edge",
+        "observability"
+      ]
+    }
+  ],
+  "prefix": "/var/lib/psim-platform-single"
+}

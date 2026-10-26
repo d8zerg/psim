@@ -1,5 +1,6 @@
 #include <boost/asio/as_tuple.hpp>
 #include <boost/asio/co_spawn.hpp>
+#include <prometheus/gauge.h>
 #include <prometheus/histogram.h>
 
 #include <algorithm>
@@ -15,13 +16,13 @@
 #include "console_replay.hpp"
 #include "console_store.hpp"
 #include "psim/platform/error.hpp"
-#include "psim/platform/error_codes.hpp"
 #include "psim/platform/kafka/client.hpp"
 #include "psim/platform/kafka/consumer.hpp"
 #include "psim/platform/kafka/processor.hpp"
 #include "psim/platform/pg/connection.hpp"
 #include "psim/platform/redis/pool.hpp"
 #include "psim/platform/runtime.hpp"
+#include "psim/platform/stream/redis.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "workers.hpp"
 
@@ -31,7 +32,7 @@ namespace asio = boost::asio;
 class ConsoleWorker final : public p::stream::Worker {
  public:
   explicit ConsoleWorker(const p::runtime::Context& c)
-      : p::stream::Worker(c, "console-models", ""), done_(executor()) {}
+      : p::stream::Worker(c, "console-models", ""), done_(executor()), retry_(executor()) {}
 
   bool ready() const override { return p::stream::Worker::ready() && healthy_.load(); }
 
@@ -50,6 +51,35 @@ class ConsoleWorker final : public p::stream::Worker {
     if (!initialized) {
       co_return initialized;
     }
+    updates_ =
+        &prometheus::BuildHistogram()
+             .Name("psim_console_update_seconds")
+             .Help("Kafka timestamp to committed live console update")
+             .Register(context().metrics().registry())
+             .Add({}, prometheus::Histogram::BucketBoundaries{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 5});
+    writer_ = &prometheus::BuildGauge()
+                   .Name("psim_console_writer_active")
+                   .Help("Whether this instance owns the console writer session")
+                   .Register(context().metrics().registry())
+                   .Add({});
+    running_ = true;
+    asio::co_spawn(executor(), supervise(), [this](const std::exception_ptr& error) {
+      if (error) {
+        context().logger().error("console consumer failed");
+      }
+      // Close the session even if an unexpected exception interrupts supervision.
+      if (guard_) {
+        (*guard_)->close();
+      }
+      writer_->Set(0);
+      healthy_.store(false);
+      running_ = false;
+      done_.cancel();
+    });
+    co_return p::Result<void>{};
+  }
+
+  asio::awaitable<p::Result<bool>> start_writer() {
     auto lease = co_await pool_->acquire();
     if (!lease) {
       co_return std::unexpected(lease.error());
@@ -57,8 +87,21 @@ class ConsoleWorker final : public p::stream::Worker {
     guard_.emplace(std::move(*lease));
     auto locked = co_await (*guard_)->query(
         {.sql = "SELECT pg_try_advisory_lock($1)", .parameters = {p::pg::Parameter::integer(kConsoleWriterLock)}});
-    if (!locked || locked->value(0, 0) != "t") {
-      co_return p::fail(p::ErrorCode::kCommonUnavailable, "console model already has a writer");
+    if (!locked) {
+      co_return std::unexpected(locked.error());
+    }
+    if (locked->value(0, 0) != "t") {
+      guard_.reset();
+      co_return false;
+    }
+    // Fence a suspended writer independently of TCP keepalives. All writes use
+    // this session, so a resumed process cannot write after its lock expires.
+    for (const auto* sql : {"SET idle_session_timeout = '15s'", "SET idle_in_transaction_session_timeout = '15s'",
+                            "SET statement_timeout = '10s'"}) {
+      auto configured = co_await (*guard_)->query({.sql = sql});
+      if (!configured) {
+        co_return std::unexpected(configured.error());
+      }
     }
     auto generation = co_await store_->active();
     if (!generation) {
@@ -98,33 +141,66 @@ class ConsoleWorker final : public p::stream::Worker {
         store_.get(), source_.get(), bounds->end,
         std::chrono::milliseconds(context().config().get<int>("settings.console_replay_timeout_ms")));
     if (!caught) {
-      co_return caught;
+      co_return std::unexpected(caught.error());
     }
     auto positioned = co_await source_->seek_and_wait(bounds->end, std::chrono::seconds(10));
     if (!positioned) {
-      co_return positioned;
+      co_return std::unexpected(positioned.error());
     }
-    updates_ =
-        &prometheus::BuildHistogram()
-             .Name("psim_console_update_seconds")
-             .Help("Kafka timestamp to committed live console update")
-             .Register(context().metrics().registry())
-             .Add({}, prometheus::Histogram::BucketBoundaries{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1, 5});
-    healthy_.store(true);
-    running_ = true;
-    asio::co_spawn(executor(), run(), [this](const std::exception_ptr& error) {
-      if (error) {
-        context().logger().error("console consumer failed");
+    co_return true;
+  }
+
+  asio::awaitable<void> release_writer() {
+    writer_->Set(0);
+    store_->writer(nullptr);
+    if (guard_) {
+      (*guard_)->close();
+      guard_.reset();
+    }
+    if (source_) {
+      co_await source_->close();
+      source_.reset();
+    }
+  }
+
+  asio::awaitable<void> supervise() {
+    while (!stopping_) {
+      auto started = co_await start_writer();
+      if (started) {
+        healthy_.store(true);
+        if (*started) {
+          writer_->Set(1);
+          context().logger().info("console writer acquired");
+          co_await run();
+          healthy_.store(false);
+        }
+      } else {
+        healthy_.store(false);
+        context().logger().warn("console writer initialization deferred",
+                                {{"code", std::string(started.error().name())}});
       }
-      healthy_.store(false);
-      running_ = false;
-      done_.cancel();
-    });
-    co_return p::Result<void>{};
+      co_await release_writer();
+      if (!stopping_) {
+        retry_.expires_after(std::chrono::seconds(1));
+        co_await retry_.async_wait(asio::as_tuple(asio::use_awaitable));
+      }
+    }
   }
 
   asio::awaitable<void> run() {
+    if (!guard_) {
+      co_return;
+    }
+    auto heartbeat = std::chrono::steady_clock::now();
     while (!stopping_) {
+      if (std::chrono::steady_clock::now() >= heartbeat) {
+        auto alive = co_await (*guard_)->query({.sql = "SELECT 1"});
+        if (!alive) {
+          context().logger().warn("console writer session lost");
+          co_return;
+        }
+        heartbeat = std::chrono::steady_clock::now() + std::chrono::seconds(1);
+      }
       const auto before = source_->positions();
       auto messages = co_await source_->poll(64, std::chrono::milliseconds(2));
       if (!messages) {
@@ -155,6 +231,7 @@ class ConsoleWorker final : public p::stream::Worker {
 
   asio::awaitable<void> shutdown() override {
     stopping_ = true;
+    retry_.cancel();
     while (running_) {
       done_.expires_at(asio::steady_timer::time_point::max());
       co_await done_.async_wait(asio::as_tuple(asio::use_awaitable));
@@ -180,9 +257,11 @@ class ConsoleWorker final : public p::stream::Worker {
   std::unique_ptr<ConsoleStore> store_;
   std::unique_ptr<p::kafka::Consumer> source_;
   asio::steady_timer done_;
+  asio::steady_timer retry_;
   std::atomic_bool healthy_{false};
   bool stopping_ = false, running_ = false;
   prometheus::Histogram* updates_ = nullptr;
+  prometheus::Gauge* writer_ = nullptr;
 };
 
 std::unique_ptr<p::runtime::Component> console_worker(const p::runtime::Context& context) {
@@ -194,18 +273,10 @@ std::unique_ptr<p::redis::Pool> console_redis(const p::runtime::Context& context
   if (config.get<std::string>("settings.redis_host").empty()) {
     return {};
   }
-  p::redis::PoolOptions options;
-  options.connection.endpoint.host = config.get<std::string>("settings.redis_host");
-  options.connection.tls.enabled = !config.get<bool>("settings.allow_plaintext");
-  options.connection.tls.ca_file = config.get<std::string>("settings.redis_ca_file");
-  options.connection.tls.certificate_file = config.get<std::string>("settings.redis_certificate_file");
-  options.connection.tls.private_key_file = config.get<std::string>("settings.redis_key_file");
+  auto options = p::stream::redis_options(config);
   options.connection.connect_timeout = std::chrono::milliseconds(250);
   options.connection.command_timeout = std::chrono::milliseconds(250);
   options.size = 4;
-  if (auto secret = config.secret("settings.redis_password_file")) {
-    options.connection.credentials.password = std::string(*secret);
-  }
   return std::make_unique<p::redis::Pool>(std::move(options));
 }
 }  // namespace psim::projection

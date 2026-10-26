@@ -44,9 +44,12 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
   if (!locked_bootstrap) {
     co_return std::unexpected(locked_bootstrap.error());
   }
+  auto schema = co_await pg::ensure_schema(&**lease, "psim_clickhouse");
+  if (!schema) {
+    co_return schema;
+  }
   for (const auto* ddl :
-       {"CREATE SCHEMA IF NOT EXISTS psim_clickhouse",
-        "CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations (target text NOT NULL, version bigint NOT NULL, "
+       {"CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations (target text NOT NULL, version bigint NOT NULL, "
         "phase text NOT NULL, name text NOT NULL, checksum text NOT NULL, step bigint NOT NULL DEFAULT 0, "
         "PRIMARY KEY (target, version, phase))"}) {
     auto created = co_await (*lease)->query({.sql = ddl});

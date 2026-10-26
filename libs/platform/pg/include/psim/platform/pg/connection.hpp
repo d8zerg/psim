@@ -127,4 +127,8 @@ class Connection {
   bool busy_ = false;
 };
 
+/// Reuse a provisioned namespace without requiring CREATE on the database. Callers serialize
+/// schema initialization with their migration lock and retain ownership of their tables.
+asio::awaitable<Result<void>> ensure_schema(Connection* connection, std::string schema);
+
 }  // namespace psim::platform::pg

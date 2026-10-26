@@ -6,6 +6,7 @@
 #include <chrono>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "psim/platform/error.hpp"
 #include "psim/platform/kafka/client.hpp"
@@ -51,6 +52,10 @@ class Producer {
 
   /// Hand a message over and wait until all in-sync replicas have it.
   asio::awaitable<Result<Delivery>> send(Record record);
+
+  /// Wait for every message in this batch, retaining its first error independently
+  /// of other concurrent batches. Uses one completion timer for the whole batch.
+  asio::awaitable<Result<void>> send_batch(std::vector<Record> records);
 
   /// Wait until every enqueued message is delivered; the first delivery error since the last
   /// flush fails it.

@@ -1,0 +1,34 @@
+{
+  "format": 1,
+  "kubernetes": "1.35.0",
+  "operators": [
+    {
+      "name": "strimzi",
+      "version": "1.3.0",
+      "url": "https://github.com/strimzi/strimzi-kafka-operator/releases/download/1.3.0/strimzi-kafka-operator-helm-3-chart-1.3.0.tgz",
+      "sha256": "42677cec73d2122f4a395d9891bbccfae18ec16b3582174d49ca04695f351192",
+      "format": "helm"
+    },
+    {
+      "name": "postgres",
+      "version": "2.0.3",
+      "url": "https://opensource.zalando.com/postgres-operator/charts/postgres-operator/postgres-operator-2.0.3.tgz",
+      "sha256": "1669599940223a93c128198eba87aad71ee004260b13a5cdc2c62c113df9564d",
+      "format": "helm"
+    },
+    {
+      "name": "clickhouse",
+      "version": "0.27.4",
+      "url": "https://github.com/Altinity/helm-charts/releases/download/release-0.27.4/altinity-clickhouse-operator-0.27.4.tgz",
+      "sha256": "b06241f34f07ebc611090edc4be036a4d4d1c680f82f4df1c5496cc808cb7a13",
+      "format": "helm"
+    },
+    {
+      "name": "seaweedfs",
+      "version": "0.1.44",
+      "url": "https://github.com/seaweedfs/seaweedfs-operator/releases/download/seaweedfs-operator-0.1.44/seaweedfs-operator-0.1.44.tgz",
+      "sha256": "46a27f3915386c4350e74e7c40e6e4032f20ca6cd21f51fa4913e871f9fcea27",
+      "format": "helm"
+    }
+  ]
+}

@@ -41,15 +41,16 @@ class Incompatible(Exception):
 
 
 class Registry:
-    def __init__(self, url):
+    def __init__(self, url, context=None):
         self.url = url.rstrip("/")
+        self.context = context
 
     def call(self, method, path, body=None):
         data = json.dumps(body).encode() if body is not None else None
         request = urllib.request.Request(self.url + path, data=data, method=method,
                                          headers={"Content-Type": "application/vnd.schemaregistry.v1+json"})
         try:
-            with urllib.request.urlopen(request, timeout=30) as response:
+            with urllib.request.urlopen(request, timeout=30, context=self.context) as response:
                 text = response.read().decode()
                 return response.status, json.loads(text) if text else None
         except urllib.error.HTTPError as e:

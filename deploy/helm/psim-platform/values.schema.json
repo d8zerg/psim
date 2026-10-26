@@ -1,0 +1,158 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "instances",
+    "services",
+    "materialImage",
+    "imagePullSecrets"
+  ],
+  "properties": {
+    "instances": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "component",
+          "image",
+          "uid",
+          "adminPort",
+          "materialSecret",
+          "config",
+          "ports",
+          "storage",
+          "resources"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,39}$"
+          },
+          "component": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]+$"
+          },
+          "image": {
+            "type": "string",
+            "pattern": "^[^ ]+@sha256:[a-f0-9]{64}$"
+          },
+          "uid": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "adminPort": {
+            "type": "integer",
+            "minimum": 1024,
+            "maximum": 65535
+          },
+          "materialSecret": {
+            "type": "string",
+            "minLength": 1
+          },
+          "config": {
+            "type": "object"
+          },
+          "configFiles": {
+            "type": "object",
+            "additionalProperties": {"type": "string"},
+            "propertyNames": {"pattern": "^[a-z][a-z0-9._-]{0,63}$"}
+          },
+          "args": {
+            "type": "array", "items": {"type": "string"}
+          },
+          "environment": {
+            "type": "array",
+            "items": {
+              "type": "object", "additionalProperties": false, "required": ["name", "value"],
+              "properties": {"name": {"type": "string", "pattern": "^[A-Z_][A-Z0-9_]*$"}, "value": {"type": "string"}}
+            }
+          },
+          "capabilities": {
+            "type": "array", "uniqueItems": true, "items": {"enum": ["NET_BIND_SERVICE"]}
+          },
+          "probeExec": {
+            "type": "array", "minItems": 1, "items": {"type": "string"}
+          },
+          "ports": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "targetPort"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "targetPort": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 65535
+                }
+              }
+            }
+          },
+          "storage": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": [
+                "name",
+                "path",
+                "size"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/"
+                },
+                "size": {
+                  "type": "string"
+                },
+                "storageClass": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "resources": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "services": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "component",
+          "ports"
+        ],
+        "properties": {
+          "type": {"enum": ["ClusterIP", "LoadBalancer", "NodePort"]},
+          "component": {
+            "type": "string"
+          },
+          "ports": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    "materialImage": {
+      "type": "string",
+      "pattern": ".+@sha256:[a-f0-9]{64}$"
+    },
+    "imagePullSecrets": {
+      "type": "array"
+    }
+  }
+}

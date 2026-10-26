@@ -44,7 +44,7 @@ namespace psim::platform::runtime {
 namespace {
 
 constexpr int kExitOk = 0;
-constexpr int kExitStartFailed = 1;
+constexpr int kExitFailed = 1;
 constexpr int kExitDrainTimeout = 3;
 
 std::string host_name() {
@@ -167,7 +167,7 @@ struct Runtime::Impl {
         logger.error("component failed to start", {{"component", component->name()},
                                                    {"code", started_component.error().name()},
                                                    {"error", std::string_view(started_component.error().message())}});
-        exit_code = kExitStartFailed;
+        exit_code = kExitFailed;
         co_await shutdown();
         co_return;
       }
@@ -256,14 +256,22 @@ struct Runtime::Impl {
         .Add({})
         .Set(static_cast<double>(shards->size()));
     context = std::make_unique<Context>(io.get_executor(), logger, metrics, *tracing, config,
-                                        Execution{.shards = shards.get(), .clock = &clock, .blocking = blocking.get()});
+                                        Execution{.shards = shards.get(), .clock = &clock, .blocking = blocking.get()},
+                                        [this] {
+                                          asio::post(io, [this] {
+                                            if (!stopping) {
+                                              exit_code = kExitFailed;
+                                              asio::co_spawn(io, shutdown(), asio::detached);
+                                            }
+                                          });
+                                        });
 
     auto created = service.create(*context);
     if (!created) {
       shards->stop();
       logger.error("service failed to initialize",
                    {{"code", created.error().name()}, {"error", std::string_view(created.error().message())}});
-      return kExitStartFailed;
+      return kExitFailed;
     }
     components = std::move(*created);
 
@@ -273,7 +281,7 @@ struct Runtime::Impl {
     if (!listening) {
       shards->stop();
       logger.error("admin endpoint failed", {{"error", std::string_view(listening.error().message())}});
-      return kExitStartFailed;
+      return kExitFailed;
     }
     admin_port = *listening;
     logger.info("service starting", {{"version", build_info().version},

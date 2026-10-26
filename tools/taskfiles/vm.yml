@@ -1,0 +1,47 @@
+version: '3'
+vars:
+  VM_PROFILE: '{{.VM_PROFILE | default "deploy/vm/local.json"}}'
+tasks:
+  test:
+    desc: Check ownership boundaries and the real KVM lifecycle in an isolated namespace
+    cmds:
+      - docker run --rm --user $(id -u):$(id -g) --volume "$PWD:/workspace" --workdir /workspace --entrypoint python3 {{.TOOLCHAIN_IMAGE}} -I tools/vm/test_vm.py
+      - python3 -I tools/vm/qualify.py
+  doctor:
+    desc: Check native KVM, Docker, RAM, CPU, disk and VM SSH port availability
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} doctor']
+  image:
+    desc: Build the pinned VM tooling container
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} image']
+  bootstrap:
+    desc: Install hash-pinned native Docker Engine and Compose inside the managed VMs
+    cmds: ['python3 -I tools/vm/bootstrap.py --profile {{.VM_PROFILE}}']
+  up:
+    desc: Create or resume the private three-node Debian VM lab and wait for cloud-init
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} up']
+  down:
+    desc: Shut down the managed VMs while preserving their disks and SSH identities
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} down']
+  destroy:
+    desc: Stop and remove only the owned VM lab, disks and SSH identities
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} destroy']
+  status:
+    desc: Show the state of the managed VMs
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} status']
+  wait:
+    desc: Wait for the managed VMs to finish cloud-init
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} wait']
+  exec:
+    desc: Run CMD in NODE using the pinned SSH host identity
+    env:
+      PSIM_VM_COMMAND: '{{.CMD | default "uname -a"}}'
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} exec --node {{.NODE | default "node-1"}}']
+  node:start:
+    desc: Start one managed VM
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} node start --node {{.NODE}}']
+  node:stop:
+    desc: Shut down one managed VM
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} node stop --node {{.NODE}}']
+  node:kill:
+    desc: Simulate abrupt power loss of one managed VM
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} node kill --node {{.NODE}}']

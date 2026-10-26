@@ -237,7 +237,9 @@ class Worker final : public p::stream::Worker {
       }
       (publishing ? relay_healthy_ : tick_healthy_).store(result.has_value());
       if (!result) {
-        context().logger().warn("audit background operation deferred", {{"code", std::string(result.error().name())}});
+        context().logger().warn(
+            "audit background operation deferred",
+            {{"code", std::string(result.error().name())}, {"error", std::string(result.error().message())}});
       }
       auto interval = publishing ? 1 : 1000;
       if (!result) {
@@ -255,7 +257,8 @@ class Worker final : public p::stream::Worker {
       auto result = co_await identity_->poll();
       identity_healthy_.store(result.has_value());
       if (!result) {
-        context().logger().warn("audit identity journal deferred", {{"code", std::string(result.error().name())}});
+        context().logger().warn("audit identity journal deferred", {{"code", std::string(result.error().name())},
+                                                                    {"error", std::string(result.error().message())}});
       }
       identity_timer_.expires_after(std::chrono::seconds(1));
       if (!stopping_) {

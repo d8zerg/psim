@@ -1,0 +1,19 @@
+{
+  "kafka": "apache/kafka:4.3.1@sha256:77e3df9054047a88b520d0cc46e16696d3b22022e1d580aeccd2632df6532837",
+  "postgres": "postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336",
+  "valkey": "valkey/valkey:9.1.2-alpine@sha256:48332870af354a799964c0012ae1194a0bf2bf894eb508f945810596dc2d8d11",
+  "clickhouse": "clickhouse/clickhouse-server:26.8.19@sha256:3ddc359dd4c29921f1b926559344c14c7d98f024e1db9d9d02926e182426fba2",
+  "keeper": "clickhouse/clickhouse-keeper:26.8.19@sha256:21c9b16c4ee1a36b726cf71a0ce81fbc1b2298f5e054833c1fb18c70fb0b79fb",
+  "seaweed": "chrislusf/seaweedfs:4.48@sha256:4e61d15fd35994cb1e43e1e553dff106794841fd9a99ade2fc8c8bfce4d7872d",
+  "keycloak": "quay.io/keycloak/keycloak:26.8.0@sha256:b0f60d489d51c5d113390bdf5461d4c06e6051be026c05549f2e1e10ec352bcc",
+  "registry": "apicurio/apicurio-registry:3.3.3@sha256:c9cae4c90ce46538abf673c68eb591345f23bcc6c2aa6bfd47189adcf609d8f1",
+  "registry-build": "apicurio/apicurio-registry:3.3.3-mutable@sha256:e43b3ee84f5d430cd64dda113e51d91599fb86cc1f6f66baf2a8da91f5955b22",
+  "otel": "otel/opentelemetry-collector-contrib:0.162.0@sha256:39923a8e431bd1f57be82411999d389fcfe40857492e4365456d97a4c1f74be6",
+  "prometheus": "prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e",
+  "grafana": "grafana/grafana:13.2.3@sha256:b28bae15e219c998fb0e0424ed724930cc61b1f61fb404d47c862f9a23f9e572",
+  "loki": "grafana/loki:3.7.8@sha256:1107dd5274e0ada47e42472b7a7e71f3b2a2fe878878108f3e2f9e51528f0193",
+  "tempo": "grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd",
+  "node": "node:24.21.0-trixie@sha256:1278a37eb510ec1606fba0e80f554bcc941ae0b44f35ae373c4822ae7717c64d",
+  "haproxy": "haproxy:3.2.10-trixie@sha256:4a72e32dfd568951c0febdfa32a12c2d9de10491c34f2cf280f46d9db2635a42",
+  "etcd": "quay.io/coreos/etcd:v3.6.9@sha256:5e79c3d2ff695afa464bc2e81deb4447855982510f425ddf35faaeac7f4b8d17"
+}

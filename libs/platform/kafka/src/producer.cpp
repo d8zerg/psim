@@ -24,6 +24,7 @@
 #include <string_view>
 #include <tuple>
 #include <utility>
+#include <vector>
 
 #include "detail.hpp"
 #include "psim/platform/async/blocking_pool.hpp"
@@ -46,9 +47,17 @@ using Clock = std::chrono::steady_clock;
 struct Pending {
   std::optional<Result<Delivery>> result;
   asio::steady_timer* event = nullptr;
+  std::size_t remaining = 1;
+  std::optional<Error> error;
 
   void complete(Result<Delivery> outcome) {
-    result = std::move(outcome);
+    if (!outcome && !error) {
+      error = outcome.error();
+    }
+    if (--remaining != 0) {
+      return;
+    }
+    result = error ? Result<Delivery>(std::unexpected(std::move(*error))) : std::move(outcome);
     if (event != nullptr) {
       event->cancel();
     }
@@ -383,6 +392,40 @@ asio::awaitable<Result<Delivery>> Producer::send(Record record) {
     co_return fail(ErrorCode::kCommonUnavailable, "send to " + record.topic + ": cancelled, outcome unknown");
   }
   co_return std::move(*pending->result);
+}
+
+asio::awaitable<Result<void>> Producer::send_batch(std::vector<Record> records) {
+  if (records.empty()) {
+    co_return Result<void>{};
+  }
+  auto pending = std::make_shared<Pending>();
+  pending->remaining = records.size();
+  for (std::size_t index = 0; index < records.size(); ++index) {
+    auto holder = std::make_unique<std::shared_ptr<Pending>>(pending);
+    auto produced = co_await state_->produce_waiting(&records[index], holder.get());
+    if (!produced) {
+      // Reports still own all successfully queued messages. Account for the
+      // unqueued suffix and wait for those reports before completing the batch.
+      for (auto unsent = index; unsent < records.size(); ++unsent) {
+        pending->complete(std::unexpected(produced.error()));
+      }
+      break;
+    }
+    std::ignore = holder.release();
+  }
+  if (!pending->result) {
+    asio::steady_timer event(co_await asio::this_coro::executor, asio::steady_timer::time_point::max());
+    pending->event = &event;
+    std::ignore = co_await event.async_wait(asio::as_tuple(asio::use_awaitable));
+    pending->event = nullptr;
+  }
+  if (!pending->result) {
+    co_return fail(ErrorCode::kCommonUnavailable, "kafka batch cancelled, outcome unknown");
+  }
+  if (!*pending->result) {
+    co_return std::unexpected(pending->result->error());
+  }
+  co_return Result<void>{};
 }
 
 asio::awaitable<Result<void>> Producer::flush(Duration timeout) {

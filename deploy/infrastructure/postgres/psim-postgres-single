@@ -1,0 +1,15 @@
+#!/bin/sh
+set -eu
+umask 077
+configuration=/etc/psim-platform/postgres/secrets
+if [ ! -s "$PGDATA/PG_VERSION" ]; then
+    initdb --data-checksums --auth-local=peer --auth-host=scram-sha-256 --username=postgres \
+        --pwfile="$configuration/admin.secret"
+    pg_ctl -D "$PGDATA" -o "-c listen_addresses='' -c unix_socket_directories=/tmp" -w start
+    trap 'pg_ctl -D "$PGDATA" -m fast -w stop' EXIT
+    psql --no-psqlrc --host=/tmp --set ON_ERROR_STOP=1 -d postgres -f "$configuration/bootstrap.sql"
+    PSIM_PG_HOST=/tmp PSIM_PG_DATABASE=psim PSIM_PG_USER=postgres /usr/bin/psim-audit-tool migrate audit_service
+    pg_ctl -D "$PGDATA" -m fast -w stop
+    trap - EXIT
+fi
+exec postgres -D "$PGDATA" -c "config_file=$configuration/postgresql.conf"

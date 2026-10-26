@@ -8,4 +8,4 @@ target_link_libraries(psim_catalog_core PUBLIC psim::platform_stream psim::platf
 psim_add_service(resource-catalog SOURCES src/main.cpp adapters/http.cpp adapters/connector_admin.cpp LIBS psim_catalog_core yaml-cpp::yaml-cpp SUMMARY "PSIM Resource Catalog")
 psim_add_test(psim_catalog_test SOURCES tests/model_test.cpp tests/configuration_test.cpp LIBS psim_catalog_core PNG::PNG libjpeg-turbo::turbojpeg-static)
 
-install(FILES ${PROJECT_SOURCE_DIR}/contracts/taxonomy/v1/taxonomy.yaml DESTINATION share/psim COMPONENT resource-catalog)
+set_property(GLOBAL PROPERTY PSIM_PACKAGE_DEPENDS_resource-catalog taxonomy)

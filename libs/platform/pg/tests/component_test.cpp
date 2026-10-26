@@ -277,6 +277,34 @@ TEST(PgMigrations, ExpandContractAreSeparateIdempotentAndDetectEditedHistory) {
   run(scenario(schema));
 }
 
+TEST(PgMigrations, ProvisionedSchemaNeedsNoDatabaseCreatePrivilege) {
+  auto scenario = [](std::string schema) -> asio::awaitable<void> {
+    auto privileged = options();
+    privileged.user = "postgres";
+    privileged.password = "psim-dev-postgres";
+    auto connection = take(co_await Connection::connect(std::move(privileged)));
+    const auto role = schema + "_role";
+    take(co_await connection->query({.sql = "CREATE ROLE " + role + " NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE"}));
+    take(co_await connection->query({.sql = "CREATE SCHEMA " + schema + " AUTHORIZATION " + role}));
+    take(co_await connection->query({.sql = "SET ROLE " + role}));
+    auto privileges = take(co_await connection->query(
+        {.sql = "SELECT has_database_privilege(current_user, current_database(), 'CREATE')"}));
+    EXPECT_EQ(privileges.value(0, 0), "f");
+    Migrator migrator(schema);
+    std::vector<Migration> plan{{.version = 1, .name = "items", .expand = {"CREATE TABLE @schema@.items (id bigint)"}}};
+    check(co_await migrator.apply(connection.get(), plan));
+    check(co_await migrator.apply(connection.get(), plan));
+    MessageStore store(schema);
+    check(co_await store.initialize(connection.get()));
+    check(co_await store.initialize(connection.get()));
+    EXPECT_FALSE(co_await ensure_schema(connection.get(), schema + "_forbidden"));
+    take(co_await connection->query({.sql = "RESET ROLE"}));
+    take(co_await connection->query({.sql = "DROP SCHEMA " + schema + " CASCADE"}));
+    take(co_await connection->query({.sql = "DROP ROLE " + role}));
+  };
+  run(scenario(unique_schema()));
+}
+
 TEST(PgStore, InboxOutboxAndDomainStateCommitTogetherAndRejectIdentityReuse) {
   const auto schema = unique_schema();
   auto scenario = [](std::string schema) -> asio::awaitable<void> {

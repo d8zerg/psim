@@ -215,7 +215,9 @@ class Worker final : public p::stream::Worker {
       }
       if (!result) {
         context().logger().warn("incident background operation deferred",
-                                {{"code", std::string(result.error().name())}});
+                                {{"code", std::string(result.error().name())},
+                                 {"error", std::string(result.error().message())},
+                                 {"publishing", publishing}});
       }
       auto interval = publishing ? 1 : 200;
       if (!result) {

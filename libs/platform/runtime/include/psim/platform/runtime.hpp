@@ -38,13 +38,15 @@ struct Execution {
 class Context {
  public:
   Context(asio::any_io_executor executor, log::Logger& logger, observability::Metrics& metrics,
-          observability::Tracing& tracing, const config::Config& config, Execution execution)
+          observability::Tracing& tracing, const config::Config& config, Execution execution,
+          std::function<void()> failure = {})
       : executor_(std::move(executor)),
         logger_(&logger),
         metrics_(&metrics),
         tracing_(&tracing),
         config_(&config),
-        execution_(execution) {}
+        execution_(execution),
+        failure_(std::move(failure)) {}
 
   [[nodiscard]] const asio::any_io_executor& executor() const noexcept { return executor_; }
 
@@ -68,6 +70,14 @@ class Context {
   /// Pool for blocking calls (runtime.blocking_threads, runtime.blocking_tasks).
   [[nodiscard]] async::BlockingPool& blocking() const noexcept { return *execution_.blocking; }
 
+  /// A terminal component error requires a process restart. Thread-safe; drains
+  /// the service and returns a failure exit code to its supervisor.
+  void request_failure() const {
+    if (failure_) {
+      failure_();
+    }
+  }
+
  private:
   asio::any_io_executor executor_;
   log::Logger* logger_;
@@ -75,6 +85,7 @@ class Context {
   observability::Tracing* tracing_;
   const config::Config* config_;
   Execution execution_;
+  std::function<void()> failure_;
 };
 
 /// A part of a service with its own lifecycle. All methods run on the runtime's control executor;
@@ -129,7 +140,8 @@ class Runtime {
   ~Runtime();
 
   /// Start, serve until a stop is requested (SIGTERM, SIGINT, request_stop), drain, return the exit code:
-  /// 0 - clean stop, 1 - failed start, 3 - drain timeout (work in progress may be lost).
+  /// 0 - clean stop, 1 - failed start or terminal component error,
+  /// 3 - drain timeout (work in progress may be lost).
   int run();
 
   /// Thread-safe.

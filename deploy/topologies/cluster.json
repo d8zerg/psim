@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "name": "psim-platform",
+  "topology": "cluster",
+  "version": "0.1.0",
+  "public_name": "psim.example.test",
+  "virtual_ip": "192.0.2.10/24",
+  "interface": "eth0",
+  "shards": 4,
+  "nodes": [
+    {
+      "name": "infra-1",
+      "address": "192.0.2.11",
+      "failure_domain": "host-1",
+      "roles": [
+        "infrastructure"
+      ]
+    },
+    {
+      "name": "infra-2",
+      "address": "192.0.2.12",
+      "failure_domain": "host-2",
+      "roles": [
+        "infrastructure"
+      ]
+    },
+    {
+      "name": "infra-3",
+      "address": "192.0.2.13",
+      "failure_domain": "host-3",
+      "roles": [
+        "infrastructure"
+      ]
+    },
+    {
+      "name": "app-1",
+      "address": "192.0.2.21",
+      "failure_domain": "host-4",
+      "roles": [
+        "application",
+        "edge"
+      ]
+    },
+    {
+      "name": "app-2",
+      "address": "192.0.2.22",
+      "failure_domain": "host-5",
+      "roles": [
+        "application",
+        "edge"
+      ]
+    },
+    {
+      "name": "obs-1",
+      "address": "192.0.2.31",
+      "failure_domain": "host-6",
+      "roles": [
+        "observability"
+      ]
+    }
+  ],
+  "security_tenant": "8a859083-3021-4d8f-a58d-225e0a3e82f8"
+}

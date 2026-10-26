@@ -1,0 +1,43 @@
+{
+  "format": 1,
+  "name": "psim-platform",
+  "topology": "cluster",
+  "version": "0.1.0",
+  "public_name": "localhost",
+  "public_port": 8443,
+  "security_tenant": "15518631-4bcc-4cfe-86e6-75afc582f66d",
+  "virtual_ip": "10.91.0.10/24",
+  "interface": "psim0",
+  "shards": 4,
+  "nodes": [
+    {
+      "name": "node-1",
+      "address": "10.91.0.11",
+      "failure_domain": "vm-1",
+      "roles": [
+        "infrastructure",
+        "application",
+        "edge"
+      ]
+    },
+    {
+      "name": "node-2",
+      "address": "10.91.0.12",
+      "failure_domain": "vm-2",
+      "roles": [
+        "infrastructure",
+        "application",
+        "edge"
+      ]
+    },
+    {
+      "name": "node-3",
+      "address": "10.91.0.13",
+      "failure_domain": "vm-3",
+      "roles": [
+        "infrastructure",
+        "observability"
+      ]
+    }
+  ]
+}

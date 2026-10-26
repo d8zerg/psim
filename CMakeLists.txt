@@ -39,6 +39,9 @@ add_subdirectory(services)
 add_subdirectory(connectors/simulator)
 add_subdirectory(connectors/webhook)
 
+install(FILES contracts/taxonomy/v1/taxonomy.yaml DESTINATION share/psim COMPONENT taxonomy)
+psim_package(taxonomy SUMMARY "PSIM shared event taxonomy")
+
 psim_finalize_packaging()
 add_subdirectory(tools/event-flow)
 add_subdirectory(tools/connector-conformance)

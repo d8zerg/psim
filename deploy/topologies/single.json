@@ -1,0 +1,21 @@
+{
+  "format": 1,
+  "name": "psim-platform-single",
+  "topology": "single",
+  "version": "0.1.0",
+  "public_name": "psim.example.test",
+  "nodes": [
+    {
+      "name": "psim-1",
+      "address": "192.0.2.11",
+      "failure_domain": "host-1",
+      "roles": [
+        "infrastructure",
+        "application",
+        "edge",
+        "observability"
+      ]
+    }
+  ],
+  "security_tenant": "4036388f-5453-45be-88c8-bbe6e3fa547b"
+}

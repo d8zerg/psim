@@ -78,6 +78,64 @@ struct RoundTrip {
   opentelemetry::trace::Tracer* tracer;
 };
 
+asio::awaitable<void> independent_batches(std::string topic, async::BlockingPool* pool) {
+  const auto executor = co_await asio::this_coro::executor;
+  auto producer = Producer::create(executor, {.client = client()});
+  EXPECT_TRUE(producer.has_value());
+  if (!producer) {
+    co_return;
+  }
+  const auto empty = co_await (*producer)->send_batch({});
+  EXPECT_TRUE(empty.has_value());
+  std::vector<Record> good;
+  good.reserve(1000);
+  for (int index = 0; index < 1000; ++index) {
+    good.push_back({.topic = topic, .key = "batch", .value = std::to_string(index)});
+  }
+  std::vector<Record> bad{{.topic = topic, .key = "prefix", .value = "queued before rejection"},
+                          {.topic = topic, .value = std::string(2UL * 1024 * 1024, 'x')},
+                          {.topic = topic, .key = "suffix", .value = "must not be queued"}};
+  using namespace asio::experimental::awaitable_operators;
+  auto good_work = (*producer)->send_batch(std::move(good));
+  auto bad_work = (*producer)->send_batch(std::move(bad));
+  auto [delivered, rejected] = co_await (std::move(good_work) && std::move(bad_work));
+  EXPECT_TRUE(delivered.has_value());
+  EXPECT_FALSE(rejected.has_value());
+  std::vector<Record> invalid{{.topic = "", .value = "delivery failure"}};
+  const auto failed = co_await (*producer)->send_batch(std::move(invalid));
+  EXPECT_FALSE(failed.has_value());
+  std::vector<Record> after{{.topic = topic, .key = "after", .value = "independent of prior errors"}};
+  const auto independent = co_await (*producer)->send_batch(std::move(after));
+  EXPECT_TRUE(independent.has_value());
+  auto input = Consumer::create(executor, consumer(topic, unique("batch")), {.blocking = pool});
+  if (!input) {
+    throw std::runtime_error("batch consumer unavailable");
+  }
+  std::size_t found = 0;
+  bool prefix = false;
+  const auto deadline = std::chrono::steady_clock::now() + seconds(20);
+  while (found < 1002 && std::chrono::steady_clock::now() < deadline) {
+    auto messages = co_await (*input)->poll(2000, milliseconds(100));
+    if (!messages) {
+      throw std::runtime_error("batch reconciliation failed");
+    }
+    for (const auto& message : *messages) {
+      EXPECT_NE(message.key(), "suffix");
+      prefix = prefix || message.key() == "prefix";
+      ++found;
+    }
+  }
+  EXPECT_EQ(found, 1002U);
+  EXPECT_TRUE(prefix);
+  co_await (*input)->close();
+}
+
+TEST(KafkaComponent, ConcurrentBatchesRetainTheirOwnErrorsAndDrainAQueuedPrefix) {
+  Topics topics;
+  async::BlockingPool pool(1, 4);
+  run(independent_batches(topics.create("batches", 3), &pool));
+}
+
 asio::awaitable<void> round_trip(RoundTrip test) {
   const auto executor = co_await asio::this_coro::executor;
   auto producer = Producer::create(executor, {.client = client()}, {.metrics = test.metrics});
