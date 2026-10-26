@@ -39,7 +39,8 @@ class Repository {
         assistant_(std::move(assistant)) {}
 
   asio::awaitable<p::Result<void>> initialize();
-  asio::awaitable<p::Result<void>> apply(processing::v1::SignalRecord signal, Encode outgoing = {});
+  // True for a newly committed signal, false for repeated inbox delivery.
+  asio::awaitable<p::Result<bool>> apply(processing::v1::SignalRecord signal, Encode outgoing = {});
   asio::awaitable<p::Result<Json>> request(p::security::Principal principal, std::string operation, std::string id,
                                            Json body, std::string key = {}, std::optional<std::uint64_t> expected = {});
   asio::awaitable<p::Result<void>> tick();

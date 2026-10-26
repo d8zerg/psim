@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PsimDependencyLatency</title><style>body{font:17px/1.65 system-ui,sans-serif;background:#f5f7fa;color:#182230;margin:0}header,main{max-width:1000px;margin:auto;padding:24px}header{display:flex;gap:24px;flex-wrap:wrap;border-bottom:1px solid #d0d5dd}main{padding-top:12px}h1{font-size:30px;line-height:1.25}h2{font-size:22px;margin-top:32px}a{color:#155eef}code{background:#e4e7ec;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}li{margin:12px 0}article{background:white;border:1px solid #d0d5dd;border-radius:8px;padding:12px 24px;margin:16px 0}@media(prefers-color-scheme:dark){body{background:#101828;color:#eaecf0}article{background:#1d2939;border-color:#475467}a{color:#84adff}code{background:#344054}header{border-color:#475467}}</style></head><body><header><a href="/monitoring/d/psim-overview">Обзор платформы</a><a href="/operations/runbooks/">Все инструкции</a><a href="/monitoring/d/psim-infrastructure">Связанный дашборд</a></header><main><h1>PsimDependencyLatency</h1>
+<p>Запросы к Kafka или PostgreSQL устойчиво занимают более 150 мс.</p>
+<h2>Диагностика</h2>
+<p>На дашборде инфраструктуры выбрать node и component из алерта. Сравнить задержки к одному target с разных узлов. Проверить RTT, потери пакетов, TLS и нагрузку узла. Успешная проверка подтверждает доступность, но не выполнение SLO конвейера.</p>
+<h2>Восстановление</h2>
+<p>Устранить потери пакетов, перегрузку канала или узла. Сохранить кворум и реплики; не снижать требования подтверждения записи. После восстановления проверить длительность проб, lag и сквозную задержку.</p>
+<h2>Подтверждение результата</h2>
+<p>Длительность проверок ниже порога на полном окне вычисления; probe_success остаётся равным 1; алерт перешёл в resolved. Проверить функциональную операцию с записью и чтением.</p></main></body></html>

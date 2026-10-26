@@ -146,6 +146,9 @@ class Check(HttpCheck):
         assert len(incidents) == 1, incidents
         value = self.incident(incidents[0]["incidentId"])
         assert value["version"] == "3" and value["priority"] == "PRIORITY_P2", value
+        self.metrics()
+        assert self.report["eventToIncidentSamples"] == 3, "repeated signals changed the pipeline histogram"
+        assert self.report["persistedSignals"] == 3, "repeated signals changed the persistence counter"
         self.request("GET", "/v1/incidents/" + value["incidentId"], role=None, expected=401)
         self.request("GET", "/v1/incidents/" + value["incidentId"], role="other", expected=403)
         self.request("GET", "/v1/incidents/" + value["incidentId"], role="tenant", expected=404)
@@ -291,18 +294,30 @@ class Check(HttpCheck):
 
     def metrics(self):
         values = {}
+        pipeline_samples = 0
+        persisted = 0
         for service in ("incident-service", "incident-2"):
             with urllib.request.urlopen("http://localhost:" + self.port(service, 9100) + "/metrics", timeout=5) as response:
                 body = response.read().decode()
             for boundary, count in re.findall(r'psim_incident_signal_seconds_bucket\{le="([^"]+)"\} ([0-9.]+)', body):
                 values[float(boundary)] = values.get(float(boundary), 0) + float(count)
+            observed = re.search(r'^psim_event_to_incident_seconds_count ([0-9.]+)$', body, re.MULTILINE)
+            assert observed, "event-to-incident histogram is missing"
+            pipeline_samples += float(observed[1])
+            committed = re.search(r'^psim_incident_signals_persisted_total ([0-9.]+)$', body, re.MULTILINE)
+            assert committed, "signal persistence counter is missing"
+            persisted += float(committed[1])
+        self.report["eventToIncidentSamples"] = pipeline_samples
+        self.report["persistedSignals"] = persisted
         return values
 
     def performance(self):
         before = self.metrics()
+        pipeline_before = self.report["eventToIncidentSamples"]
         expected = self.emit(count=self.count, uniqueGroups=True, group="load-" + self.fixtures)
         self.wait(lambda: int(self.sql("SELECT count(*) FROM incident.signals WHERE tenant='" + self.tenant + "' AND body->'signal'->>'groupingKey' LIKE 'load-%'")) == self.count, 180)
         after = self.metrics()
+        assert self.report["eventToIncidentSamples"] - pipeline_before >= self.count
         samples = after[float("inf")] - before.get(float("inf"), 0)
         assert samples >= self.count
         upper = min(bound for bound, count in after.items() if count - before.get(bound, 0) >= 0.99 * samples)

@@ -107,6 +107,7 @@
 - [Поставка двух топологий](engineering/deployment-topologies.md)
 - [Локальный стенд KVM](engineering/local-vm-lab.md)
 - [Первоначальное доверие и учётные записи](engineering/deployment-pki.md)
+- [Пакет наблюдаемости и дашборды](engineering/observability.md)
 
 ## Участие и поддержка
 

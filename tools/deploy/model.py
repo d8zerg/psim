@@ -134,7 +134,7 @@ class Profile:
                 'nodes': [{'name': n.name, 'address': n.address, 'failure_domain': n.domain, 'roles': sorted(n.roles)} for n in self.nodes]}
 
     def uid(self, service):
-        names = list(SERVICES) + ['postgres', 'etcd', 'valkey', 'sentinel', 'kafka', 'keeper', 'clickhouse', 'keycloak', 'registry', 'seaweed', 'haproxy', 'web', 'observability', 'deployment-admin']
+        names = list(SERVICES) + ['postgres', 'etcd', 'valkey', 'sentinel', 'kafka', 'keeper', 'clickhouse', 'keycloak', 'registry', 'seaweed', 'haproxy', 'web', 'observability', 'deployment-admin', 'monitoring', 'prometheus', 'alertmanager', 'grafana', 'loki', 'tempo']
         return self.uid_base + names.index(service)
 
     @property

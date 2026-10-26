@@ -33,6 +33,9 @@ def create(origin):
     client = clients[0]['id']
     roles = [api.request('GET', base + '/clients/' + client + '/roles/' + role) for role in data['roles']]
     api.request('POST', base + '/users/' + users[0]['id'] + '/role-mappings/clients/' + client, roles)
+    if 'admin' in data['roles']:
+        observability = api.request('GET', base + '/roles/psim-observability-admin')
+        api.request('POST', base + '/users/' + users[0]['id'] + '/role-mappings/realm', [observability])
     print('Initial account created; first sign-in requires a new password and TOTP enrollment')
 
 

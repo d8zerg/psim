@@ -36,8 +36,8 @@ def render_infrastructure(bundle):
         proxy(bundle, node)
     for node in profile.select('application'):
         web(bundle, node)
-    for node in profile.select('observability'):
-        observability(bundle, node)
+    from observability import render
+    render(bundle)
 
 
 def kafka(bundle, node, index, nodes):
@@ -198,7 +198,7 @@ def keeper(bundle, node, index, nodes):
     members = ''.join(f'<server><id>{i}</id><hostname>{n.name}</hostname><port>9234</port></server>' for i, n in enumerate(nodes, 1))
     xml = f'''<clickhouse>
 <listen_host>{node.address}</listen_host><logger><level>warning</level><console>1</console></logger>
-<keeper_server><tcp_port_secure>9281</tcp_port_secure><server_id>{index}</server_id>
+<keeper_server><tcp_port_secure>9281</tcp_port_secure><server_id>{index}</server_id><four_letter_word_white_list>ruok,mntr</four_letter_word_white_list>
 <log_storage_path>/var/lib/clickhouse/coordination/log</log_storage_path><snapshot_storage_path>/var/lib/clickhouse/coordination/snapshots</snapshot_storage_path>
 <raft_configuration><secure>true</secure>{members}</raft_configuration>
 <coordination_settings><operation_timeout_ms>10000</operation_timeout_ms><session_timeout_ms>30000</session_timeout_ms></coordination_settings>
@@ -209,7 +209,7 @@ def keeper(bundle, node, index, nodes):
 
 
 def clickhouse(bundle, node, index, nodes):
-    for port in (9440, 9010):
+    for port in (9440, 9010, 18447):
         bundle.port(node, port, 'clickhouse')
     ca, certificate, key = bundle.tls(node, 'clickhouse', dns=['clickhouse', *[n.name for n in nodes]])
     _, keeper_certificate, keeper_key = bundle.tls(node, 'clickhouse', purpose='keeper', authority='keeper')
@@ -219,7 +219,7 @@ def clickhouse(bundle, node, index, nodes):
     bundle.credential(node, 'clickhouse', 'peer.secret')
     bundle.credential(node, 'clickhouse', 'interserver.secret')
     xml = f'''<clickhouse>
-<listen_host>{node.address}</listen_host><tcp_port_secure>9440</tcp_port_secure>
+<listen_host>{node.address}</listen_host><tcp_port_secure>9440</tcp_port_secure><https_port>18447</https_port>
 <interserver_https_port>9010</interserver_https_port><interserver_http_host>{node.name}</interserver_http_host>
 <interserver_http_credentials><user>replication</user><password>{{{{secret:clickhouse/interserver.secret}}}}</password></interserver_http_credentials>
 <logger><level>warning</level><console>1</console></logger><path>/var/lib/clickhouse/</path>
@@ -399,6 +399,8 @@ def proxy(bundle, node):
     combined = protected(bundle, node, 'haproxy', 'public.pem', '{{combine:identity.pem,identity.key}}')
     sections = ['global\n  log stdout format raw local0\n  maxconn 20000\n  tune.ssl.default-dh-param 2048\n  stats socket /tmp/psim-haproxy.sock mode 600 level admin\n',
                 'defaults\n  log global\n  timeout connect 3s\n  timeout client 60s\n  timeout server 60s\n  timeout tunnel 1h\n']
+    bundle.port(node, 19301, 'haproxy-metrics')
+    sections.append(f'frontend metrics\n  bind {node.address}:19301\n  mode http\n  http-request use-service prometheus-exporter if {{ path /metrics }}\n')
     def tcp(name, port, targets, check_port=None, primary=False):
         bundle.port(node, port, name)
         text = f'listen {name}\n  bind 0.0.0.0:{port}\n  mode tcp\n  balance roundrobin\n'
@@ -434,8 +436,12 @@ def proxy(bundle, node):
   http-response set-header Strict-Transport-Security max-age=31536000
   acl identity path_beg /identity/
   acl api path_beg /v1/ /ws
+  acl monitoring path_beg /monitoring/
+  acl runbooks path_beg /operations/runbooks/
   use_backend public-identity if identity
   use_backend public-api if api
+  use_backend public-monitoring if monitoring
+  use_backend public-runbooks if runbooks
   default_backend public-web
 backend public-identity
   mode http
@@ -454,6 +460,9 @@ backend public-identity
   mode tcp
   balance leastconn
 '''+''.join(f'  server gateway-{i} {n.name}:17443 check\n' for i,n in enumerate(apps,1)))
+    observer = profile.select('observability')[0]
+    sections.append(f'backend public-monitoring\n  mode http\n  server grafana {observer.name}:19444 ssl verify required ca-file {ca} verifyhost {observer.name} sni str({observer.name}) check\n')
+    sections.append(f'backend public-runbooks\n  mode http\n  server runbooks {observer.name}:19443 ssl verify required ca-file {ca} crt {combined} verifyhost {observer.name} sni str({observer.name}) check\n')
     config = protected(bundle, node, 'haproxy', 'haproxy.cfg', '\n'.join(sections))
     service = bundle.service(node, 'haproxy', 'psim-platform/haproxy:' + profile.image_version, ['-W', '-db', '-f', config])
     if node in profile.select('edge'):
@@ -498,15 +507,3 @@ def web(bundle, node):
         'PSIM_LISTEN': node.address, 'PSIM_PORT': '18180', 'PSIM_ISSUER': bundle.profile.issuer,
         'PSIM_CA_FILE': ca, 'PSIM_CERTIFICATE_FILE': certificate, 'PSIM_PRIVATE_KEY_FILE': key})
     service['entrypoint'] = ['node', '/srv/server.mjs']
-
-
-def observability(bundle, node):
-    # The collector accepts only verified TLS; product code carries no client-side telemetry credentials.
-    bundle.port(node, 4317, 'otel')
-    ca, certificate, key = bundle.tls(node, 'observability', dns=[node.name])
-    config = {'receivers': {'otlp': {'protocols': {'grpc': {'endpoint': node.address + ':4317', 'tls': {'cert_file': certificate, 'key_file': key}}}}},
-        'processors': {'memory_limiter': {'check_interval': '1s', 'limit_mib': 256}, 'batch': {'timeout': '1s'}},
-        'exporters': {'debug': {'verbosity': 'basic'}},
-        'service': {'pipelines': {kind: {'receivers': ['otlp'], 'processors': ['memory_limiter', 'batch'], 'exporters': ['debug']} for kind in ('traces', 'metrics', 'logs')}}}
-    filename = protected(bundle, node, 'observability', 'collector.json', json.dumps(config))
-    bundle.service(node, 'otel', bundle.images['otel'], ['--config=' + filename], owner='observability')

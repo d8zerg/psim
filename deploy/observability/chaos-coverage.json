@@ -1,0 +1,167 @@
+{
+  "C-01": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    },
+    {
+      "alert": "PsimKafkaReplication",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimKafkaReplication"
+    }
+  ],
+  "C-02": [
+    {
+      "alert": "PsimServiceUnavailable",
+      "dashboard": "/monitoring/d/psim-services",
+      "runbook": "/operations/runbooks/PsimServiceUnavailable"
+    }
+  ],
+  "C-03": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    },
+    {
+      "alert": "PsimPostgresPrimary",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimPostgresPrimary"
+    }
+  ],
+  "C-04": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    },
+    {
+      "alert": "PsimValkeyPrimary",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimValkeyPrimary"
+    }
+  ],
+  "C-05": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    },
+    {
+      "alert": "PsimClickHouseReplication",
+      "dashboard": "/monitoring/d/psim-storage",
+      "runbook": "/operations/runbooks/PsimClickHouseReplication"
+    }
+  ],
+  "C-06": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    },
+    {
+      "alert": "PsimServiceUnavailable",
+      "dashboard": "/monitoring/d/psim-services",
+      "runbook": "/operations/runbooks/PsimServiceUnavailable"
+    },
+    {
+      "alert": "PsimKafkaLag",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimKafkaLag"
+    }
+  ],
+  "C-07": [
+    {
+      "alert": "PsimDependencyLatency",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimDependencyLatency"
+    },
+    {
+      "alert": "PsimPipelineLatency",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimPipelineLatency"
+    },
+    {
+      "alert": "PsimKafkaLag",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimKafkaLag"
+    }
+  ],
+  "C-08": [
+    {
+      "alert": "PsimDiskSpace",
+      "dashboard": "/monitoring/d/psim-storage",
+      "runbook": "/operations/runbooks/PsimDiskSpace"
+    },
+    {
+      "alert": "PsimDiskCritical",
+      "dashboard": "/monitoring/d/psim-storage",
+      "runbook": "/operations/runbooks/PsimDiskCritical"
+    }
+  ],
+  "C-09": [
+    {
+      "alert": "PsimClockSkew",
+      "dashboard": "/monitoring/d/psim-operations",
+      "runbook": "/operations/runbooks/PsimClockSkew"
+    }
+  ],
+  "C-10": [
+    {
+      "alert": "PsimConnectorOffline",
+      "dashboard": "/monitoring/d/psim-business",
+      "runbook": "/operations/runbooks/PsimConnectorOffline"
+    }
+  ],
+  "C-11": [
+    {
+      "alert": "PsimMonitoringUnavailable",
+      "dashboard": "/monitoring/d/psim-operations",
+      "runbook": "/operations/runbooks/PsimMonitoringUnavailable"
+    },
+    {
+      "alert": "PsimServiceUnavailable",
+      "dashboard": "/monitoring/d/psim-services",
+      "runbook": "/operations/runbooks/PsimServiceUnavailable"
+    }
+  ],
+  "C-12": [
+    {
+      "alert": "PsimServiceUnavailable",
+      "dashboard": "/monitoring/d/psim-services",
+      "runbook": "/operations/runbooks/PsimServiceUnavailable"
+    },
+    {
+      "alert": "PsimPipelineLatency",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimPipelineLatency"
+    },
+    {
+      "alert": "PsimSignalInterrupted",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimSignalInterrupted"
+    }
+  ],
+  "C-13": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    }
+  ],
+  "C-14": [
+    {
+      "alert": "PsimCorrelationRestore",
+      "dashboard": "/monitoring/d/psim-pipeline",
+      "runbook": "/operations/runbooks/PsimCorrelationRestore"
+    }
+  ],
+  "C-15": [
+    {
+      "alert": "PsimComponentUnavailable",
+      "dashboard": "/monitoring/d/psim-infrastructure",
+      "runbook": "/operations/runbooks/PsimComponentUnavailable"
+    }
+  ]
+}

@@ -26,11 +26,12 @@ def packages(profile):
 def install(profile, node):
     stage = '/home/psim/.cache/psim-delivery/native'
     local.execute(node.name, ['install', '-d', '-m', '0700', stage])
+    local.execute(node.name, ['sudo', 'apt-get', 'install', '--yes', 'logrotate'])
     archives = packages(profile)
     for archive in archives:
         require(archive.is_file(), 'build the release Debian packages first')
         local.vm.copy_to(local.VM_NAME, node.name, archive, stage + '/' + archive.name)
-    program = '''import hashlib,json,pathlib,subprocess,sys
+    program = '''import hashlib,json,pathlib,shutil,subprocess,sys
 prefix=pathlib.Path(sys.argv[1]); node=sys.argv[2]; name=sys.argv[3]; archives=json.loads(sys.argv[4])
 s=json.loads((prefix/'installation.json').read_text())
 assert s['node']==node and s['name']==name
@@ -50,6 +51,9 @@ for source in sorted((prefix/'config'/node/'systemd').glob('psim-*.service')):
  assert not target.is_symlink() and (not target.exists() or target.read_bytes()==source.read_bytes())
  target.write_bytes(source.read_bytes()); target.chmod(0o644)
 subprocess.run(['systemctl','daemon-reload'],check=True)
+rotation=prefix/'config'/node/'logrotate.conf'
+shutil.copyfile(rotation,'/etc/logrotate.d/psim-platform')
+subprocess.run(['systemctl','enable','--now','logrotate.timer'],check=True)
 '''
     expected = {stage + '/' + archive.name: hashlib.sha256(archive.read_bytes()).hexdigest() for archive in archives}
     local.execute(node.name, ['sudo', 'python3', '-c', program, profile.prefix, node.name, profile.name, json.dumps(expected)])

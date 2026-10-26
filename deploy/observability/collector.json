@@ -1,0 +1,184 @@
+{
+  "receivers": {
+    "otlp": {
+      "protocols": {
+        "grpc": {
+          "endpoint": "0.0.0.0:4317",
+          "tls": {
+            "cert_file": "/etc/psim-platform/observability/secrets/identity.pem",
+            "key_file": "/etc/psim-platform/observability/secrets/identity.key"
+          }
+        }
+      }
+    },
+    "fluentforward": {
+      "endpoint": "127.0.0.1:24224"
+    },
+    "filelog": {
+      "include": [
+        "/var/log/psim/*.jsonl"
+      ],
+      "start_at": "beginning",
+      "storage": "file_storage"
+    },
+    "otlp/remote": {
+      "protocols": {
+        "grpc": {
+          "endpoint": "0.0.0.0:14317",
+          "tls": {
+            "cert_file": "/etc/psim-platform/observability/secrets/identity.pem",
+            "key_file": "/etc/psim-platform/observability/secrets/identity.key",
+            "client_ca_file": "/etc/psim-platform/observability/secrets/ca.pem"
+          }
+        }
+      }
+    }
+  },
+  "extensions": {
+    "file_storage": {
+      "directory": "/var/lib/otel/queue",
+      "create_directory": true
+    },
+    "health_check": {
+      "endpoint": "127.0.0.1:13133"
+    }
+  },
+  "processors": {
+    "memory_limiter": {
+      "check_interval": "1s",
+      "limit_mib": 256
+    },
+    "resource": {
+      "attributes": []
+    },
+    "transform/logs": {
+      "error_mode": "ignore",
+      "log_statements": [
+        {
+          "context": "log",
+          "statements": [
+            "set(body, body[\"log\"]) where IsMap(body) and body[\"log\"] != nil",
+            "merge_maps(attributes, ParseJSON(body), \"upsert\") where IsString(body) and IsMatch(body, \"^[{]\")",
+            "set(attributes[\"service.name\"], attributes[\"service\"]) where attributes[\"service\"] != nil",
+            "set(trace_id, TraceID(attributes[\"trace_id\"])) where attributes[\"trace_id\"] != nil",
+            "set(span_id, SpanID(attributes[\"span_id\"])) where attributes[\"span_id\"] != nil",
+            "set(severity_text, attributes[\"level\"]) where attributes[\"level\"] != nil",
+            "set(time, Time(attributes[\"ts\"], \"%Y-%m-%dT%H:%M:%S.%fZ\")) where attributes[\"ts\"] != nil"
+          ]
+        }
+      ]
+    },
+    "batch": {
+      "timeout": "1s",
+      "send_batch_size": 1024
+    },
+    "groupbyattrs": {
+      "keys": [
+        "service.name",
+        "instance"
+      ]
+    }
+  },
+  "exporters": {
+    "otlp/tempo": {
+      "endpoint": "127.0.0.1:14318",
+      "tls": {
+        "insecure": true
+      },
+      "sending_queue": {
+        "enabled": true,
+        "storage": "file_storage",
+        "queue_size": 1000
+      },
+      "retry_on_failure": {
+        "enabled": true,
+        "max_elapsed_time": "0s"
+      }
+    },
+    "otlphttp/loki": {
+      "endpoint": "http://127.0.0.1:13100/otlp",
+      "sending_queue": {
+        "enabled": true,
+        "storage": "file_storage",
+        "queue_size": 1000
+      },
+      "retry_on_failure": {
+        "enabled": true,
+        "max_elapsed_time": "0s"
+      }
+    },
+    "prometheusremotewrite": {
+      "endpoint": "http://127.0.0.1:19090/api/v1/write",
+      "resource_to_telemetry_conversion": {
+        "enabled": true
+      }
+    }
+  },
+  "service": {
+    "extensions": [
+      "file_storage",
+      "health_check"
+    ],
+    "telemetry": {
+      "metrics": {
+        "readers": [
+          {
+            "pull": {
+              "exporter": {
+                "prometheus": {
+                  "host": "127.0.0.1",
+                  "port": 18889
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "pipelines": {
+      "traces": {
+        "receivers": [
+          "otlp"
+        ],
+        "processors": [
+          "memory_limiter",
+          "resource",
+          "batch"
+        ],
+        "exporters": [
+          "otlp/tempo"
+        ]
+      },
+      "logs": {
+        "receivers": [
+          "otlp",
+          "fluentforward",
+          "filelog"
+        ],
+        "processors": [
+          "memory_limiter",
+          "resource",
+          "transform/logs",
+          "groupbyattrs",
+          "batch"
+        ],
+        "exporters": [
+          "otlphttp/loki"
+        ]
+      },
+      "metrics": {
+        "receivers": [
+          "otlp"
+        ],
+        "processors": [
+          "memory_limiter",
+          "resource",
+          "batch"
+        ],
+        "exporters": [
+          "prometheusremotewrite"
+        ]
+      }
+    }
+  }
+}

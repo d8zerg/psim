@@ -11,6 +11,16 @@
 version: 1
 
 methods:
+  - id: TS-39
+    kind: test
+    name: Пакет наблюдаемости
+    criteria: Семь статических дашбордов, корректные PromQL и конфигурации, переходы алертов и инструкции для C-01-C-15, бизнес-агрегаты без доступа к исходным таблицам, mTLS метрик, OTLP логи и трассы, доставка Prometheus -> Alertmanager -> журнал и браузерный просмотр без ошибок запросов
+    env: E-CI
+    gate: pr
+    barrier: automated
+    task: task deploy:observability:test
+    steps: ['9.4']
+    purpose: Поставка наблюдаемости и диагностические маршруты отказов; не заменяет квалификацию RPO/RTO
   - id: TS-38
     kind: test
     name: Загрузка и восстановление веб-модулей

@@ -7,6 +7,7 @@
 #include <boost/beast/core.hpp>
 #include <boost/beast/http.hpp>
 #include <boost/beast/ssl.hpp>
+#include <prometheus/counter.h>
 #include <prometheus/histogram.h>
 #include <psim/processing/v1/signal.pb.h>
 
@@ -17,6 +18,7 @@
 #include <expected>
 #include <initializer_list>
 #include <memory>
+#include <optional>
 #include <set>
 #include <string>
 #include <string_view>
@@ -84,6 +86,19 @@ class Worker final : public p::stream::Worker {
              .Help("Signal persistence transaction latency")
              .Register(context().metrics().registry())
              .Add({}, prometheus::Histogram::BucketBoundaries{0.001, 0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.1, 0.5, 1});
+    event_latency_ =
+        &prometheus::BuildHistogram()
+             .Name("psim_event_to_incident_seconds")
+             .Help(
+                 "Last source event timestamp to successful incident persistence; excludes timer signals and future "
+                 "timestamps")
+             .Register(context().metrics().registry())
+             .Add({}, prometheus::Histogram::BucketBoundaries{0.01, 0.05, 0.1, 0.25, 0.5, 0.75, 1, 2, 5, 10, 30, 60});
+    persisted_ = &prometheus::BuildCounter()
+                      .Name("psim_incident_signals_persisted_total")
+                      .Help("Distinct signals committed to incidents, including timer signals")
+                      .Register(context().metrics().registry())
+                      .Add({});
     auto pool = co_await database();
     if (!pool) {
       co_return std::unexpected(pool.error());
@@ -178,6 +193,10 @@ class Worker final : public p::stream::Worker {
       co_return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "invalid signal");
     }
     auto headers = message->headers();
+    const auto event_at = signal->signal().has_last_event_at() && !signal->signal().event_ids().empty()
+                                  && !signal->signal().has_absence_deadline()
+                              ? std::optional(signal->signal().last_event_at())
+                              : std::nullopt;
     p::kafka::inject(*trace, headers);
     auto result = co_await repository_->apply(
         std::move(*signal),
@@ -185,8 +204,22 @@ class Worker final : public p::stream::Worker {
           return record(std::move(topic), std::move(key), value, headers);
         });
     latency_->Observe(std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count());
+    if (result && *result) {
+      persisted_->Increment();
+    }
+    if (result && *result && event_at && event_at->seconds() >= 0 && event_at->nanos() >= 0
+        && event_at->nanos() < 1000000000) {
+      const auto event_time = static_cast<double>(event_at->seconds()) + (static_cast<double>(event_at->nanos()) / 1e9);
+      const auto now = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+      if (now >= event_time) {
+        event_latency_->Observe(now - event_time);
+      }
+    }
     trace->End();
-    co_return result;
+    if (!result) {
+      co_return std::unexpected(result.error());
+    }
+    co_return p::Result<void>{};
   }
 
   void launch(asio::awaitable<void> operation) {
@@ -345,6 +378,8 @@ class Worker final : public p::stream::Worker {
 
  private:
   prometheus::Histogram* latency_ = nullptr;
+  prometheus::Histogram* event_latency_ = nullptr;
+  prometheus::Counter* persisted_ = nullptr;
   Tcp::acceptor acceptor_;
   asio::steady_timer tick_, relay_timer_, done_;
   std::atomic_bool healthy_{false};

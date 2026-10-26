@@ -14,7 +14,7 @@ def build(version):
     images = json.loads((ROOT / 'deploy/topologies/images.json').read_text())
     output = ROOT / 'build/deployment'
     output.mkdir(parents=True, exist_ok=True)
-    for name, base in [('postgres', 'postgres'), ('web', 'node'), ('keycloak', 'keycloak'), ('haproxy', 'haproxy'), ('registry', 'registry-build')]:
+    for name, base in [('postgres', 'postgres'), ('web', 'node'), ('keycloak', 'keycloak'), ('haproxy', 'haproxy'), ('registry', 'registry-build'), ('monitoring', 'postgres')]:
         with tempfile.TemporaryDirectory(prefix='image-' + name + '-', dir=output) as temporary:
             context = Path(temporary)
             shutil.copytree(ROOT / 'deploy/infrastructure' / name, context, dirs_exist_ok=True)

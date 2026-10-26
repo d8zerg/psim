@@ -49,7 +49,7 @@ def package(bundle, material, node, output, owner, external=False):
     for service in compose['services'].values():
         for volume in service['volumes']:
             source = volume.split(':', 1)[0]
-            if source.startswith(profile.prefix + '/data/' + node + '/'):
+            if source.startswith(profile.prefix + '/data/' + node + '/') and not volume.endswith(':ro'):
                 directories[source[len(profile.prefix) + 1:]] = int(service['user'].split(':')[0])
     metadata = {'format': 1, 'lab': state['lab'], 'material_id': state['id'], 'profile': profile.document(), 'node': node,
         'files': {name: {'sha256': hashlib.sha256(body).hexdigest(), 'uid': uid, 'mode': mode} for name, (body, uid, mode) in files.items()},

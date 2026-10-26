@@ -396,7 +396,7 @@ asio::awaitable<p::Result<void>> Repository::save(pg::Transaction* tx, p::securi
                            details);
 }
 
-asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord signal, Encode outgoing) {
+asio::awaitable<p::Result<bool>> Repository::apply(processing::v1::SignalRecord signal, Encode outgoing) {
   const auto& input = signal.envelope();
   const auto& incoming = signal.signal();
   if (!p::stream::uuid(input.tenant_id()) || !p::stream::uuid(input.message_id())
@@ -405,10 +405,10 @@ asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord 
       || incoming.grouping_key().size() > 1024 || incoming.priority() < 1 || incoming.priority() > 4) {
     co_return p::fail(Code::kProcessingPayloadInvalid, "invalid signal identity or priority");
   }
-  co_return co_await pg::in_transaction<void>(
+  co_return co_await pg::in_transaction<bool>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited owned closure.
-      [this, &signal, &outgoing](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+      [this, &signal, &outgoing](pg::Transaction* tx) -> asio::awaitable<p::Result<bool>> {
         const auto& origin = signal.envelope();
         const auto& source = signal.signal();
         auto accepted = co_await messages_.accept(tx, "signals", origin.tenant_id() + ":" + origin.message_id(),
@@ -427,7 +427,7 @@ asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord 
           if (!restored) {
             co_return std::unexpected(restored.error());
           }
-          co_return p::Result<void>{};
+          co_return false;
         }
         auto locked = co_await tx->connection().query(
             {.sql = "SELECT pg_advisory_xact_lock(hashtextextended($1,0))",
@@ -576,8 +576,12 @@ asio::awaitable<p::Result<void>> Repository::apply(processing::v1::SignalRecord 
         if (!stored) {
           co_return std::unexpected(stored.error());
         }
-        co_return co_await save(tx, system(origin.tenant_id()), value, created ? "created" : "signal",
-                                origin.message_id(), {}, {}, outgoing ? &outgoing : nullptr, &origin);
+        auto saved = co_await save(tx, system(origin.tenant_id()), value, created ? "created" : "signal",
+                                   origin.message_id(), {}, {}, outgoing ? &outgoing : nullptr, &origin);
+        if (!saved) {
+          co_return std::unexpected(saved.error());
+        }
+        co_return true;
       });
 }
 

@@ -42,7 +42,7 @@ class Material:
         self.profile = verify_bundle(bundle)
         root = Path(__file__).resolve().parents[2]
         for relative, checksum in json.loads((self.bundle / 'generation.json').read_text()).items():
-            require(relative in ('tools/deploy/material.py', 'tools/deploy/policies.py', 'deploy/local/config/keycloak/psim-realm.json'),
+            require(relative in ('tools/deploy/material.py', 'tools/deploy/policies.py', 'deploy/observability/business.sql', 'deploy/local/config/keycloak/psim-realm.json'),
                     'unknown material generation input')
             require(hashlib.sha256((root / relative).read_bytes()).hexdigest() == checksum,
                     'material generator differs from the sealed deployment bundle')
@@ -224,6 +224,12 @@ class Material:
                 path.write_text(json.dumps(trusted, indent=2) + '\n')
             elif entry['kind'] == 'private-key-der':
                 command('openssl', 'pkcs8', '-topk8', '-nocrypt', '-in', str(self.sibling(relative, entry['source'])), '-outform', 'DER', '-out', str(path))
+        for relative, entry in self.files.items():
+            if entry['kind'] == 'certificate-copy':
+                source = entry['source']
+                require(source in self.files and self.files[source]['kind'] in ('certificate', 'trust-bundle')
+                        and self.files[source]['node'] == entry['node'], 'invalid public certificate source')
+                self.target(relative).write_bytes(self.target(source).read_bytes())
         providers = {'postgres-bootstrap': policies.postgres, 'valkey-acl': policies.valkey, 'sentinel-acl': policies.sentinel,
                      'clickhouse-users': policies.clickhouse, 's3-identities': policies.s3,
                      'keycloak-realm': lambda profile, secret: policies.realm(profile, secret, self.tenant)}

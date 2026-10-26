@@ -1,0 +1,449 @@
+{
+  "groups": [
+    {
+      "name": "psim-platform",
+      "interval": "15s",
+      "rules": [
+        {
+          "record": "psim_clock_offset_seconds",
+          "expr": "psim_host_time_seconds - timestamp(psim_host_time_seconds)"
+        },
+        {
+          "alert": "PsimServiceUnavailable",
+          "expr": "up{job=\"psim-services\"} == 0 or psim_runtime_ready == 0",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "services"
+          },
+          "annotations": {
+            "summary": "Экземпляр сервиса недоступен",
+            "description": "Проверить узел, readiness, зависимости и последние ошибки выбранного экземпляра.",
+            "runbook_url": "/operations/runbooks/PsimServiceUnavailable",
+            "dashboard_url": "/monitoring/d/psim-services"
+          }
+        },
+        {
+          "alert": "PsimComponentUnavailable",
+          "expr": "psim_probe_success == 0",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "infrastructure"
+          },
+          "annotations": {
+            "summary": "Компонент инфраструктуры недоступен",
+            "description": "Проверить component, node, TLS и длительность запроса. Сравнить состояние остальных реплик.",
+            "runbook_url": "/operations/runbooks/PsimComponentUnavailable",
+            "dashboard_url": "/monitoring/d/psim-infrastructure"
+          }
+        },
+        {
+          "alert": "PsimMonitoringUnavailable",
+          "expr": "up{job=\"psim-monitoring\"} == 0",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Сбор диагностики узла недоступен",
+            "description": "Проверить агент, сертификат, порт 19443 и доступность узла.",
+            "runbook_url": "/operations/runbooks/PsimMonitoringUnavailable",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimKafkaReplication",
+          "expr": "psim_kafka_under_replicated_partitions > 0 or psim_kafka_offline_partitions > 0",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "Нарушена репликация Kafka",
+            "description": "Проверить доступность брокеров, ISR, диски и сетевые ошибки.",
+            "runbook_url": "/operations/runbooks/PsimKafkaReplication",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimKafkaLag",
+          "expr": "sum by (deployment, node, group, topic) (psim_kafka_group_lag) > 10000",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "Растёт отставание потребителя Kafka",
+            "description": "Сравнить входную скорость, скорость обработки, возраст данных и остановленные партиции.",
+            "runbook_url": "/operations/runbooks/PsimKafkaLag",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimDeadLetters",
+          "expr": "increase(psim_kafka_dead_letters_total[5m]) > 0 or increase(psim_clickhouse_dead_letters_total[5m]) > 0 or delta(psim_kafka_dlq_end_offset[5m]) > 0",
+          "for": "0m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "В DLQ поступают новые записи",
+            "description": "Определить stage, code или topic; проверить схему и ошибки исходного сервиса.",
+            "runbook_url": "/operations/runbooks/PsimDeadLetters",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimPartitionStopped",
+          "expr": "psim_kafka_stopped_partitions > 0",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "Обработка партиции остановлена",
+            "description": "Проверить stage и повторяющиеся ошибки обработки.",
+            "runbook_url": "/operations/runbooks/PsimPartitionStopped",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimPipelineLatency",
+          "expr": "histogram_quantile(0.99, sum by (deployment, service, le) (rate(psim_event_to_incident_seconds_bucket[5m]))) > 1",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "p99 событие -> фиксация инцидента превышает 1 с",
+            "description": "Сравнить лаг Kafka, длительности Normalizer, Correlation Engine, транзакций инцидента и состояние PostgreSQL.",
+            "runbook_url": "/operations/runbooks/PsimPipelineLatency",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimSignalInterrupted",
+          "expr": "sum by (deployment) (rate(psim_kafka_produced_messages_total{topic=\"psim.signals.v1\"}[2m])) > 0 and on (deployment) sum by (deployment) (increase(psim_incident_signals_persisted_total[2m])) == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "Сигналы публикуются без фиксации инцидентов",
+            "description": "Проверить lag потребителя сигналов, Incident Service и PostgreSQL. Обычный поток событий без срабатываний правил не вызывает этот алерт.",
+            "runbook_url": "/operations/runbooks/PsimSignalInterrupted",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimClickHouseIngest",
+          "expr": "psim_clickhouse_ingest_lag_seconds > 60 and on (deployment, node, service, instance) max by (deployment, node, service, instance) (psim_kafka_consumer_lag) > 0",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "storage"
+          },
+          "annotations": {
+            "summary": "Загрузка ClickHouse отстаёт",
+            "description": "Проверить pending batches, ошибки вставки, replication queue, parts и диски. Возраст последней записи без очереди не означает отказ.",
+            "runbook_url": "/operations/runbooks/PsimClickHouseIngest",
+            "dashboard_url": "/monitoring/d/psim-storage"
+          }
+        },
+        {
+          "alert": "PsimClickHouseReplication",
+          "expr": "psim_clickhouse_replication_queue > 100 or psim_clickhouse_replica_readonly > 0",
+          "for": "5m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "storage"
+          },
+          "annotations": {
+            "summary": "Нарушена репликация ClickHouse",
+            "description": "Проверить Keeper, доступность второй реплики, ошибки очереди и свободное место.",
+            "runbook_url": "/operations/runbooks/PsimClickHouseReplication",
+            "dashboard_url": "/monitoring/d/psim-storage"
+          }
+        },
+        {
+          "alert": "PsimClickHouseParts",
+          "expr": "psim_clickhouse_active_parts > 1000",
+          "for": "10m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "storage"
+          },
+          "annotations": {
+            "summary": "Слишком много активных частей ClickHouse",
+            "description": "Проверить table, partition, размер batch и скорость merges.",
+            "runbook_url": "/operations/runbooks/PsimClickHouseParts",
+            "dashboard_url": "/monitoring/d/psim-storage"
+          }
+        },
+        {
+          "alert": "PsimPostgresPrimary",
+          "expr": "sum by (deployment) (psim_postgres_primary) != 1",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "infrastructure"
+          },
+          "annotations": {
+            "summary": "Нет единственного primary PostgreSQL",
+            "description": "Проверить Patroni, etcd, watchdog и синхронную реплику.",
+            "runbook_url": "/operations/runbooks/PsimPostgresPrimary",
+            "dashboard_url": "/monitoring/d/psim-infrastructure"
+          }
+        },
+        {
+          "alert": "PsimValkeyPrimary",
+          "expr": "sum by (deployment) (psim_valkey_primary) != 1",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "infrastructure"
+          },
+          "annotations": {
+            "summary": "Нет единственного primary Valkey",
+            "description": "Проверить Sentinel, доступность primary и состояние реплик.",
+            "runbook_url": "/operations/runbooks/PsimValkeyPrimary",
+            "dashboard_url": "/monitoring/d/psim-infrastructure"
+          }
+        },
+        {
+          "alert": "PsimDiskSpace",
+          "expr": "psim_filesystem_available_bytes / psim_filesystem_size_bytes < 0.15",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "storage"
+          },
+          "annotations": {
+            "summary": "Свободно менее 15% диска",
+            "description": "Определить node и volume. Проверить рост Kafka, ClickHouse, SeaweedFS и телеметрии.",
+            "runbook_url": "/operations/runbooks/PsimDiskSpace",
+            "dashboard_url": "/monitoring/d/psim-storage"
+          }
+        },
+        {
+          "alert": "PsimDiskCritical",
+          "expr": "psim_filesystem_available_bytes / psim_filesystem_size_bytes < 0.05",
+          "for": "1m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "storage"
+          },
+          "annotations": {
+            "summary": "Свободно менее 5% диска",
+            "description": "Проверить противодавление и наличие подтверждённых данных. Определить самый быстро растущий volume.",
+            "runbook_url": "/operations/runbooks/PsimDiskCritical",
+            "dashboard_url": "/monitoring/d/psim-storage"
+          }
+        },
+        {
+          "alert": "PsimCertificateExpiry",
+          "expr": "psim_certificate_expiry_seconds - time() < 30 * 86400",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "До истечения сертификата менее 30 суток",
+            "description": "Проверить owner и certificate, цепочку доверия и полномочия CA.",
+            "runbook_url": "/operations/runbooks/PsimCertificateExpiry",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimBackupStale",
+          "expr": "time() - psim_backup_last_success_seconds > 86400 or psim_backup_last_success_seconds == 0",
+          "for": "5m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Нет успешной резервной копии за 24 часа",
+            "description": "Проверить backup, журнал задания, независимое целевое хранилище и время последнего подтверждённого завершения.",
+            "runbook_url": "/operations/runbooks/PsimBackupStale",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimBackupTelemetryStale",
+          "expr": "time() - psim_backup_status_updated_seconds > 600 or psim_backup_status_valid == 0",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Состояние резервных копий неизвестно",
+            "description": "Проверить файл состояния агента, его формат, права и обновление заданиями копирования.",
+            "runbook_url": "/operations/runbooks/PsimBackupTelemetryStale",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimDutyMissing",
+          "expr": "psim_sites_without_duty > 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "business"
+          },
+          "annotations": {
+            "summary": "На площадках отсутствует текущий дежурный",
+            "description": "Проверить tenant, число площадок без назначения и раздел дежурств в консоли.",
+            "runbook_url": "/operations/runbooks/PsimDutyMissing",
+            "dashboard_url": "/monitoring/d/psim-business"
+          }
+        },
+        {
+          "alert": "PsimConnectorOffline",
+          "expr": "psim_connectors_offline > 0",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "business"
+          },
+          "annotations": {
+            "summary": "Есть отключённые коннекторы",
+            "description": "Сравнить число регистраций с живыми сессиями; проверить сеть, срок сертификата и буфер SDK.",
+            "runbook_url": "/operations/runbooks/PsimConnectorOffline",
+            "dashboard_url": "/monitoring/d/psim-business"
+          }
+        },
+        {
+          "alert": "PsimClockSkew",
+          "expr": "abs(psim_clock_offset_seconds) > 1",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Часы узла расходятся более чем на 1 с",
+            "description": "Проверить доступность источника времени, chrony и системные часы. Метрика сравнивает часы агента с часами Prometheus.",
+            "runbook_url": "/operations/runbooks/PsimClockSkew",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimCorrelationRestore",
+          "expr": "histogram_quantile(0.99, sum by (deployment, node, le) (rate(psim_correlation_restore_seconds_bucket[5m]))) > 30",
+          "for": "0m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "pipeline"
+          },
+          "annotations": {
+            "summary": "Восстановление корреляции превышает 30 с",
+            "description": "Проверить размер состояния, changelog lag, диск и доступность Kafka.",
+            "runbook_url": "/operations/runbooks/PsimCorrelationRestore",
+            "dashboard_url": "/monitoring/d/psim-pipeline"
+          }
+        },
+        {
+          "alert": "PsimApiErrors",
+          "expr": "sum by (deployment, service) (rate(psim_api_proxy_failures_total[5m])) / clamp_min(sum by (deployment, service) (rate(psim_api_requests_total[5m])), 0.01) > 0.05",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "services"
+          },
+          "annotations": {
+            "summary": "Доля ошибок проксирования API превышает 5% входных запросов",
+            "description": "Проверить operation, upstream, TLS, Valkey и ошибки проксирования.",
+            "runbook_url": "/operations/runbooks/PsimApiErrors",
+            "dashboard_url": "/monitoring/d/psim-services"
+          }
+        },
+        {
+          "alert": "PsimTelemetryRejected",
+          "expr": "sum by (deployment) (rate(otelcol_exporter_send_failed_spans_total[5m])) > 0 or sum by (deployment) (rate(otelcol_exporter_send_failed_log_records_total[5m])) > 0",
+          "for": "5m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Collector не доставляет телеметрию",
+            "description": "Проверить Loki, Tempo, очереди, диски и ошибки Collector.",
+            "runbook_url": "/operations/runbooks/PsimTelemetryRejected",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimMetricCollectionFailed",
+          "expr": "psim_collection_success == 0",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Не удалось получить подробные метрики",
+            "description": "Проверить collector, component, права мониторинга, TLS и совместимость протокола. Доступность TCP не подтверждает получение метрик.",
+            "runbook_url": "/operations/runbooks/PsimMetricCollectionFailed",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimAlertDeliveryFailed",
+          "expr": "rate(alertmanager_notifications_failed_total[5m]) > 0",
+          "for": "2m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Не доставляются уведомления об отказах",
+            "description": "Проверить receiver, TLS, доступность webhook и журнал Alertmanager.",
+            "runbook_url": "/operations/runbooks/PsimAlertDeliveryFailed",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimWatchdog",
+          "expr": "vector(1)",
+          "for": "0m",
+          "labels": {
+            "severity": "info",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Контроль работы канала наблюдаемости",
+            "description": "Проверить регулярное получение уведомления внешним мониторингом.",
+            "runbook_url": "/operations/runbooks/PsimWatchdog",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimDependencyLatency",
+          "expr": "psim_probe_duration_seconds{component=~\"kafka|postgres\"} > 0.15 and psim_probe_success == 1",
+          "for": "2m",
+          "labels": {
+            "severity": "warning",
+            "subsystem": "infrastructure"
+          },
+          "annotations": {
+            "summary": "Длительность запросов к зависимости превышает 150 мс",
+            "description": "Сравнить target с разных узлов, проверить RTT, потери пакетов и нагрузку.",
+            "runbook_url": "/operations/runbooks/PsimDependencyLatency",
+            "dashboard_url": "/monitoring/d/psim-infrastructure"
+          }
+        }
+      ]
+    }
+  ]
+}

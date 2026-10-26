@@ -152,6 +152,7 @@ class Bundle:
                         settings[alias + '_host'] = target
                         settings[alias + '_port'] = str(SERVICES[target][1] + 10000)
                 config = {'service': {'instance': name + '-' + node.name}, 'admin': {'listen': node.address + ':' + str(admin)},
+                          'telemetry': {'otlp_endpoint': node.name + ':4317', 'otlp_tls': True, 'otlp_ca_file': ca, 'sampling_ratio': 0.01},
                           'runtime': {'shards': profile.shards if name in ('normalizer', 'event-history', 'correlation-engine', 'connector-gateway') else 1},
                           'shutdown': {'drain_timeout_ms': 30000}, 'settings': settings}
                 self.write(node.name + '/services/' + name + '.json', config)
@@ -191,6 +192,8 @@ RestrictSUIDSGID=true
 LockPersonality=true
 CapabilityBoundingSet=
 UMask=0077
+StandardOutput=append:{self.profile.prefix}/data/{node.name}/service-logs/{name}.jsonl
+StandardError=journal
 BindReadOnlyPaths={self.profile.prefix}/config/{node.name}/services:/etc/psim-platform/services
 BindReadOnlyPaths={self.profile.prefix}/material/{node.name}/{name}:/etc/psim-platform/{name}/secrets
 BindReadOnlyPaths={self.profile.prefix}/config/{node.name}/hosts:/etc/hosts
@@ -227,15 +230,27 @@ WantedBy=multi-user.target
             for path in sorted((ROOT / directory).rglob('*.proto')):
                 self.write('support/tree/' + str(path.relative_to(ROOT)), path.read_text())
         self.write('support/tree/contracts/topics/topics.yaml', (ROOT / 'contracts/topics/topics.yaml').read_text())
+        from observability import finalize
+        finalize(self)
         for node in self.profile.nodes:
             self.write(node.name + '/compose.json', self.composes[node.name])
+            self.write(node.name + '/logrotate.conf', f'''{self.profile.prefix}/data/{node.name}/service-logs/*.jsonl {{
+  size 20M
+  rotate 5
+  copytruncate
+  compress
+  missingok
+  notifempty
+  su root root
+}}
+''')
             hosts = '\n'.join(address + ' ' + name for name, address in sorted(self.hosts(node).items()))
             self.write(node.name + '/hosts', '127.0.0.1 localhost\n' + hosts + '\n')
         self.write('material.json', {'format': 1, 'files': self.material})
         self.write('ports.json', self.ports)
         self.write('generation.json', {relative: hashlib.sha256((ROOT / relative).read_bytes()).hexdigest()
                    for relative in ('tools/deploy/material.py', 'tools/deploy/policies.py',
-                                    'deploy/local/config/keycloak/psim-realm.json')})
+                                    'deploy/observability/business.sql', 'deploy/local/config/keycloak/psim-realm.json')})
         files = {}
         for path in sorted(self.directory.rglob('*')):
             if path.is_file():

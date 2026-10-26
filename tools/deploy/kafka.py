@@ -79,6 +79,9 @@ def bootstrap(profile):
         for owner, names in sorted(permissions.items()):
             acl(owner, operation, '--topic', names)
     for owner in sorted(writes): acl(owner, 'IdempotentWrite', '--cluster', [])
+    acl('monitoring', 'Describe', '--cluster', [])
+    acl('monitoring', 'Describe', '--topic', ['psim.'], True)
+    acl('monitoring', 'Describe', '--group', ['*'])
     for owner, groups in GROUPS.items():
         for prefix in (False, True):
             names = [group for group in groups if group.endswith('-') == prefix]

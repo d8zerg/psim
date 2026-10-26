@@ -41,6 +41,14 @@ class PrivatePayloadTest(unittest.TestCase):
             identity = archive.getmember('material/node-1/postgres/passwd')
             self.assertEqual((identity.uid, identity.gid, identity.mode, identity.mtime),
                              (self.profile.uid('postgres'), self.profile.uid('postgres'), 0o400, FILE_MTIME))
+            payload = json.load(archive.extractfile('payload.json'))
+            self.assertEqual(payload['directories']['data/node-1/postgres'], self.profile.uid('postgres'))
+            self.assertEqual(payload['directories']['data/node-1/clickhouse'], self.profile.uid('clickhouse'))
+            public = archive.extractfile('material/node-1/monitoring/incident-service-identity.pem').read()
+            self.assertEqual(public, archive.extractfile('material/node-1/incident-service/identity.pem').read())
+            self.assertNotIn(b'PRIVATE KEY', public)
+            self.assertEqual(archive.extractfile('material/node-1/monitoring/trust-postgres-ca.pem').read(),
+                             archive.extractfile('material/node-1/postgres/ca.pem').read())
         replacement = self.root / 'replacement'
         Material(self.bundle, replacement).create_lab()
         with self.assertRaisesRegex(ValueError, 'cached node payload'):

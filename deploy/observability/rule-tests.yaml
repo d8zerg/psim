@@ -1,0 +1,88 @@
+rule_files: [rules.json]
+evaluation_interval: 1m
+tests:
+  - name: failures-reach-alerting
+    interval: 1m
+    input_series:
+      - {series: 'up{job="psim-services",deployment="test",node="n1",service="normalizer"}', values: '0+0x20'}
+      - {series: 'up{job="psim-monitoring",deployment="test",node="n1"}', values: '0+0x20'}
+      - {series: 'psim_probe_success{deployment="test",node="n1",component="keycloak"}', values: '0+0x20'}
+      - {series: 'psim_probe_success{deployment="test",node="n1",component="kafka"}', values: '1+0x20'}
+      - {series: 'psim_probe_duration_seconds{deployment="test",node="n1",component="kafka"}', values: '0.2+0x20'}
+      - {series: 'psim_kafka_under_replicated_partitions{deployment="test"}', values: '1+0x20'}
+      - {series: 'psim_kafka_group_lag{deployment="test",group="g",topic="t"}', values: '20000+0x20'}
+      - {series: 'psim_kafka_dlq_end_offset{deployment="test",topic="psim.dlq.history.v1"}', values: '0+10x20'}
+      - {series: 'psim_kafka_stopped_partitions{deployment="test"}', values: '1+0x20'}
+      - {series: 'psim_event_to_incident_seconds_bucket{deployment="test",service="incident-service",le="1"}', values: '0+0x20'}
+      - {series: 'psim_event_to_incident_seconds_bucket{deployment="test",service="incident-service",le="2"}', values: '0+100x20'}
+      - {series: 'psim_event_to_incident_seconds_bucket{deployment="test",service="incident-service",le="+Inf"}', values: '0+100x20'}
+      - {series: 'psim_kafka_produced_messages_total{deployment="test",topic="psim.signals.v1"}', values: '0+1000x20'}
+      - {series: 'psim_incident_signals_persisted_total{deployment="test"}', values: '0+0x20'}
+      - {series: 'psim_clickhouse_ingest_lag_seconds{deployment="test",node="n1",service="event-history",instance="i"}', values: '100+0x20'}
+      - {series: 'psim_kafka_consumer_lag{deployment="test",node="n1",service="event-history",instance="i",topic="a"}', values: '100+0x20'}
+      - {series: 'psim_kafka_consumer_lag{deployment="test",node="n1",service="event-history",instance="i",topic="b"}', values: '100+0x20'}
+      - {series: 'psim_clickhouse_replication_queue{deployment="test"}', values: '101+0x20'}
+      - {series: 'psim_clickhouse_active_parts{deployment="test"}', values: '1001+0x20'}
+      - {series: 'psim_postgres_primary{deployment="test"}', values: '0+0x20'}
+      - {series: 'psim_valkey_primary{deployment="test"}', values: '0+0x20'}
+      - {series: 'psim_filesystem_available_bytes{deployment="test",node="n1",volume="kafka"}', values: '1+0x20'}
+      - {series: 'psim_filesystem_size_bytes{deployment="test",node="n1",volume="kafka"}', values: '100+0x20'}
+      - {series: 'psim_certificate_expiry_seconds{deployment="test"}', values: '100000+0x20'}
+      - {series: 'psim_backup_last_success_seconds{deployment="test",backup="plans"}', values: '0+0x20'}
+      - {series: 'psim_backup_status_valid{deployment="test"}', values: '0+0x20'}
+      - {series: 'psim_backup_status_updated_seconds{deployment="test"}', values: '0+0x20'}
+      - {series: 'psim_sites_without_duty{deployment="test",tenant="t1"}', values: '1+0x20'}
+      - {series: 'psim_connectors_offline{deployment="test",tenant="t1"}', values: '1+0x20'}
+      - {series: 'psim_host_time_seconds{deployment="test",node="n1"}', values: '600+60x20'}
+      - {series: 'psim_correlation_restore_seconds_bucket{deployment="test",node="n1",le="30"}', values: '0+0x20'}
+      - {series: 'psim_correlation_restore_seconds_bucket{deployment="test",node="n1",le="60"}', values: '0+100x20'}
+      - {series: 'psim_correlation_restore_seconds_bucket{deployment="test",node="n1",le="+Inf"}', values: '0+100x20'}
+      - {series: 'psim_api_requests_total{deployment="test",service="api-gateway"}', values: '0+100x20'}
+      - {series: 'psim_api_proxy_failures_total{deployment="test",service="api-gateway"}', values: '0+10x20'}
+      - {series: 'otelcol_exporter_send_failed_spans_total{deployment="test"}', values: '0+10x20'}
+      - {series: 'otelcol_exporter_send_failed_log_records_total{deployment="test"}', values: '0+10x20'}
+      - {series: 'psim_collection_success{deployment="test",collector="kafka"}', values: '0+0x20'}
+      - {series: 'alertmanager_notifications_failed_total{deployment="test"}', values: '0+10x20'}
+    promql_expr_test:
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDependencyLatency"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimServiceUnavailable"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimComponentUnavailable"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimMonitoringUnavailable"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimKafkaReplication"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimKafkaLag"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDeadLetters"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimPartitionStopped"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimPipelineLatency"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimSignalInterrupted"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimClickHouseIngest"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimClickHouseReplication"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimClickHouseParts"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimPostgresPrimary"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimValkeyPrimary"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDiskSpace"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDiskCritical"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimCertificateExpiry"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimBackupStale"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimBackupTelemetryStale"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDutyMissing"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimConnectorOffline"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimClockSkew"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimCorrelationRestore"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimApiErrors"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimTelemetryRejected"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimMetricCollectionFailed"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimAlertDeliveryFailed"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimWatchdog"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+  - name: recovery-and-no-input-are-not-failures
+    interval: 1m
+    input_series:
+      - {series: 'up{job="psim-services",deployment="test",node="n1",service="normalizer"}', values: '0 0 0 1+0x20'}
+      - {series: 'psim_clickhouse_ingest_lag_seconds{deployment="test",node="n1",service="event-history",instance="i"}', values: '1000+1x20'}
+      - {series: 'psim_kafka_consumer_lag{deployment="test",node="n1",service="event-history",instance="i",topic="a"}', values: '0+0x20'}
+      - {series: 'psim_kafka_consumer_lag{deployment="test",node="n1",service="event-history",instance="i",topic="b"}', values: '0+0x20'}
+      - {series: 'psim_kafka_produced_messages_total{deployment="test",topic="psim.signals.v1"}', values: '1000+0x20'}
+      - {series: 'psim_incident_signals_persisted_total{deployment="test"}', values: '1+0x20'}
+      - {series: 'psim_sites_without_duty{deployment="test",tenant="t1"}', values: '1 1 1 0+0x20'}
+      - {series: 'psim_connectors_offline{deployment="test",tenant="t1"}', values: '1 1 1 0+0x20'}
+    promql_expr_test:
+      - {expr: 'ALERTS{alertstate="firing",alertname=~"PsimServiceUnavailable|PsimClickHouseIngest|PsimSignalInterrupted|PsimDutyMissing|PsimConnectorOffline"}', eval_time: 15m, exp_samples: []}

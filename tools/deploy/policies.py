@@ -20,6 +20,7 @@ def sql_value(value):
 def postgres(profile, secret):
     roles = {name.replace('-', '_'): secret(name + '/postgres.secret') for name in SERVICES}
     roles.update({name: secret(name + '/postgres.secret') for name in ('keycloak', 'registry', 'seaweed')})
+    roles['monitoring'] = secret('monitoring/postgres.secret')
     statements = []
     for role, password in roles.items():
         statements += [f'SELECT {sql_value("CREATE ROLE " + sql_name(role))} WHERE NOT EXISTS (SELECT FROM pg_roles WHERE rolname={sql_value(role)}) \\gexec',
@@ -49,6 +50,7 @@ def postgres(profile, secret):
                            f'ALTER TABLE psim_clickhouse.{table} FORCE ROW LEVEL SECURITY;',
                            f'DROP POLICY IF EXISTS {policy} ON psim_clickhouse.{table};',
                            f'CREATE POLICY {policy} ON psim_clickhouse.{table} TO {role} USING ({condition}) WITH CHECK ({condition});']
+    statements += ['GRANT pg_monitor TO monitoring;', (Path(__file__).resolve().parents[2] / 'deploy/observability/business.sql').read_text()]
     return '\n'.join(statements) + '\n'
 
 
@@ -57,7 +59,8 @@ def password_hash(value):
 
 
 def valkey(profile, secret):
-    users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/valkey.secret')) + ' ~* &* +@all']
+    users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/valkey.secret')) + ' ~* &* +@all',
+             'user monitoring on ' + password_hash(secret('monitoring/valkey.secret')) + ' +ping +info']
     for name, commands, pattern in [
         ('connector-gateway', '+get +set +del +pexpire +pttl +incrby +eval', '~psim:17:connector-gateway*'),
         ('projection-service', '+get +set +del', '~psim:18:projection-service*'),
@@ -74,6 +77,7 @@ def valkey(profile, secret):
 def sentinel(profile, secret):
     users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/sentinel.secret')) + ' ~* &* +@all',
              'user sentinel-peer on ' + password_hash(secret('sentinel/peer.secret')) + ' +ping +client|setname +sentinel|is-master-down-by-addr']
+    users.append('user monitoring on ' + password_hash(secret('monitoring/sentinel.secret')) + ' +ping +sentinel|masters')
     for name in ('connector-gateway', 'command-service', 'projection-service', 'api-gateway'):
         users.append(f'user {name} on {password_hash(secret(name + "/sentinel.secret"))} +ping +client|setname +sentinel|get-master-addr-by-name')
     return '\n'.join(users) + '\n'
@@ -91,6 +95,7 @@ def clickhouse(profile, secret):
         users.append(body + '</' + name + '>')
     user('default', secrets.token_urlsafe(48), ['USAGE ON *.*'])
     user('deployment-admin', secret('deployment-admin/clickhouse.secret'), administrator=True)
+    user('monitoring', secret('monitoring/clickhouse.secret'), ['SELECT ON system.parts', 'SELECT ON system.replicas'], reader=True)
     user('cluster-peer', secret('clickhouse/peer.secret'), ['ALL ON default.*', 'CLUSTER ON *.*'])
     views = {'event-history': ['signal_facts', 'event_signals', 'incident_signals'],
              'projection-service': ['incident_report_mv', 'incident_report_current']}
@@ -146,4 +151,16 @@ def realm(profile, secret, tenant):
         template['users'].append({'username': 'service-account-' + client_id, 'enabled': True, 'serviceAccountClientId': client_id,
             'attributes': {'psim_tenant': [tenant], 'psim_scopes': ['*'], 'psim_scope_set': ['initial']},
             'clientRoles': {'realm-management': roles, **({'psim': ['admin', 'integrator', 'operator', 'supervisor', 'auditor']} if not directory else {})}})
+    template['roles']['realm'].extend({'name': name, 'composite': True, 'composites': {'realm': ['mfa-required']}}
+        for name in ('psim-observability-admin', 'psim-observability-viewer'))
+    template['clients'].append({'clientId': 'psim-grafana', 'enabled': True, 'publicClient': False,
+        'standardFlowEnabled': True, 'directAccessGrantsEnabled': False, 'serviceAccountsEnabled': False,
+        'fullScopeAllowed': True,
+        'secret': secret('grafana/identity.secret'), 'redirectUris': [profile.origin + '/monitoring/login/generic_oauth'],
+        'webOrigins': [profile.origin], 'attributes': {'pkce.code.challenge.method': 'S256'},
+        'defaultClientScopes': ['web-origins', 'profile', 'roles', 'email'],
+        'protocolMappers': [{'name': 'observability-roles', 'protocol': 'openid-connect',
+            'protocolMapper': 'oidc-usermodel-realm-role-mapper', 'config': {'claim.name': 'psim_observability_roles',
+                'jsonType.label': 'String', 'multivalued': 'true', 'access.token.claim': 'true',
+                'id.token.claim': 'true', 'userinfo.token.claim': 'true'}}]})
     return json.dumps(template, indent=2)

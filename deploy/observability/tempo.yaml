@@ -1,0 +1,32 @@
+stream_over_http_enabled: true
+server:
+  http_listen_address: 127.0.0.1
+  http_listen_port: 13200
+  grpc_listen_address: 127.0.0.1
+  grpc_listen_port: 19096
+  log_level: warn
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc: {endpoint: 127.0.0.1:14318}
+storage:
+  trace:
+    backend: local
+    local: {path: /var/tempo/traces}
+    wal: {path: /var/tempo/wal}
+backend_worker:
+  compaction:
+    block_retention: 72h
+backend_scheduler:
+  local_work_path: /var/tempo/scheduler
+  provider:
+    compaction:
+      compaction:
+        block_retention: 72h
+overrides:
+  defaults:
+    compaction:
+      block_retention: 72h
+usage_report:
+  reporting_enabled: false
