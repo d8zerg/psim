@@ -194,7 +194,7 @@ tasks:
       - cmd: |
           mkdir -p "{{.CACHE_DIR}}/home"
           docker run --rm --platform linux/amd64 {{.RUN_OPTIONS | default ""}} -u {{.UID}}:{{.GID}} --network {{.PROJECT}}_default \
-            -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
+            -e PSIM_CMD -e PSIM_PLATFORM -e PSIM_BUILD_VERSION -e HOME=/cache/home \
             -e PSIM_TEST_KAFKA=kafka-1:19092 -e PSIM_TEST_KAFKA_FAULT=toxiproxy:29092 \
             -e PSIM_TEST_S3=https://s3:8443 -e PSIM_TEST_S3_FAULT=https://toxiproxy:18443 \
             -e PSIM_TEST_CLICKHOUSE=clickhouse-1 -e PSIM_TEST_CLICKHOUSE_SECOND=clickhouse-2 -e PSIM_TEST_CLICKHOUSE_FAULT=toxiproxy \
@@ -224,7 +224,7 @@ tasks:
           else
             mkdir -p "{{.CACHE_DIR}}/conan" "{{.CACHE_DIR}}/ccache" "{{.CACHE_DIR}}/home"
             docker run --rm --platform linux/amd64 {{.RUN_OPTIONS | default ""}} {{.TTY}} -u {{.UID}}:{{.GID}} \
-              -e PSIM_CMD -e PSIM_PLATFORM -e HOME=/cache/home \
+              -e PSIM_CMD -e PSIM_PLATFORM -e PSIM_BUILD_VERSION -e HOME=/cache/home \
               -v "{{.ROOT_DIR}}":/repo -v "{{.CACHE_DIR}}/conan":/cache/conan \
               -v "{{.CACHE_DIR}}/ccache":/cache/ccache -v "{{.CACHE_DIR}}/home":/cache/home \
               -w /repo {{.TOOLCHAIN_IMAGE}} bash -c 'eval "$PSIM_CMD"'

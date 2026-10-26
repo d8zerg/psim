@@ -14,7 +14,12 @@ from model import SERVICES, require
 
 def packages(profile):
     folder = local.ROOT / 'build/debian13/release/packages'
-    return [folder / ('psim-' + name + '_' + profile.version + '_amd64.deb')
+    import lab
+    state = lab.read_state()
+    if state and state.get('lifecycle'):
+        require(state['lifecycle']['status'] == 'rolled-back', 'runtime switching requires a completely rolled-back baseline')
+        folder = Path(state['lifecycle']['baseline'])
+    return [folder / ('psim-' + name + '_' + profile.package_version + '_amd64.deb')
             for name in sorted({'taxonomy', *{binary for binary, _, _ in SERVICES.values()}})]
 
 
@@ -24,7 +29,7 @@ def install(profile, node):
     archives = packages(profile)
     for archive in archives:
         require(archive.is_file(), 'build the release Debian packages first')
-        local.vm.copy_to('psim-platform-vm', node.name, archive, stage + '/' + archive.name)
+        local.vm.copy_to(local.VM_NAME, node.name, archive, stage + '/' + archive.name)
     program = '''import hashlib,json,pathlib,subprocess,sys
 prefix=pathlib.Path(sys.argv[1]); node=sys.argv[2]; name=sys.argv[3]; archives=json.loads(sys.argv[4])
 s=json.loads((prefix/'installation.json').read_text())
@@ -72,6 +77,10 @@ def switch(runtime):
         expected = {path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in packages(profile)}
         require(not state.get('packages') or state['packages'] == expected, 'Debian packages changed; recreate the lab')
         for node in profile.select('application'): install(profile, node)
+        if state.get('lifecycle'):
+            for node in profile.select('application'):
+                local.execute(node.name, ['sudo', 'python3', '/home/psim/.cache/psim-delivery/lifecycle/node_release.py',
+                    'park-streams', '--prefix', profile.prefix, '--node', node.name])
         for node in profile.select('application'): local.compose(profile, node.name, ['stop', *SERVICES])
         state['packages'] = expected
     else:
@@ -88,6 +97,11 @@ def switch(runtime):
             local.start(bundle, set(SERVICES))
         raise
     state['runtime'] = runtime; lab.save_state(state)
+    if state.get('lifecycle'):
+        for node in profile.select('application'):
+            destination = '/home/psim/.cache/psim-delivery/lifecycle/node_release.py'
+            local.execute(node.name, ['sudo', 'python3', destination, 'record-runtime', '--prefix', profile.prefix,
+                                     '--node', node.name, '--command', runtime])
     print('Application runtime ready: ' + runtime)
 
 

@@ -25,7 +25,8 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
   }
   std::int64_t previous = 0;
   for (const auto& migration : migrations) {
-    if (migration.version <= previous || migration.name.empty() || migration.expand.empty()) {
+    if (migration.version <= previous || migration.name.empty() || migration.expand.empty()
+        || migration.minimum_reader < 0 || migration.minimum_reader > migration.version) {
       co_return fail(ErrorCode::kCommonInvalidArgument,
                      "ClickHouse migrations must have increasing versions and expand DDL");
     }
@@ -51,7 +52,11 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
   for (const auto* ddl :
        {"CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations (target text NOT NULL, version bigint NOT NULL, "
         "phase text NOT NULL, name text NOT NULL, checksum text NOT NULL, step bigint NOT NULL DEFAULT 0, "
-        "PRIMARY KEY (target, version, phase))"}) {
+        "PRIMARY KEY (target, version, phase))",
+        "DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='psim_clickhouse' "
+        "AND table_name='schema_migrations' AND column_name='minimum_reader') THEN "
+        "ALTER TABLE psim_clickhouse.schema_migrations ADD COLUMN minimum_reader bigint NOT NULL DEFAULT 0; END IF; "
+        "END $$"}) {
     auto created = co_await (*lease)->query({.sql = ddl});
     if (!created) {
       co_return std::unexpected(created.error());
@@ -61,14 +66,22 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
   if (!bootstrap_committed) {
     co_return bootstrap_committed;
   }
-  auto history = co_await (*lease)->query(
-      {.sql = "SELECT version, phase, name, checksum FROM psim_clickhouse.schema_migrations WHERE target=$1",
-       .parameters = {pg::Parameter::text(target_)}});
+  auto history = co_await (*lease)->query({.sql = "SELECT version, phase, name, checksum, minimum_reader FROM "
+                                                  "psim_clickhouse.schema_migrations WHERE target=$1",
+                                           .parameters = {pg::Parameter::text(target_)}});
   if (!history) {
     co_return std::unexpected(history.error());
   }
   for (std::size_t index = 0; index < history->size(); ++index) {
     const auto version = history->integer(index, 0);
+    const auto floor = history->integer(index, 4);
+    if (history->value(index, 1) != "expand" && history->value(index, 1) != "contract") {
+      co_return fail(ErrorCode::kCommonConcurrentModification, "unknown ClickHouse migration phase");
+    }
+    if (version && *version > migrations.back().version && history->value(index, 1) == "expand" && floor && *floor > 0
+        && *floor <= migrations.back().version) {
+      continue;
+    }
     bool found = false;
     for (const auto& migration : migrations) {
       if (version != Result<std::int64_t>(migration.version)) {
@@ -79,7 +92,10 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
       for (const auto& statement : statements) {
         content += std::to_string(statement.size()) + ":" + statement;
       }
-      found = history->value(index, 2) == migration.name && history->value(index, 3) == detail::fingerprint(content);
+      found = floor && *floor >= 0
+              && (*floor == 0 ? migration.version : *floor)
+                     == (migration.minimum_reader == 0 ? migration.version : migration.minimum_reader)
+              && history->value(index, 2) == migration.name && history->value(index, 3) == detail::fingerprint(content);
     }
     if (!found) {
       co_return fail(ErrorCode::kCommonConcurrentModification,
@@ -131,11 +147,12 @@ asio::awaitable<Result<void>> Migrator::apply(std::vector<Migration> migrations,
       }
       if (row->size() == 0) {
         auto registered = co_await (*lease)->query(
-            {.sql = "INSERT INTO psim_clickhouse.schema_migrations (target,version,phase,name,checksum) VALUES "
-                    "($1,$2,$3,$4,$5)",
+            {.sql = "INSERT INTO psim_clickhouse.schema_migrations (target,version,phase,name,checksum,minimum_reader) "
+                    "VALUES "
+                    "($1,$2,$3,$4,$5,$6)",
              .parameters = {pg::Parameter::text(target_), pg::Parameter::integer(migration.version),
                             pg::Parameter::text(stage), pg::Parameter::text(migration.name),
-                            pg::Parameter::text(checksum)}});
+                            pg::Parameter::text(checksum), pg::Parameter::integer(migration.minimum_reader)}});
         if (!registered) {
           co_return std::unexpected(registered.error());
         }

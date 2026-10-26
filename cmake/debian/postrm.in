@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+if [ -d /run/systemd/system ]; then systemctl daemon-reload; fi
+# Runtime data, private identities and operator configuration belong to the installation.
+exit 0

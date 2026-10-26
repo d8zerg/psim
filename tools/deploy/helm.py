@@ -12,8 +12,8 @@ from model import SERVICES, require
 
 def values(bundle, output):
     bundle = Path(bundle).resolve(); profile = verify_bundle(bundle)
-    references = sorted({'psim-platform/psim-' + binary + ':' + profile.version for binary, _, _ in SERVICES.values()}
-                        | {'psim-platform/' + name + ':' + profile.version for name in ('web', 'haproxy')})
+    references = sorted({'psim-platform/psim-' + binary + ':' + profile.image_version for binary, _, _ in SERVICES.values()}
+                        | {'psim-platform/' + name + ':' + profile.image_version for name in ('web', 'haproxy')})
     _, manifest = local.export_images(references)
     result = configuration(bundle, profile, {reference: reference.split(':')[0] + '@' + manifest['oci'][reference][0]
                                            for reference in references})
@@ -35,7 +35,7 @@ def configuration(bundle, profile, images):
             for field in ('spool_directory', 'state_directory', 'checkpoint_directory'):
                 if field in config['settings']:
                     storage.append({'name': field.replace('_', '-'), 'path': config['settings'][field], 'size': '10Gi'})
-            reference = 'psim-platform/psim-' + binary + ':' + profile.version
+            reference = 'psim-platform/psim-' + binary + ':' + profile.image_version
             result['instances'].append({'name': name + '-' + node.name, 'component': name,
                 'image': images[reference],
                 'uid': profile.uid(name), 'adminPort': 19100 + index, 'materialSecret': name + '-' + node.name,
@@ -80,7 +80,7 @@ listen connectors
     web_probe = "const fs=require('node:fs'),https=require('node:https');const read=n=>fs.readFileSync(process.env[n]);https.get({hostname:'127.0.0.1',port:18180,servername:'web',path:'/health/ready',ca:read('PSIM_CA_FILE'),cert:read('PSIM_CERTIFICATE_FILE'),key:read('PSIM_PRIVATE_KEY_FILE'),timeout:2000},r=>{r.resume();r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1)).on('timeout',function(){this.destroy()});"
     for node in profile.select('application'):
         material = '/etc/psim-platform/web/secrets/'
-        result['instances'].append({'name': 'web-' + node.name, 'component': 'web', 'image': images['psim-platform/web:' + profile.version],
+        result['instances'].append({'name': 'web-' + node.name, 'component': 'web', 'image': images['psim-platform/web:' + profile.image_version],
             'uid': profile.uid('web'), 'adminPort': 18180, 'materialSecret': 'web-' + node.name, 'config': {}, 'args': [],
             'environment': [{'name': key, 'value': value} for key, value in {'PSIM_ISSUER': profile.origin + '/identity/realms/psim',
                 'PSIM_LISTEN': '0.0.0.0', 'PSIM_PORT': '18180', 'PSIM_CA_FILE': material + 'ca.pem', 'PSIM_CERTIFICATE_FILE': material + 'identity.pem',
@@ -89,7 +89,7 @@ listen connectors
             'resources': {'requests': {'cpu': '50m', 'memory': '64Mi'}, 'limits': {'cpu': '1', 'memory': '256Mi'}}})
     for node in profile.select('edge'):
         result['instances'].append({'name': 'haproxy-' + node.name, 'component': 'haproxy',
-            'image': images['psim-platform/haproxy:' + profile.version], 'uid': profile.uid('haproxy'), 'adminPort': 19130,
+            'image': images['psim-platform/haproxy:' + profile.image_version], 'uid': profile.uid('haproxy'), 'adminPort': 19130,
             'materialSecret': 'haproxy-' + node.name, 'config': {}, 'configFiles': {'edge.cfg': edge_configuration},
             'args': ['-W', '-db', '-f', '/etc/psim-platform/services/edge.cfg'], 'capabilities': ['NET_BIND_SERVICE'],
             'ports': [{'name': 'https', 'targetPort': 443}, {'name': 'connectors', 'targetPort': 7443}], 'storage': [],

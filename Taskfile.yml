@@ -43,9 +43,10 @@ vars:
   # Base of the container images (ADR-034): Debian 13 with the system C++ runtime,
   # no shell, non-root user.
   DISTROLESS_IMAGE: gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2
-  # Product version (CMakeLists.txt project VERSION) and container images (deploy/images/<name>).
+  # Product version follows annotated SemVer tags and the current source revision.
   VERSION:
-    sh: sed -n 's/^  VERSION \([0-9.]*\)$/\1/p' {{.ROOT_DIR}}/CMakeLists.txt
+    sh: python3 -I {{.ROOT_DIR}}/tools/version.py --field version
+  IMAGE_VERSION: '{{.VERSION | replace "+" "_"}}'
   IMAGES: psim-projection-service psim-audit-service psim-notification-service psim-response-engine psim-command-service psimctl psim-event-history psim-resource-catalog psim-connector-gateway psim-normalizer psim-correlation-engine psim-incident-service psim-api-gateway
   # Scope of the last `task ci` run (tools/ci/scope.py).
   CI_SCOPE: build/{{.PLATFORM}}/ci-scope.json

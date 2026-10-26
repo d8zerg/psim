@@ -464,8 +464,8 @@ methods:
     env: E-CLUSTER
     gate: release
     barrier: automated
-    task: task chaos:upgrade
-    steps: ['9.2']
+    task: task deploy:upgrade:qualify
+    steps: ['10.1']
   - id: C-13
     kind: chaos
     name: Недоступность Keycloak

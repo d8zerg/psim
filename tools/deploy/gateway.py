@@ -15,7 +15,7 @@ from model import SERVICES, require
 
 def command(bundle, profile, holder):
     image = 'psim-platform/toolchain:debian13-' + __import__('hashlib').sha256((local.ROOT / 'tools/toolchain/Dockerfile').read_bytes()).hexdigest()[:12]
-    return ['docker', 'run', '--rm', '--network', 'container:psim-platform-vm', '--read-only', '--cap-drop', 'ALL',
+    return ['docker', 'run', '--rm', '--network', 'container:' + local.VM_NAME, '--read-only', '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges:true', '--user', str(profile.uid('deployment-admin')) + ':' + str(profile.uid('deployment-admin')),
             '--tmpfs', '/tmp:rw,nosuid,nodev,size=64m,mode=1777',
             '--env', 'LD_PRELOAD=', '--env', 'PSIM_GATEWAY_PROBE_CONFIG=/case/config.json',
@@ -32,7 +32,7 @@ def prepare(bundle, profile, holder):
         '--mount', 'type=bind,src=' + str(local.ROOT / 'tools/deploy') + ',dst=/code,readonly',
         '--mount', 'type=bind,src=' + str(bundle) + ',dst=/bundle,readonly',
         '--mount', 'type=bind,src=' + str(holder) + ',dst=/private', '--entrypoint', 'python3',
-        'psim-platform/postgres:' + profile.version, '/code/qualification_setup.py', 'prepare', '--bundle', '/bundle', '--material', '/private/material'])
+        'psim-platform/postgres:' + profile.image_version, '/code/qualification_setup.py', 'prepare', '--bundle', '/bundle', '--material', '/private/material'])
 
 
 def bench():

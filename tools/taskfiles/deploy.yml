@@ -1,5 +1,41 @@
 version: '3'
 tasks:
+  lifecycle:test:
+    desc: Verify signatures, compatibility, configuration preservation and initial-install boundaries in Docker
+    cmds:
+      - docker run --rm --user {{.UID}}:{{.GID}} --volume "{{.ROOT_DIR}}:/repo:ro" --workdir /repo {{.TOOLCHAIN_IMAGE}} python3 -I tools/deploy/test_lifecycle.py
+      - docker run --rm --user 0:0 --volume "{{.ROOT_DIR}}:/repo:ro" --workdir /repo {{.TOOLCHAIN_IMAGE}} python3 -I tools/deploy/test_install.py
+      - docker run --rm --user 0:0 --volume "{{.ROOT_DIR}}:/repo:ro" --volume "{{.ROOT_DIR}}/build/debian13/release/packages:/packages:ro" --workdir /repo {{.TOOLCHAIN_IMAGE}} python3 -I tools/deploy/test_packages.py
+  upgrade:preflight:
+    desc: Verify the separately trusted release, complete artifact inventory and mixed-version contracts
+    requires: {vars: [BUNDLE, BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/upgrade.py preflight --bundle "{{.BUNDLE}}" --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}"
+  upgrade:prepare:
+    desc: Stage signed releases and retain the active installation on every application node
+    requires: {vars: [BUNDLE, BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/upgrade.py prepare --bundle "{{.BUNDLE}}" --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}"
+  upgrade:apply:
+    desc: Apply expand migrations and replace healthy application replicas serially
+    requires: {vars: [BUNDLE, BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/upgrade.py apply --bundle "{{.BUNDLE}}" --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}"
+  upgrade:rollback:
+    desc: Restore retained configuration and application versions before the contract barrier
+    requires: {vars: [BUNDLE, BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/upgrade.py rollback --bundle "{{.BUNDLE}}" --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}"
+  upgrade:contract:
+    desc: Fence rollback and contract the previous expansion only after all readers use a later epoch
+    requires: {vars: [BUNDLE, BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/upgrade.py contract --bundle "{{.BUNDLE}}" --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}"
+  upgrade:qualify:
+    desc: Verify the signed upgrade and rollback under continuous publication and public floor reads
+    requires: {vars: [BASELINE, RELEASE, TRUSTED_KEY]}
+    cmds:
+      - python3 -I tools/deploy/qualify_upgrade.py --baseline "{{.BASELINE}}" --release "{{.RELEASE}}" --trusted-key "{{.TRUSTED_KEY}}" --rate {{.RATE | default "50000"}} --runtime {{.RUNTIME | default "containers"}}
   check:
     desc: Validate deployment profiles, process isolation and Helm material isolation without VMs
     cmds:

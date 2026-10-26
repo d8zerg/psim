@@ -156,7 +156,7 @@ class Bundle:
                           'shutdown': {'drain_timeout_ms': 30000}, 'settings': settings}
                 self.write(node.name + '/services/' + name + '.json', config)
                 filename = CONFIG + '/services/' + name + '.json'
-                image = 'psim-platform/psim-' + binary + ':' + profile.version
+                image = 'psim-platform/psim-' + binary + ':' + profile.image_version
                 mounts = [profile.prefix + '/config/' + node.name + '/services/' + name + '.json:' + filename + ':ro']
                 for field in ('spool_directory', 'state_directory', 'checkpoint_directory'):
                     if field in settings:

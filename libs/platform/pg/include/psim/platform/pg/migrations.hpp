@@ -18,6 +18,8 @@ struct Migration {
   std::string name;
   std::vector<std::string> expand{};
   std::vector<std::string> contract{};
+  /// Oldest migration plan allowed to coexist with this expand phase; zero means version.
+  std::int64_t minimum_reader = 0;
 };
 
 /// Transactional migration runner, serialized with an advisory transaction lock per schema.

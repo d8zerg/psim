@@ -1,0 +1,7 @@
+#!/bin/sh
+set -eu
+if [ "$1" = configure ] && [ -d /run/systemd/system ]; then
+  systemctl daemon-reload
+fi
+# The release coordinator controls serial service replacement and configuration migration.
+exit 0

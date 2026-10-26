@@ -27,7 +27,7 @@ def bootstrap(bundle, operation, owner='deployment-admin', **kwargs):
     if operation == 'kafka':
         command += ['--entrypoint', '/bin/sh', images['kafka'], '/operator/kafka-bootstrap.sh']
     else:
-        command += ['--entrypoint', 'python3', 'psim-platform/postgres:' + profile.version, '/config/support/setup.py', operation]
+        command += ['--entrypoint', 'python3', 'psim-platform/postgres:' + profile.image_version, '/config/support/setup.py', operation]
     return local.execute(node.name, command, **kwargs)
 
 

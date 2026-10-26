@@ -51,7 +51,7 @@ def main():
     profile = verify_bundle(args.bundle); material = Path(args.private).resolve()
     password = getpass.getpass('Temporary password (at least 16 characters): ')
     require(len(password) >= 16 and password == getpass.getpass('Repeat temporary password: '), 'temporary password is too short or differs')
-    image = 'psim-platform/postgres:' + profile.version
+    image = 'psim-platform/postgres:' + profile.image_version
     command = ['docker', 'run', '--rm', '--interactive', '--network', 'host', '--read-only', '--cap-drop', 'ALL',
         '--security-opt', 'no-new-privileges:true', '--env', 'LD_PRELOAD=', '--user', str(profile.uid('deployment-admin')),
         '--tmpfs', '/tmp:rw,nosuid,size=32m,mode=1777',

@@ -35,7 +35,8 @@ def postgres(profile, secret):
         for item in [schema, *({'response-engine': ['escalation'], 'projection-service': ['console']}.get(name, []))]:
             statements.append(f'CREATE SCHEMA IF NOT EXISTS {sql_name(item)} AUTHORIZATION {sql_name(name.replace("-", "_"))};')
     statements += ['CREATE SCHEMA IF NOT EXISTS psim_clickhouse;',
-        'CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations(target text NOT NULL,version bigint NOT NULL,phase text NOT NULL,name text NOT NULL,checksum text NOT NULL,step bigint NOT NULL DEFAULT 0,PRIMARY KEY(target,version,phase));',
+        'CREATE TABLE IF NOT EXISTS psim_clickhouse.schema_migrations(target text NOT NULL,version bigint NOT NULL,phase text NOT NULL,name text NOT NULL,checksum text NOT NULL,step bigint NOT NULL DEFAULT 0,minimum_reader bigint NOT NULL DEFAULT 0,PRIMARY KEY(target,version,phase));',
+        'ALTER TABLE psim_clickhouse.schema_migrations ADD COLUMN IF NOT EXISTS minimum_reader bigint NOT NULL DEFAULT 0;',
         'CREATE TABLE IF NOT EXISTS psim_clickhouse.pending_batches(loader text NOT NULL,topic text NOT NULL,partition integer NOT NULL,first_offset bigint NOT NULL,next_offset bigint NOT NULL,token text NOT NULL,payload bytea NOT NULL,applied boolean NOT NULL DEFAULT false,PRIMARY KEY(loader,topic,partition),CHECK(first_offset>=0 AND next_offset>first_offset));']
     for service, target, loaders in [('event-history', 'event_history_psim', ['psim-event-history/events_v1', 'psim-history-facts/history_facts_v1']),
                                       ('projection-service', 'incident_reports_psim', ['psim-projection-service/incident_facts_v1'])]:

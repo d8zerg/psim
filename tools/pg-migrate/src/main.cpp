@@ -46,7 +46,8 @@ int run(std::span<char*> arguments) {
     migrations.push_back({.version = item.at("version").get<std::int64_t>(),
                           .name = item.at("name").get<std::string>(),
                           .expand = item.at("expand").get<std::vector<std::string>>(),
-                          .contract = item.value("contract", std::vector<std::string>{})});
+                          .contract = item.value("contract", std::vector<std::string>{}),
+                          .minimum_reader = item.value("minimum_reader", std::int64_t{0})});
   }
   pg::ConnectionOptions options{.host = setting("PSIM_PG_HOST", "127.0.0.1"),
                                 .port = setting("PSIM_PG_PORT", "5432"),

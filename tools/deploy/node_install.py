@@ -6,11 +6,15 @@ import os
 from pathlib import Path, PurePosixPath
 import pwd
 import grp
+import platform
 import shutil
 import stat
+import sys
 import subprocess
 import tarfile
 import tempfile
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def require(condition, message):
@@ -47,7 +51,7 @@ def account(owner, uid):
         run('useradd', '--system', '--uid', str(uid), '--gid', str(uid), '--no-create-home', '--home-dir', '/nonexistent', '--shell', '/usr/sbin/nologin', name)
 
 
-def install(archive, digest, expected_node):
+def install(archive, digest, expected_node, *, lab=False, release=None, trusted=None):
     require(os.geteuid() == 0, 'node installation requires root on the target VM')
     archive = Path(archive)
     require(hashlib.sha256(archive.read_bytes()).hexdigest() == digest, 'node payload checksum mismatch')
@@ -60,12 +64,31 @@ def install(archive, digest, expected_node):
             require(not path.is_absolute() and '..' not in path.parts and member.isfile(), 'unsafe node payload member')
         metadata = json.load(package.extractfile('payload.json'))
         require(metadata['format'] == 1 and metadata['node'] == expected_node, 'node payload identity mismatch')
+        if lab:
+            require(metadata.get('lab') is True, 'lab mode requires an explicitly marked lab payload')
+        else:
+            require(release is not None and trusted is not None, 'initial installation requires a signed release and a separately trusted key')
+            from delivery import verify
+            manifest = verify(release, trusted)
+            require(metadata['profile']['version'] == manifest['version'], 'node payload version differs from the signed release')
+            operating_system = platform.freedesktop_os_release()
+            require(operating_system.get('ID') == 'debian' and operating_system.get('VERSION_ID') == '13'
+                    and platform.machine() == 'x86_64', 'Debian 13 x86_64 is required')
+            require((os.cpu_count() or 0) >= 2, 'at least two CPU cores are required')
+            memory = next(int(line.split()[1]) * 1024 for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemTotal:'))
+            require(memory >= 4 * 1024**3, 'at least 4 GiB RAM is required for an installation node')
+            run('docker', 'info', '--format', '{{.OSType}} {{.Architecture}}')
+            run('docker', 'compose', 'version', '--short')
         require(set(names) == set(metadata['files']) | {'payload.json'}, 'node payload inventory mismatch')
         for name, entry in metadata['files'].items():
             require(hashlib.sha256(package.extractfile(name).read()).hexdigest() == entry['sha256'], 'node payload member checksum mismatch')
         prefix = Path(metadata['profile']['prefix'])
         require(prefix.is_absolute() and '..' not in prefix.parts and len(prefix.parts) >= 3, 'invalid installation prefix')
         require(not any(path.is_symlink() for path in (prefix, *prefix.parents)), 'installation prefix traverses a symlink')
+        if not lab:
+            location = next(path for path in (prefix, *prefix.parents) if path.exists())
+            required = sum(path.stat().st_size for path in Path(release).iterdir()) * 2 + 256 * 1024 * 1024
+            require(shutil.disk_usage(location).free > required, 'insufficient space for installation and rollback artifacts')
         state = prefix / 'installation.json'
         pg_uid = metadata['directories'].get('data/' + expected_node + '/postgres') if metadata['profile']['topology'] == 'cluster' else None
         if pg_uid is not None:
@@ -110,5 +133,7 @@ def install(archive, digest, expected_node):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--archive', required=True); parser.add_argument('--sha256', required=True); parser.add_argument('--node', required=True)
+    parser.add_argument('--lab', action='store_true')
+    parser.add_argument('--release'); parser.add_argument('--trusted-key')
     args = parser.parse_args()
-    install(args.archive, args.sha256, args.node)
+    install(args.archive, args.sha256, args.node, lab=args.lab, release=args.release, trusted=args.trusted_key)

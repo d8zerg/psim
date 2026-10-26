@@ -221,15 +221,16 @@ def control(name, action, node=None):
     return result
 
 
-def ssh(name, node, command, check=True, capture_output=False):
+def ssh(name, node, command, check=True, capture_output=False, input=None):
     args, address = ssh_connection(name, node, 'ssh')
-    return subprocess.run(args + ['psim@' + address, shlex.join(command)], check=check, capture_output=capture_output, text=True)
+    if input is not None: args[2:2] = ['--interactive']
+    return subprocess.run(args + ['psim@' + address, shlex.join(command)], check=check, capture_output=capture_output, text=True, input=input)
 
 
 def copy_to(name, node, source, destination):
     source = Path(source).resolve(strict=True)
     require(source.is_file(), 'VM upload source must be a regular file')
-    require(re.fullmatch(r'/home/psim/[a-zA-Z0-9_./-]+', destination) and '..' not in Path(destination).parts, 'invalid VM upload destination')
+    require(re.fullmatch(r'/home/psim/[a-zA-Z0-9_./+~-]+', destination) and '..' not in Path(destination).parts, 'invalid VM upload destination')
     args, address = ssh_connection(name, node, 'scp')
     insert = args.index('--entrypoint')
     args[insert:insert] = ['--volume', str(source) + ':/payload:ro']

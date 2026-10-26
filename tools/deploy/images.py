@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def build(version):
+    version = version.replace('+', '_')
     images = json.loads((ROOT / 'deploy/topologies/images.json').read_text())
     output = ROOT / 'build/deployment'
     output.mkdir(parents=True, exist_ok=True)

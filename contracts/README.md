@@ -92,3 +92,5 @@ task contracts:buf -- dep update   # произвольная команда buf
 | S11 Отказ без потерь | Семантика топиков в [topics.yaml](topics/topics.yaml); `ConnectorEvent.event_id`, `source_seq`; `BatchAck`; realtime `resume_token`, `ResyncRequired`; код `REALTIME_RESYNC_REQUIRED` |
 | S12 Обновление | Правила эволюции и `buf breaking`; согласование версии в `Register.protocol_versions`; `Envelope.schema_version` |
 | S13 Отчёт | `ReportService.GetIncidentReport` (`IncidentMetrics`: `mtta`, `mttr`, `false_alarm_rate`, соблюдение SLA), `ExportIncidentReport` (CSV) |
+
+Квалификация S12 отложена до [шага 10.1](../docs/psim-mvp-development-plan.md#шаг-101-производительность). Контрактные механизмы обновления реализованы; успешный нагрузочный сценарий остаётся обязательным перед выпуском. Шаг 9.2 принят с этим ограничением.

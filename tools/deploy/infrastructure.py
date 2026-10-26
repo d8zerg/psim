@@ -132,7 +132,7 @@ def postgres(bundle, node, nodes):
     protected(bundle, node, 'postgres', 'bootstrap.sql', '{{postgres-bootstrap}}')
     protected(bundle, node, 'postgres', 'passwd', f'postgres:x:{profile.uid("postgres")}:{profile.uid("postgres")}:psim-platform:/var/lib/postgresql:/usr/sbin/nologin\n')
     protected(bundle, node, 'postgres', 'group', f'postgres:x:{profile.uid("postgres")}:\n')
-    service = bundle.service(node, 'postgres', 'psim-platform/postgres:' + profile.version, command, volumes=[data(bundle, node, 'postgres') + ':/var/lib/postgresql'], environment={'PGHOST': '/tmp'})
+    service = bundle.service(node, 'postgres', 'psim-platform/postgres:' + profile.image_version, command, volumes=[data(bundle, node, 'postgres') + ':/var/lib/postgresql'], environment={'PGHOST': '/tmp'})
     service['shm_size'] = '256m'
     if cluster:
         service['devices'] = ['/dev/watchdog:/dev/watchdog']
@@ -358,7 +358,7 @@ def identity(bundle, node):
         bundle.port(node, 57800, 'keycloak-cache-health')
     config_file = protected(bundle, node, 'keycloak', 'keycloak.conf', config)
     realm = protected(bundle, node, 'keycloak', 'realm.json', '{{keycloak-realm}}')
-    bundle.service(node, 'keycloak', 'psim-platform/keycloak:' + bundle.profile.version, ['--config-file=' + config_file, 'start', '--optimized', '--import-realm'],
+    bundle.service(node, 'keycloak', 'psim-platform/keycloak:' + bundle.profile.image_version, ['--config-file=' + config_file, 'start', '--optimized', '--import-realm'],
                    volumes=[data(bundle, node, 'keycloak') + ':/opt/keycloak/data', bundle.profile.prefix + '/material/' + node.name + '/keycloak/realm.json:/opt/keycloak/data/import/psim.json:ro'],
                    environment={'JAVA_OPTS_KC_HEAP': '-Xms128m -Xmx768m'})
 
@@ -387,7 +387,7 @@ def registry(bundle, node):
         'apicurio.ccompat.legacy-id-mode.enabled': 'true',
         'apicurio.rest.deletion.artifact.enabled': 'false'})
     config_file = protected(bundle, node, 'registry', 'application.properties', config)
-    bundle.service(node, 'registry', 'psim-platform/registry:' + bundle.profile.version, [], environment={'QUARKUS_CONFIG_LOCATIONS': config_file,
+    bundle.service(node, 'registry', 'psim-platform/registry:' + bundle.profile.image_version, [], environment={'QUARKUS_CONFIG_LOCATIONS': config_file,
                    'JAVA_OPTS': '-Xms128m -Xmx512m -XX:+ExitOnOutOfMemoryError'})
 
 
@@ -397,7 +397,7 @@ def proxy(bundle, node):
     apps = profile.select('application')
     ca, certificate, key = bundle.tls(node, 'haproxy', dns=[profile.public_name])
     combined = protected(bundle, node, 'haproxy', 'public.pem', '{{combine:identity.pem,identity.key}}')
-    sections = ['global\n  log stdout format raw local0\n  maxconn 20000\n  tune.ssl.default-dh-param 2048\n',
+    sections = ['global\n  log stdout format raw local0\n  maxconn 20000\n  tune.ssl.default-dh-param 2048\n  stats socket /tmp/psim-haproxy.sock mode 600 level admin\n',
                 'defaults\n  log global\n  timeout connect 3s\n  timeout client 60s\n  timeout server 60s\n  timeout tunnel 1h\n']
     def tcp(name, port, targets, check_port=None, primary=False):
         bundle.port(node, port, name)
@@ -441,6 +441,10 @@ backend public-identity
   mode http
 '''+''.join(f'  server identity-{i} {n.name}:18445 ssl verify required ca-file {ca} verifyhost keycloak sni str(keycloak) check\n' for i,n in enumerate(infra[:2],1))+f'''backend public-api
   mode http
+  retries 2
+  option redispatch
+  retry-on conn-failure empty-response 503
+  http-request disable-l7-retry unless {{ method GET HEAD }}
   option httpchk GET /health/ready
 '''+''.join(f'  server api-{i} {n.name}:{SERVICES["api-gateway"][1]} ssl verify required ca-file {ca} verifyhost api-gateway sni str(api-gateway) check port {19100 + list(SERVICES).index("api-gateway")} no-check-ssl\n' for i,n in enumerate(apps,1))+'''backend public-web
   mode http
@@ -451,7 +455,7 @@ backend public-identity
   balance leastconn
 '''+''.join(f'  server gateway-{i} {n.name}:17443 check\n' for i,n in enumerate(apps,1)))
     config = protected(bundle, node, 'haproxy', 'haproxy.cfg', '\n'.join(sections))
-    service = bundle.service(node, 'haproxy', 'psim-platform/haproxy:' + profile.version, ['-W', '-db', '-f', config])
+    service = bundle.service(node, 'haproxy', 'psim-platform/haproxy:' + profile.image_version, ['-W', '-db', '-f', config])
     if node in profile.select('edge'):
         service['cap_add'] = ['NET_BIND_SERVICE']
     # VRRP stays in a native unit: only this process receives network administration rights.
@@ -490,7 +494,7 @@ vrrp_instance PSIM {{
 def web(bundle, node):
     bundle.port(node, 18180, 'web')
     ca, certificate, key = bundle.tls(node, 'web', dns=['web'])
-    service = bundle.service(node, 'web', 'psim-platform/web:' + bundle.profile.version, [], environment={
+    service = bundle.service(node, 'web', 'psim-platform/web:' + bundle.profile.image_version, [], environment={
         'PSIM_LISTEN': node.address, 'PSIM_PORT': '18180', 'PSIM_ISSUER': bundle.profile.issuer,
         'PSIM_CA_FILE': ca, 'PSIM_CERTIFICATE_FILE': certificate, 'PSIM_PRIVATE_KEY_FILE': key})
     service['entrypoint'] = ['node', '/srv/server.mjs']

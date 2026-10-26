@@ -1,0 +1,14 @@
+{
+  "format": 1,
+  "components": {
+    "kafka": {"supported": ["4.3.1"], "rolling_scope": "qualified patch transitions only", "order": ["one broker-controller at a time", "all ISR restored", "metadata feature finalization after rollback window"]},
+    "postgres": {"supported": ["18.6"], "rolling_scope": "qualified minor transitions within major 18", "order": ["asynchronous replica", "synchronous replica", "controlled primary switchover", "former primary"], "major_upgrade": "separate pg_upgrade or logical replication procedure"},
+    "clickhouse": {"supported": ["26.8.19"], "rolling_scope": "qualified patch transitions", "order": ["one server replica", "replication queues drained", "second server replica", "Keeper in a separate operation"]},
+    "keeper": {"supported": ["26.8.19"], "rolling_scope": "qualified patch transitions", "order": ["one follower at a time", "quorum checked after each restart", "leader last"]},
+    "valkey": {"supported": ["9.1.2"], "rolling_scope": "qualified compatible transitions", "order": ["first replica", "second replica", "Sentinel controlled failover", "former primary", "Sentinels one at a time"]},
+    "keycloak": {"supported": ["26.8.0"], "rolling_scope": "only transitions supported by the vendor rolling-update compatibility check", "order": ["database compatibility preflight", "one identity replica at a time", "login and refresh check"], "incompatible_transition": "maintenance operation with backup and tested restore"},
+    "seaweed": {"supported": ["4.47", "4.48"], "qualified_transitions": [["4.47", "4.48"]], "rolling_scope": "qualified adjacent releases with unchanged volume and metadata formats", "order": ["masters one at a time with quorum", "volume servers one at a time with replica checks", "filers one at a time", "S3 gateways one at a time"], "barriers": ["all current floor objects readable", "volume replicas on distinct racks", "new object upload after completion"]}
+  },
+  "unlisted_targets": "reject until the exact digest transition and rollback limits are qualified",
+  "automatic_major_upgrades": false
+}

@@ -226,11 +226,12 @@ tasks:
       vars: [CMD]
     env:
       PSIM_CMD: '{{.CMD}}'
+      PSIM_PRODUCT_VERSION: '{{.VERSION}}'
     cmds:
       - mkdir -p "{{.WEB_CACHE}}/bin" "{{.WEB_CACHE}}/home" "{{.WEB_CACHE}}/pnpm-store" "{{.WEB_CACHE}}/corepack" "{{.WEB_CACHE}}/buf"
       - >-
         docker run --rm {{.TTY}} -u {{.UID}}:{{.GID}}
-        -e PSIM_CMD -e HOME=/cache/home -e COREPACK_HOME=/cache/corepack -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+        -e PSIM_CMD -e PSIM_PRODUCT_VERSION -e HOME=/cache/home -e COREPACK_HOME=/cache/corepack -e COREPACK_ENABLE_DOWNLOAD_PROMPT=0
         -e npm_config_store_dir=/cache/pnpm-store -e BUF_CACHE_DIR=/cache/buf -e TURBO_TELEMETRY_DISABLED=1
         -e DO_NOT_TRACK=1 -e CI=true -e PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
         -v "{{.ROOT_DIR}}":/repo -v "{{.WEB_CACHE}}":/cache -w /repo/web

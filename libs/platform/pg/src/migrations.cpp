@@ -21,7 +21,8 @@ asio::awaitable<Result<void>> Migrator::apply(Connection* connection, std::vecto
   }
   std::int64_t previous = 0;
   for (const auto& migration : migrations) {
-    if (migration.version <= previous || migration.name.empty() || migration.expand.empty()) {
+    if (migration.version <= previous || migration.name.empty() || migration.expand.empty()
+        || migration.minimum_reader < 0 || migration.minimum_reader > migration.version) {
       co_return fail(ErrorCode::kCommonInvalidArgument,
                      "migrations must have unique increasing versions and expand steps");
     }
@@ -43,20 +44,23 @@ asio::awaitable<Result<void>> Migrator::apply(Connection* connection, std::vecto
   constexpr auto* kCreateMigrations =
       "CREATE TABLE IF NOT EXISTS @schema@.psim_migrations (version bigint NOT NULL, phase text NOT NULL, name text "
       "NOT NULL, checksum text NOT NULL, PRIMARY KEY (version, phase))";
-  for (const auto* schema_ddl : {kCreateMigrations}) {
+  for (const auto* schema_ddl :
+       {kCreateMigrations,
+        "ALTER TABLE @schema@.psim_migrations ADD COLUMN IF NOT EXISTS minimum_reader bigint NOT NULL DEFAULT 0"}) {
     auto statement = detail::schema_sql(schema_, schema_ddl);
     const auto result = co_await connection->query({.sql = *statement});
     if (!result) {
       co_return std::unexpected(result.error());
     }
   }
-  auto existing = co_await connection->query(
-      {.sql = *detail::schema_sql(
-           schema_, "SELECT version, phase, name, checksum FROM @schema@.psim_migrations ORDER BY version, phase")});
+  auto existing =
+      co_await connection->query({.sql = *detail::schema_sql(schema_,
+                                                             "SELECT version, phase, name, checksum, minimum_reader "
+                                                             "FROM @schema@.psim_migrations ORDER BY version, phase")});
   if (!existing) {
     co_return std::unexpected(existing.error());
   }
-  // A binary must not silently apply an incomplete history or run against a newer schema.
+  // Unknown expansions need an explicit reader floor. Unknown contract phases forbid rollback.
   for (std::size_t row = 0; row < existing->size(); ++row) {
     const auto version = existing->integer(row, 0);
     if (!version) {
@@ -64,15 +68,27 @@ asio::awaitable<Result<void>> Migrator::apply(Connection* connection, std::vecto
     }
     const auto found = std::ranges::find(migrations, *version, &Migration::version);
     if (found == migrations.end()) {
+      const auto floor = existing->integer(row, 4);
+      if (*version > migrations.back().version && existing->value(row, 1) == "expand" && floor && *floor > 0
+          && *floor <= migrations.back().version) {
+        continue;
+      }
       co_return fail(ErrorCode::kCommonConcurrentModification, "database migration history is newer or incomplete");
     }
     const auto applied_phase = existing->value(row, 1);
+    if (applied_phase != "expand" && applied_phase != "contract") {
+      co_return fail(ErrorCode::kCommonConcurrentModification, "unknown PostgreSQL migration phase");
+    }
     const auto& statements = applied_phase == "expand" ? found->expand : found->contract;
     std::string content;
     for (const auto& migration_sql : statements) {
       content += std::to_string(migration_sql.size()) + ":" + migration_sql;
     }
-    if (existing->value(row, 2) != found->name || existing->value(row, 3) != detail::fingerprint(content)) {
+    const auto floor = existing->integer(row, 4);
+    if (!floor || *floor < 0
+        || (*floor == 0 ? found->version : *floor)
+               != (found->minimum_reader == 0 ? found->version : found->minimum_reader)
+        || existing->value(row, 2) != found->name || existing->value(row, 3) != detail::fingerprint(content)) {
       co_return fail(ErrorCode::kCommonConcurrentModification, "applied PostgreSQL migration was modified");
     }
   }
@@ -113,10 +129,11 @@ asio::awaitable<Result<void>> Migrator::apply(Connection* connection, std::vecto
       co_return fail(ErrorCode::kCommonInternal, "PostgreSQL migration checksum failed");
     }
     const auto recorded = co_await connection->query(
-        {.sql = *detail::schema_sql(
-             schema_, "INSERT INTO @schema@.psim_migrations (version, phase, name, checksum) VALUES ($1, $2, $3, $4)"),
+        {.sql = *detail::schema_sql(schema_,
+                                    "INSERT INTO @schema@.psim_migrations (version, phase, name, checksum, "
+                                    "minimum_reader) VALUES ($1, $2, $3, $4, $5)"),
          .parameters = {Parameter::integer(migration.version), Parameter::text(stage), Parameter::text(migration.name),
-                        Parameter::text(checksum)}});
+                        Parameter::text(checksum), Parameter::integer(migration.minimum_reader)}});
     if (!recorded) {
       co_return std::unexpected(recorded.error());
     }

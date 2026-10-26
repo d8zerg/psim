@@ -28,8 +28,8 @@ def render_profiles(output):
                         and service['cap_drop'] == ['ALL'] for service in compose.values()), 'unsafe service process isolation')
             if 'application' in node.roles:
                 require(set(SERVICES) <= compose.keys(), 'application topology is incomplete')
-        references = {'psim-platform/psim-' + binary + ':' + profile.version for binary, _, _ in SERVICES.values()}
-        references |= {'psim-platform/' + name + ':' + profile.version for name in ('web', 'haproxy')}
+        references = {'psim-platform/psim-' + binary + ':' + profile.image_version for binary, _, _ in SERVICES.values()}
+        references |= {'psim-platform/' + name + ':' + profile.image_version for name in ('web', 'haproxy')}
         # Rendering fixtures never refer to executable images and are removed after the check.
         images = {reference: reference.split(':')[0] + '@sha256:' + '0' * 64 for reference in references}
         (output / ('values-' + name + '.json')).write_text(json.dumps(configuration(bundle, profile, images)))

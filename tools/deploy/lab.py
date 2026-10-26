@@ -20,7 +20,7 @@ from model import Profile, SERVICES, require
 from render import render
 
 ROOT = local.ROOT
-CACHE = ROOT / '.cache/deployment'
+CACHE = local.CACHE
 STATE = CACHE / 'lab-state.json'
 
 
@@ -66,7 +66,7 @@ def save_state(state):
 
 def paths(topology):
     require(topology in ('single', 'cluster'), 'invalid lab topology')
-    return ROOT / ('build/deployment/lab-' + topology), CACHE / ('lab-' + topology)
+    return local.BUILD / ('lab-' + topology), CACHE / ('lab-' + topology)
 
 
 def private_paths(profile, bundle, holder):
@@ -74,7 +74,7 @@ def private_paths(profile, bundle, holder):
             (holder.stat().st_uid == os.getuid() and holder.stat().st_mode & 0o777 == 0o700)),
             'unsafe private lab directory')
     if holder.exists(): require({path.name for path in holder.iterdir()} <= {'material'}, 'foreign files in private lab directory')
-    payloads = ROOT / 'build/deployment/payloads' / bundle.name
+    payloads = local.BUILD / 'payloads' / bundle.name
     if payloads.exists():
         require(not payloads.is_symlink() and {path.name for path in payloads.iterdir()} <= {node.name + '.tar.gz' for node in profile.nodes}, 'foreign node payload files')
     return payloads
@@ -98,18 +98,18 @@ def material_identity(profile, holder):
     value = json.loads(local.vm.capture(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '0:0',
         '--cap-drop', 'ALL', '--cap-add', 'DAC_OVERRIDE', '--security-opt', 'no-new-privileges:true', '--env', 'LD_PRELOAD=',
         '--mount', 'type=bind,src=' + str(holder) + ',dst=/private,readonly', '--entrypoint', 'python3',
-        'psim-platform/postgres:' + profile.version, '-c', program]))
+        'psim-platform/postgres:' + profile.image_version, '-c', program]))
     require(value['lab'] is True and value['complete'] is True and value['name'] == profile.name,
             'private lab material is incomplete or belongs to another installation')
     return value
 
 
 def public_ca(profile, holder, topology, create=True):
-    path = ROOT / ('build/deployment/lab-' + topology + '-ca.pem')
+    path = local.BUILD / ('lab-' + topology + '-ca.pem')
     certificate = local.vm.capture(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '0:0',
         '--cap-drop', 'ALL', '--cap-add', 'DAC_OVERRIDE', '--security-opt', 'no-new-privileges:true', '--env', 'LD_PRELOAD=',
         '--mount', 'type=bind,src=' + str(holder) + ',dst=/private,readonly', '--entrypoint', 'python3',
-        'psim-platform/postgres:' + profile.version, '-c', "print(open('/private/material/authority/platform.pem').read(),end='')"]) + '\n'
+        'psim-platform/postgres:' + profile.image_version, '-c', "print(open('/private/material/authority/platform.pem').read(),end='')"]) + '\n'
     require(certificate.startswith('-----BEGIN CERTIFICATE-----\n') and 'PRIVATE KEY' not in certificate, 'invalid public lab trust')
     require(not path.is_symlink() and (not path.exists() or path.read_text() == certificate), 'public lab trust file belongs to another installation')
     if create: path.write_text(certificate)
@@ -120,16 +120,22 @@ def up(topology):
     bundle, holder = paths(topology)
     state = read_state()
     require(state is None or state['topology'] == topology, 'another lab topology is installed; destroy it before changing topology')
-    profile = Profile.load(ROOT / ('deploy/topologies/local-vm.json' if topology == 'cluster' else 'deploy/topologies/local-single.json'))
-    bundle.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='.lab-render-', dir=bundle.parent) as temporary:
-        candidate = Path(temporary) / 'bundle'
-        render(profile, candidate)
-        checksum = digest(candidate / 'manifest.json')
-        if bundle.exists():
-            verify_bundle(bundle)
-            require(digest(bundle / 'manifest.json') == checksum, 'lab configuration changed; recreate the lab before installing it')
-        else: shutil.copytree(candidate, bundle)
+    if state:
+        profile = verify_bundle(bundle)
+        checksum = digest(bundle / 'manifest.json')
+    else:
+        value = json.loads((ROOT / ('deploy/topologies/local-vm.json' if topology == 'cluster' else 'deploy/topologies/local-single.json')).read_text())
+        value['version'] = local.vm.capture(['python3', '-I', str(ROOT / 'tools/version.py'), '--field', 'version'])
+        profile = Profile.parse(value)
+        bundle.parent.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(prefix='.lab-render-', dir=bundle.parent) as temporary:
+            candidate = Path(temporary) / 'bundle'
+            render(profile, candidate)
+            checksum = digest(candidate / 'manifest.json')
+            if bundle.exists():
+                verify_bundle(bundle)
+                require(digest(bundle / 'manifest.json') == checksum, 'unowned lab configuration differs from the requested installation')
+            else: shutil.copytree(candidate, bundle)
     references = sorted({image for node in profile.nodes for image in local.images_for(bundle, node.name)})
     images = {image: local.vm.capture(['docker', 'image', 'inspect', '--format', '{{.Id}}', image]) for image in references}
     if state:
@@ -151,14 +157,14 @@ def up(topology):
             '--mount', 'type=bind,src=' + str(ROOT / 'deploy/local/config/keycloak') + ',dst=/repo/deploy/local/config/keycloak,readonly',
             '--mount', 'type=bind,src=' + str(bundle) + ',dst=/bundle,readonly',
             '--mount', 'type=bind,src=' + str(holder) + ',dst=/private', '--entrypoint', 'python3',
-            'psim-platform/postgres:' + profile.version, '/repo/tools/deploy/material.py', '--bundle', '/bundle', '--output', '/private/material', '--lab-issue'])
+            'psim-platform/postgres:' + profile.image_version, '/repo/tools/deploy/material.py', '--bundle', '/bundle', '--output', '/private/material', '--lab-issue'])
     identity = material_identity(profile, holder)
     require(identity['public_manifest_sha256'] == state['manifest'], 'private material belongs to another public bundle')
     require(not state.get('material_id') or state['material_id'] == identity['id'], 'private material identity changed; recreate the lab')
     state['material_id'] = identity['id']; save_state(state)
     ca = public_ca(profile, holder, topology)
     state['ca_sha256'] = digest(ca); save_state(state)
-    manager = local.vm.container('psim-platform-vm')
+    manager = local.vm.container(local.VM_NAME)
     cold_start = manager is None or not manager['State']['Running']
     local.prepare(bundle, material)
     require(images == {image: local.vm.capture(['docker', 'image', 'inspect', '--format', '{{.Id}}', image]) for image in references},
@@ -178,7 +184,13 @@ def up(topology):
     wait_operation(bundle, 'schemas')
     wait_operation(bundle, 'bucket')
     wait_operation(bundle, 'identity')
-    if state.get('runtime') == 'systemd':
+    if state.get('lifecycle'):
+        for node in profile.select('application'):
+            destination = '/home/psim/.cache/psim-delivery/lifecycle/'
+            for source in (ROOT / 'tools/deploy/node_release.py', ROOT / 'tools/deploy/delivery.py', ROOT / 'tools/version.py'):
+                local.vm.copy_to(local.VM_NAME, node.name, source, destination + source.name)
+            local.execute(node.name, ['sudo', 'python3', destination + 'node_release.py', 'resume', '--prefix', profile.prefix, '--node', node.name, '--command', 'start-only'])
+    elif state.get('runtime') == 'systemd':
         import native
         require(state['packages'] == {path.name: digest(path) for path in native.packages(profile)}, 'native package artifacts changed; recreate the lab')
         native.units(profile, 'start')
@@ -192,7 +204,7 @@ def up(topology):
 def destroy():
     state = read_state()
     if state is None:
-        local.vm.destroy('psim-platform-vm')
+        local.vm.destroy(local.VM_NAME)
         return
     bundle, holder = paths(state['topology'])
     require(not bundle.is_symlink(), 'unsafe deployment bundle directory')
@@ -211,15 +223,15 @@ if p.exists():
 '''
     command = ['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '0:0', '--env', 'LD_PRELOAD=',
         '--mount', 'type=bind,src=' + str(holder) + ',dst=/private', '--entrypoint', 'python3',
-        'psim-platform/postgres:' + profile.version, '-c', cleanup, profile.name, state['manifest']]
-    ca = ROOT / ('build/deployment/lab-' + state['topology'] + '-ca.pem')
+        'psim-platform/postgres:' + profile.image_version, '-c', cleanup, profile.name, state['manifest']]
+    ca = local.BUILD / ('lab-' + state['topology'] + '-ca.pem')
     if ca.exists() or ca.is_symlink():
         require(not ca.is_symlink() and ca.stat().st_uid == os.getuid(), 'unsafe public lab trust file')
         if state.get('ca_sha256'): require(digest(ca) == state['ca_sha256'], 'public lab trust belongs to another installation')
         else: public_ca(profile, holder, state['topology'], create=False)
     if holder.exists(): local.vm.run(command + ['verify', state.get('material_id', '')])
     else: require(not state.get('material_id'), 'private material disappeared from an installed lab')
-    if local.vm.directory('psim-platform-vm').exists(): local.vm.destroy('psim-platform-vm')
+    if local.vm.directory(local.VM_NAME).exists(): local.vm.destroy(local.VM_NAME)
     if holder.exists():
         local.vm.run(command + ['remove', state.get('material_id', '')])
         holder.rmdir()
@@ -238,6 +250,6 @@ if __name__ == '__main__':
     args = parser.parse_args()
     with exclusive():
         if args.action == 'up': up(args.topology)
-        elif args.action == 'down': local.vm.down('psim-platform-vm')
+        elif args.action == 'down': local.vm.down(local.VM_NAME)
         elif args.action == 'destroy': destroy()
         else: print(json.dumps(read_state(), indent=2))

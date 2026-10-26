@@ -1,7 +1,8 @@
 cmake_minimum_required(VERSION 3.28)
 
+include(cmake/PsimVersion.cmake)
 project(psim
-  VERSION 0.1.0
+  VERSION ${PSIM_NUMERIC_VERSION}
   DESCRIPTION "Open-Source PSIM Platform"
   LANGUAGES C CXX)
 
@@ -34,6 +35,7 @@ add_subdirectory(contracts)
 add_subdirectory(libs)
 add_subdirectory(tools/psimctl)
 add_subdirectory(tools/pg-migrate)
+add_subdirectory(tools/ch-migrate)
 add_subdirectory(tools/service-template)
 add_subdirectory(services)
 add_subdirectory(connectors/simulator)

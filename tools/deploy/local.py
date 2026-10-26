@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -19,9 +20,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from material import verify_bundle
 from model import SERVICES, require
 
+LAB_ID = os.environ.get('PSIM_LAB_ID', '')
+require(not LAB_ID or re.fullmatch(r'[a-z][a-z0-9-]{0,31}', LAB_ID), 'invalid VM lab identifier')
+VM_NAME = 'psim-platform-vm' + ('-' + LAB_ID if LAB_ID else '')
+BUILD = ROOT / 'build/deployment' / LAB_ID if LAB_ID else ROOT / 'build/deployment'
+CACHE = ROOT / '.cache/deployment' / LAB_ID if LAB_ID else ROOT / '.cache/deployment'
+
 
 def execute(node, command, **kwargs):
-    return vm.ssh('psim-platform-vm', node, command, **kwargs)
+    return vm.ssh(VM_NAME, node, command, **kwargs)
 
 
 def images_for(bundle, node):
@@ -87,6 +94,7 @@ def prepare(bundle, material):
     bundle = Path(bundle).resolve(); material = Path(material).resolve()
     profile = verify_bundle(bundle)
     value = vm.profile(ROOT / 'deploy/vm/local.json')
+    value['name'] = VM_NAME
     value['nodes'] = [node for node in value['nodes'] if node['name'] in {item.name for item in profile.nodes}]
     saved = vm.manifest(value['name']) if vm.directory(value['name']).exists() else None
     nodes = {node['name']: node['address'] for node in value['nodes']}
@@ -100,14 +108,14 @@ def prepare(bundle, material):
     spec = importlib.util.spec_from_file_location('psim_vm_bootstrap', ROOT / 'tools/vm/bootstrap.py')
     bootstrap = importlib.util.module_from_spec(spec); spec.loader.exec_module(bootstrap)
     bootstrap.bootstrap(value)
-    output = ROOT / 'build/deployment/payloads' / bundle.name
+    output = BUILD / 'payloads' / bundle.name
     output.mkdir(parents=True, exist_ok=True)
     archives = {}
     for node in profile.nodes:
         payload = output / (node.name + '.tar.gz')
         vm.run(['docker', 'run', '--rm', '--user', '0:0', '--env', 'LD_PRELOAD=',
                 '--volume', str(ROOT) + ':/repo:ro', '--volume', str(output) + ':/output', '--workdir', '/repo',
-                '--entrypoint', 'python3', 'psim-platform/postgres:' + profile.version, '-I', 'tools/deploy/archive.py',
+                '--entrypoint', 'python3', 'psim-platform/postgres:' + profile.image_version, '-I', 'tools/deploy/archive.py',
                 '--bundle', '/repo/' + str(bundle.relative_to(ROOT)), '--material', '/repo/' + str(material.relative_to(ROOT)),
                 '--node', node.name, '--output', '/output/' + payload.name, '--owner', str(os.getuid())])
         image_archive, image_manifest = export_images(images_for(bundle, node.name))
@@ -120,9 +128,9 @@ def prepare(bundle, material):
         missing_images = not images_match(node.name, image_manifest['oci'])
         sources = [payload, ROOT / 'tools/deploy/node_install.py'] + ([image_archive] if missing_images else [])
         for source in sources:
-            vm.copy_to('psim-platform-vm', node.name, source, destination + '/' + source.name)
+            vm.copy_to(VM_NAME, node.name, source, destination + '/' + source.name)
         execute(node.name, ['sudo', 'python3', destination + '/node_install.py', '--archive', destination + '/' + payload.name,
-            '--sha256', hashlib.sha256(payload.read_bytes()).hexdigest(), '--node', node.name])
+            '--sha256', hashlib.sha256(payload.read_bytes()).hexdigest(), '--node', node.name, '--lab'])
         if missing_images:
             execute(node.name, ['sudo', 'docker', 'image', 'load', '--input', destination + '/' + image_archive.name], capture_output=True)
         require(images_match(node.name, image_manifest['oci']), 'loaded OCI image identity mismatch')

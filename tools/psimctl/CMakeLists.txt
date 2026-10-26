@@ -15,6 +15,7 @@ function(psimctl_smoke_test name expected)
     FAIL_REGULAR_EXPRESSION "Sanitizer|runtime error:")
 endfunction()
 
-psimctl_smoke_test(version "^psimctl ${PROJECT_VERSION} " version)
+string(REPLACE "+" "\\+" PSIM_VERSION_REGEX "${PSIM_VERSION}")
+psimctl_smoke_test(version "^psimctl ${PSIM_VERSION_REGEX} " version)
 psimctl_smoke_test(envelope_sample "\"messageId\"" contracts envelope-sample)
 psimctl_smoke_test(usage "^usage: psimctl" unknown)

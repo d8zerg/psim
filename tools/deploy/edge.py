@@ -43,10 +43,10 @@ RestrictSUIDSGID=true
 WantedBy=multi-user.target
 ''')
         destination = '/home/psim/.cache/psim-delivery/' + filename.name
-        local.vm.copy_to('psim-platform-vm', node.name, filename, destination)
+        local.vm.copy_to(local.VM_NAME, node.name, filename, destination)
         config = Path(bundle) / node.name / 'keepalived.conf'
         staged_config = '/home/psim/.cache/psim-delivery/keepalived.conf'
-        local.vm.copy_to('psim-platform-vm', node.name, config, staged_config)
+        local.vm.copy_to(local.VM_NAME, node.name, config, staged_config)
         local.execute(node.name, ['sudo', 'keepalived', '--config-test', '--use-file', staged_config])
         local.execute(node.name, ['sudo', 'install', '-m', '0644', staged_config, profile.prefix + '/config/' + node.name + '/keepalived.conf'])
         local.execute(node.name, ['sudo', 'install', '-m', '0644', destination, '/etc/systemd/system/psim-keepalived.service'])

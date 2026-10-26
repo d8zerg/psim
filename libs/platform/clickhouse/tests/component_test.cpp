@@ -199,6 +199,42 @@ TEST(ClickHouseConnection, FailedReplicaRotatesAndRecoveredReplicaCatchesUp) {
   run(scenario());
 }
 
+TEST(ClickHouseMigrations, OldReaderAcceptsCompatibleExpansionButRejectsContract) {
+  auto scenario = []() -> asio::awaitable<void> {
+    async::BlockingPool blocking(2, 8);
+    Pool pool(&blocking, options());
+    pg::Pool journal(journal_options());
+    const auto table = unique();
+    Migrator runner(&pool, &journal, table);
+    const std::vector<Migration> old{
+        {.version = 1,
+         .name = "initial",
+         // psim-arch: allow-sql (generated test identifier only)
+         .expand = {"CREATE TABLE IF NOT EXISTS " + table + " (id UInt64) ENGINE=Memory"}}};
+    check(co_await runner.apply(old));
+    auto next = old;
+    next.push_back({.version = 2,
+                    .name = "compatible",
+                    // psim-arch: allow-sql (generated test identifier only)
+                    .expand = {"ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS note Nullable(String)"},
+                    // psim-arch: allow-sql (generated test identifier only)
+                    .contract = {"ALTER TABLE " + table + " DROP COLUMN IF EXISTS note"},
+                    .minimum_reader = 1});
+    check(co_await runner.apply(next));
+    check(co_await runner.apply(old));
+    next[1].minimum_reader = 2;
+    EXPECT_FALSE(co_await runner.apply(next));
+    next[1].minimum_reader = 1;
+    check(co_await runner.apply(next, MigrationPhase::kContract));
+    EXPECT_FALSE(co_await runner.apply(old));
+    check(co_await pool.execute_ddl("DROP TABLE " + table));  // psim-arch: allow-sql (generated test identifier only)
+    auto lease = take(co_await journal.acquire());
+    take(co_await lease->query({.sql = "DELETE FROM psim_clickhouse.schema_migrations WHERE target=$1",
+                                .parameters = {pg::Parameter::text(table)}}));
+  };
+  run(scenario());
+}
+
 TEST(ClickHouseMigrations, ExpandContractResumeAndChecksumValidation) {
   auto scenario = []() -> asio::awaitable<void> {
     async::BlockingPool blocking(2, 8);

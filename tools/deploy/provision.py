@@ -22,7 +22,7 @@ def run(args):
         '--mount', 'type=bind,src=' + str(local.ROOT) + ',dst=/repo,readonly',
         '--mount', 'type=bind,src=' + str(bundle) + ',dst=/bundle,readonly',
         '--mount', 'type=bind,src=' + str(private.parent) + ',dst=/private', '--entrypoint', 'python3']
-    image = 'psim-platform/postgres:' + profile.version
+    image = 'psim-platform/postgres:' + profile.image_version
     material = '/private/' + private.name
     base = [image, '/repo/tools/deploy/material.py', '--bundle', '/bundle', '--output', material]
     if args.action in ('request', 'export'):

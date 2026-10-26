@@ -29,7 +29,7 @@ def qualify():
     bundle, holder = lab.paths('cluster'); profile = verify_bundle(bundle)
     gateway.prepare(bundle, profile, holder)
     runtime = gateway.command(bundle, profile, holder)
-    runtime[-1] = 'psim-platform/postgres:' + profile.version
+    runtime[-1] = 'psim-platform/postgres:' + profile.image_version
     name = 'psim-platform-postgres-failover-probe'
     require(not local.vm.capture(['docker', 'container', 'ls', '--all', '--filter', 'name=^/' + name + '$', '--format', '{{.ID}}']),
             'PostgreSQL qualification container name is already in use')
@@ -46,7 +46,7 @@ def qualify():
             before = records(output)
             primary = next(node for node in profile.select('infrastructure') if node.address == before[-1]['primary'])
             cut = time.monotonic()
-            local.vm.control('psim-platform-vm', 'kill', primary.name)
+            local.vm.control(local.VM_NAME, 'kill', primary.name)
             deadline = cut + 60
             while recovered is None:
                 recovered = next((row for row in records(output) if row['monotonic'] >= cut and row['primary'] != primary.address), None)
@@ -71,8 +71,8 @@ def qualify():
             local.vm.run(['docker', 'rm', '--force', metadata['Id']], capture_output=True)
             process.wait(timeout=10)
         if primary is not None:
-            local.vm.control('psim-platform-vm', 'start', primary.name)
-            local.vm.wait('psim-platform-vm')
+            local.vm.control(local.VM_NAME, 'start', primary.name)
+            local.vm.wait(local.VM_NAME)
             lab.wait_operation(bundle, 'core', 180)
             lab.wait_operation(bundle, 'applications', 180)
 

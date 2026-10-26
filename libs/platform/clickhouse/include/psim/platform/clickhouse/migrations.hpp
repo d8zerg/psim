@@ -19,6 +19,8 @@ struct Migration {
   /// the last statement. Replicated table paths/macros are identical in all topologies.
   std::vector<std::string> expand{};
   std::vector<std::string> contract{};
+  /// Oldest migration plan allowed to coexist with this expand phase; zero means version.
+  std::int64_t minimum_reader = 0;
 };
 
 class Migrator {

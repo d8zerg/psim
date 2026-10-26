@@ -139,12 +139,13 @@ def setup(api):
     mappings = api.request('GET', '/v1/mappings')['mappingRuleSets']
     version = next((item['version'] for item in mappings if item['connectorType'] == connector_type), 0)
     api.request('PUT', '/v1/mappings/' + connector_type, {'connectorType': connector_type, 'taxonomyVersion': '1',
-            'rules': [{'rawCode': 'ALARM*', 'condition': 'raw.raw_code.startsWith("ALARM")', 'type': 'intrusion.zone.alarm'}]}, version)
+            'rules': [{'rawCode': 'ALARM*', 'condition': 'raw.raw_code.startsWith("ALARM")', 'type': 'intrusion.zone.alarm'},
+                      {'rawCode': 'BACKGROUND', 'condition': 'raw.raw_code == "BACKGROUND"', 'type': 'intrusion.zone.restore'}]}, version)
     incident_type = str(uuid.uuid4()); rule = str(uuid.uuid4())
     api.request('POST', '/v1/incident-types', {'incidentTypeId': incident_type, 'code': uuid.uuid4().hex,
             'name': 'Qualification intrusion', 'defaultPriority': 'PRIORITY_P2', 'groupingWindow': '60s', 'autoCloseAfter': '300s'})
     api.request('POST', '/v1/rules', {'ruleId': rule, 'name': 'Qualification intrusion rule',
-            'correlationScope': 'CORRELATION_SCOPE_ZONE', 'filter': {'types': ['intrusion.*'], 'siteIds': [state['site']]},
+            'correlationScope': 'CORRELATION_SCOPE_ZONE', 'filter': {'types': ['intrusion.zone.alarm'], 'siteIds': [state['site']]},
             'window': '1s', 'single': {}, 'output': {'incidentTypeId': incident_type, 'priority': 'PRIORITY_P2',
             'summaryTemplate': 'Alarm ${event.zone_id}'}})
     checked = api.request('POST', '/v1/rules/' + rule + ':validate', {'version': 1}, 1)
@@ -157,11 +158,50 @@ def setup(api):
     print('Fresh connector, catalog, normalization mapping and correlation rule initialized through public APIs')
 
 
+def setup_load(api):
+    state = json.loads(STATE.read_text())
+    if state.get('load_devices') == 10000:
+        print('LOAD-50K catalog already prepared'); return
+    device_type = api.request('GET', '/v1/devices/' + state['device'])['device']['deviceTypeId']
+    zones = [(state['site'], state['zone'])]
+    for _ in range(9):
+        site = api.location('SITE'); building = api.location('BUILDING', site)
+        floor_location = api.location('FLOOR', building); zone = api.location('ZONE', floor_location)
+        zones.append((site['locationId'], zone['locationId']))
+    jobs = []
+    for site_index, (site, zone) in enumerate(zones):
+        rows = [{'deviceId': str(uuid.uuid4()), 'deviceTypeId': device_type,
+                 'zoneId': zone, 'siteId': site, 'connectorId': state['connector'],
+                 'externalId': 'load-' + str(site_index) + '-' + str(index), 'name': 'Load device',
+                 'sources': [{'externalRef': 'load/' + str(site_index) + '/' + str(index), 'kind': 'alarm', 'name': 'Load source'}]}
+                for index in range(1000) if site_index != 0 or index != 0]
+        for begin in range(0, len(rows), 500):
+            jobs.append(api.request('POST', '/v1/imports?format=json', rows[begin:begin + 500])['importJob']['importId'])
+    deadline = time.monotonic() + 1200
+    pending = set(jobs)
+    refreshed = time.monotonic()
+    while pending:
+        if time.monotonic() - refreshed > 60:
+            api = API(api.origin); refreshed = time.monotonic()
+        for identifier in list(pending):
+            report = api.request('GET', '/v1/imports/' + identifier)['importJob']
+            if report['state'] == 'IMPORT_STATE_COMPLETED':
+                if int(report.get('rowsFailed', 0)) or not int(report.get('rowsCreated', 0)):
+                    raise RuntimeError('LOAD-50K catalog import failed: ' + json.dumps(report))
+                pending.remove(identifier)
+        if time.monotonic() >= deadline: raise RuntimeError('LOAD-50K catalog import timed out')
+        if pending: time.sleep(1)
+    state.update(load_devices=10000, load_sites=[site for site, _ in zones], load_imports=jobs)
+    save(state)
+    print('LOAD-50K catalog prepared: 10000 devices on 10 sites')
+
+
 def verify(api):
     state = json.loads(STATE.read_text()); event = json.loads((CASE / 'event.json').read_text())['event_id']
     now = dt.datetime.now(dt.timezone.utc)
     query = urllib.parse.urlencode({'from': (now - dt.timedelta(minutes=10)).isoformat(),
-            'to': (now + dt.timedelta(minutes=5)).isoformat(), 'siteIds': state['site'], 'pageSize': 100})
+            'to': (now + dt.timedelta(minutes=5)).isoformat(), 'siteIds': state['site'],
+            'deviceIds': state['device'], 'pageSize': 100})
     wait(lambda: any(item['eventId'] == event for item in api.request('GET', '/v1/events?' + query)['events']),
          'SDK event did not reach normalized event history')
     incident = wait(lambda: next((item for item in api.request('GET', '/v1/incidents?siteIds=' + state['site'])['incidents']
@@ -174,7 +214,7 @@ def verify(api):
 
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(); parser.add_argument('action', choices=['floor', 'read', 'upload', 'anonymous', 'setup', 'verify'])
+    parser = argparse.ArgumentParser(); parser.add_argument('action', choices=['floor', 'read', 'upload', 'anonymous', 'setup', 'setup-load', 'verify'])
     parser.add_argument('--origin', default='https://localhost:8443'); args = parser.parse_args()
     if args.action == 'anonymous': anonymous()
-    else: {'floor': floor, 'read': read, 'upload': upload, 'setup': setup, 'verify': verify}[args.action](API(args.origin))
+    else: {'floor': floor, 'read': read, 'upload': upload, 'setup': setup, 'setup-load': setup_load, 'verify': verify}[args.action](API(args.origin))

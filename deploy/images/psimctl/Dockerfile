@@ -4,6 +4,7 @@
 ARG BASE=gcr.io/distroless/cc-debian13:nonroot
 FROM ${BASE}
 COPY psimctl /usr/bin/psimctl
+COPY psim-ch-migrate psim-pg-migrate /usr/bin/
 USER 65532:65532
 ENTRYPOINT ["/usr/bin/psimctl"]
 CMD ["version"]

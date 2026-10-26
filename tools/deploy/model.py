@@ -84,7 +84,7 @@ class Profile:
         public = value.get('public_name', '')
         require(isinstance(public, str) and len(public) <= 253 and all(re.fullmatch(r'[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?', label) for label in public.split('.')), 'invalid public DNS name')
         version = value.get('version', '')
-        require(isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?', version), 'invalid application version')
+        require(isinstance(version, str) and re.fullmatch(r'[0-9]+\.[0-9]+\.[0-9]+(?:-[a-zA-Z0-9.-]+)?(?:\+[a-zA-Z0-9.-]+)?', version), 'invalid application version')
         prefix = value.get('prefix', '/var/lib/psim-platform')
         require(isinstance(prefix, str) and re.fullmatch(r'/[a-zA-Z0-9_/-]+', prefix) and '..' not in Path(prefix).parts and prefix not in ('/', '/etc', '/var', '/var/lib'), 'invalid installation prefix')
         uid = value.get('uid_base', 60000)
@@ -117,6 +117,14 @@ class Profile:
 
     def select(self, role):
         return tuple(n for n in self.nodes if role in n.roles)
+
+    @property
+    def image_version(self):
+        return self.version.replace('+', '_')
+
+    @property
+    def package_version(self):
+        return self.version.replace('-', '~', 1)
 
     def document(self):
         return {'format': 1, 'name': self.name, 'topology': self.topology, 'version': self.version,

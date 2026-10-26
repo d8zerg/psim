@@ -136,7 +136,8 @@ struct Runtime::Impl {
     if (target == "/info") {
       const auto build = build_info();
       const json body = {{"service", service.name},    {"instance", instance},       {"version", build.version},
-                         {"commit", build.git_commit}, {"compiler", build.compiler}, {"build_type", build.build_type}};
+                         {"commit", build.git_commit}, {"compiler", build.compiler}, {"build_type", build.build_type},
+                         {"configuration_format", 2}};
       return {.status = 200, .content_type = "application/json", .body = body.dump()};
     }
     return {.status = 404, .content_type = "application/json", .body = R"({"status":"not_found"})"};

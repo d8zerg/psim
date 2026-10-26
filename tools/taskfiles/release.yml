@@ -68,14 +68,15 @@ tasks:
           [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
           cp "$bins" "$stage"/
           if [ "{{.ITEM}}" = psim-projection-service ]; then cp {{.RELEASE_BUILD}}/services/projection-service/psim-report-tool {{.RELEASE_BUILD}}/services/projection-service/psim-console-tool "$stage"/; fi
+          if [ "{{.ITEM}}" = psimctl ]; then cp {{.RELEASE_BUILD}}/tools/ch-migrate/psim-ch-migrate {{.RELEASE_BUILD}}/tools/pg-migrate/psim-pg-migrate "$stage"/; fi
           if [ "{{.ITEM}}" = psim-normalizer ] || [ "{{.ITEM}}" = psim-correlation-engine ] || [ "{{.ITEM}}" = psim-resource-catalog ]; then cp contracts/taxonomy/v1/taxonomy.yaml "$stage"/; fi
           docker build --quiet --platform linux/amd64 --build-arg BASE={{.DISTROLESS_IMAGE}} \
             --label org.opencontainers.image.title=psim-platform-{{.ITEM}} \
             --label org.opencontainers.image.version={{.VERSION}} \
             --label org.opencontainers.image.revision={{.COMMIT}} \
             --label org.opencontainers.image.vendor="Open-Source PSIM Platform" \
-            -t {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} "$stage" >/dev/null
-          echo "image: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}}"
+            -t {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}} "$stage" >/dev/null
+          echo "image: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}}"
 
   images:test:
     desc: Run every image read-only, without capabilities, as non-root (SR-24)
@@ -83,10 +84,10 @@ tasks:
     cmds:
       - for: {var: IMAGES}
         cmd: |
-          user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}})
+          user=$(docker image inspect -f '{{"{{"}}.Config.User{{"}}"}}' {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}})
           case "$user" in ""|0|0:*|root|root:*) echo "FAIL: {{.IMAGE_NAMESPACE}}/{{.ITEM}} runs as root" >&2; exit 1 ;; esac
-          docker run --rm --platform linux/amd64 --read-only --cap-drop ALL --security-opt no-new-privileges {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} >/dev/null
-          echo "ok: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} runs read-only, no capabilities, user $user"
+          docker run --rm --platform linux/amd64 --read-only --cap-drop ALL --security-opt no-new-privileges {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}} >/dev/null
+          echo "ok: {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}} runs read-only, no capabilities, user $user"
 
   sbom:app:
     desc: SBOM of the components linked into PSIM binaries (Conan host dependencies and the system C++ runtime)
@@ -115,7 +116,7 @@ tasks:
       - cp {{.PACKAGES}}/*.deb {{.DIST}}/
       - for: {var: IMAGES}
         cmd: >-
-          docker save -o {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.VERSION}} &&
+          docker save -o {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar {{.IMAGE_NAMESPACE}}/{{.ITEM}}:{{.IMAGE_VERSION}} &&
           chmod 644 {{.DIST}}/psim-platform-{{.ITEM}}_{{.VERSION}}_image.tar
       - for: {var: IMAGES}
         cmd: >-
@@ -145,6 +146,14 @@ tasks:
         SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) {{.PYTHON}} tools/release/sbom.py docs {{.DIST}}/psim-platform-docs_{{.VERSION}}.tar
         {{.VERSION}} $(git rev-parse HEAD) tools/docs/portal/requirements.txt {{.REDOC_VERSION}} {{.DIST}}/psim-platform-docs_{{.VERSION}}.tar.cdx.json
       - '{{.PYTHON}} tools/release/sbom.py licenses tools/release/licenses.yaml {{.DIST}}/*.cdx.json'
+      - task: :cpp:_run
+        vars:
+          CMD: python3 -I tools/release/installer.py {{.DIST}}/psim-platform-installer_{{.VERSION}}.tar {{.VERSION}}
+      - task: :contracts:build
+      - task: :cpp:_run
+        vars:
+          CMD: python3 -I tools/deploy/contract_snapshot.py --root /repo --descriptor /repo/.cache/contracts/image.json --output /repo/{{.RELEASE_BUILD}}/contracts.json
+      - python3 -I tools/deploy/release_manifest.py --directory {{.DIST}} --version {{.VERSION}} --image-tag {{.IMAGE_VERSION}} --revision $(git rev-parse HEAD) --contracts {{.RELEASE_BUILD}}/contracts.json
       - task: sign
 
   sign:
@@ -159,7 +168,7 @@ tasks:
     cmds:
       - cmd: '[ "{{.TRUSTED_KEY}}" != "{{.ROOT_DIR}}/.cache/keys/psim-dev.pub.pem" ] || echo "note: verifying with the development key"'
       - task: _with_key
-        vars: {KEY: '{{.TRUSTED_KEY}}', SCRIPT: verify.sh}
+        vars: {KEY: '{{.TRUSTED_KEY}}', SCRIPT: verify_lifecycle.sh}
 
   _with_key:
     internal: true

@@ -1,0 +1,8 @@
+find_package(nlohmann_json REQUIRED CONFIG)
+add_executable(psim-ch-migrate src/main.cpp)
+psim_target_defaults(psim-ch-migrate)
+target_link_libraries(psim-ch-migrate PRIVATE psim::platform_clickhouse nlohmann_json::nlohmann_json)
+install(TARGETS psim-ch-migrate RUNTIME DESTINATION bin COMPONENT ch-migrate)
+psim_package(ch-migrate SUMMARY "PSIM ClickHouse expand and contract migration runner")
+add_test(NAME psim-ch-migrate.usage COMMAND psim-ch-migrate)
+set_tests_properties(psim-ch-migrate.usage PROPERTIES LABELS "smoke;psim-ch-migrate" WILL_FAIL TRUE)

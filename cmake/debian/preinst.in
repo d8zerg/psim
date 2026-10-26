@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+case "$1" in install|upgrade)
+  . /etc/os-release
+  [ "$ID" = debian ] && [ "$VERSION_ID" = 13 ] && [ "$(dpkg --print-architecture)" = amd64 ] || {
+    echo "psim: Debian 13 amd64 is required" >&2; exit 1;
+  }
+esac
+exit 0
