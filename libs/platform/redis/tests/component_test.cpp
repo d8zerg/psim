@@ -36,6 +36,14 @@ asio::awaitable<int> consume_many(RateLimiter* limiter, std::string id) {
   }
   co_return accepted;
 }
+
+asio::awaitable<int> consume_tokens(TokenBucket* limiter) {
+  int accepted = 0;
+  for (int i = 0; i < 100; ++i) {
+    accepted += take(co_await limiter->consume("user", 1, 75)).allowed ? 1 : 0;
+  }
+  co_return accepted;
+}
 }  // namespace
 
 TEST(RedisConnection, BinaryParametersAndPipelineKeepResponseOrder) {
@@ -264,6 +272,91 @@ TEST(RedisLimiter, ConcurrentClientsEnforceOneAtomicFixedWindow) {
     EXPECT_TRUE(take(co_await a.consume("short", 1, std::chrono::milliseconds{30})).allowed);
     EXPECT_FALSE(co_await a.consume("bad", 0, std::chrono::seconds{1}));
     EXPECT_FALSE(co_await a.consume("bad", 1, std::chrono::hours{31 * 24}));
+  };
+  run(scenario());
+}
+
+TEST(RedisTokenBucket, ConcurrentPoolsShareBurstDespiteClientRestartAndClockReversal) {
+  auto scenario = []() -> asio::awaitable<void> {
+    using namespace asio::experimental::awaitable_operators;  // NOLINT(google-build-using-namespace): operator&&
+    const auto service = unique();
+    const Keyspace keys(service, "tenant");
+    const auto key = take(keys.key("bucket", "user"));
+    Pool first({.connection = options()});
+    Pool second({.connection = options()});
+    TokenBucket a(&first, keys);
+    TokenBucket b(&second, keys);
+    Admin admin(co_await asio::this_coro::executor, options().endpoint);
+    // A future server timestamp models a clock reversal without time-sensitive concurrency assertions.
+    const auto seeded = co_await admin.execute(
+        {"EVAL",
+         "local t=redis.call('TIME'); redis.call('HSET',KEYS[1],'tokens',75000000,'updated',"
+         "string.format('%.0f',tonumber(t[1])*1000000+tonumber(t[2])+10000000),'rate',1,'burst',75); "
+         "return redis.call('PEXPIRE',KEYS[1],75000)",
+         "1", key});
+    EXPECT_TRUE(seeded);
+    const auto counts = co_await (consume_tokens(&a) && consume_tokens(&b));
+    EXPECT_EQ(std::get<0>(counts) + std::get<1>(counts), 75);
+    first.close();
+    Pool restarted({.connection = options()});
+    EXPECT_FALSE(take(co_await TokenBucket(&restarted, keys).consume("user", 1, 75)).allowed);
+    EXPECT_TRUE(take(co_await TokenBucket(&second, {service, "other-tenant"}).consume("user", 1, 75)).allowed);
+    EXPECT_TRUE(take(co_await b.consume("other-user", 1, 75)).allowed);
+    EXPECT_FALSE(co_await a.consume("user", 1, 75));
+  };
+  run(scenario());
+}
+
+TEST(RedisTokenBucket, RefillsContinuouslyExpiresAndRejectsMismatchedConfiguration) {
+  auto scenario = []() -> asio::awaitable<void> {
+    Pool pool({.connection = options()});
+    const Keyspace keys(unique(), "tenant");
+    TokenBucket bucket(&pool, keys);
+    EXPECT_TRUE(take(co_await bucket.consume("user", 1, 4)).allowed);
+    EXPECT_FALSE(co_await bucket.consume("user", 2, 4));
+    EXPECT_FALSE(co_await bucket.consume("user", 1, 5));
+    EXPECT_TRUE(take(co_await bucket.consume("other-user", 1, 4)).allowed);
+    EXPECT_FALSE(co_await bucket.consume("bad", 0, 1));
+    EXPECT_FALSE(co_await bucket.consume("bad", 1, 0));
+    EXPECT_FALSE(co_await bucket.consume("bad", 1000000001, 1));
+    EXPECT_FALSE(co_await bucket.consume("bad", 1, 1000000001));
+    EXPECT_FALSE(co_await bucket.consume("bad", 1, 1000000000));
+    Admin admin(co_await asio::this_coro::executor, options().endpoint);
+    const auto key = take(keys.key("bucket", "user"));
+    const auto seeded =
+        co_await admin.execute({"EVAL",
+                                "local t=redis.call('TIME'); redis.call('HSET',KEYS[1],'tokens',0,'updated',"
+                                "string.format('%.0f',tonumber(t[1])*1000000+tonumber(t[2])-1500000)); return 1",
+                                "1", key});
+    EXPECT_TRUE(seeded);
+    EXPECT_TRUE(take(co_await bucket.consume("user", 1, 4)).allowed);
+    auto exhausted = take(co_await bucket.consume("user", 1, 4));
+    EXPECT_FALSE(exhausted.allowed);
+    EXPECT_GT(exhausted.retry_after.count(), 0);
+    EXPECT_LE(exhausted.retry_after.count(), 500);
+    EXPECT_TRUE(take(co_await bucket.consume("expires", 100, 1)).allowed);
+    async::SystemClock clock;
+    co_await clock.sleep_for(std::chrono::milliseconds(40));
+    auto connection = take(co_await Connection::connect(options()));
+    EXPECT_EQ(take(take(co_await connection->execute({"EXISTS", take(keys.key("bucket", "expires"))})).integer()), 0);
+    EXPECT_TRUE(take(co_await bucket.consume("expires", 100, 1)).allowed);
+    take(co_await connection->execute({"SET", key, "invalid-state", "PX", "30000"}));
+    EXPECT_FALSE(co_await bucket.consume("user", 1, 4));
+    TokenBucket invalid(nullptr, keys);
+    EXPECT_FALSE(co_await invalid.consume("user", 1, 4));
+  };
+  run(scenario());
+}
+
+TEST(RedisTokenBucket, HighRateWithUnitBurstUsesMicrosecondRefill) {
+  auto scenario = []() -> asio::awaitable<void> {
+    Pool pool({.connection = options()});
+    TokenBucket bucket(&pool, {unique(), "tenant"});
+    for (int i = 0; i < 20; ++i) {
+      EXPECT_TRUE(take(co_await bucket.consume("user", 100000, 1)).allowed);
+      async::SystemClock clock;
+      co_await clock.sleep_for(std::chrono::microseconds(50));
+    }
   };
   run(scenario());
 }

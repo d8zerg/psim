@@ -51,10 +51,13 @@
 #include "psim/platform/pg/repository.hpp"
 #include "psim/platform/pg/store.hpp"
 #include "psim/platform/pg/transaction.hpp"
+#include "psim/platform/redis/patterns.hpp"
+#include "psim/platform/redis/pool.hpp"
 #include "psim/platform/runtime.hpp"
 #include "psim/platform/security/http.hpp"
 #include "psim/platform/security/jwt.hpp"
 #include "psim/platform/security/tls.hpp"
+#include "psim/platform/stream/redis.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "psim/realtime/v1/realtime.pb.h"
 #include "realtime.hpp"
@@ -154,8 +157,13 @@ class Gateway final : public p::stream::Worker {
     queue_messages_ = config.get<std::size_t>("settings.realtime_queue_messages");
     queue_bytes_ = config.get<std::size_t>("settings.realtime_queue_bytes");
     total_queue_bytes_ = config.get<std::size_t>("settings.realtime_total_queue_bytes");
-    limiter_ = std::make_unique<RateLimiter>(config.get<std::size_t>("settings.rate_per_second"),
-                                             config.get<std::size_t>("settings.rate_burst"));
+    rate_ = config.get<std::int64_t>("settings.rate_per_second");
+    burst_ = config.get<std::int64_t>("settings.rate_burst");
+    auto redis = p::stream::redis_options(config);
+    redis.acquire_timeout = std::chrono::milliseconds(500);
+    redis.connection.connect_timeout = std::chrono::milliseconds(500);
+    redis.connection.command_timeout = std::chrono::milliseconds(500);
+    redis_ = std::make_unique<p::redis::Pool>(std::move(redis));
     ip_limiter_ = std::make_unique<RateLimiter>(config.get<std::size_t>("settings.ip_rate_per_second"),
                                                 config.get<std::size_t>("settings.ip_rate_burst"));
     for (const auto* name : {"catalog", "rules", "incidents", "commands", "response", "history", "reports",
@@ -772,6 +780,10 @@ class Gateway final : public p::stream::Worker {
       pool_.reset();
     }
     verifier_.reset();
+    if (redis_) {
+      redis_->close();
+      redis_.reset();
+    }
   }
 
   template <typename Stream>
@@ -840,12 +852,18 @@ class Gateway final : public p::stream::Worker {
 
   bool origin(std::string_view value) const { return allowed_origin(value, origins_); }
 
-  bool limit(const p::security::Principal& principal) {
-    const bool allowed = limiter_->allow(principal.tenant + ":" + principal.subject, std::chrono::steady_clock::now());
-    if (!allowed) {
-      http_metrics_->limited();
+  asio::awaitable<p::Result<void>> limit(std::string tenant, std::string subject) {
+    auto decision = co_await p::redis::TokenBucket(redis_.get(), {"api-gateway", std::move(tenant)})
+                        .consume(std::move(subject), rate_, burst_);
+    if (!decision) {
+      http_metrics_->limit_failed();
+      co_return p::fail(p::ErrorCode::kCommonUnavailable, "shared rate limiter unavailable");
     }
-    return allowed;
+    if (!decision->allowed) {
+      http_metrics_->limited();
+      co_return p::fail(p::ErrorCode::kCommonRateLimited, "request rate exceeded");
+    }
+    co_return p::Result<void>{};
   }
 
   const Endpoint& endpoint(const std::string& service) const { return endpoints_.at(service); }
@@ -890,7 +908,9 @@ class Gateway final : public p::stream::Worker {
   bool plaintext_ = false, relaying_ = false;
   std::shared_ptr<asio::ssl::context> tls_, upstream_tls_;
   std::unique_ptr<p::pg::OutboxRelay> relay_;
-  std::unique_ptr<RateLimiter> limiter_, ip_limiter_;
+  std::unique_ptr<RateLimiter> ip_limiter_;
+  std::unique_ptr<p::redis::Pool> redis_;
+  std::int64_t rate_ = 0, burst_ = 0;
   std::unique_ptr<HttpMetrics> http_metrics_;
   std::vector<std::string> origins_;
   std::map<std::string, Endpoint> endpoints_;
@@ -1292,12 +1312,16 @@ asio::awaitable<void> Session<Stream>::run() {
     if (access) {
       beast::get_lowest_layer(socket).expires_after(std::chrono::seconds(60));
     }
+    p::Result<void> limited;
+    if (access) {
+      limited = co_await gateway->limit(authenticated->tenant, authenticated->subject);
+    }
     if (!access) {
       auto logged = co_await gateway->denied(authenticated ? std::optional(*authenticated) : std::nullopt,
                                              (*selected)->operation);
       co_await problem(logged ? access.error() : logged.error());
-    } else if (!gateway->limit(*authenticated)) {
-      co_await problem(p::Error(p::ErrorCode::kCommonRateLimited, "request rate exceeded"));
+    } else if (!limited) {
+      co_await problem(limited.error());
     } else if (auto headers = request_headers(**selected, request.base()); !headers) {
       co_await problem(headers.error());
     } else if ((*selected)->service == "local") {

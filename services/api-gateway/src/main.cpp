@@ -25,6 +25,7 @@ std::string settings() {
     fields[name] = {{"type", "string"}, {"default", ""}};
   }
   fields["redis_password_file"] = {{"type", "string"}, {"x-psim-secret", true}};
+  fields["redis_host"] = {{"type", "string"}, {"minLength", 1}, {"default", "valkey"}};
   for (const auto* name : {"rate_per_second", "rate_burst", "ip_rate_per_second", "ip_rate_burst"}) {
     fields[name] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 100000}, {"default", 1000}};
   }

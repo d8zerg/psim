@@ -242,6 +242,32 @@
           "unit": "ops"
         }
       }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Shared rate limiter failures",
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(psim_api_rate_limit_failures_total[5m]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        }
+      }
     }
   ]
 }

@@ -61,6 +61,7 @@ def valkey(profile, secret):
         ('connector-gateway', '+get +set +del +pexpire +pttl +incrby +eval', '~psim:17:connector-gateway*'),
         ('projection-service', '+get +set +del', '~psim:18:projection-service*'),
         ('command-service', '+get', '%R~psim:17:connector-gateway*7:session*'),
+        ('api-gateway', '+eval +time +hmget +hset +pexpire', '~psim:11:api-gateway*6:bucket*'),
     ]:
         users.append(f'user {name} on {password_hash(secret(name + "/valkey.secret"))} {pattern} +ping +role +client|setname {commands}')
     if profile.topology == 'cluster':
@@ -72,7 +73,7 @@ def valkey(profile, secret):
 def sentinel(profile, secret):
     users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/sentinel.secret')) + ' ~* &* +@all',
              'user sentinel-peer on ' + password_hash(secret('sentinel/peer.secret')) + ' +ping +client|setname +sentinel|is-master-down-by-addr']
-    for name in ('connector-gateway', 'command-service', 'projection-service'):
+    for name in ('connector-gateway', 'command-service', 'projection-service', 'api-gateway'):
         users.append(f'user {name} on {password_hash(secret(name + "/sentinel.secret"))} +ping +client|setname +sentinel|get-master-addr-by-name')
     return '\n'.join(users) + '\n'
 

@@ -108,7 +108,7 @@ class Bundle:
                     settings['role'] = 'management'
                     settings['replay_kafka_certificate_file'] = self.credential(node, name, 'replay.pem', 'certificate', dns_names=[node.name], uri='psim://service/rule-replay', common_name='rule-replay')
                     settings['replay_kafka_private_key_file'] = self.credential(node, name, 'replay.key', 'private-key')
-                if name in ('connector-gateway', 'command-service', 'projection-service'):
+                if name in ('connector-gateway', 'command-service', 'projection-service', 'api-gateway'):
                     settings.update({'redis_host': infra[0].name, 'redis_user': name, 'redis_password_file': secret('valkey.secret'),
                                      'redis_ca_file': ca, 'redis_certificate_file': certificate, 'redis_key_file': key})
                     if profile.topology == 'cluster':

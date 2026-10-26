@@ -1,6 +1,13 @@
 groups:
   - name: api-gateway
     rules:
+      - alert: ApiGatewaySharedRateLimiterUnavailable
+        expr: sum(rate(psim_api_rate_limit_failures_total[5m])) > 0
+        for: 2m
+        labels: {severity: warning}
+        annotations:
+          summary: API Gateway cannot enforce the shared request quota
+          description: Check Valkey availability, primary discovery, credentials and quota key permissions.
       - alert: ApiGatewayProxyFailures
         expr: sum(rate(psim_api_proxy_failures_total[5m])) > 1
         for: 2m

@@ -38,6 +38,8 @@ class HttpMetrics {
 
   void limited() { limited_->Increment(); }
 
+  void limit_failed() { limit_failed_->Increment(); }
+
   void proxy_failed() { proxy_failed_->Increment(); }
 
  private:
@@ -51,6 +53,7 @@ class HttpMetrics {
   prometheus::Gauge* active_;
   prometheus::Counter* denied_;
   prometheus::Counter* limited_;
+  prometheus::Counter* limit_failed_;
   prometheus::Counter* proxy_failed_;
 };
 }  // namespace psim::api_gateway

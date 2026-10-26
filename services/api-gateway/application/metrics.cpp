@@ -50,6 +50,11 @@ HttpMetrics::HttpMetrics(const platform::runtime::Context& context) : context_(&
                   .Help("Requests and connections rejected by rate limits")
                   .Register(registry)
                   .Add({});
+  limit_failed_ = &prometheus::BuildCounter()
+                       .Name("psim_api_rate_limit_failures_total")
+                       .Help("Requests rejected because the shared rate limiter is unavailable")
+                       .Register(registry)
+                       .Add({});
   proxy_failed_ = &prometheus::BuildCounter()
                        .Name("psim_api_proxy_failures_total")
                        .Help("Failed upstream exchanges or response delivery")

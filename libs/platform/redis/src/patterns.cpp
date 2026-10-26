@@ -26,6 +26,25 @@ constexpr std::string_view kLimitScript =
     "return {1,c,redis.call('PTTL',KEYS[1])}";
 constexpr std::string_view kRenewScript =
     "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('PEXPIRE',KEYS[1],ARGV[2]) end; return 0";
+// Microsecond fixed point and explicit decimal encoding retain full timestamp precision in Lua.
+constexpr std::string_view kBucketScript =
+    "local rate=tonumber(ARGV[1]); local burst=tonumber(ARGV[2]); local cap=burst*1000000; "
+    "local time=redis.call('TIME'); local now=tonumber(time[1])*1000000+tonumber(time[2]); "
+    "local state=redis.call('HMGET',KEYS[1],'tokens','updated','rate','burst'); local tokens=cap; "
+    "if state[1] then "
+    " if tonumber(state[3])~=rate or tonumber(state[4])~=burst then "
+    "  return redis.error_reply('ERR token bucket configuration mismatch') end; "
+    " local updated=tonumber(state[2]); tokens=tonumber(state[1]); "
+    " if not updated or not tokens or tokens<0 or tokens>cap then "
+    "  return redis.error_reply('ERR invalid token bucket state') end; "
+    " now=math.max(now,updated); tokens=math.min(cap,tokens+math.min(now-updated,tonumber(ARGV[3])*1000)*rate); "
+    "end; "
+    "local allowed=0; local retry=0; "
+    "if tokens>=1000000 then tokens=tokens-1000000; allowed=1 "
+    "else retry=math.ceil((1000000-tokens)/(rate*1000)) end; "
+    "redis.call('HSET',KEYS[1],'tokens',string.format('%.0f',tokens),'updated',string.format('%.0f',now),"
+    "'rate',rate,'burst',burst); "
+    "redis.call('PEXPIRE',KEYS[1],math.max(1,math.ceil((cap-tokens)/(rate*1000)))); return {allowed,retry}";
 constexpr std::string_view kReleaseScript =
     "if redis.call('GET',KEYS[1])==ARGV[1] then return redis.call('DEL',KEYS[1]) end; return 0";
 
@@ -173,6 +192,32 @@ asio::awaitable<Result<LimitDecision>> RateLimiter::consume(std::string id, std:
     co_return fail(ErrorCode::kCommonInternal, "invalid Redis rate limit response");
   }
   co_return LimitDecision{*allowed == 1, *accepted, std::chrono::milliseconds{*remaining}};
+}
+
+asio::awaitable<Result<TokenDecision>> TokenBucket::consume(std::string id, std::int64_t rate, std::int64_t burst) {
+  auto key = keys_.key("bucket", id);
+  if (!key || rate <= 0 || rate > 1000000000 || burst <= 0 || burst > 1000000000) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "invalid Redis token bucket");
+  }
+  const auto refill = std::chrono::milliseconds{(burst * 1000 + rate - 1) / rate};
+  if (refill > kMaxTtl) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "Redis token bucket refill exceeds 30 days");
+  }
+  auto reply = co_await execute(pool_, {"EVAL", std::string(kBucketScript), "1", *key, std::to_string(rate),
+                                        std::to_string(burst), std::to_string(refill.count())});
+  if (!reply) {
+    co_return std::unexpected(reply.error());
+  }
+  if (reply->kind != Reply::Kind::kArray || reply->elements.size() != 2) {
+    co_return fail(ErrorCode::kCommonInternal, "invalid Redis token bucket response");
+  }
+  auto allowed = reply->elements[0].integer();
+  auto retry = reply->elements[1].integer();
+  if (!allowed || !retry || (*allowed != 0 && *allowed != 1) || *retry < 0 || *retry > 1000
+      || (*allowed == 1 && *retry != 0) || (*allowed == 0 && *retry == 0)) {
+    co_return fail(ErrorCode::kCommonInternal, "invalid Redis token bucket response");
+  }
+  co_return TokenDecision{*allowed == 1, std::chrono::milliseconds{*retry}};
 }
 
 asio::awaitable<Result<bool>> SessionRegistry::claim(std::string id, Session session, Duration ttl) {

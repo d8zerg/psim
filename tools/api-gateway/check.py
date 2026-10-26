@@ -2,12 +2,15 @@
 import concurrent.futures
 import http.client
 import json
+import math
 import os
 from pathlib import Path
 import runpy
 import ssl
 import subprocess
 import sys
+import time
+from types import SimpleNamespace
 import urllib.error
 import urllib.request
 
@@ -30,9 +33,27 @@ class Check(Base):
         settings = {"allow_plaintext": True, "listen_port": 8443, "pg_password_file": "/repo/.cache/event-flow/postgres.secret", "introspection_secret_file": "/repo/.cache/event-flow/introspection.secret", "issuer": "http://keycloak:8080/realms/psim", "tls_certificate_file": "/repo/.cache/event-flow/api-server.pem", "tls_private_key_file": "/repo/.cache/event-flow/api-server.key", "upstream_ca_file": "/repo/.cache/event-flow/ca.pem", "allowed_origins": ["https://console.example"], "redis_host": "valkey", "redis_password_file": "/repo/.cache/event-flow/redis.secret", "rate_per_second": 100, "rate_burst": 100, "ip_rate_per_second": 10000, "ip_rate_burst": 10000}
         config = {"service": {"instance": "public-api"}, "runtime": {"shards": 1}, "telemetry": {"otlp_endpoint": "otel-collector:4317", "otlp_tls": False, "sampling_ratio": 0.01}, "settings": settings}
         (self.output / "api.json").write_text(json.dumps(config))
+        limited = json.loads(json.dumps(config))
+        limited['runtime']['shards'] = 2
+        limited['settings'].update({'rate_per_second': 1, 'rate_burst': 200, 'redis_user': 'api-gateway'})
+        (self.output / 'api-limits.json').write_text(json.dumps(limited))
+        with self.override.open('a') as file:
+            for name in ('api-rate-1', 'api-rate-2'):
+                service = {
+                    'image': 'debian:trixie@sha256:913f6706df59a68922d1dd08f78c2476560a8d367897200a6005b00e5f67c2d5',
+                    'profiles': ['api-limits'], 'user': f'{os.getuid()}:{os.getgid()}', 'read_only': True,
+                    'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'] + (['seccomp=unconfined'] if preset == 'tsan' else []),
+                    'volumes': [str(ROOT) + ':/repo:ro', str(ROOT / 'build/debian13' / preset / 'profiles') + ':/profiles'],
+                    'environment': {'LLVM_PROFILE_FILE': '/profiles/%p-%m.profraw', 'PSIM__SERVICE__INSTANCE': name},
+                    'tmpfs': ['/tmp'], 'mem_limit': '1024m', 'ports': ['127.0.0.1::8443'],
+                    'command': [f'/repo/build/debian13/{preset}/services/api-gateway/psim-api-gateway', '--config',
+                                '/repo/build/resource-catalog/' + preset + '/api-limits.json'],
+                }
+                file.write('  ' + name + ': ' + json.dumps(service) + '\n')
 
     def principal_cases(self):
-        return super().principal_cases() | {"supervisor": ("supervisor", [self.site_id], helpers["TENANT"])}
+        return super().principal_cases() | {"supervisor": ("supervisor", [self.site_id], helpers["TENANT"])} | {
+            name: ('operator', [self.site_id], helpers['TENANT']) for name in ('rate-user', 'rate-other', 'rate-warmup')}
 
     def request(self, method, path, *args, **kwargs):
         if self.public:
@@ -52,9 +73,9 @@ class Check(Base):
             self.captures.append({"method": method, "path": path, "status": status, "media": "application/problem+json" if status >= 400 else "application/json", "body": result})
         return result
 
-    def public_request(self, method, path, headers=None, body=None):
-        headers = {"Authorization": "Bearer " + self.token("admin")} | (headers or {})
-        connection = http.client.HTTPSConnection("localhost", int(self.port("api-gateway", 8443)), context=self.ca, timeout=30)
+    def public_request(self, method, path, headers=None, body=None, service='api-gateway', role='admin'):
+        headers = {"Authorization": "Bearer " + self.token(role)} | (headers or {})
+        connection = http.client.HTTPSConnection("localhost", int(self.port(service, 8443)), context=self.ca, timeout=30)
         connection.request(method, path, body=body, headers=headers)
         response = connection.getresponse()
         result = response.status, dict(response.getheaders()), response.read()
@@ -85,6 +106,85 @@ class Check(Base):
         assert status == 400
         self.wait(lambda: int(self.sql("SELECT count(*) FROM access.psim_outbox")) >= 3, 30)
         self.mark("CORS, bearer failures, role checks, request preconditions and durable denial audit")
+
+    def distributed_limits(self):
+        sys.path.insert(0, str(ROOT / 'tools/deploy'))
+        try:
+            import policies
+            password = (ROOT / '.cache/event-flow/redis.secret').read_text().strip()
+            acl = next(line.split()[2:] for line in policies.valkey(SimpleNamespace(topology='single'), lambda _: password).splitlines()
+                       if line.startswith('user api-gateway '))
+        finally:
+            sys.path.pop(0)
+        def valkey(*args):
+            command = ['exec', '-T', 'valkey', 'sh', '-c',
+                       'IFS= read -r VALKEYCLI_AUTH; export VALKEYCLI_AUTH; exec valkey-cli --no-auth-warning "$@"',
+                       'sh', *args]
+            return self.run(self.compose_cmd + command, input=password + '\n').strip()
+        def install_acl():
+            assert valkey('ACL', 'SETUSER', 'api-gateway', *acl) == 'OK'
+        names = ('api-rate-1', 'api-rate-2')
+        def ready(name):
+            try:
+                self.env_command("python3 -c 'import urllib.request; assert urllib.request.urlopen(\"http://" + name + ":9100/health/ready\", timeout=2).status == 200'")
+                return True
+            except RuntimeError:
+                return False
+        def burst():
+            def request(index):
+                return self.public_request('GET', '/v1/me', service=names[index % 2], role='rate-user')
+            with concurrent.futures.ThreadPoolExecutor(max_workers=16) as workers:
+                responses = list(workers.map(request, range(400)))
+            for status, headers, raw in responses:
+                assert status in (200, 429), (status, raw)
+                if status == 429:
+                    assert headers['Retry-After'] == '1' and json.loads(raw)['status'] == 429
+            return sum(status == 200 for status, _, _ in responses)
+        install_acl()
+        try:
+            self.compose('up', '-d', '--force-recreate', *names)
+            for name in names:
+                self.wait(lambda: ready(name), 90)
+                self.port(name, 8443)
+                self.wait(lambda: self.public_request('GET', '/v1/me', service=name, role='rate-warmup')[0] == 200, 30)
+            self.token('rate-user'); self.token('rate-other')
+            started = time.monotonic()
+            accepted = burst()
+            assert 200 <= accepted <= 200 + math.ceil(time.monotonic() - started), accepted
+            self.compose('restart', names[0])
+            self.wait(lambda: ready(names[0]), 90)
+            accepted += burst()
+            elapsed = time.monotonic() - started
+            assert elapsed < 120 and accepted <= 200 + math.ceil(elapsed), (accepted, elapsed)
+            assert self.public_request('GET', '/v1/me', service=names[0], role='rate-other')[0] == 200
+            self.report['sharedRateLimit'] = {'replicas': 2, 'shardsPerReplica': 2, 'burst': 200,
+                                              'ratePerSecond': 1, 'acceptedAcrossRestart': accepted,
+                                              'seconds': round(elapsed, 3), 'deploymentAcl': True}
+            try:
+                self.compose('stop', '-t', '10', 'valkey')
+                for name in names:
+                    status, _, body = self.public_request('GET', '/v1/me', service=name, role='rate-other')
+                    assert status == 503 and json.loads(body)['status'] == 503, (status, body)
+                assert self.public_request('GET', '/v1/me', {'Authorization': 'Bearer invalid'}, service=names[0], role='rate-other')[0] == 401
+            finally:
+                self.compose('up', '-d', 'valkey')
+                self.wait(lambda: valkey('PING') == 'PONG', 30)
+                install_acl()
+            for name in names:
+                self.wait(lambda: self.public_request('GET', '/v1/me', service=name, role='rate-other')[0] == 200, 30)
+                text = self.env_command("python3 -c 'import urllib.request; print(urllib.request.urlopen(\"http://" + name + ":9100/metrics\").read().decode())'")
+                import re
+                for counter in ('psim_api_rate_limited_total', 'psim_api_rate_limit_failures_total'):
+                    found = re.search(r'^' + counter + r' ([0-9.e+-]+)$', text, re.MULTILINE)
+                    assert found and float(found[1]) >= 1, counter
+            self.mark('shared token bucket across two replicas and four shards, restart persistence, deployment ACL, 429, fail-closed 503 and recovery')
+        finally:
+            self.compose('stop', '-t', '30', *names)
+            logs = self.compose('logs', '--no-color', *names)
+            (self.output / 'api-limit-servers.log').write_text(logs)
+            import re
+            assert not re.search(r'AddressSanitizer|LeakSanitizer|ThreadSanitizer|runtime error:', logs), 'shared limiter sanitizer finding'
+            self.compose('rm', '--force', *names)
 
     def settings(self):
         current = self.request("GET", "/v1/settings")
@@ -309,6 +409,7 @@ def main():
     try:
         check.prepare()
         check.security()
+        check.distributed_limits()
         check.basic()
         check.settings()
         check.streaming()

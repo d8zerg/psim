@@ -48,6 +48,23 @@ class RateLimiter {
   Keyspace keys_;
 };
 
+struct TokenDecision {
+  bool allowed = false;
+  std::chrono::milliseconds retry_after{};
+};
+
+/// Shared token bucket with server time, atomic refill and expiry at full capacity.
+class TokenBucket {
+ public:
+  TokenBucket(Pool* pool, Keyspace keys) : pool_(pool), keys_(std::move(keys)) {}
+
+  asio::awaitable<Result<TokenDecision>> consume(std::string id, std::int64_t rate, std::int64_t burst);
+
+ private:
+  Pool* pool_;
+  Keyspace keys_;
+};
+
 struct Session {
   /// A fresh unguessable generation token supplied by the gateway for each connection.
   std::string owner{};
