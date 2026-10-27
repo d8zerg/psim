@@ -70,7 +70,7 @@ def kafka(bundle, node, index, nodes):
     script = f'''#!/bin/sh
 set -eu
 if [ ! -f /var/lib/kafka/data/meta.properties ]; then
- /opt/kafka/bin/kafka-storage.sh format -t '{{{{cluster-id}}}}' -c '{config}'
+ /opt/kafka/bin/kafka-storage.sh format --cluster-id='{{{{cluster-id}}}}' -c '{config}'
 fi
 exec /opt/kafka/bin/kafka-server-start.sh '{config}'
 '''
@@ -92,8 +92,10 @@ def postgres(bundle, node, nodes):
               'password_encryption': 'scram-sha-256', 'max_connections': 400,
               'wal_level': 'replica', 'max_wal_senders': 10, 'max_replication_slots': 10,
               'wal_log_hints': 'on', 'hot_standby': 'on', 'synchronous_commit': 'on', 'unix_socket_directories': '/tmp',
-              'shared_buffers': '256MB', 'work_mem': '4MB'}
+              'shared_buffers': '256MB', 'work_mem': '4MB', 'archive_mode': 'on' if profile.wal_archive else 'off', 'archive_timeout': '60s',
+              'archive_command': '/usr/bin/psimctl --config ' + CONFIG + '/postgres/secrets/backup.json backup wal-push %f %p'}
     hba = ['local all all peer', 'hostssl replication replicator 0.0.0.0/0 scram-sha-256 clientcert=verify-full',
+           'hostssl replication postgres 0.0.0.0/0 scram-sha-256 clientcert=verify-full',
            'hostssl all all 0.0.0.0/0 scram-sha-256 clientcert=verify-full', 'hostnossl all all 0.0.0.0/0 reject']
     if cluster:
         etcd_ca, etcd_certificate, etcd_key = bundle.tls(node, 'postgres', purpose='etcd', authority='etcd')
@@ -231,10 +233,12 @@ def clickhouse(bundle, node, index, nodes):
 <openSSL><server><certificateFile>{certificate}</certificateFile><privateKeyFile>{key}</privateKeyFile><caConfig>{client_ca}</caConfig><verificationMode>strict</verificationMode><loadDefaultCAFile>false</loadDefaultCAFile><disableProtocols>sslv2,sslv3,tlsv1,tlsv1_1</disableProtocols></server>
 <client><certificateFile>{keeper_certificate}</certificateFile><privateKeyFile>{keeper_key}</privateKeyFile><caConfig>{client_ca}</caConfig><verificationMode>strict</verificationMode><loadDefaultCAFile>false</loadDefaultCAFile></client></openSSL>
 <users_config>{CONFIG}/clickhouse/secrets/users.xml</users_config>
+<storage_configuration><disks><backups><type>local</type><path>/backups/</path></backups></disks></storage_configuration>
+<backups><allowed_disk>backups</allowed_disk><allowed_path>/backups/</allowed_path></backups>
 </clickhouse>'''
     config = protected(bundle, node, 'clickhouse', 'server.xml', xml)
     protected(bundle, node, 'clickhouse', 'users.xml', '{{clickhouse-users}}')
-    bundle.service(node, 'clickhouse', bundle.images['clickhouse'], ['--config-file=' + config], volumes=[data(bundle, node, 'clickhouse') + ':/var/lib/clickhouse'])['entrypoint'] = ['/usr/bin/clickhouse-server']
+    bundle.service(node, 'clickhouse', bundle.images['clickhouse'], ['--config-file=' + config], volumes=[data(bundle, node, 'clickhouse') + ':/var/lib/clickhouse', data(bundle, node, 'clickhouse-backup') + ':/backups'])['entrypoint'] = ['/usr/bin/clickhouse-server']
 
 
 def seaweed(bundle, node, index, nodes):

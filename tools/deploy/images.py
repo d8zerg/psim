@@ -14,12 +14,15 @@ def build(version):
     images = json.loads((ROOT / 'deploy/topologies/images.json').read_text())
     output = ROOT / 'build/deployment'
     output.mkdir(parents=True, exist_ok=True)
-    for name, base in [('postgres', 'postgres'), ('web', 'node'), ('keycloak', 'keycloak'), ('haproxy', 'haproxy'), ('registry', 'registry-build'), ('monitoring', 'postgres')]:
+    for name, base in [('postgres', 'postgres'), ('web', 'node'), ('keycloak', 'keycloak'), ('haproxy', 'haproxy'), ('registry', 'registry-build'), ('monitoring', 'monitoring-build')]:
         with tempfile.TemporaryDirectory(prefix='image-' + name + '-', dir=output) as temporary:
             context = Path(temporary)
             shutil.copytree(ROOT / 'deploy/infrastructure' / name, context, dirs_exist_ok=True)
             if name == 'postgres':
                 shutil.copy2(ROOT / 'build/debian13/release/services/audit-service/psim-audit-tool', context / 'psim-audit-tool')
+                shutil.copy2(ROOT / 'build/debian13/release/tools/psimctl/psimctl', context / 'psimctl')
+            if name == 'monitoring':
+                shutil.copy2(ROOT / 'build/debian13/release/tools/monitoring-agent/psim-monitoring-agent', context / 'psim-monitoring-agent')
             if name == 'web':
                 source = ROOT / 'web/apps/console/dist'
                 if not (source / 'index.html').is_file():

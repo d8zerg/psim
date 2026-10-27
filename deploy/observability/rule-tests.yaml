@@ -29,6 +29,8 @@ tests:
       - {series: 'psim_filesystem_size_bytes{deployment="test",node="n1",volume="kafka"}', values: '100+0x20'}
       - {series: 'psim_certificate_expiry_seconds{deployment="test"}', values: '100000+0x20'}
       - {series: 'psim_backup_last_success_seconds{deployment="test",backup="plans"}', values: '0+0x20'}
+      - {series: 'psim_backup_last_attempt_success{deployment="test",backup="postgres"}', values: '0+0x20'}
+      - {series: 'psim_postgres_wal_archive_failures_total{deployment="test"}', values: '0+1x20'}
       - {series: 'psim_backup_status_valid{deployment="test"}', values: '0+0x20'}
       - {series: 'psim_backup_status_updated_seconds{deployment="test"}', values: '0+0x20'}
       - {series: 'psim_sites_without_duty{deployment="test",tenant="t1"}', values: '1+0x20'}
@@ -62,6 +64,8 @@ tests:
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDiskSpace"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDiskCritical"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimCertificateExpiry"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimBackupFailed"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
+      - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimWalArchiveFailed"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimBackupStale"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimBackupTelemetryStale"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
       - {expr: 'count(ALERTS{alertstate="firing",alertname="PsimDutyMissing"})', eval_time: 15m, exp_samples: [{labels: '{}', value: 1}]}
@@ -84,5 +88,7 @@ tests:
       - {series: 'psim_incident_signals_persisted_total{deployment="test"}', values: '1+0x20'}
       - {series: 'psim_sites_without_duty{deployment="test",tenant="t1"}', values: '1 1 1 0+0x20'}
       - {series: 'psim_connectors_offline{deployment="test",tenant="t1"}', values: '1 1 1 0+0x20'}
+      - {series: 'psim_backup_last_attempt_success{deployment="test",backup="postgres"}', values: '0 0 0 1+0x20'}
+      - {series: 'psim_postgres_wal_archive_failures_total{deployment="test"}', values: '0 1 1+0x20'}
     promql_expr_test:
-      - {expr: 'ALERTS{alertstate="firing",alertname=~"PsimServiceUnavailable|PsimClickHouseIngest|PsimSignalInterrupted|PsimDutyMissing|PsimConnectorOffline"}', eval_time: 15m, exp_samples: []}
+      - {expr: 'ALERTS{alertstate="firing",alertname=~"PsimServiceUnavailable|PsimClickHouseIngest|PsimSignalInterrupted|PsimDutyMissing|PsimConnectorOffline|PsimBackupFailed|PsimWalArchiveFailed"}', eval_time: 15m, exp_samples: []}

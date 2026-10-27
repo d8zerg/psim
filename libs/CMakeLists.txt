@@ -1,5 +1,6 @@
 add_subdirectory(platform/core)
 add_subdirectory(platform/errors)
+add_subdirectory(platform/files)
 add_subdirectory(platform/log)
 add_subdirectory(platform/async)
 add_subdirectory(platform/security)

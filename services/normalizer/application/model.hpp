@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -39,6 +40,7 @@ class Model {
   p::Result<void> config(const config::v1::ConfigRecord& record);
   p::Result<std::optional<Prepared>> prepare(const ingest::v1::RawEventRecord& raw) const;
   p::Result<void> restore(const processing::v1::NormalizerStateRecord& record, std::int32_t partition);
+  p::Result<void> forget(std::string_view cursor, std::int32_t partition);
   void stage(Prepared prepared, std::int32_t partition);
   [[nodiscard]] std::vector<std::pair<std::int32_t, processing::v1::NormalizerStateRecord>> pending_records() const;
   void commit();

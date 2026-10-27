@@ -1,0 +1,6 @@
+add_library(psim_platform_files STATIC src/files.cpp)
+add_library(psim::platform_files ALIAS psim_platform_files)
+target_include_directories(psim_platform_files PUBLIC include)
+target_link_libraries(psim_platform_files PUBLIC psim::platform_errors)
+psim_target_defaults(psim_platform_files)
+psim_add_test(psim_platform_files_test SOURCES tests/files_test.cpp LIBS psim::platform_files)

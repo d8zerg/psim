@@ -61,6 +61,8 @@ if (!saved) {
 auto cached = co_await cache.get(resource_id);
 ```
 
+Для отдельного соединения мониторинга `require_primary=false` разрешает чтение реплик и Sentinel без проверки доступности записи. Пулы рабочих клиентов сохраняют проверку primary.
+
 Для Sentinel заполняются `options.sentinel.endpoints`, `primary_name`, credentials и TLS. Статический endpoint используется только без Sentinel. Конфигурация и получение секретов остаются у сервисного адаптера.
 
 ## Проверка

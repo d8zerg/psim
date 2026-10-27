@@ -1,0 +1,9 @@
+[Unit]
+Description=Open-Source PSIM Platform backup status heartbeat
+ConditionPathExists=/etc/psim-platform/psimctl.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/psimctl --config /etc/psim-platform/psimctl.json backup status
+UMask=0077
+NoNewPrivileges=true

@@ -2,6 +2,8 @@
 
 Статус: Принято. Решение о хранении - [ADR-080](../adr/0080-observability-package.md).
 
+Узловой агент - отдельная программа `psim-monitoring-agent` в `tools/monitoring-agent`, пакет `psim-monitoring-agent` и образ `psim-platform/monitoring`. Он запускается с `--config /etc/psim-platform/monitoring/agent.json`, использует UID мониторинга и собственный жизненный цикл. `psimctl diagnose` остаётся разовой административной диагностикой. Общий файловый ввод-вывод находится в `psim::platform_files`; протокольные клиенты также берутся из платформенных библиотек.
+
 ## Состав и доступ
 
 Пакет находится в `deploy/observability/` и входит в конфигурацию узлов при `task deploy:render`. Нужны образы инфраструктуры из `deploy/topologies/images.json` и образ `psim-platform/monitoring:<version>`, собираемый `task deploy:images`. Дашборды, конфигурации и инструкции поставляются готовыми файлами; отдельная генерация не требуется.

@@ -56,6 +56,10 @@ std::string_view Message::value() const noexcept {
   return bytes(message_->payload, message_->len);
 }
 
+bool Message::tombstone() const noexcept {
+  return message_->payload == nullptr;
+}
+
 std::optional<std::chrono::system_clock::time_point> Message::timestamp() const noexcept {
   rd_kafka_timestamp_type_t type = RD_KAFKA_TIMESTAMP_NOT_AVAILABLE;
   const std::int64_t ms = rd_kafka_message_timestamp(message_, &type);

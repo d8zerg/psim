@@ -168,6 +168,9 @@ class Worker final : public p::stream::Worker {
           executor(), kafka_options("normalizer-restore"),
           {.blocking = &context().blocking(), .logger = &context().logger()}, {"psim.normalizer.state.v1"},
           [this](const p::kafka::Message& message) -> p::Result<void> {
+            if (message.tombstone()) {
+              return model_->forget(message.key(), message.partition());
+            }
             auto state = decode<processing::v1::NormalizerStateRecord>(message);
             if (!state) {
               return std::unexpected(state.error());

@@ -8,9 +8,11 @@
 #include <cstdlib>
 #include <exception>
 #include <expected>
+#include <filesystem>
 #include <fstream>
 #include <print>
 #include <span>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -19,6 +21,8 @@
 #include "psim/platform/error.hpp"
 #include "psim/platform/pg/connection.hpp"
 #include "psim/platform/pg/migrations.hpp"
+#include "psim/platform/security/secret.hpp"
+#include "release.hpp"
 
 namespace {
 namespace pg = psim::platform::pg;
@@ -30,6 +34,45 @@ std::string setting(const char* name, std::string fallback = {}) {
 }
 
 int run(std::span<char*> arguments) {
+  if (arguments.size() >= 4 && std::string_view(arguments[1]) == "release") {
+    std::filesystem::path directory;
+    std::string phase = "expand";
+    std::int64_t epoch = 0;
+    for (std::size_t index = 2; index + 1 < arguments.size(); index += 2) {
+      const std::string_view option(arguments[index]);
+      if (option == "--release") {
+        directory = arguments[index + 1];
+      } else if (option == "--phase") {
+        phase = arguments[index + 1];
+      } else if (option == "--minimum-epoch") {
+        epoch = std::stoll(arguments[index + 1]);
+      } else {
+        throw std::invalid_argument("unknown release migration option");
+      }
+    }
+    if (directory.empty() || arguments.size() % 2 != 0) {
+      throw std::invalid_argument("invalid release migration arguments");
+    }
+    const auto password_file = setting("PSIM_PG_PASSWORD_FILE");
+    auto password = setting("PSIM_PG_PASSWORD");
+    if (!password_file.empty()) {
+      auto value = psim::platform::security::read_secret(password_file);
+      if (!value) {
+        throw std::invalid_argument("invalid PostgreSQL password file");
+      }
+      password = value->view();
+    }
+    return migrate_release({.host = setting("PSIM_PG_HOST", "postgres"),
+                            .port = setting("PSIM_PG_PORT", "15432"),
+                            .database = setting("PSIM_PG_DATABASE", "psim"),
+                            .user = setting("PSIM_PG_USER", "postgres"),
+                            .password = std::move(password),
+                            .properties = {{"sslmode", setting("PSIM_PG_SSLMODE", "verify-full")},
+                                           {"sslrootcert", setting("PSIM_PG_SSLROOTCERT")},
+                                           {"sslcert", setting("PSIM_PG_SSLCERT")},
+                                           {"sslkey", setting("PSIM_PG_SSLKEY")}}},
+                           std::move(directory), std::move(phase), epoch);
+  }
   if (arguments.size() != 3
       || (std::string_view(arguments[1]) != "expand" && std::string_view(arguments[1]) != "contract")) {
     std::println(stderr, "usage: psim-pg-migrate expand|contract manifest.json (connection: PSIM_PG_* environment)");

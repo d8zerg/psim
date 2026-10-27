@@ -1,6 +1,7 @@
-// psimctl - PSIM administration CLI: version and a contract sample.
+// psimctl - PSIM administration CLI and operational command dispatcher.
 
 #include <google/protobuf/util/json_util.h>
+#include <unistd.h>
 
 #include <cstdio>
 #include <exception>
@@ -8,7 +9,10 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
+#include "operations.hpp"
 #include "psim/common/v1/envelope.pb.h"
 #include "psim/platform/build_info.hpp"
 
@@ -40,8 +44,25 @@ int print_envelope_sample() {
 }
 
 int usage() {
-  std::println(stderr, "usage: psimctl version | psimctl contracts envelope-sample");
+  std::println(stderr,
+               "usage: psimctl version | contracts envelope-sample | gateway | migrate postgres|clickhouse | "
+               "audit | projection console|facts | [--config FILE] diagnose|backup|plans|dlq|history|normalizer|"
+               "certificates|replay|support");
   return 2;
+}
+
+int execute(std::string binary, std::vector<std::string> values) {
+  std::vector<char*> arguments;
+  arguments.reserve(values.size() + 2);
+  arguments.push_back(binary.data());
+  for (auto& value : values) {
+    arguments.push_back(value.data());
+  }
+  arguments.push_back(nullptr);
+  // Replace the launcher, preserving signals, exit status and file descriptors without a shell.
+  (void)::execv(binary.c_str(), arguments.data());
+  std::println(stderr, "psimctl: operational runtime or tool is unavailable");
+  return 1;
 }
 
 int run(std::span<char*> args) {
@@ -51,7 +72,44 @@ int run(std::span<char*> args) {
   if (args.size() == 3 && std::string_view{args[1]} == "contracts" && std::string_view{args[2]} == "envelope-sample") {
     return print_envelope_sample();
   }
-  return usage();
+  if (args.size() < 2) {
+    return usage();
+  }
+  const std::string_view command(args[1]);
+  std::string tool;
+  std::size_t skip = 2;
+  if (command == "gateway") {
+    tool = "psim-gateway-admin";
+  } else if (command == "audit") {
+    tool = "psim-audit-tool";
+  } else if (command == "migrate" && args.size() >= 3) {
+    const std::string_view target(args[2]);
+    if (target != "postgres" && target != "clickhouse") {
+      return usage();
+    }
+    tool = target == "postgres" ? "psim-pg-migrate" : "psim-ch-migrate";
+    skip = 3;
+  } else if (command == "projection" && args.size() >= 3) {
+    const std::string_view target(args[2]);
+    if (target != "console" && target != "facts") {
+      return usage();
+    }
+    tool = target == "console" ? "psim-console-tool" : "psim-report-tool";
+    skip = 3;
+  }
+  std::vector<std::string> values;
+  if (!tool.empty()) {
+    for (const auto* argument : args.subspan(skip)) {
+      values.emplace_back(argument);
+    }
+    return execute("/usr/bin/" + tool, std::move(values));
+  }
+  if (command != "--config" && command != "--help" && command != "diagnose" && command != "backup" && command != "plans"
+      && command != "dlq" && command != "history" && command != "normalizer" && command != "certificates"
+      && command != "replay" && command != "support") {
+    return usage();
+  }
+  return psim::ctl::operations(args.subspan(1));
 }
 
 }  // namespace

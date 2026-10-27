@@ -54,6 +54,8 @@ struct ConnectionOptions {
   Duration connect_timeout = std::chrono::seconds{5};
   Duration command_timeout = std::chrono::seconds{5};
   std::size_t max_response_bytes = std::size_t{4} * 1024 * 1024;
+  /// Monitoring may inspect a replica or Sentinel without requiring a writable primary.
+  bool require_primary = true;
 };
 
 /// A bounded RESP3 value. Error text contains only a recognized protocol error category.

@@ -58,6 +58,7 @@ class Profile:
     shards: int
     public_port: int
     security_tenant: str
+    wal_archive: bool
 
     @classmethod
     def load(cls, path):
@@ -66,7 +67,7 @@ class Profile:
     @classmethod
     def parse(cls, value):
         require(isinstance(value, dict), 'inventory must be an object')
-        require(set(value) <= {'format', 'name', 'topology', 'nodes', 'public_name', 'public_port', 'security_tenant', 'virtual_ip', 'interface', 'version', 'prefix', 'uid_base', 'shards'}, 'unknown inventory field')
+        require(set(value) <= {'format', 'name', 'topology', 'nodes', 'public_name', 'public_port', 'security_tenant', 'virtual_ip', 'interface', 'version', 'prefix', 'uid_base', 'shards', 'wal_archive'}, 'unknown inventory field')
         require(value.get('format') == 1, 'unsupported inventory format')
         topology = value.get('topology')
         require(topology in ('single', 'cluster'), 'topology must be single or cluster')
@@ -101,7 +102,9 @@ class Profile:
         require(type(port) is int and 1 <= port <= 65535, 'invalid public port')
         tenant = value.get('security_tenant')
         require(isinstance(tenant, str) and str(uuid.UUID(tenant)) == tenant, 'invalid security tenant')
-        profile = cls(identifier(value.get('name')), topology, tuple(nodes), public, virtual, interface, version, prefix.rstrip('/'), uid, shards, port, tenant)
+        wal_archive = value.get('wal_archive', False)
+        require(type(wal_archive) is bool, 'WAL archive switch must be boolean')
+        profile = cls(identifier(value.get('name')), topology, tuple(nodes), public, virtual, interface, version, prefix.rstrip('/'), uid, shards, port, tenant, wal_archive)
         if topology == 'single':
             require(len(nodes) == 1 and nodes[0].roles == ROLES, 'single topology requires one node with all roles')
             require(virtual is None, 'single topology does not use a virtual address')
@@ -130,7 +133,7 @@ class Profile:
         return {'format': 1, 'name': self.name, 'topology': self.topology, 'version': self.version,
                 'public_name': self.public_name, 'public_port': self.public_port, 'security_tenant': self.security_tenant,
                 'virtual_ip': self.virtual_ip, 'interface': self.interface, 'prefix': self.prefix,
-                'uid_base': self.uid_base, 'shards': self.shards,
+                'uid_base': self.uid_base, 'shards': self.shards, 'wal_archive': self.wal_archive,
                 'nodes': [{'name': n.name, 'address': n.address, 'failure_domain': n.domain, 'roles': sorted(n.roles)} for n in self.nodes]}
 
     def uid(self, service):

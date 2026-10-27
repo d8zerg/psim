@@ -1,10 +1,8 @@
-# psimctl container image (ADR-034, SR-24): Debian 13 distroless base with the C++ runtime (no shell),
-# non-root user, the binary from the release preset. Built by `task release:images` from a staging
-# directory that holds this file and the binary; the base digest is pinned in the root Taskfile.
-ARG BASE=gcr.io/distroless/cc-debian13:nonroot
-FROM ${BASE}
+# Administrative client tools include PostgreSQL physical-backup utilities.
+ARG OPERATIONS_BASE
+FROM ${OPERATIONS_BASE}
 COPY psimctl /usr/bin/psimctl
-COPY psim-ch-migrate psim-pg-migrate /usr/bin/
+COPY psim-ch-migrate psim-pg-migrate psim-gateway-admin psim-audit-tool psim-console-tool psim-report-tool psim-response-replay /usr/bin/
 USER 65532:65532
 ENTRYPOINT ["/usr/bin/psimctl"]
 CMD ["version"]

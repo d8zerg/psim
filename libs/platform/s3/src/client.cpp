@@ -12,6 +12,7 @@
 #include <aws/s3/model/GetObjectRequest.h>
 #include <aws/s3/model/HeadObjectRequest.h>
 #include <aws/s3/model/HeadObjectResult.h>
+#include <aws/s3/model/ListObjectsV2Request.h>
 #include <aws/s3/model/PutObjectRequest.h>
 #include <boost/asio/cancellation_state.hpp>
 #include <boost/asio/this_coro.hpp>
@@ -294,13 +295,48 @@ asio::awaitable<Result<Object>> Client::head(std::string key) {
       });
 }
 
-asio::awaitable<Result<Object>> Client::put(std::string key, std::string source_file) {
+asio::awaitable<Result<ListPage>> Client::list(std::string continuation, std::size_t max_keys) {
+  if (continuation.size() > 4096 || max_keys == 0 || max_keys > 1000) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "invalid S3 continuation token");
+  }
+  co_return co_await state_->run<ListPage>(
+      [token = std::move(continuation), max_keys](Aws::S3::S3Client& client, const Options& config,
+                                                  const auto& control) -> Result<ListPage> {
+        Aws::S3::Model::ListObjectsV2Request request;
+        request.SetBucket(config.bucket);
+        request.SetMaxKeys(static_cast<int>(max_keys));
+        if (!token.empty()) {
+          request.SetContinuationToken(token);
+        }
+        request.SetContinueRequestHandler([control](const Aws::Http::HttpRequest*) { return !control->stopped(); });
+        const auto outcome = client.ListObjectsV2(request);
+        if (!outcome.IsSuccess()) {
+          return std::unexpected(error(outcome.GetError(), *control));
+        }
+        ListPage page;
+        for (const auto& object : outcome.GetResult().GetContents()) {
+          if (!detail::valid_key(object.GetKey())) {
+            return fail(ErrorCode::kCommonInvalidArgument, "bucket contains an invalid object key");
+          }
+          page.keys.push_back(object.GetKey());
+        }
+        if (outcome.GetResult().GetIsTruncated()) {
+          page.continuation = outcome.GetResult().GetNextContinuationToken();
+          if (page.continuation.empty() || page.continuation == token) {
+            return fail(ErrorCode::kCommonInvalidArgument, "S3 enumeration made no progress");
+          }
+        }
+        return page;
+      });
+}
+
+asio::awaitable<Result<Object>> Client::put(std::string key, std::string source_file, WriteMode mode) {
   auto state = state_;
   if (!detail::valid_key(key) || source_file.empty() || source_file.find('\0') != std::string::npos) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "invalid S3 key or source path");
   }
   co_return co_await state->run<Object>(
-      [key = std::move(key), path = std::move(source_file), metrics = state->metrics](
+      [key = std::move(key), path = std::move(source_file), mode, metrics = state->metrics](
           Aws::S3::S3Client& client, const Options& config, const auto& control) -> Result<Object> {
         auto source = detail::snapshot(path, config.max_object_bytes, control);
         if (!source) {
@@ -325,6 +361,9 @@ asio::awaitable<Result<Object>> Client::put(std::string key, std::string source_
             return Object{key, source->size, source->sha256, outcome.GetResult().GetETag()};
           }
           const auto failure = error(outcome.GetError(), *control);
+          if (mode == WriteMode::kWriteOnly) {
+            return std::unexpected(failure);
+          }
           if (failure.code() != ErrorCode::kCommonUnavailable
               && failure.code() != ErrorCode::kCommonConcurrentModification) {
             return std::unexpected(failure);

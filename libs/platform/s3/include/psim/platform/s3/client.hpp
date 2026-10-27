@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <vector>
 
 #include "psim/platform/async/blocking_pool.hpp"
 #include "psim/platform/error.hpp"
@@ -53,6 +54,13 @@ struct Object {
   std::string etag{};
 };
 
+struct ListPage {
+  std::vector<std::string> keys;
+  std::string continuation;
+};
+
+enum class WriteMode : std::uint8_t { kReconcile, kWriteOnly };
+
 /// Immutable keys with conditional creation. Native SDK/file operations run in BlockingPool.
 /// Admission is bounded on one executor/shard. No redirects, ambient credentials or SDK retries.
 class Client {
@@ -68,7 +76,9 @@ class Client {
   /// Snapshot a regular input file with bounded RAM and disk, hash and conditionally PUT it.
   /// An existing key is accepted only for the same size/SHA-256. An unknown write outcome is
   /// reconciled with HEAD; only a confirmed absence permits another conditional PUT.
-  asio::awaitable<Result<Object>> put(std::string key, std::string source_file);
+  asio::awaitable<Result<Object>> put(std::string key, std::string source_file, WriteMode mode = WriteMode::kReconcile);
+  /// Bounded bucket enumeration. Only explicit read identities need ListBucket permission.
+  asio::awaitable<Result<ListPage>> list(std::string continuation = {}, std::size_t max_keys = 1000);
   asio::awaitable<Result<Object>> head(std::string key);
   /// Verify the independently supplied digest/length, GET with If-Match, hash streamed bytes,
   /// then atomically create destination_file. Existing destinations are never overwritten.

@@ -194,7 +194,7 @@ asio::awaitable<p::Result<void>> Repository::cleanup_files(
       [&remove](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
         auto rows = co_await tx->connection().query(
             {.sql = "SELECT tenant::text,id::text,key FROM catalog.files WHERE NOT linked AND "
-                    "expires<=clock_timestamp() ORDER BY expires FOR UPDATE SKIP LOCKED LIMIT 16"});
+                    "expires<=clock_timestamp()-interval '8 days' ORDER BY expires FOR UPDATE SKIP LOCKED LIMIT 16"});
         if (!rows) {
           co_return std::unexpected(rows.error());
         }

@@ -442,6 +442,36 @@
             "runbook_url": "/operations/runbooks/PsimDependencyLatency",
             "dashboard_url": "/monitoring/d/psim-infrastructure"
           }
+        },
+        {
+          "alert": "PsimBackupFailed",
+          "expr": "psim_backup_last_attempt_success == 0",
+          "for": "5m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Последняя попытка резервного копирования завершилась ошибкой",
+            "description": "Выполнить psimctl diagnose и проверить независимое хранилище. Повторить psimctl backup create; не изменять время последней успешной копии вручную.",
+            "runbook_url": "/operations/runbooks/PsimBackupFailed",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
+        },
+        {
+          "alert": "PsimWalArchiveFailed",
+          "expr": "increase(psim_postgres_wal_archive_failures_total[10m]) > 0",
+          "for": "5m",
+          "labels": {
+            "severity": "critical",
+            "subsystem": "operations"
+          },
+          "annotations": {
+            "summary": "Ошибки архивирования WAL PostgreSQL",
+            "description": "Проверить psimctl backup wal-push, конфигурацию PostgreSQL и отдельную учётную запись записи копий. Не удалять WAL вручную.",
+            "runbook_url": "/operations/runbooks/PsimWalArchiveFailed",
+            "dashboard_url": "/monitoring/d/psim-operations"
+          }
         }
       ]
     }

@@ -60,7 +60,7 @@ def password_hash(value):
 
 def valkey(profile, secret):
     users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/valkey.secret')) + ' ~* &* +@all',
-             'user monitoring on ' + password_hash(secret('monitoring/valkey.secret')) + ' +ping +info']
+             'user monitoring on ' + password_hash(secret('monitoring/valkey.secret')) + ' +ping +info +hello +client|setname']
     for name, commands, pattern in [
         ('connector-gateway', '+get +set +del +pexpire +pttl +incrby +eval', '~psim:17:connector-gateway*'),
         ('projection-service', '+get +set +del', '~psim:18:projection-service*'),
@@ -77,7 +77,7 @@ def valkey(profile, secret):
 def sentinel(profile, secret):
     users = ['user default off', 'user deployment-admin on ' + password_hash(secret('deployment-admin/sentinel.secret')) + ' ~* &* +@all',
              'user sentinel-peer on ' + password_hash(secret('sentinel/peer.secret')) + ' +ping +client|setname +sentinel|is-master-down-by-addr']
-    users.append('user monitoring on ' + password_hash(secret('monitoring/sentinel.secret')) + ' +ping +sentinel|masters')
+    users.append('user monitoring on ' + password_hash(secret('monitoring/sentinel.secret')) + ' +ping +sentinel|masters +hello +client|setname')
     for name in ('connector-gateway', 'command-service', 'projection-service', 'api-gateway'):
         users.append(f'user {name} on {password_hash(secret(name + "/sentinel.secret"))} +ping +client|setname +sentinel|get-master-addr-by-name')
     return '\n'.join(users) + '\n'

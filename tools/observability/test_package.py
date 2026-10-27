@@ -1,19 +1,13 @@
 """Validate static operational assets and diagnostics failure semantics."""
-import importlib.util
-import io
 import json
 from pathlib import Path
 import re
 import sys
-import tempfile
-import time
 import unittest
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
 PACKAGE = ROOT / 'deploy/observability'
-spec = importlib.util.spec_from_file_location('agent', ROOT / 'deploy/infrastructure/monitoring/agent.py')
-agent = importlib.util.module_from_spec(spec); spec.loader.exec_module(agent)
 
 
 class Package(unittest.TestCase):
@@ -92,33 +86,6 @@ class Package(unittest.TestCase):
         output = ROOT / 'build/observability'; output.mkdir(parents=True, exist_ok=True)
         (output / 'dashboard-expressions.json').write_text(json.dumps({'groups': [{'name': 'dashboard-syntax', 'rules': expressions}]}))
 
-    def test_backups_never_invent_success(self):
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory) / 'state.json'
-            missing = agent.backup_metrics(path, ['plans'])
-            self.assertIn('psim_backup_status_valid 0.0', missing)
-            self.assertIn('psim_backup_last_success_seconds{backup="plans"} 0.0', missing)
-            now = time.time()
-            valid = {'updated_at_seconds': now, 'backups': {'plans': {'last_success_seconds': now - 100, 'size_bytes': 1024}}}
-            path.write_text(json.dumps(valid))
-            self.assertIn('psim_backup_status_valid 1.0', agent.backup_metrics(path, ['plans']))
-            for value in [-1, now + 10000, float('nan')]:
-                valid['backups']['plans']['last_success_seconds'] = value; path.write_text(json.dumps(valid))
-                result = agent.backup_metrics(path, ['plans'])
-                self.assertIn('psim_backup_status_valid 0.0', result)
-                self.assertIn('psim_backup_last_success_seconds{backup="plans"} 0.0', result)
-
-    def test_resp_and_metric_input_are_bounded(self):
-        self.assertEqual(agent.resp(io.BytesIO(b'*2\r\n$3\r\nfoo\r\n:7\r\n')), ['foo', 7])
-        for value in [b'$100000000\r\n', b'*100000000\r\n', b'-password hidden\r\n', b'$3\r\nx']:
-            with self.assertRaises(ValueError): agent.resp(io.BytesIO(value))
-        with self.assertRaises(ValueError): agent.sample('value', float('inf'))
-        self.assertIn('name="line\\nquote\\\""', agent.sample('value', 1, name='line\nquote"'))
-
-    def test_failed_probe_retains_target_and_never_reports_healthy(self):
-        result = agent.probe({'component': 'postgres', 'kind': 'tcp', 'host': '127.0.0.1', 'port': 1, 'tls': None}, {})
-        self.assertIn('psim_probe_success{component="postgres",target="127.0.0.1:1"} 0.0', result)
-        self.assertNotIn('secret', result)
 
 
 if __name__ == '__main__': unittest.main()

@@ -6,11 +6,14 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
 #include <cstddef>
 #include <cstdint>
 #include <expected>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -369,6 +372,36 @@ p::Result<void> Model::restore(const processing::v1::NormalizerStateRecord& reco
   const auto source = key(record.envelope().tenant_id(), record.source_state().source_id());
   if (newer(record.source_state().last_confirmed_at(), confirmed_[source])) {
     confirmed_[source] = record.source_state().last_confirmed_at();
+  }
+  return {};
+}
+
+p::Result<void> Model::forget(std::string_view cursor, std::int32_t partition) {
+  const auto slash = cursor.find('/');
+  const auto colon = cursor.find(':');
+  std::uint64_t epoch = 0;
+  if (slash != 36 || colon != 73 || !p::stream::uuid(cursor.substr(0, slash))
+      || !p::stream::uuid(cursor.substr(slash + 1, 36))) {
+    return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "invalid source cursor tombstone");
+  }
+  const auto suffix = cursor.substr(colon + 1);
+  const auto parsed = std::from_chars(suffix.data(), suffix.data() + suffix.size(), epoch);
+  if (parsed.ec != std::errc{} || parsed.ptr != suffix.data() + suffix.size()) {
+    return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "invalid source cursor epoch");
+  }
+  const auto found = committed_.find(std::string(cursor));
+  if (found != committed_.end()) {
+    if (found->second.partition != partition) {
+      return p::fail(p::ErrorCode::kProcessingPayloadInvalid, "source cursor tombstone partition differs");
+    }
+    committed_.erase(found);
+  }
+  confirmed_.erase(std::string(cursor.substr(0, colon)));
+  for (const auto& [id, value] : committed_) {
+    const auto source = key(value.record.envelope().tenant_id(), value.record.source_state().source_id());
+    if (newer(value.record.source_state().last_confirmed_at(), confirmed_[source])) {
+      confirmed_[source] = value.record.source_state().last_confirmed_at();
+    }
   }
   return {};
 }

@@ -83,6 +83,7 @@ struct Record {
   Headers headers{};
   /// Explicit partition; by default the partitioner hashes the key (murmur2, as the Java client).
   std::optional<std::int32_t> partition{};
+  bool tombstone = false;
 };
 
 /// A consumed message. Owns the librdkafka message; views stay valid while the Message lives.
@@ -103,6 +104,7 @@ class Message {
   [[nodiscard]] std::int64_t offset() const noexcept;
   [[nodiscard]] std::string_view key() const noexcept;
   [[nodiscard]] std::string_view value() const noexcept;
+  [[nodiscard]] bool tombstone() const noexcept;
   /// Producer (CreateTime) or broker (LogAppendTime) timestamp, when the message has one.
   [[nodiscard]] std::optional<std::chrono::system_clock::time_point> timestamp() const noexcept;
   /// Value of the last header with this name.

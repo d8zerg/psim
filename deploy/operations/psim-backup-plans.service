@@ -1,0 +1,13 @@
+[Unit]
+Description=Open-Source PSIM Platform independent floor plan copy
+After=network-online.target
+ConditionPathExists=/etc/psim-platform/psimctl.json
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/psimctl --config /etc/psim-platform/psimctl.json backup create --component plans
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+TimeoutStartSec=1h

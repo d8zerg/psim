@@ -16,5 +16,6 @@
   "tempo": "grafana/tempo:3.1.0@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd",
   "node": "node:24.21.0-trixie@sha256:1278a37eb510ec1606fba0e80f554bcc941ae0b44f35ae373c4822ae7717c64d",
   "haproxy": "haproxy:3.2.10-trixie@sha256:4a72e32dfd568951c0febdfa32a12c2d9de10491c34f2cf280f46d9db2635a42",
-  "etcd": "quay.io/coreos/etcd:v3.6.9@sha256:5e79c3d2ff695afa464bc2e81deb4447855982510f425ddf35faaeac7f4b8d17"
+  "etcd": "quay.io/coreos/etcd:v3.6.9@sha256:5e79c3d2ff695afa464bc2e81deb4447855982510f425ddf35faaeac7f4b8d17",
+  "monitoring-build": "gcr.io/distroless/cc-debian13:nonroot@sha256:e792ab3d241a468a4fd7519ddbbebe66b49b5f365771716ea688ad40b6c6f1c2"
 }

@@ -279,6 +279,8 @@ tasks:
         if: '[ "{{.RELEASE}}" = true ]'
       - task: deploy:observability:test
         if: '[ "{{.RELEASE}}" = true ]'
+      - task: deploy:operations:test
+        if: '[ "{{.RELEASE}}" = true ]'
 
   ci:nightly:
     desc: Nightly pipeline - ci over the full scope plus reproducibility and image scanning

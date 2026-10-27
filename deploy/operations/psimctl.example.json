@@ -1,0 +1,96 @@
+{
+  "format": 1,
+  "deployment": "psim-platform",
+  "actor": "operations-administrator",
+  "state_directory": "/var/lib/psim-platform/operations",
+  "postgres": {
+    "host": "postgres",
+    "port": "15432",
+    "database": "psim",
+    "user": "postgres",
+    "password_file": "/etc/psim-platform/operations/postgres.secret",
+    "data_uid": 60013,
+    "ca_file": "/etc/psim-platform/operations/ca.pem",
+    "certificate_file": "/etc/psim-platform/operations/identity.pem",
+    "key_file": "/etc/psim-platform/operations/identity.key"
+  },
+  "plans": {
+    "endpoint": "https://s3:18446",
+    "bucket": "psim-plans",
+    "access_key_file": "/etc/psim-platform/operations/plans.access",
+    "secret_key_file": "/etc/psim-platform/operations/plans.secret",
+    "ca_file": "/etc/psim-platform/operations/plans-ca.pem"
+  },
+  "clickhouse": {
+    "host": "clickhouse",
+    "port": 19440,
+    "user": "deployment-admin",
+    "password_file": "/etc/psim-platform/operations/clickhouse.secret",
+    "backup_directory": "/backups",
+    "data_uid": 60019,
+    "ca_file": "/etc/psim-platform/operations/ca.pem",
+    "certificate_file": "/etc/psim-platform/operations/identity.pem",
+    "key_file": "/etc/psim-platform/operations/identity.key"
+  },
+  "kafka": {
+    "brokers": "psim-1:9092",
+    "dlq_sources": {
+      "psim.dlq.normalizer.v1": [
+        "psim.ingest.raw.v1"
+      ],
+      "psim.dlq.projection.v1": [
+        "psim.incidents.events.v1",
+        "psim.response.events.v1"
+      ]
+    },
+    "ca_file": "/etc/psim-platform/operations/ca.pem",
+    "certificate_file": "/etc/psim-platform/operations/identity.pem",
+    "key_file": "/etc/psim-platform/operations/identity.key"
+  },
+  "api": {
+    "endpoint": "https://psim.example.test",
+    "token_file": "/etc/psim-platform/operations/operator.token",
+    "ca_file": "/etc/psim-platform/operations/ca.pem"
+  },
+  "identity": {
+    "endpoint": "https://keycloak:18444/identity",
+    "token_file": "/etc/psim-platform/operations/identity-admin.token",
+    "ca_file": "/etc/psim-platform/operations/ca.pem",
+    "certificate_file": "/etc/psim-platform/operations/identity.pem",
+    "key_file": "/etc/psim-platform/operations/identity.key"
+  },
+  "gateway": {
+    "endpoint": "connector-gateway:27443",
+    "tls_directory": "/etc/psim-platform/operations/gateway"
+  },
+  "health": {
+    "gateway": {
+      "endpoint": "https://psim.example.test/v1/me",
+      "ca_file": "/etc/psim-platform/operations/ca.pem"
+    }
+  },
+  "backup": {
+    "storage": {
+      "endpoint": "https://backup.example.invalid",
+      "bucket": "psim-backups",
+      "access_key_file": "/etc/psim-platform/operations/backup-writer.access",
+      "secret_key_file": "/etc/psim-platform/operations/backup-writer.secret",
+      "ca_file": "/etc/psim-platform/operations/backup-writer-ca.pem"
+    },
+    "read_storage": {
+      "endpoint": "https://backup.example.invalid",
+      "bucket": "psim-backups",
+      "access_key_file": "/etc/psim-platform/operations/backup-reader.access",
+      "secret_key_file": "/etc/psim-platform/operations/backup-reader.secret",
+      "ca_file": "/etc/psim-platform/operations/backup-reader-ca.pem"
+    },
+    "recipient_certificate_file": "/etc/psim-platform/operations/backup-recipient.pem",
+    "recipient_private_key_file": "/etc/psim-platform/operations/backup-recipient.key",
+    "protected_directory": "/var/lib/psim-platform/protected-export",
+    "status_file": "/var/lib/psim-platform/monitoring/backups.json",
+    "wal_namespace": "replace-with-installation-identifier",
+    "pitr_window_seconds": 604800,
+    "copy_interval_seconds": 3600,
+    "orphan_grace_seconds": 691200
+  }
+}

@@ -87,42 +87,39 @@ class Coordinator:
         files = ['release.json', *[entry['file'] for entry in manifest.get('migrations', [])]]
         for name in files:
             local.vm.copy_to(local.VM_NAME, node.name, release / name, destination + '/' + name)
-        local.vm.copy_to(local.VM_NAME, node.name, Path(__file__).with_name('release_migrations.py'), self.stage_root + '/release_migrations.py')
         command = ['sudo', 'docker', 'run', '--rm', '--read-only', '--network', 'host', '--cap-drop', 'ALL',
             '--security-opt', 'no-new-privileges:true', '--user', str(self.profile.uid('deployment-admin')) + ':' + str(self.profile.uid('deployment-admin')),
             '--env', 'LD_PRELOAD=', '--tmpfs', '/tmp:rw,nosuid,size=64m,mode=1777',
             '--mount', 'type=bind,src=' + self.profile.prefix + '/material/' + node.name + '/deployment-admin,dst=/operator,readonly',
             '--mount', 'type=bind,src=' + destination + ',dst=/release,readonly',
-            '--mount', 'type=bind,src=' + self.stage_root + '/release_migrations.py,dst=/runner.py,readonly',
-            '--mount', 'type=bind,src=' + self.profile.prefix + '/config/' + node.name + '/hosts,dst=/etc/hosts,readonly',
-            '--entrypoint', 'python3', 'psim-platform/postgres:' + self.profile.image_version, '/runner.py', '--release', '/release']
-        if contract: command += ['--phase', 'contract', '--minimum-epoch', str(self.new['schema_epoch'])]
-        # Public SQL plans contain no credentials; operator credentials remain in their existing role directory.
+            '--mount', 'type=bind,src=' + self.profile.prefix + '/config/' + node.name + '/hosts,dst=/etc/hosts,readonly']
         local.execute(node.name, ['chmod', '-R', 'a+rX', destination])
-        print(local.execute(node.name, command, capture_output=True).stdout, flush=True)
-        analytical = [entry for entry in manifest.get('migrations', []) if entry['engine'] == 'clickhouse']
-        if analytical:
-            from delivery import digest
-            tools = manifest['migration_tools']
-            archive = release / tools['file']
-            local.vm.copy_to(local.VM_NAME, node.name, archive, self.stage_root + '/' + archive.name)
-            load = '''import hashlib,json,pathlib,subprocess,sys
+        if not manifest.get('migrations'): return
+        from delivery import digest
+        tools = manifest['migration_tools']
+        archive = release / tools['file']
+        local.vm.copy_to(local.VM_NAME, node.name, archive, self.stage_root + '/' + archive.name)
+        load = """import hashlib,json,pathlib,subprocess,sys
 p=pathlib.Path(sys.argv[1]); assert hashlib.file_digest(p.open('rb'),'sha256').hexdigest()==sys.argv[2]
 subprocess.run(['docker','image','load','--input',str(p)],check=True,stdout=subprocess.DEVNULL)
 value=json.loads(subprocess.check_output(['docker','image','inspect',sys.argv[3]],text=True))[0]['Id']
 assert value in json.loads(sys.argv[4]); print(value)
-'''
-            identity = local.execute(node.name, ['sudo', 'python3', '-c', load, self.stage_root + '/' + archive.name,
-                digest(archive), tools['tag'], json.dumps(tools['digests'])], capture_output=True).stdout.strip()
-            base = command[:command.index('--entrypoint')]
-            settings = {'PSIM_PG_HOST': 'postgres', 'PSIM_PG_PORT': '15432', 'PSIM_PG_USER': 'postgres',
-                'PSIM_PG_PASSWORD_FILE': '/operator/postgres.secret', 'PSIM_PG_SSLROOTCERT': '/operator/ca.pem',
-                'PSIM_PG_SSLCERT': '/operator/postgres.pem', 'PSIM_PG_SSLKEY': '/operator/postgres.key',
-                'PSIM_CH_HOST': 'clickhouse', 'PSIM_CH_USER': 'deployment-admin', 'PSIM_CH_PASSWORD_FILE': '/operator/clickhouse.secret',
-                'PSIM_CH_CA': '/operator/ca.pem', 'PSIM_CH_CERT': '/operator/identity.pem', 'PSIM_CH_KEY': '/operator/identity.key'}
-            for key, value in settings.items(): base += ['--env', key + '=' + value]
-            for entry in analytical:
-                local.execute(node.name, base + ['--entrypoint', '/usr/bin/psim-ch-migrate', identity,
+"""
+        identity = local.execute(node.name, ['sudo', 'python3', '-c', load, self.stage_root + '/' + archive.name,
+            digest(archive), tools['tag'], json.dumps(tools['digests'])], capture_output=True).stdout.strip()
+        settings = {'PSIM_PG_HOST': 'postgres', 'PSIM_PG_PORT': '15432', 'PSIM_PG_USER': 'postgres',
+            'PSIM_PG_PASSWORD_FILE': '/operator/postgres.secret', 'PSIM_PG_SSLROOTCERT': '/operator/ca.pem',
+            'PSIM_PG_SSLCERT': '/operator/postgres.pem', 'PSIM_PG_SSLKEY': '/operator/postgres.key',
+            'PSIM_CH_HOST': 'clickhouse', 'PSIM_CH_USER': 'deployment-admin', 'PSIM_CH_PASSWORD_FILE': '/operator/clickhouse.secret',
+            'PSIM_CH_CA': '/operator/ca.pem', 'PSIM_CH_CERT': '/operator/identity.pem', 'PSIM_CH_KEY': '/operator/identity.key'}
+        for key, value in settings.items(): command += ['--env', key + '=' + value]
+        if any(entry['engine'] == 'postgres' for entry in manifest['migrations']):
+            arguments = ['--entrypoint', '/usr/bin/psim-pg-migrate', identity, 'release', '--release', '/release']
+            if contract: arguments += ['--phase', 'contract', '--minimum-epoch', str(self.new['schema_epoch'])]
+            print(local.execute(node.name, command + arguments, capture_output=True).stdout, flush=True)
+        for entry in manifest['migrations']:
+            if entry['engine'] == 'clickhouse':
+                local.execute(node.name, command + ['--entrypoint', '/usr/bin/psim-ch-migrate', identity,
                     'contract' if contract else 'expand', '/release/' + entry['file']], capture_output=True)
 
     def contract(self):

@@ -176,6 +176,26 @@ TEST_F(Normalizer, OldAndOtherSessionEventsNeverAdvanceConfirmation) {
   EXPECT_FALSE(require_prepared(result).event.event().live_observation());
 }
 
+TEST_F(Normalizer, CursorTombstonesRemoveOnlyTheirEpochAndRejectOtherPartitions) {
+  auto first = model.prepare(raw(100));
+  model.stage(std::move(require_prepared(first)), 3);
+  model.commit();
+  auto second = raw(100);
+  second.mutable_raw_event()->set_source_epoch(1);
+  auto prepared = model.prepare(second);
+  model.stage(std::move(require_prepared(prepared)), 3);
+  model.commit();
+  const auto cursor = std::string(kTenant) + "/" + kSource + ":0";
+  EXPECT_FALSE(model.forget(cursor, 2));
+  EXPECT_FALSE(*model.prepare(raw(100)));
+  ASSERT_TRUE(model.forget(cursor, 3));
+  EXPECT_TRUE(*model.prepare(raw(100)));
+  EXPECT_FALSE(*model.prepare(second));
+  EXPECT_TRUE(model.forget(cursor, 3));
+  EXPECT_FALSE(model.forget("invalid", 3));
+  EXPECT_FALSE(model.forget(std::string(kTenant) + "/" + kSource + ":invalid", 3));
+}
+
 TEST_F(Normalizer, ValidatesCatalogMappingAndRawMetadata) {
   auto input = raw();
   input.mutable_raw_event()->set_source_id(kDevice);

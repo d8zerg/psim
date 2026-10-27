@@ -202,7 +202,7 @@ struct Producer::State {
     args.at(count).vtype = RD_KAFKA_VTYPE_TOPIC;
     args.at(count++).u.cstr = record.topic.c_str();
     args.at(count).vtype = RD_KAFKA_VTYPE_VALUE;
-    args.at(count).u.mem.ptr = record.value.data();
+    args.at(count).u.mem.ptr = record.tombstone ? nullptr : record.value.data();
     args.at(count++).u.mem.size = record.value.size();
     args.at(count).vtype = RD_KAFKA_VTYPE_KEY;
     args.at(count).u.mem.ptr = record.key.data();

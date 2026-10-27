@@ -12,6 +12,7 @@ vars:
   COMMIT:
     sh: git rev-parse --short=12 HEAD
   DIST: dist/psim-platform-{{.VERSION}}-{{.COMMIT}}
+  OPERATIONS_BASE: postgres:18.6-trixie@sha256:74935e72241653ca55e0414067e6d8763aceb8a810eb51b452253ec3dcfc4336
   # Keys may live outside the repository: they are mounted read-only into the toolchain container.
   DEV_KEY: '{{.ROOT_DIR}}/.cache/keys/psim-dev.pem'
   SIGNING_KEY: '{{.PSIM_SIGNING_KEY | default .DEV_KEY}}'
@@ -39,12 +40,12 @@ tasks:
     cmds:
       - for: {var: RUNTIMES}
         cmd: >-
-          docker run --rm --platform linux/amd64 -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{index .RUNTIME_IMAGES .ITEM}}
+          docker run --rm --platform linux/amd64 -v "{{.ROOT_DIR}}/{{.PACKAGES}}":/packages:ro {{.OPERATIONS_BASE}}
           sh -ec 'dpkg -i /packages/*.deb >/dev/null;
           for binary in {{.IMAGES}}; do
             case "$binary" in psimctl) "$binary" version ;; *) "$binary" --version ;; esac;
           done;
-          psim-simulator --version; psim-webhook --version; psim-audit-tool --version;
+          psim-simulator --version; psim-webhook --version; psim-audit-tool --version; psim-monitoring-agent --version;
           audit_status=0; psim-audit-tool >/dev/null 2>&1 || audit_status=$?; [ "$audit_status" = 2 ];
           status=0; psim-pg-migrate >/dev/null 2>&1 || status=$?; [ "$status" = 2 ];
           package_names=$(for archive in /packages/*.deb; do dpkg-deb -f "$archive" Package; done);
@@ -52,7 +53,7 @@ tasks:
           echo "ok: packages install, run and remove on {{.ITEM}}"'
 
   images:
-    desc: Build container images (distroless, non-root) from the release preset
+    desc: Build non-root service and administrative container images from the release preset
     deps:
       - task: :cpp:build
         vars: {PRESET: release}
@@ -68,9 +69,12 @@ tasks:
           [ "$(echo "$bins" | grep -c .)" = 1 ] || { echo "expected one executable {{.ITEM}}, found: $bins" >&2; exit 1; }
           cp "$bins" "$stage"/
           if [ "{{.ITEM}}" = psim-projection-service ]; then cp {{.RELEASE_BUILD}}/services/projection-service/psim-report-tool {{.RELEASE_BUILD}}/services/projection-service/psim-console-tool "$stage"/; fi
-          if [ "{{.ITEM}}" = psimctl ]; then cp {{.RELEASE_BUILD}}/tools/ch-migrate/psim-ch-migrate {{.RELEASE_BUILD}}/tools/pg-migrate/psim-pg-migrate "$stage"/; fi
+          if [ "{{.ITEM}}" = psimctl ]; then
+            cp {{.RELEASE_BUILD}}/tools/ch-migrate/psim-ch-migrate {{.RELEASE_BUILD}}/tools/pg-migrate/psim-pg-migrate {{.RELEASE_BUILD}}/tools/gateway-admin/psim-gateway-admin {{.RELEASE_BUILD}}/services/audit-service/psim-audit-tool {{.RELEASE_BUILD}}/services/projection-service/psim-console-tool {{.RELEASE_BUILD}}/services/projection-service/psim-report-tool {{.RELEASE_BUILD}}/services/response-engine/psim-response-replay "$stage"/
+          fi
           if [ "{{.ITEM}}" = psim-normalizer ] || [ "{{.ITEM}}" = psim-correlation-engine ] || [ "{{.ITEM}}" = psim-resource-catalog ]; then cp contracts/taxonomy/v1/taxonomy.yaml "$stage"/; fi
           docker build --quiet --platform linux/amd64 --build-arg BASE={{.DISTROLESS_IMAGE}} \
+            --build-arg OPERATIONS_BASE={{.OPERATIONS_BASE}} \
             --label org.opencontainers.image.title=psim-platform-{{.ITEM}} \
             --label org.opencontainers.image.version={{.VERSION}} \
             --label org.opencontainers.image.revision={{.COMMIT}} \

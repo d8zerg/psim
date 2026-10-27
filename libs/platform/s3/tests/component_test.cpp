@@ -7,8 +7,10 @@
 #include <cstddef>
 #include <filesystem>
 #include <memory>
+#include <set>
 #include <sstream>
 #include <string>
+#include <utility>
 
 #include "../src/detail.hpp"
 #include "psim/platform/async/blocking_pool.hpp"
@@ -18,6 +20,43 @@
 #include "support.hpp"
 
 namespace psim::platform::s3::testing {
+TEST(S3Component, PaginationAndWriteOnlyPublicationPreserveImmutableObjects) {
+  auto scenario = []() -> asio::awaitable<void> {
+    async::BlockingPool blocking(2, 8);
+    auto client = take(co_await Client::create(&blocking, options()));
+    const Files files;
+    const auto source = files.write("input", 32);
+    std::set<std::string> expected;
+    for (int index = 0; index < 10; ++index) {
+      const auto key = files.key() + "/" + std::to_string(index);
+      expected.insert(key);
+      take(co_await client->put(key, source, WriteMode::kWriteOnly));
+      EXPECT_FALSE(co_await client->put(key, source, WriteMode::kWriteOnly));
+    }
+    EXPECT_FALSE(co_await client->list());
+    auto reader = take(co_await Client::create(&blocking, options("admin")));
+    std::set<std::string> found;
+    std::string token;
+    std::size_t pages = 0;
+    do {
+      auto page = take(co_await reader->list(token, 3));
+      for (const auto& key : page.keys) {
+        if (expected.contains(key)) {
+          EXPECT_TRUE(found.insert(key).second);
+        }
+      }
+      token = std::move(page.continuation);
+      EXPECT_LT(++pages, 1000);
+    } while (!token.empty() && pages < 1000);
+    EXPECT_GT(pages, 1);
+    EXPECT_EQ(found, expected);
+    for (const auto& key : expected) {
+      check(co_await client->remove(key));
+    }
+  };
+  run(scenario());
+}
+
 TEST(S3Component, RoundTripTwentyMiBMetadataImmutableKeysAndDeletion) {
   auto scenario = []() -> asio::awaitable<void> {
     async::BlockingPool blocking(2, 8);

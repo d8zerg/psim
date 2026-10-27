@@ -11,6 +11,7 @@ RUN python3 -m venv /opt/patroni \
  && rm -rf /root/.cache/pip
 COPY psim-postgres-single /usr/local/bin/psim-postgres-single
 COPY psim-audit-tool /usr/bin/psim-audit-tool
+COPY psimctl /usr/bin/psimctl
 COPY pg-env.sh /opt/psim/pg-env.sh
 COPY psim-postgres-env psim-postgres-bin /usr/local/bin/
 RUN chmod 0555 /usr/local/bin/psim-postgres-single /usr/local/bin/psim-postgres-env /usr/local/bin/psim-postgres-bin \

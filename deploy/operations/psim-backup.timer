@@ -1,0 +1,11 @@
+[Unit]
+Description=Open-Source PSIM Platform daily encrypted backup
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=24h
+Persistent=true
+Unit=psim-backup.service
+
+[Install]
+WantedBy=timers.target

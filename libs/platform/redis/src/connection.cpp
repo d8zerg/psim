@@ -285,9 +285,11 @@ asio::awaitable<Result<std::unique_ptr<Connection>>> Connection::connect(Connect
     if (!connection) {
       co_return std::unexpected(connection.error());
     }
-    auto role = co_await (*connection)->verify_primary(remaining());
-    if (!role) {
-      co_return std::unexpected(role.error());
+    if (options.require_primary) {
+      auto role = co_await (*connection)->verify_primary(remaining());
+      if (!role) {
+        co_return std::unexpected(role.error());
+      }
     }
     co_return std::move(*connection);
   }

@@ -1,8 +1,9 @@
 # Explicit expand/contract PostgreSQL migrations. Manifest is a trusted release artifact.
 find_package(nlohmann_json REQUIRED CONFIG)
-add_executable(psim-pg-migrate src/main.cpp)
+find_package(OpenSSL REQUIRED CONFIG)
+add_executable(psim-pg-migrate src/main.cpp src/release.cpp)
 psim_target_defaults(psim-pg-migrate)
-target_link_libraries(psim-pg-migrate PRIVATE psim::platform_pg nlohmann_json::nlohmann_json)
+target_link_libraries(psim-pg-migrate PRIVATE psim::platform_pg nlohmann_json::nlohmann_json OpenSSL::Crypto)
 install(TARGETS psim-pg-migrate RUNTIME DESTINATION bin COMPONENT psim-pg-migrate)
 psim_package(psim-pg-migrate SUMMARY "PSIM PostgreSQL migration runner")
 add_test(NAME psim-pg-migrate.usage COMMAND psim-pg-migrate)

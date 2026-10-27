@@ -40,7 +40,7 @@ def prepare(directory, prefix):
     selected = {'monitoring', 'otel', 'prometheus', 'alertmanager', 'grafana', 'loki', 'tempo', 'kafka', 'valkey', 'keeper', 'clickhouse', 'postgres'}
     compose['services'] = {name: value for name, value in compose['services'].items() if name in selected}
     postgres = compose['services']['postgres']
-    postgres.update(image='psim-platform/monitoring:0.1.0', entrypoint=['/usr/local/bin/docker-entrypoint.sh'],
+    postgres.update(image='psim-platform/operations-test:local', entrypoint=['/usr/local/bin/docker-entrypoint.sh'],
                     command=['postgres', '-c', 'config_file=/etc/psim-platform/postgres/secrets/postgresql.conf'])
     postgres['environment'].update(PGDATA='/var/lib/postgresql/data', POSTGRES_HOST_AUTH_METHOD='trust', POSTGRES_DB='psim')
     for name in ('passwd', 'group'):
@@ -136,6 +136,7 @@ def verify(directory):
         assert result['dashboard']['uid'] == uid
     def protocols_ready():
         metrics = http('https://127.0.0.1:19443/metrics').decode()
+        (ROOT / 'build/observability/last-metrics.txt').write_text(metrics)
         expected = ['psim_postgres_primary', 'psim_valkey_primary', 'psim_keeper_outstanding_requests',
                     'psim_kafka_group_lag{group="psim-observability-test",partition="0",topic="psim.observability.v1"} 2.0',
                     'psim_kafka_dlq_end_offset{topic="psim.dlq.observability.v1"} 1.0',
@@ -213,7 +214,7 @@ def main():
         subprocess.run(compose + ['exec', '-T', 'postgres', 'psql', '--host=/tmp', '--username=postgres', '--dbname=postgres',
             '--set', 'ON_ERROR_STOP=1', '--file=/etc/psim-platform/postgres/secrets/bootstrap.sql'], check=True, stdout=subprocess.DEVNULL)
         subprocess.run(docker + ['--network', 'host', '--add-host', 'psim-obs:127.0.0.1', '--entrypoint', 'python3',
-            'psim-platform/monitoring:0.1.0', '-I', 'tools/observability/smoke.py', '--kafka', '/repo/' + str(relative)], check=True)
+            'psim-platform/operations-test:local', '-I', 'tools/observability/smoke.py', '--kafka', '/repo/' + str(relative)], check=True)
         line = json.dumps({'service': 'container-log-test', 'instance': 'container-fixture', 'level': 'INFO',
             'msg': 'container-log-smoke', 'trace_id': 'a' * 32, 'span_id': 'b' * 16})
         subprocess.run(['docker', 'run', '--rm', '--log-driver', 'fluentd', '--log-opt', 'fluentd-address=127.0.0.1:24224',

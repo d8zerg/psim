@@ -318,11 +318,17 @@ class Check:
         self.sql("CREATE FUNCTION catalog.reject_image() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.linked AND NOT OLD.linked THEN RAISE EXCEPTION 'image commit fault'; END IF; RETURN NEW; END $$; CREATE TRIGGER reject_image BEFORE UPDATE ON catalog.files FOR EACH ROW EXECUTE FUNCTION catalog.reject_image();")
         try:
             self.request("PUT", path + "?width=100&height=100", data, version=self.floor["version"], content_type="image/png", expected=400)
+            self.request("PUT", path + "?width=100&height=100", data, version=self.floor["version"], content_type="image/png", expected=400)
         finally:
             self.sql("DROP TRIGGER reject_image ON catalog.files; DROP FUNCTION catalog.reject_image();")
         assert self.request("GET", path) == exact
         orphans = self.sql("SELECT key FROM catalog.files WHERE NOT linked").splitlines()
-        self.sql("UPDATE catalog.files SET expires=clock_timestamp() WHERE NOT linked")
+        assert len(orphans) >= 2
+        self.sql("UPDATE catalog.files SET expires=clock_timestamp()-interval '1 day' WHERE NOT linked")
+        self.sql("UPDATE catalog.files SET expires=clock_timestamp()-interval '9 days' WHERE key='" + orphans[0] + "'")
+        self.wait(lambda: self.sql("SELECT count(*) FROM catalog.files WHERE key='" + orphans[0] + "'") == "0", 40)
+        assert self.sql("SELECT count(*) FROM catalog.files WHERE NOT linked") == str(len(orphans) - 1)
+        self.sql("UPDATE catalog.files SET expires=clock_timestamp()-interval '9 days' WHERE NOT linked")
         self.wait(lambda: self.sql("SELECT count(*) FROM catalog.files WHERE NOT linked") == "0", 40)
         for key in orphans:
             assert self.s3_request("HEAD", key, True) == 404
