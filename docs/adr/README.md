@@ -1,110 +1,106 @@
-# Реестр архитектурных решений (ADR)
+# Architecture decision records (ADR)
 
-Шаг плана 0.4. Формат - [шаблон](template.md) на основе MADR.
+<!-- language-links -->
+[English](README.md) | [Русский](../ru/adr/README.md)
+<!-- /language-links -->
 
-## Статусы
+Use the MADR-based [template](template.md).
 
-| Статус | Смысл |
+## Statuses
+
+| Status | Meaning |
 |---|---|
-| Предложено | Решение сформулировано, но ещё не принято: его подтверждают в начале шага плана, к которому оно относится, с учётом замеров и прототипов |
-| Принято | Решение действует; реализация обязана ему следовать |
-| Заменено ADR-NNN | Решение отменено более поздним ADR |
-| Отклонено | Рассмотрено и не принято |
+| Proposed | Defined but not accepted; approve before implementation using measurements and prototypes |
+| Accepted | In force; implementation must follow the decision |
+| Superseded by ADR-NNN | Replaced by a later ADR |
+| Rejected | Considered and not accepted |
 
-Правило: ADR принимается до начала шага плана, который от него зависит. Изменение принятого решения оформляется новым ADR, который заменяет старый; старый не редактируется по существу.
+Accept an ADR before implementing changes that depend on it. A substantive change to an accepted decision requires a new ADR that supersedes the old one; do not rewrite the old decision.
 
-## Реестр
+## Registry
 
-| № | Решение | Статус | Шаг плана |
-|---|---|---|---|
-| [ADR-001](0001-monorepo-structure.md) | Структура монорепозитория и границы модулей | Принято | 0.4 |
-| [ADR-002](0002-kafka-central-bus.md) | Kafka как центральная шина; дистрибутив и версия (KRaft) | Принято | 0.4 |
-| [ADR-003](0003-schema-registry.md) | Schema Registry: Apicurio Registry с Confluent-совместимым API | Принято | 0.4 |
-| [ADR-004](0004-serialization-and-schema-evolution.md) | Формат сериализации и правила эволюции схем | Принято | 0.4 |
-| [ADR-005](0005-envelope-and-identifiers.md) | Конверт сообщения, UUIDv7 и именные UUID | Принято | 0.4 |
-| [ADR-006](0006-delivery-semantics.md) | Семантика доставки по потокам | Принято | 0.4 |
-| [ADR-007](0007-partitioning-strategy.md) | Стратегия партиционирования и «горячие» ключи | Принято | 0.4 |
-| [ADR-008](0008-cqrs-outbox-inbox.md) | CQRS, transactional outbox и inbox | Принято | 0.4 |
-| [ADR-009](0009-correlation-state-store.md) | Хранение состояния корреляции: RocksDB с changelog-топиком | Принято | 0.4 |
-| [ADR-010](0010-time-semantics.md) | Семантика времени: event time, водяные знаки, рассогласование часов | Принято | 0.4 |
-| [ADR-011](0011-correlation-rule-language.md) | Язык правил корреляции: декларативная модель с выражениями CEL | Предложено | 5.1 |
-| [ADR-012](0012-response-execution-and-timers.md) | Исполнение сценариев реагирования и сервис таймеров | Принято | 6.1 |
-| [ADR-013](0013-event-history-storage.md) | Хранение истории событий в MVP и долговременный архив | Заменено ADR-028 | 0.4 |
-| [ADR-014](0014-postgresql-async-driver.md) | Асинхронный драйвер PostgreSQL | Принято | 2.4 |
-| [ADR-015](0015-redis-client-and-role.md) | Redis-совместимое хранилище, клиент и его роль | Принято | 2.5 |
-| [ADR-016](0016-threading-model.md) | Модель потоков исполнения и корутины | Принято | 2.2 |
-| [ADR-017](0017-connector-protocol.md) | Протокол коннекторов и управление потоком | Принято | 0.5 |
-| [ADR-018](0018-command-routing.md) | Маршрутизация команд к сессиям коннекторов | Принято | 4.2 |
-| [ADR-019](0019-realtime-channel.md) | Realtime-канал: WebSocket, снимок и дельты, возобновление по смещениям | Принято | 0.5 |
-| [ADR-020](0020-authorization-model.md) | Модель авторизации: RBAC + ABAC, точка принятия решений | Принято | 5.3, 7.4 |
-| [ADR-021](0021-audit-hash-chain.md) | Неизменяемый аудит на цепочке хэшей | Принято | 6.4 |
-| [ADR-022](0022-multitenancy.md) | Мультитенантность в модели данных при одном тенанте в MVP | Принято | 0.4 |
-| [ADR-023](0023-deployment-topologies.md) | Топологии развёртывания и границы надёжности режима «одна машина» | Принято | 9.1 |
-| [ADR-024](0024-zero-downtime-upgrades.md) | Обновления без простоя и миграции | Принято | 9.2 |
-| [ADR-025](0025-ai-extension-points.md) | Точки расширения для ИИ | Принято | 0.4 |
-| [ADR-026](0026-rest-contract-and-dto.md) | REST-контракт и DTO: proto-first с генерацией OpenAPI | Принято | 0.5 |
-| [ADR-027](0027-incident-states.md) | Эскалация и «ложная тревога» - не состояния инцидента | Принято | 0.4 |
-| [ADR-028](0028-clickhouse-analytical-storage.md) | ClickHouse для истории событий и аналитики | Принято | 0.5 |
-| [ADR-029](0029-deterministic-source-id.md) | Детерминированный идентификатор источника | Принято | 0.5 |
-| [ADR-030](0030-task-runner.md) | Task как единая точка запуска задач разработки | Принято | 0.5 |
-| [ADR-031](0031-verification-tooling.md) | Инструменты верификации | Принято | 0.7 |
-| [ADR-032](0032-cpp-toolchain.md) | C++ toolchain: Debian 13 x86_64, clang 21 и libstdc++, Conan 2, CMake пресеты | Принято | 1.1 |
-| [ADR-033](0033-code-quality-gates.md) | Контроль качества кода: форматирование, clang-tidy, контроль include, санитайзеры, покрытие, fitness functions | Принято | 1.2 |
-| [ADR-034](0034-local-ci-and-supply-chain.md) | Локальный конвейер CI/CD и цепочка поставки | Принято | 1.3 |
-| [ADR-035](0035-local-environment.md) | Локальное окружение разработки и интеграционного тестирования | Принято | 1.4 |
-| [ADR-036](0036-no-git-hooks.md) | Отказ от git-хуков: `task ci` перед коммитом (уточняет ADR-033, п. 8 и ADR-034, п. 3-4) | Принято | 1.4 |
-| [ADR-037](0037-web-monorepo.md) | Веб-монорепозиторий: инструменты, генерация клиентов, барьеры | Принято | 1.5 |
-| [ADR-038](0038-documentation-portal.md) | Портал документации из репозитория | Принято | 1.6 |
-| [ADR-039](0039-service-runtime.md) | Runtime сервиса: конфигурация, логи, метрики, трассировка, health, остановка, шаблон | Принято | 2.1 |
-| [ADR-040](0040-async-primitives.md) | Асинхронные примитивы: шарды, время, дедлайны, противодавление, пул блокирующих операций | Принято | 2.2 |
-| [ADR-041](0041-kafka-layer.md) | Слой Kafka: интеграция с Asio, продюсер и транзакции (KIP-447), потребитель, обработчик с повторами и DLQ, wire format и реестр схем (уточняет механизм EOS-K ADR-006) | Принято | 2.3 |
-| [ADR-042](0042-operational-capabilities.md) | Эксплуатационные функции MVP: файлы, достоверное состояние, обслуживание, передача, сертификаты и replay | Принято | 0.1 |
-| [ADR-043](0043-platform-security.md) | Безопасность платформы: TLS/mTLS, JWT/JWKS, секреты и внешняя PKI | Принято | 2.6 |
-| [ADR-044](0044-deterministic-simulation.md) | Детерминированная симуляция: модели Kafka и inbox/outbox, управляемое время, сбои и ручной запуск | Принято | 2.7 |
-| [ADR-045](0045-clickhouse-layer.md) | Нативный ClickHouse, журнал пакетов и восстановление Kafka -> ClickHouse | Принято | 2.8 |
-| [ADR-046](0046-s3-object-storage.md) | S3: AWS SDK, SeaweedFS, потоковая передача и безопасные повторы | Принято | 2.9 |
-| [ADR-047](0047-event-flow.md) | Сквозной поток M1, временные fixture и проверка браузера | Принято | 3.1 |
-| [ADR-048](0048-connector-sdk.md) | Connector SDK: дисковый буфер, команды, сверка состояния и набор соответствия | Принято | 4.1 |
-| [ADR-049](0049-connector-gateway.md) | Connector Gateway: постоянные регистрации, lease сессии, контроль heartbeat и подтверждение отзыва | Принято | 4.2 |
+| ID | Decision | Status |
+|---|---|---|
+| [ADR-001](0001-monorepo-structure.md) | Monorepo structure and module boundaries | Accepted |
+| [ADR-002](0002-kafka-central-bus.md) | Kafka as the central bus: distribution and version | Accepted |
+| [ADR-003](0003-schema-registry.md) | Schema Registry | Accepted |
+| [ADR-004](0004-serialization-and-schema-evolution.md) | Serialization format and schema evolution rules | Accepted |
+| [ADR-005](0005-envelope-and-identifiers.md) | Message envelope, UUIDv7 and named UUIDs | Accepted |
+| [ADR-006](0006-delivery-semantics.md) | Delivery semantics by data flow | Accepted |
+| [ADR-007](0007-partitioning-strategy.md) | Partitioning strategy and high-load keys | Accepted |
+| [ADR-008](0008-cqrs-outbox-inbox.md) | CQRS, transactional outbox and inbox | Accepted |
+| [ADR-009](0009-correlation-state-store.md) | Correlation state storage: RocksDB with a changelog topic | Accepted |
+| [ADR-010](0010-time-semantics.md) | Time semantics: event time, watermarks and clock skew | Accepted |
+| [ADR-011](0011-correlation-rule-language.md) | Correlation rule language | Proposed |
+| [ADR-012](0012-response-execution-and-timers.md) | Response-plan execution and timers | Accepted |
+| [ADR-013](0013-event-history-storage.md) | MVP event-history storage and long-term archive | Superseded by ADR-028 |
+| [ADR-014](0014-postgresql-async-driver.md) | Asynchronous PostgreSQL driver | Accepted |
+| [ADR-015](0015-redis-client-and-role.md) | Redis-compatible store, client and responsibilities | Accepted |
+| [ADR-016](0016-threading-model.md) | Execution threads and coroutines | Accepted |
+| [ADR-017](0017-connector-protocol.md) | Connector protocol and flow control | Accepted |
+| [ADR-018](0018-command-routing.md) | Routing commands to connector sessions | Accepted |
+| [ADR-019](0019-realtime-channel.md) | Realtime channel: WebSocket, snapshots, deltas and offset-based resumption | Accepted |
+| [ADR-020](0020-authorization-model.md) | Authorization: RBAC, ABAC and the policy decision point | Accepted |
+| [ADR-021](0021-audit-hash-chain.md) | Tamper-evident audit hash chain | Accepted |
+| [ADR-022](0022-multitenancy.md) | Multitenant data model with one tenant in MVP | Accepted |
+| [ADR-023](0023-deployment-topologies.md) | Deployment topologies and single-machine reliability limits | Accepted |
+| [ADR-024](0024-zero-downtime-upgrades.md) | Zero-downtime upgrades and migrations | Accepted |
+| [ADR-025](0025-ai-extension-points.md) | AI extension points | Accepted |
+| [ADR-026](0026-rest-contract-and-dto.md) | REST contracts and DTOs: proto-first OpenAPI generation | Accepted |
+| [ADR-027](0027-incident-states.md) | Escalation and false alarms are not incident states | Accepted |
+| [ADR-028](0028-clickhouse-analytical-storage.md) | ClickHouse for event history and analytics | Accepted |
+| [ADR-029](0029-deterministic-source-id.md) | Deterministic source identifiers | Accepted |
+| [ADR-030](0030-task-runner.md) | Task as the development task entry point | Accepted |
+| [ADR-031](0031-verification-tooling.md) | Verification tools | Accepted |
+| [ADR-032](0032-cpp-toolchain.md) | C++ toolchain: Debian 13 x86_64, Clang 21, libstdc++, Conan 2 and CMake presets | Accepted |
+| [ADR-033](0033-code-quality-gates.md) | Code quality gates: formatting, clang-tidy, includes, sanitizers, coverage and fitness functions | Accepted |
+| [ADR-034](0034-local-ci-and-supply-chain.md) | Local CI/CD and software supply chain | Accepted |
+| [ADR-035](0035-local-environment.md) | Local development and integration-test environment | Accepted |
+| [ADR-036](0036-no-git-hooks.md) | Remove Git hooks and run `task ci` before committing | Accepted |
+| [ADR-037](0037-web-monorepo.md) | Web monorepo: tools, client generation and quality gates | Accepted |
+| [ADR-038](0038-documentation-portal.md) | Documentation portal built from the repository | Accepted |
+| [ADR-039](0039-service-runtime.md) | Service Runtime | Accepted |
+| [ADR-040](0040-async-primitives.md) | Asynchronous primitives of the platform | Accepted |
+| [ADR-041](0041-kafka-layer.md) | Kafka layer | Accepted |
+| [ADR-042](0042-operational-capabilities.md) | Operational capabilities within MVP scope | Accepted |
+| [ADR-043](0043-platform-security.md) | Platform Security: TLS, JWT/JWKS, Secrets, and External PKI | Accepted |
+| [ADR-044](0044-deterministic-simulation.md) | Deterministic Simulation Environment with Manual Execution | Accepted |
+| [ADR-045](0045-clickhouse-layer.md) | Native ClickHouse layer and Kafka batch recovery | Accepted |
+| [ADR-046](0046-s3-object-storage.md) | S3-compatible file storage | Accepted |
+| [ADR-047](0047-event-flow.md) | Minimal end-to-end event flow | Accepted |
+| [ADR-048](0048-connector-sdk.md) | Connector SDK, disk buffer and state reconciliation | Accepted |
+| [ADR-049](0049-connector-gateway.md) | Connector Gateway: Registration, Sessions, and Revocation Confirmation | Accepted |
+| [ADR-050](0050-reference-connectors.md) | Reference connectors and durable HTTP retries | Accepted |
+| [ADR-051](0051-resource-catalog.md) | Resource Catalog: Resources, files and maintenance | Accepted |
+| [ADR-052](0052-normalization-and-event-history.md) | Normalization, Source Cursors, and Event History | Accepted |
+| [ADR-053](0053-incident-service.md) | Incident Service | Accepted |
+| [ADR-054](0054-event-history-links.md) | Event History, links and extended retention | Accepted |
+| [ADR-055](0055-command-service.md) | Device Command Service | Accepted |
+| [ADR-056](0056-sla-and-notifications.md) | SLA, duty assignment, and Notification Delivery | Accepted |
+| [ADR-057](0057-incident-reporting.md) | Incident Facts and Reporting | Accepted |
+| [ADR-058](0058-api-gateway-and-configuration.md) | API Gateway and Configuration Management for Normalization | Accepted |
+| [ADR-059](0059-console-projections.md) | Console read models in Projection Service | Accepted |
+| [ADR-060](0060-realtime-delivery.md) | Realtime resume from Kafka and operational snapshots | Accepted |
+| [ADR-061](0061-live-access-validation.md) | Checking current token validity and scope sets | Accepted |
+| [ADR-062](0062-design-system-and-stable-updates.md) | Design System and Stable Interface Updates | Accepted |
+| [ADR-063](0063-interface-principles.md) | Principles of Real-Time Interface | Accepted |
+| [ADR-064](0064-alarm-philosophy.md) | Philosophy of Operator Alarms and Load | Accepted |
+| [ADR-065](0065-ui-loading-budgets.md) | Module Loading and Budgets | Accepted |
+| [ADR-066](0066-ui-font-and-icons.md) | Local Fonts and Object Icons | Accepted |
+| [ADR-067](0067-assistant-boundaries.md) | Assistant with sources and Without Command Execution | Accepted |
+| [ADR-068](0068-operational-interface-backend.md) | Server Operations for the Real-time Interface | Accepted |
+| [ADR-069](0069-application-shell-and-session-recovery.md) | Application Shell and Session Recovery | Accepted |
+| [ADR-070](0070-lazy-loading-and-delivery-budgets.md) | Lazy module loading and Delivery Budgets | Accepted |
+| [ADR-071](0071-operator-console.md) | Operator’s Work Console | Accepted |
+| [ADR-072](0072-administration.md) | Administration Module | Accepted |
+| [ADR-073](0073-administration-delivery-budget.md) | Budget for the entire application graph with administration | Accepted |
+| [ADR-074](0074-audit-and-reporting-interface.md) | Audit and Reporting Interface | Accepted |
+| [ADR-075](0075-audit-and-reporting-delivery-budget.md) | Budget for a unique JS delivery with auditing and reporting | Accepted |
+| [ADR-076](0076-web-client-qualification.md) | Web Client Qualification | Accepted |
+| [ADR-077](0077-seaweedfs-deployment-topology.md) | Operational Topology of SeaweedFS | Accepted |
+| [ADR-078](0078-shared-api-rate-limits.md) | Shared quotas for REST API in Valkey | Accepted |
+| [ADR-079](0079-release-version-identification.md) | Defining Version and Identity of a Delivery | Accepted |
+| [ADR-080](0080-observability-package.md) | Telemetry storage and observability package | Accepted |
+| [ADR-081](0081-administration-and-recovery.md) | Native Administrative Operations and Backup Copies | Accepted |
 
-| [ADR-050](0050-reference-connectors.md) | Эталонные коннекторы, пакетная генерация и долговечные HTTP-повторы | Принято | 4.3 |
-
-| [ADR-051](0051-resource-catalog.md) | Resource Catalog: ресурсы, файлы и обслуживание | Принято | 4.4 |
-| [ADR-052](0052-normalization-and-event-history.md) | Нормализация, курсоры источников и история событий | Принято | 4.5 |
-| [ADR-053](0053-incident-service.md) | Incident Service: жизненный цикл, окна группировки, авторизация и передача ответственности | Принято | 5.3 |
-| [ADR-054](0054-event-history-links.md) | История событий, связи и продление хранения | Принято | 5.4 |
-| [ADR-055](0055-command-service.md) | Сервис команд устройствам, подтверждение и привязка к сессии | Принято | 6.2 |
-
-| [ADR-056](0056-sla-and-notifications.md) | SLA, дежурства и доставка уведомлений | Принято | 6.3 |
-
-| [ADR-057](0057-incident-reporting.md) | Факты инцидентов, исходные значения SLA и отчётность | Принято | 6.5 |
-
-| [ADR-058](0058-api-gateway-and-configuration.md) | API Gateway, потоковая передача файлов и управление конфигурацией нормализации | Принято | 7.1 |
-| [ADR-059](0059-console-projections.md) | Общие модели консоли, кэш и восстановление Kafka в Projection Service | Принято | 7.3 |
-| [ADR-060](0060-realtime-delivery.md) | Realtime из Kafka, независимое от узла возобновление и оперативные образы | Принято | 7.2 |
-
-| [ADR-061](0061-live-access-validation.md) | Актуальная проверка прав и отзыв доступа | Принято | 7.4 |
-| [ADR-062](0062-design-system-and-stable-updates.md) | Дизайн-система и стабильное обновление интерфейса | Принято | 8.1 |
-| [ADR-063](0063-interface-principles.md) | Принципы оперативного интерфейса | Принято | 8.1 |
-| [ADR-064](0064-alarm-philosophy.md) | Философия тревог и нагрузка оператора | Принято | 8.1 |
-| [ADR-065](0065-ui-loading-budgets.md) | Загрузка и бюджеты интерфейса | Принято | 8.1 |
-| [ADR-066](0066-ui-font-and-icons.md) | Локальные шрифты и предметные иконки | Принято | 8.1 |
-| [ADR-067](0067-assistant-boundaries.md) | Ассистент с источниками и без выполнения команд | Принято | 8.1 |
-| [ADR-068](0068-operational-interface-backend.md) | Серверные операции оперативного интерфейса | Принято | 8.1a |
-| [ADR-069](0069-application-shell-and-session-recovery.md) | Оболочка приложения и восстановление сессии | Принято | 8.2 |
-| [ADR-070](0070-lazy-loading-and-delivery-budgets.md) | Ленивая загрузка модулей и бюджеты поставки | Принято | 8.6 |
-| [ADR-071](0071-operator-console.md) | Рабочая консоль оператора | Принято | 8.3 |
-| [ADR-072](0072-administration.md) | Модуль администрирования | Принято | 8.4 |
-| [ADR-073](0073-administration-delivery-budget.md) | Бюджет полного графа приложения с администрированием | Принято | 8.4 |
-| [ADR-074](0074-audit-and-reporting-interface.md) | Интерфейс аудита и отчётности | Принято | 8.5 |
-| [ADR-075](0075-audit-and-reporting-delivery-budget.md) | Бюджет уникальной JS-поставки с аудитом и отчётами | Принято | 8.5 |
-| [ADR-076](0076-web-client-qualification.md) | Квалификация веб-клиента | Принято | 8.6 |
-| [ADR-077](0077-seaweedfs-deployment-topology.md) | Эксплуатационная топология SeaweedFS | Принято | 9.1 |
-| [ADR-078](0078-shared-api-rate-limits.md) | Общие квоты REST API в Valkey | Принято | 7.1, 9.1 |
-| [ADR-079](0079-release-version-identification.md) | Определение версии и идентичности поставки | Принято | 9.2 |
-| [ADR-080](0080-observability-package.md) | Хранение телеметрии и пакет наблюдаемости | Принято | 9.4 |
-| [ADR-081](0081-administration-and-recovery.md) | Нативные инструменты эксплуатации и независимые резервные копии | Принято | 9.3, 9.5 |
-
-ADR-026 и ADR-027 добавлены сверх реестра плана (раздел 18) по итогам шагов 0.2-0.3, ADR-028-ADR-030 - на шаге 0.5, ADR-031 - на шаге 0.7, ADR-032 - на шаге 1.1, ADR-033 - на шаге 1.2, ADR-034 - на шаге 1.3, ADR-035 и ADR-036 - на шаге 1.4, ADR-037 - на шаге 1.5, ADR-038 - на шаге 1.6, ADR-039 - на шаге 2.1, ADR-040 - на шаге 2.2, ADR-041 - на шаге 2.3. В ADR-028 и ADR-030 принято использование ClickHouse и Task.
-
-ADR-042 принят как дополнение объёма MVP; реализация распределена по существующим шагам.
+ADR-042 defines operational requirements for files, state, maintenance, responsibility handover, certificates and replay.

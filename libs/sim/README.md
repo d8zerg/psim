@@ -1,10 +1,14 @@
-# Детерминированный симуляционный стенд
+# Deterministic Simulation Environment
 
-Шаг 2.7 · [ADR-044](../../docs/adr/0044-deterministic-simulation.md) · `psim::sim`
+<!-- language-links -->
+[English](README.md) | [Русский](../../docs/ru/repository/libs/sim/README.md)
+<!-- /language-links -->
 
-Стенд проверяет семантику доставки в одном процессе без внешней инфраструктуры. Запускается только вручную через Task; не входит в `check`, CI, ночной конвейер или выпуск. CMake исключает его из обычной сборки, проверки не регистрируются в CTest.
+[ADR-044](../../docs/adr/0044-deterministic-simulation.md) · `psim::sim`
 
-## Запуск
+The environment verifies delivery semantics in a single process without external infrastructure. It is launched only manually through Task; it does not participate in `check`, CI, night pipeline, or release. CMake excludes it from the regular build, and no tests are registered in CTest.
+
+## Launch
 
 ```bash
 task sim:test
@@ -15,40 +19,40 @@ task sim:sanitizers
 task sim:coverage
 ```
 
-`sim:short` проверяет доставку и корреляцию на 200 последовательных зернах начиная с `SEED` (по умолчанию 1), `sim:long` - на 10 000. `sim:replay` выполняет одно зерно и сохраняет полную трассу. `sim:test` отдельно проверяет модели, границы сбоев, оракул и CLI. Команды собирают нужные цели в toolchain проекта; сети Kafka/PostgreSQL/Valkey не нужны.
+`sim:short` checks delivery and correlation on 200 consecutive seeds starting from `SEED` (default is 1), and `sim:long` on 10,000 seeds. `sim:replay` runs one seed and saves the complete trace. `sim:test` separately checks models, failure boundaries, oracle, and CLI. Commands build required targets in the project’s toolchain; Kafka/PostgreSQL/Valkey networks are not required.
 
-Общие параметры: `PRESET=debug|release|asan|tsan|coverage`, `SEED=1`, `EVENTS=24`, `PARTITIONS=3`, `FAULT_DECISIONS=120`, `MAX_HANDLERS=100000`, `MAX_TIME_MS=30000`, `MODEL_VERSION=1`. Лимит времени относится к виртуальному времени. Случайные сбои прекращаются после заданного числа решений, затем конвейер должен дренироваться; бесконечная недоступность проверяется отдельным регрессионным сценарием с лимитом обработчиков.
+General parameters: `PRESET=debug|release|asan|tsan|coverage`, `SEED=1`, `EVENTS=24`, `PARTITIONS=3`, `FAULT_DECISIONS=120`, `MAX_HANDLERS=100000`, `MAX_TIME_MS=30000`, `MODEL_VERSION=1`. Time limit applies to virtual time. Random failures are stopped after a certain number of decisions, then the pipeline must be drained; infinite unavailability is checked with a separate regression scenario with a processing limit.
 
 ```bash
 task sim:replay SEED=42 EVENTS=48 PARTITIONS=4 FAULT_DECISIONS=300
 task sim:short PRESET=release SEED=201
 ```
 
-CLI `build/debian13/<preset>/libs/sim/psim-sim --help` позволяет указать `--runs`, `--trace-dir` и `--save-trace`. Код возврата: 0 - сверка прошла, 1 - сценарий не сошёлся или оракул обнаружил ошибку, 2 - некорректные аргументы/версия модели или ошибка записи трассы. Переполнение диапазона зерен отклоняется.
+CLI `build/debian13/<preset>/libs/sim/psim-sim --help` allows specifying `--runs`, `--trace-dir`, and `--save-trace`. Return values: 0 - verification succeeded, 1 - scenario did not match or oracle detected an error, 2 - incorrect arguments/version of the model or trace recording error. Seed range overflow is rejected.
 
-## Модели и цепочка
+## Models and Chain
 
-| Компонент | Поведение |
+| Component | Behavior |
 |---|---|
-| `Random` | SplitMix64 и rejection sampling, воспроизводимые решения без зависимости от STL-распределений |
-| `Scheduler` | Один Asio io_context, `ManualClock` шага 2.2, продвижение к ближайшему таймеру, лимиты и обнаружение deadlock |
-| `Broker` | Устойчивые журналы партиций, read_committed, атомарные выход/changelog/смещения, fencing и однократный commit |
-| `Store` | Версионная транзакция inbox + эффект + outbox, изоляция `(tenant, id)`, отдельное подтверждение публикации |
-| `run_pipeline` | Эталонная доставка, сценарные сбои, независимый оракул, трасса и стабильный fingerprint |
+| `Random` | SplitMix64 and rejection sampling, reproducible decisions independent of STL distributions |
+| `Scheduler` | One Asio io_context, `ManualClock`, advancing to the next timer, limits, and detecting deadlock |
+| `Broker` | Stable partition logs, read_committed, atomic output/changelog/offsets, fencing, and single commit |
+| `Store` | Versioning transaction inbox + effect + outbox, isolation of `(tenant, id)`, separate confirmation of publication |
+| `run_pipeline` | Standard delivery, scenario failures, independent oracle, trace, and stable fingerprint |
 
-Входы заранее записываются в устойчивый журнал, дублируются и перемешиваются. Транзакционный обработчик публикует нормализованный выход и changelog вместе со смещением; после падения восстанавливает дедупликацию из changelog. Следующий обработчик фиксирует inbox и outbox в БД до подтверждения смещения. Реле публикует outbox; падение после публикации создаёт повтор доставки. Получатель использует свой inbox, чтобы исключить повторный эффект.
+Input is recorded in a stable log, duplicated, and shuffled. The transaction processor publishes normalized output and changelog along with offsets; after a crash, it restores deduplication from the changelog. The next processor stores inbox and outbox in the database before the offset is confirmed. The relay publishes outbox; a crash after publication creates a duplicate delivery. The recipient uses its inbox to prevent duplicate effects.
 
-Потерянный ответ чтения оставляет запись в журнале, потерянное подтверждение требует повтора. Отказ до commit откатывает незавершённые изменения; отказ после commit сохраняет их. Задержки меняют порядок работы партиций; порядок устойчивого журнала внутри партиции сохраняется. Модель не заявляет восстановление физически потерянных подтверждённых данных.
+Lost read acknowledgments leave a record in the log, lost acknowledgments require repetition. Failure before commit cancels unfinished changes; failure after commit preserves them. Delays change the order of partitions; the order of the stable log within a partition is preserved. The model does not claim to restore physically lost confirmed data.
 
-Оракул сравнивает ключи и содержимое с независимым входным набором: нет потерянных, лишних и повреждённых сообщений, транзакционный выход уникален, эффекты БД и получателя совпадают с ожиданием. Проверяются полное потребление журналов и отсутствие незавершённого outbox. Транспортные повторы допустимы и учитываются отдельно.
+The oracle compares keys and content with an independent input set: no lost, redundant, or corrupted messages, transaction output is unique, database and recipient effects match expectations. Full log consumption and absence of unfinished outbox are checked. Transport duplicates are allowed and considered separately.
 
-## Воспроизведение и расширение
+## Reproduction and Expansion
 
-При ошибке CLI печатает точную команду `sim:replay` с зерном и всеми параметрами, сохраняет `.cache/sim/v1-seed-<seed>.trace`. В заголовке - версия модели, параметры и fingerprint, далее входы, решения, виртуальные моменты, commit и результат оракула. Файл одного зерна перезаписывается; перед изменением модели сохраните регрессионный пример в репозитории и зафиксируйте исходный код. Одинаковые версия, параметры и зерно дают одинаковую полную трассу, в том числе при ошибке.
+If the CLI fails, it prints the exact command `sim:replay` with seeds and all parameters, saving `.cache/sim/v1-seed-<seed>.trace`. In the header, there is the model version, parameters, and fingerprint, followed by inputs, decisions, virtual moments, commit, and oracle result. The file of one seed is overwritten; before changing the model, save the regression example in the repository and record the source code. Same versions, parameters, and seeds yield the same complete trace, even in case of failure.
 
-`FaultScript` задаёт сбои в конкретной стадии и точке (до/после commit, публикация, подтверждение); он заменяет случайный выбор. Скрипт и `Transform` должны быть детерминированы и храниться вместе с регрессионным тестом. `Transform` подключает обработчик к эталонной цепочке, чей оракул ожидает сохранение исходного сообщения; для иной предметной семантики нужны отдельный сценарий и оракул.
+`FaultScript` specifies failures at specific stages and points (before/after commit, publication, confirmation); it replaces random selection. The script and `Transform` must be deterministic and stored together with the regression test. `Transform` connects the processor to the standard chain, whose oracle expects to save the original message; for other semantic contexts, a separate scenario and oracle are needed.
 
-Отдельная цель корреляции использует настоящий вычислитель правил и модель `Broker`: сверяет сигналы с независимым ожидаемым набором при падениях до commit, после commit, до обновления локальной копии и при переназначении партиций. Она также запускается только вручную, без CTest и CI.
+A separate correlation target uses the actual computing rules and model `Broker`: it compares signals with an independent expected set during crashes before commit, after commit, before updating the local copy, and when reassigning partitions. It also runs only manually, without CTest and CI.
 
 ```bash
 task correlation:sim
@@ -56,6 +60,6 @@ task correlation:sim RUNS=10000
 task correlation:sim SEED=42 RUNS=1 SAVE_TRACE=true
 ```
 
-Симуляция не запускает реальные адаптеры и сервисы и не доказывает отсутствие дубликатов предметных инцидентов. Репликация, протоколы и физические отказы проверяются компонентными и хаос-тестами.
+Simulation does not run real adapters and services, nor does it prove the absence of duplicate domain incidents. Replication, protocols, and physical failures are checked by component and chaos tests.
 
-Ручное покрытие включает библиотеку и CLI; порог - 75% строк. Отчёты находятся в `build/debian13/coverage/libs/sim/coverage.json` и `coverage-html/`.
+Manual coverage includes libraries and CLI; the threshold is 75% lines. Reports are located in `build/debian13/coverage/libs/sim/coverage.json` and `coverage-html/`.

@@ -1,32 +1,35 @@
-# ADR-027. Эскалация и «ложная тревога» - не состояния инцидента
+# ADR-027. Escalation and false alarms are not incident states
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 5.3)
-- **Связанные:** [state-models.md](../domain/state-models.md#1-инцидент), [aggregates.md](../domain/aggregates.md#42-агрегат-incident)
+<!-- language-links -->
+[English](0027-incident-states.md) | [Русский](../ru/adr/0027-incident-states.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** [state-models.md](../domain/state-models.md#1-incident), [aggregates.md](../domain/aggregates.md#42-aggregate-incident)
 
-План (шаг 5.3) перечисляет состояния инцидента: новый, принят, в работе, решён, закрыт, а также эскалирован и ложный. Эскалация может произойти в любом открытом состоянии (SLA принятия - в «новом», SLA решения - в «принят» и «в работе»), а «ложный» - это итог работы, который нужен в отчётах наряду с другими итогами.
+## Context
 
-## Рассмотренные варианты
+Candidate incident states include new, acknowledged, in progress, resolved, closed, escalated and false alarm. Escalation can happen in any open state: acknowledgement SLA while new, resolution SLA while acknowledged or in progress. False alarm is an outcome that reports need alongside other outcomes.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Семь состояний, как в плане | Буквальное соответствие плану | «Эскалирован» теряет информацию о том, на каком этапе инцидент (новый или в работе); из «эскалирован» нужны переходы во все открытые состояния; «ложный» требует отдельного пути к закрытию и отдельного учёта в MTTR |
-| **Пять состояний + ортогональный `escalation_level` + решение `resolution`** | Маленький автомат; эскалация сохраняет этап работы и имеет уровни; единый путь к закрытию; доля ложных тревог считается по `resolution` | Интерфейс отображает эскалацию и итог как метки, а не статусы |
+| Seven states including escalation and false alarm | One enum represents every attribute | Escalated loses the current work stage, requiring transitions to every open state; false alarm needs a separate closure path and MTTR handling |
+| **Five states, independent `escalation_level` and `resolution`** | Small state machine; escalation preserves work stage and supports levels; one closure path; false-alarm rate uses `resolution` | UI displays escalation and outcome as labels rather than statuses |
 
-## Решение
+## Decision
 
-1. Состояния: `new`, `acknowledged`, `in_progress`, `resolved`, `closed`.
-2. Эскалация - атрибут `escalation_level` (0 - нет), меняется в открытых состояниях, событие `IncidentEscalated`.
-3. Итог - `resolution`: `confirmed`, `false_alarm`, `test`, `duplicate`; задаётся при переходе в `resolved`.
-4. Старший смены может решить инцидент из `new` с итогом `false_alarm`, `test` или `duplicate` (массовые ложные срабатывания).
+1. States: `new`, `acknowledged`, `in_progress`, `resolved`, `closed`.
+2. Escalation uses `escalation_level`, with 0 meaning none. It changes in open states and produces `IncidentEscalated`.
+3. Outcome uses `resolution`: `confirmed`, `false_alarm`, `test` or `duplicate`, assigned when transitioning to `resolved`.
+4. A shift supervisor can resolve a `new` incident as `false_alarm`, `test` or `duplicate`, supporting mass false alarms.
 
-## Последствия
+## Consequences
 
-- Отчёты (S13): доля ложных тревог = доля `resolution = false_alarm` среди решённых за период.
-- Веб-интерфейс показывает эскалацию и итог отдельными метками; фильтр ленты «эскалированные» - по `escalation_level > 0`.
+- Reports (S13) calculate false-alarm rate as the proportion of incidents resolved during the period with `resolution = false_alarm`.
+- The web UI displays escalation and outcome as separate labels; the escalated feed filter uses `escalation_level > 0`.
 
-## Проверка
+## Verification
 
-Тесты на основе свойств инвариантов агрегата (DoD шага 5.3).
+Property-based tests verify aggregate invariants.

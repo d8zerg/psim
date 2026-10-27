@@ -1,39 +1,42 @@
-# ADR-025. Точки расширения для ИИ
+# ADR-025. AI extension points
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4
-- **Связанные:** ADR-004, ADR-011, ADR-012, [context-map.md](../domain/context-map.md#5-точки-расширения-для-ии-adr-025), X1 в [mvp-scope.md](../product/mvp-scope.md#2-вне-mvp)
+<!-- language-links -->
+[English](0025-ai-extension-points.md) | [Русский](../ru/adr/0025-ai-extension-points.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, ADR-011, ADR-012, [context-map.md](../domain/context-map.md#5-extensions-for-ai-adr-025), X1 in [mvp-scope.md](../product/mvp-scope.md#2-beyond-mvp)
 
-ИИ-функции (первичная сортировка тревог, снижение ложных срабатываний, ассистент оператора) вне MVP, но должны добавляться без изменения ядра.
+## Context
 
-## Рассмотренные варианты
+AI features such as alarm triage, false-positive reduction and an operator assistant are outside MVP scope, but must be addable without changing the core.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Встроить вызовы моделей в сервисы ядра | Прямой доступ к данным | Связывает ядро с моделями; задержки и отказы моделей на горячем пути |
-| Ничего не закладывать | Ноль затрат | Позднее добавление потребует изменений контрактов и сервисов |
-| **Закрепить три точки расширения, которые используют уже существующие механизмы** | Ноль кода в MVP сверх обычных контрактов; ИИ-модули - внешние потребители и производители по публичным контрактам | Нужно не нарушить эти точки при развитии контрактов |
+| Embed model calls in core services | Direct data access | Couples the core to models; model latency and failure affect the hot path |
+| Provide no extension points | No current cost | Later integration requires contract and service changes |
+| **Define three extension points using existing mechanisms** | No additional MVP code beyond normal contracts; AI modules are external consumers and producers using public contracts | Contract evolution must preserve these extension points |
 
-## Решение
+## Decision
 
-| Точка | Механизм | Использование |
+| Extension point | Mechanism | Use |
 |---|---|---|
-| **Потребитель топиков** | Внешний сервис читает `psim.events.normalized.v1` или `psim.signals.v1` и публикует сигналы в `psim.signals.v1` от имени зарегистрированного «правила-источника» | Модель классифицирует тревоги или порождает сигналы; детерминированный `signal_id` строится по тем же правилам |
-| **Шаг сценария `automated`** | Шаг вызывает внешний обработчик по HTTPS (webhook с подписью) и получает результат: рекомендацию, заполнение поля, выбор ветки с подтверждением оператора | Помощь в принятии решения внутри сценария |
-| **Ассистент оператора** | Клиент API с ролью только для чтения и realtime-подпиской | Подсказки и сводки в консоли |
+| **Topic consumer** | An external service reads `psim.events.normalized.v1` or `psim.signals.v1` and publishes to `psim.signals.v1` as a registered source rule | A model classifies alarms or produces signals; deterministic `signal_id` follows the same rules |
+| **`automated` scenario step** | A signed HTTPS webhook calls an external handler and receives a recommendation, field value or branch choice requiring operator confirmation | Decision support within a scenario |
+| **Operator assistant** | Read-only API client with a realtime subscription | Console suggestions and summaries |
 
-Требования к контрактам MVP, вытекающие из решения:
+Resulting MVP contract requirements:
 
-1. Сигнал имеет поле `origin` (правило или внешний источник) и ссылку на объяснение (`explanation_ref`, необязательно).
-2. Шаг сценария `automated` присутствует в модели сценария с MVP (выполняется как webhook).
-3. Действия ИИ-субъектов фиксируются в аудите как `actor.kind = SERVICE` с идентификатором модуля.
+1. A signal has `origin` (rule or external source) and optional `explanation_ref`.
+2. The scenario model includes an `automated` step from MVP, executed as a webhook.
+3. Audit identifies AI actions as `actor.kind = SERVICE`, with the module identifier.
 
-## Последствия
+## Consequences
 
-- Внешние ИИ-модули подчиняются тем же контрактам, правам и аудиту, что и остальные компоненты.
+- External AI modules follow the same contracts, permissions and audit requirements as other components.
 
-## Проверка
+## Verification
 
-Контракт сигнала и сценария содержит перечисленные поля (проверка в шаге 0.5).
+Contract tests check that signal and scenario contracts contain these fields.

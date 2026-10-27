@@ -1,44 +1,48 @@
-# Администрирование
+# Administration
 
-Администратор настраивает систему через `/admin`; интегратор управляет коннекторами и отображениями через `/integrations`. Используются текущая OIDC-сессия, публичный REST API Gateway и проверки области на стороне каждого владельца данных. Решение - [ADR-072](../adr/0072-administration.md).
+<!-- language-links -->
+[English](administration.md) | [Русский](../ru/engineering/administration.md)
+<!-- /language-links -->
 
-## Каталог
+The administrator configures the system through `/admin`. The integrator manages connectors and mappings through `/integrations`. The current OIDC session, public REST API Gateway, and access scope checks are used. The solution is [ADR-072](../adr/0072-administration.md).
 
-Выберите раздел и создайте запись либо откройте существующую. Форма предлагает UUID; до первого сохранения его можно заменить, например для идентичности сертификата внешней PKI. После сохранения идентификатор недоступен для изменения. Сервер назначает версию и метаданные. Списки поддерживают фильтр и последовательные страницы; фоновое чтение обновляет список, сохраняя редактируемые поля.
+## Catalog
 
-Иерархия: площадка -> здание -> этаж -> зона. Для площадки укажите часовой пояс IANA; для остальных локаций - родителя. Смена типа локации удаляет несовместимое значение часового пояса либо родителя. Площадку вычисляет сервер. Устройство связывается с зоной, типом и коннектором; источники содержат внешнюю ссылку и kind. Состояние ресурса задаётся отдельно от качества связи. Регистрация коннектора не является свидетельством актуальности устройства.
+Select a section and create a record or open an existing one. The form provides a UUID; it can be replaced before the first save, for example, to ensure identity consistency with external PKI certificates. After saving, the identifier cannot be changed. The server assigns a version and metadata. Lists support filtering and sequential pages; background reading updates the list while preserving editable fields.
 
-Типы устройств, отображения, правила, типы инцидентов, SLA и настройки требуют области всего тенанта. Сценарии также являются общими определениями. Администратор площадки управляет разрешёнными локациями, устройствами, файлами и обслуживанием. Недоступная общая конфигурация не запрашивается.
+Hierarchy: site -> building -> floor -> zone. For a site, specify the IANA time zone; for other locations, specify the parent. Changing the location type removes incompatible time zone or parent values. The site is calculated by the server. The device connects to the zone, type, and connector; sources include an external link and kind. Resource status is set separately from connection quality. Registering a connector does not confirm the device state freshness.
 
-## Импорт и планы этажей
+Device types, mappings, rules, incident types, SLA, and settings require tenant-wide scope. Response scenarios are also common definitions. The site administrator manages allowed locations, devices, files, and maintenance. An unavailable general configuration is not requested.
 
-В разделе импорта выберите CSV с заголовком либо JSON-массив устройств и выполните проверку. Интерфейс показывает сохранённое задание, счётчики и ошибки строк. Применение доступно после завершённой проверки без ошибок для того же файла. Выбор другого файла отменяет возможность применения прежнего результата. Предел - 64 МиБ. Неизвестный результат записи требует точного повтора; автоматического повторения нет.
+## Import and Floor Plans
 
-В разделе планов укажите UUID этажа. Загрузка PNG/JPEG использует текущую версию этажа и положительные размеры плана. Проверяются расширение/тип, размер до 20 МиБ и декодирование до 16 миллионов пикселей; сервер повторно проверяет содержимое. Версии читаются страницами. Просмотр получает файл через авторизованный API и освобождает Blob URL после закрытия или смены версии. В хранилище нет публичных URL.
+In the import section, select a CSV with headers or a JSON array of devices and perform checks. The interface shows saved tasks, counters, and error messages. Application is available after successful checks without errors for the same file. Selecting another file cancels previous results. Limit is 64 MiB. Unknown write outcomes require an exact retry; automatic retry is not available.
 
-## Нормализация, правила и сценарии
+In the plan section, specify the UUID of the floor. PNG/JPEG upload uses the current floor version and positive floor plan dimensions. Extension/type, size up to 20 MiB, and decoding up to 16 million pixels are checked; the server rechecks the content. Versions are read page by page. The view receives the file through an authorized API and releases the Blob URL after closing or changing the version. There are no public URLs in the storage.
 
-Для нового типа коннектора создайте набор отображений с тем же `connectorType`, версией таксономии и упорядоченными правилами. Каждое правило содержит исходный код либо префикс с завершающей `*`, необязательное условие CEL, целевой тип таксономии и отображение атрибутов. Публикация сохраняет версию набора с проверкой прежней версии.
+## Normalization, Rules, and Scenarios
 
-Тип инцидента задаёт приоритет, группировку, требование реагирования и ссылку на политику эскалации. Политика содержит сроки принятия и разрешения для приоритетов, уровни с возрастающими задержками, получателями и каналами.
+For a new connector type, create a mapping set with the same `connectorType`, taxonomy version, and ordered rules. Each rule contains source code or a prefix with the ending `*`, optional CEL condition, target taxonomy type, and attribute mappings. Publishing saves the set version with a check against the previous version.
 
-Правило корреляции редактируется полями: фильтр, область, окно, допустимое опоздание, подавление, один вид корреляции и выходной сигнал. Сначала сохраните черновик, затем проверьте сохранённую версию. Пробный прогон принимает диапазон UTC и источник Kafka либо ClickHouse. Его состояние и счётчики читаются до завершения. Активация после подтверждения сохраняет остальные правила и использует версию всего активного набора. Ошибки диапазона, CEL и связей возвращает сервер.
+Incident type sets priority, grouping, response requirement, and reference to escalation policy. The policy includes acknowledgement and resolution times for priorities, levels with increasing delays, recipients, and channels.
 
-Сценарий задаёт привязки к типам инцидентов, начальный шаг и список шагов. Тип шага выбирается явно: инструкция, контрольный список, решение, команда, уведомление, ожидание, эскалация либо внешний обработчик. Вложенные списки, ветвления и параметры заполняются отдельными полями. Выбор другого типа удаляет прежние взаимоисключающие параметры. Проверка и публикация относятся к сохранённой версии; изменение формы требует повторного сохранения и проверки. Архивирование требует подтверждения.
+Correlation rules are edited in fields: filter, scope, window, allowed lateness, suppression, one type of correlation, and output signal. First save a draft, then check the saved version. A trial run accepts UTC range and Kafka or ClickHouse source. Its status and counters are read until completion. Activation after confirmation preserves the other rules and uses the version of the active set. Server returns errors for range, CEL, and reference errors.
 
-## Обслуживание и сертификаты
+A scenario sets bindings to incident types, initial step, and list of steps. Step type is explicitly selected: instruction, checklist, decision, command, notification, waiting, escalation, or external handler. Nested lists, branches, and parameters are filled with separate fields. Selecting another type removes previous conflicting parameters. Check and publish apply to the saved version; changing the form requires saving and rechecking. Archiving requires confirmation.
 
-Окно обслуживания содержит устройство либо зону, начало, обязательное окончание, причину, ответственного и конкретные типы событий либо UUID правил подавления. Сервер фиксирует автоматические переходы и аудит. Для досрочного завершения введите причину и подтвердите действие. Пожарные события и P1 не подавляются.
+## Maintenance and Certificates
 
-Для регистрации коннектора укажите его UUID, тип и публичный PEM, выданный внешней PKI для этой идентичности. Продление передаёт новый публичный сертификат. Закрытый ключ остаётся вне браузера. Полное отключение коннектора требует причины и подтверждения. Реестр сертификатов и состояние регистрации доступны в карточке; все изменения проходят существующий аудит Gateway и каталога.
+The maintenance window contains a device or zone, start, required end, reason, responsible person, and specific event types or UUID of suppression rules. The server records automatic transitions and audits. To terminate early, enter the reason and confirm the action. Fire incidents and P1 are not suppressed.
 
-## Доступ и ошибки
+To register a connector, specify its UUID, type, and public PEM issued by external PKI for this identity. Renewal supplies a new public certificate. The private key remains outside the browser. Fully disabling a connector requires a reason and confirmation. Certificate registry and registration status are available in the card; all changes go through the existing Gateway audit and catalog.
 
-Панель прав читает `/v1/me`: текущего пользователя, тенант, роли, площадки, зоны и разрешённые действия. Назначение ролей `psim` и `psim_scopes` выполняется в консоли Keycloak выбранного realm. Для неё требуется отдельная сессия администратора идентификации. Ссылка не передаёт bearer приложения; администратор площадки не получает полномочий управления IdP. После изменения обновите панель; текущие серверные проверки применяют отзыв доступа к действующим сессиям.
+## Access and Errors
 
-Конфликт версий сохраняет введённые поля. Явное перечитывание требует подтверждения отмены изменений. Неизвестный результат блокирует новые записи до точного повтора с прежним ключом. При разрыве сети, ошибке актуального чтения, в учениях и на видеостене запись запрещена. Отказ авторизации скрывает ранее загруженные данные. Смена идентичности отменяет запросы и очищает кэш.
+The right-hand panel reads `/v1/me`: current user, tenant, roles, sites, zones, and allowed actions. Assigning roles `psim` and `psim_scopes` is done in the Keycloak console of the selected realm. It requires a separate identity administrator session. The link does not pass application bearer tokens; the site administrator does not get authority to manage IdP. After changes, update the panel; current server checks apply to active sessions.
 
-## Проверки
+Version conflicts retain entered fields. Explicit rereading requires confirmation to undo changes. Unknown outcomes block new writes until an exact retry with the previous key. In case of network failure, failure to read current state, exercises, and video wall, writes are prohibited. Authentication failure hides previously loaded data. Changing identity cancels requests and clears cache.
+
+## Checks
 
 ```sh
 task web:check
@@ -46,6 +50,6 @@ task admin:test PRESET=release
 task response:test PRESET=release
 ```
 
-Модульные проверки охватывают структуры форм, oneof, сохранение введённых полей, версии, повторы, отзыв прав, импорт и файлы. Нативный Playwright-прогон использует реальный PKCE с MFA, HTTPS, Kafka, PostgreSQL, Gateway и закрытое хранилище файлов. Конфигурация S1/S2 и правила со сценарием создаётся действиями браузера. Затем событие новой mTLS-идентичности проверяется через нормализацию и корреляцию до инцидента и запуска опубликованного сценария. Отдельный администратор площадки получает отказ при чтении чужого этажа.
+Module checks cover form structures, oneof, saving entered fields, versions, retries, revoked permissions, import, and files. The native Playwright run uses real PKCE with MFA, HTTPS, Kafka, PostgreSQL, Gateway, and private file storage. S1/S2 configuration and rules with scenarios are created by browser actions. Then, a new mTLS identity is checked through normalization and correlation before incident and published scenario execution. A separate site administrator receives errors when reading another floor.
 
-Диагностика, снимки экрана и отчёт находятся в `build/admin/<preset>/`. Созданное проверкой Compose-окружение удаляется; `PSIM_ADMIN_KEEP_ENV=1` сохраняет его для диагностики. Проверка существующего окружения не удаляет его тома. Отчёт по размерам - [сравнение поставки](administration-assets.md); предел полного графа принят в [ADR-073](../adr/0073-administration-delivery-budget.md).
+Diagnostics, screenshots, and reports are in `build/admin/<preset>/`. The Compose environment created by the check is deleted; `PSIM_ADMIN_KEEP_ENV=1` saves it for diagnosis. Checking the existing environment does not delete its files. Bundle size - [comparison of deliveries](administration-assets.md); the full graph’s limit is accepted in [ADR-073](../adr/0073-administration-delivery-budget.md).

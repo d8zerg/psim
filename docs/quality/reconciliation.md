@@ -1,78 +1,115 @@
-# Методика сквозной сверки потерь и дубликатов
+# Event Loss and Duplicate Reconciliation
 
-Версия 0.1 · Шаг плана 0.7 · Статус: черновик
+<!-- language-links -->
+[English](reconciliation.md) | [Русский](../ru/quality/reconciliation.md)
+<!-- /language-links -->
 
-Цель: доказать «0 потерянных событий, 0 потерянных инцидентов, 0 дубликатов инцидентов» (план 1.3) в нагрузочных и хаос-тестах, а не предполагать это. Реализация - шаги 3.1 (базовая версия), 4.3 (симулятор), 10.1, 10.2.
+Objective: To prove “0 lost events, 0 lost incidents, 0 duplicate incidents” in load and chaos tests, rather than assuming this to be the case. Goals G-05 and G-06 are verified through cross-checking with the simulator during load and failures.
+
+This is the qualification protocol. Available evidence and outstanding qualification requirements are listed in [release readiness](../product/release-readiness.md).
 
 ---
 
-## 1. Идея
+## 1. Concept
 
-Генератор нагрузки знает, что отправил; платформа сохраняет, что приняла и что из этого получилось. Сверка сравнивает два множества по уникальным ключам, которые платформа обязана сохранить неизменными по всему конвейеру.
+The load generator knows what it has sent; the platform keeps track of what it has received and what results were obtained from those. The cross-check compares two sets of unique keys, which the platform must maintain unchanged throughout the pipeline.
 
-```mermaid
-flowchart LR
-    SIM[Симулятор] -- "журнал отправки:<br/>source, epoch, seq, event_id,<br/>ожидаемый исход" --> LED[(Журнал генератора)]
-    SIM -- события --> GW[Connector Gateway] --> K1{{raw}} --> N[Normalizer] --> K2{{normalized}}
-    K2 --> CE[Correlation] --> K3{{signals}} --> IS[Incident Service] --> K4{{incidents.events}}
-    K2 --> CH[(ClickHouse events)]
-    K3 --> CH2[(ClickHouse event_signals)]
-    K4 --> CH3[(ClickHouse incident_facts)]
-    LED --> REC[Сверка]
-    CH --> REC
-    CH2 --> REC
-    CH3 --> REC
-    REC --> REP[Отчёт: потери, дубликаты,<br/>лишние, задержки]
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+left to right direction
+rectangle "Simulator" as SIM
+database "Generator Log" as LED
+rectangle "Connector Gateway" as GW
+queue "raw" as K1
+rectangle "Normalizer" as N
+queue "normalized" as K2
+rectangle "Correlation" as CE
+queue "signals" as K3
+rectangle "Incident Service" as IS
+queue "incidents.events" as K4
+database "ClickHouse events" as CH
+database "ClickHouse event_signals" as CH2
+database "ClickHouse incident_facts" as CH3
+rectangle "Comparison" as REC
+rectangle "Report: Losses, duplicates, \nextra records, latency" as REP
+SIM --> LED : Sending log: \nsource, epoch, seq, event_id, \nExpected output
+SIM --> GW : events
+GW --> K1
+K1 --> N
+N --> K2
+K2 --> CE
+CE --> K3
+K3 --> IS
+IS --> K4
+K2 --> CH
+K3 --> CH2
+K4 --> CH3
+LED --> REC
+CH --> REC
+CH2 --> REC
+CH3 --> REC
+REC --> REP
+@enduml
 ```
 
-## 2. Ключи сверки
+## 2. Keys for Cross-Checking
 
-| Уровень | Ключ | Источник ожидаемого | Источник фактического |
+| Level | Key | Expected Source | Actual Source |
 |---|---|---|---|
-| События | `(source_id, source_epoch, source_seq)` и `event_id` | Журнал генератора: каждое событие с подтверждённой отправкой (`BatchAck`) и каждое событие в буфере SDK на момент окончания теста | ClickHouse `events` (все события, ADR-028) и, для контроля, чтение `psim.events.normalized.v1` |
-| Сигналы | `signal_id` (детерминирован, ADR-005) | Оракул сценариев: генератор порождает события по сценариям с известным результатом корреляции | `psim.signals.v1`, ClickHouse `event_signals` |
-| Инциденты | `grouping_key` + окно | Оракул сценариев | `psim.incidents.events.v1`, ClickHouse `incident_facts`, PostgreSQL Incident Service |
+| Events | `(source_id, source_epoch, source_seq)` and `event_id` | Generator log: each event with confirmed sending (`BatchAck`) and each event in the SDK buffer at the end of the test | ClickHouse `events` (all events, ADR-028) and, for verification, reading `psim.events.normalized.v1` |
+| Signals | `signal_id` (deterministic, ADR-005) | Scenario oracle: the generator generates events according to scenarios with known correlation results | `psim.signals.v1`, ClickHouse `event_signals` |
+| Incidents | `grouping_key` + window | Scenario oracle | `psim.incidents.events.v1`, ClickHouse `incident_facts`, PostgreSQL Incident Service |
 
-Журнал генератора - файл или таблица ClickHouse `loadgen_ledger`, отдельная от данных платформы, чтобы сверка не зависела от проверяемой системы.
+The generator log is a file or table ClickHouse `loadgen_ledger`, separate from the platform’s data, so that the cross-check does not depend on the system being tested.
 
-## 3. Оракул сценариев
+## 3. Scenario Oracle
 
-Фоновая нагрузка (`LOAD-50K`) состоит из событий, которые не порождают сигналов, и из **сценарных вставок** с известным результатом:
+Background load (`LOAD-50K`) consists of events that do not generate signals and **scenario inserts** with known results:
 
-| Вставка | Ожидаемый результат |
+| Insert | Expected Result |
 |---|---|
-| Пара «периметр + видеоаналитика» в одной зоне в пределах окна | 1 сигнал, 1 инцидент |
-| Та же пара с интервалом больше окна | 0 сигналов |
-| Повтор пары в окне группировки | 1 инцидент с 2 сигналами |
-| Пороговая серия N событий | 1 сигнал |
-| Отсутствие ожидаемого heartbeat | 1 сигнал после закрытия окна |
-| Поздние события в пределах допустимого опоздания | Учтены |
-| Поздние события сверх допустимого опоздания | Не учтены, посчитаны в метрике |
+| Pair “perimeter + video analytics” in one zone within the window | 1 signal, 1 incident |
+| Same pair with an interval longer than the window | 0 signals |
+| Repetition of the pair in the grouping window | 1 incident with 2 signals |
+| N consecutive events at the threshold | 1 signal |
+| Absence of expected heartbeat | 1 signal after the window closes |
+| Late events within the allowable delay | Counted |
+| Late events beyond the allowable delay | Not counted, but included in the metric |
 
-Оракул вычисляет ожидаемые сигналы и инциденты теми же правилами в эталонной однопоточной реализации доменного ядра без инфраструктуры (тот же код домена, другой адаптер), поэтому ожидания не зависят от партиционирования и сбоев.
+The oracle calculates expected signals and incidents using the same rules as in the reference single-threaded implementation of the domain core without infrastructure (the same domain code, different adapter), so expectations do not depend on partitioning or failures.
 
-## 4. Алгоритм
+## 4. Algorithm
 
-1. **Подготовка.** Чистое состояние или зафиксированная отметка времени начала; генератор записывает зерно, профиль, список вставок.
-2. **Прогон.** Нагрузка и, для хаос-тестов, внесение сбоев по сценарию эксперимента.
-3. **Дренирование.** Генератор останавливается; ожидание, пока лаг всех групп потребителей станет 0 и буферы SDK пусты, но не дольше дедлайна (по умолчанию 10 мин).
-4. **Сверка событий.** Для каждого источника: множество отправленных номеров минус принятые = потерянные; принятые с кратностью больше 1 = дубликаты; принятые, но не отправленные = лишние.
-5. **Сверка сигналов и инцидентов.** Сравнение с оракулом по `signal_id` и по `grouping_key`; инцидент с тем же `grouping_key` в одном окне более одного раза - дубликат.
-6. **Отчёт.** Количество и примеры по каждой категории; распределение задержек (по [latency-measurement.md](latency-measurement.md)); список внесённых сбоев с временем.
+1. **Preparation.** Clean state or a timestamp of start time; the generator records seeds, profiles, and list of inserts.
+2. **Execution.** Load and, for chaos tests, insertion of failures according to experimental scenarios.
+3. **Draining.** The generator stops; waiting until all consumer group lags reach 0 and SDK buffers are empty, but not longer than the deadline (default 10 minutes).
+4. **Event Checking.** For each source: compare the expected and actual key sets. Expected keys absent from the actual set are lost; actual keys absent from the expected set are extra; multiplicity greater than the expected count identifies duplicates.
+5. **Signal and Incident Checking.** Comparison with the oracle using `signal_id` and `grouping_key`; an incident with the same `grouping_key` in one window more than once is a duplicate.
+6. **Report.** Number and examples for each category; distribution of delays (in [latency-measurement.md](latency-measurement.md)); list of inserted failures with time.
 
-## 5. Критерии
+## 5. Criteria
 
-| Категория | Порог |
+| Category | Threshold |
 |---|---|
-| Потерянные события | 0 |
-| Дубликаты событий в `psim.events.normalized.v1` | 0 (EOS-K, ADR-006) |
-| Лишние события | 0 |
-| Потерянные сигналы и инциденты | 0 |
-| Дубликаты инцидентов | 0 |
-| События, отброшенные политикой переполнения SDK | Допустимы только класса `info`, только при сценарии переполнения, и каждое отражено в метрике `system.connector.buffer_overflow` |
+| Lost events | 0 |
+| Duplicates in `psim.events.normalized.v1` | 0 (EOS-K, ADR-006) |
+| Extra events | 0 |
+| Lost signals and incidents | 0 |
+| Duplicates of incidents | 0 |
+| Events discarded by SDK overflow policy | 0. A full buffer rejects new enqueue attempts and applies backpressure; accepted events remain queued. The `info` class is not an eviction exception. Record overflow attempts in `system.connector.buffer_overflow`. |
 
-Любое нарушение - провал теста; отчёт сохраняет данные для воспроизведения (зерно, время сбоев, диапазоны смещений).
+Any violation is a test failure; the report retains data for reproduction (seeds, failure times, deviation ranges).
 
-## 6. Сверка в симуляции
+## 6. Cross-Checking in Simulation
 
-В симуляционном стенде (шаг 2.7) тот же алгоритм выполняется в памяти после каждого прогона: тысячи прогонов с разными зёрнами и расписаниями сбоев. Это основной способ доказательства корректности; сверка на стендах подтверждает её на реальной инфраструктуре.
+In the simulation environment (ADR-044), the same algorithm is executed in memory after each execution: thousands of executions with different seeds and failure schedules. Simulation checks the domain model across reproducible schedules; integration reconciliation separately checks the implementation on real infrastructure.

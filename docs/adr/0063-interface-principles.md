@@ -1,20 +1,24 @@
-# ADR-063. Принципы оперативного интерфейса
+# ADR-063. Principles of Real-Time Interface
 
-- **Статус:** Принято
-- **Связанные:** [ADR-062](0062-design-system-and-stable-updates.md)
+<!-- language-links -->
+[English](0063-interface-principles.md) | [Русский](../ru/adr/0063-interface-principles.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-062](0062-design-system-and-stable-updates.md)
 
-Предсказуемость важнее адаптивности. Порядок действий, идентификатор выбранной записи, фокус и расположение основных областей сохраняются при обновлении. Автоматическая рекомендация может предложить фильтр, раскладку или кризисный режим; применяет её оператор явным действием.
+## Solution
 
-Нормальное состояние нейтрально. Яркий цвет обозначает отклонение, опасность или необходимость внимания; фокус и ссылки сохраняют доступное различие. Цвет повторяется текстом и предметным символом. Исправность не выводится из отсутствия новых событий: показываются свежесть, источник и качество связи.
+Predictability is more important than adaptability. The order of actions, the identifier of the selected record, focus, and location of main areas remain unchanged during updates. Automatic recommendations can suggest filters, layouts, or crisis modes; the operator applies them explicitly.
 
-Режимы: обычный, кризис, учения, видеостена. Режим не меняет смысл команд и не расширяет права. Изменение плотности и темы не перемещает рабочие действия. Потеря связи оставляет последний успешный результат с явной пометкой; команда по устаревшим данным недоступна.
+A normal state is neutral. Bright colors indicate deviations, risks, or attention needed; focus and links maintain a clear distinction. Color is repeated with text and object symbols. Healthy operation cannot be inferred from the absence of new events: freshness, source, and communication quality are displayed.
 
-## Проверка
+Modes: normal, crisis, exercises, video wall. A mode does not change the meaning of commands or expand rights. Changing density and theme does not move working actions. Loss of connection leaves the last successful result with an explicit note; commands based on outdated data are unavailable.
 
-Проверки смысла и клавиатуры, неизменность DOM и выбранной записи, контраст и снимки всех вариантов. Наличие текста статуса проверяется отдельно от CSS. Рекомендация не может сама отправить команду или применить кризисный режим.
+## Verification
 
-## Основание
+Verifications include semantic and keyboard checks, DOM and selected record invariance, contrast, and snapshots of all variants. The presence of status text is checked separately from CSS. Recommendations cannot send commands or apply crisis modes themselves.
 
-[ISA101](https://www.isa.org/standards-and-publications/isa-standards/isa-standards-committees/isa101) рассматривает навигацию, графику, цвета и тревоги HMI. Описанные выше правила являются политикой продукта; наличие ссылки не является заявлением о сертификации по стандарту.
+## Basis
+
+[ISA101](https://www.isa.org/standards-and-publications/isa-standards/isa-standards-committees/isa101) discusses navigation, charts, colors, and alerts in HMI. The above rules are product policy; the presence of links does not constitute a certification statement according to standards.

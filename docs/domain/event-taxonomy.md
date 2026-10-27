@@ -1,222 +1,224 @@
-# Таксономия событий v1 и модель критичности
+# Taxonomy of Events v1 and Severity Model
 
-Версия 0.1 · Шаг плана 0.2 · Статус: черновик
+<!-- language-links -->
+[English](event-taxonomy.md) | [Русский](../ru/domain/event-taxonomy.md)
+<!-- /language-links -->
 
-Таксономия - общий язык событий от любых источников. Правила отображения (Normalizer) переводят коды производителей в типы таксономии; правила корреляции и отчёты работают только с типами таксономии. Единственный источник истины - [contracts/taxonomy/v1/taxonomy.yaml](../../contracts/taxonomy/v1/taxonomy.yaml) (шаг 0.5); этот документ - описание. Таблицы раздела 5 сверяются с YAML автоматически (`task contracts:verify`); новые типы добавляются сначала в YAML.
+Taxonomy is a common language for events from any source. The Normalizer rules convert vendor codes into taxonomy types; correlation and reporting rules only work with taxonomy types. The only source of truth is [contracts/taxonomy/v1/taxonomy.yaml](../../contracts/taxonomy/v1/taxonomy.yaml); this document describes the taxonomy. Tables in section 5 are automatically synchronized with YAML (`task contracts:verify`); new types are added to YAML first.
 
 ---
 
-## 1. Структура кода
+## 1. Code Structure
 
 ```
-<домен>.<объект>.<событие>
+<domain>.<object>.<event>
 ```
 
-- **Домен** - подсистема безопасности или инфраструктуры.
-- **Объект** - что именно сработало: зона, шлейф, дверь, детектор, канал.
-- **Событие** - что произошло.
+- **Domain** - Security subsystem or infrastructure.
+- **Object** - The affected entity: zone, stream, door, detector or channel.
+- **Event** - What occurred.
 
-Коды - строчные латинские буквы, цифры и `_`. Примеры: `intrusion.zone.alarm`, `access.door.forced`, `video.analytics.person_detected`.
+Codes are lowercase letters, numbers, and `_`. Examples: `intrusion.zone.alarm`, `access.door.forced`, `video.analytics.person_detected`.
 
-**Эволюция:** типы только добавляются. Удалённый тип помечается `deprecated` и продолжает приниматься до следующей мажорной версии таксономии. Переименование - это добавление нового типа и вывод старого. Версия таксономии входит в нормализованное событие.
+**Evolution:** Types are only added. Removed types are marked as `deprecated` and continue to be accepted until the next major version of the taxonomy. Renaming involves adding a new type and deprecating the old one. A taxonomy version is included in a normalized event.
 
-## 2. Класс события
+## 2. Event Class
 
-Каждый тип относится к одному классу. Класс определяет поведение по умолчанию в корреляции и отображении.
+Each type belongs to one class. The class defines default behavior in correlation and reporting.
 
-| Класс | Смысл | Пример |
+| Class | Meaning | Example |
 |---|---|---|
-| `alarm` | Тревога: возможная угроза | Проникновение, пожар, взлом двери |
-| `warning` | Предупреждение: отклонение без прямой угрозы | Дверь удерживается открытой, предварительный пожарный сигнал |
-| `fault` | Неисправность оборудования или связи | Обрыв шлейфа, потеря видеосигнала |
-| `restore` | Возврат в норму после `alarm`, `warning` или `fault` | Восстановление шлейфа, связь восстановлена |
-| `state` | Смена режима | Постановка на охрану, снятие с охраны |
-| `info` | Информационное событие | Проход по карте, вход оператора в систему устройства |
+| `alarm` | Alarm: potential threat | Intrusion, fire, door break-in |
+| `warning` | Warning: deviation without direct threat | Door remains open, preliminary fire alert |
+| `fault` | Equipment or communication failure | Stream interruption, video signal loss |
+| `restore` | Recovery after `alarm`, `warning`, or `fault` | Stream restoration, connection restored |
+| `state` | Mode change | Arming and disarming |
+| `info` | Information event | Card access, operator entry into the device system |
 
-Пары `alarm`/`fault` ↔ `restore` указаны в столбце «Восстановление»; правило корреляции `absence` и проекции состояния устройств используют их, чтобы определить текущее состояние источника.
+Pairs `alarm`/`fault` -> `restore` are listed in the “Recovery” column; correlation rule `absence` and device state projections use them to determine the current status of the source.
 
-## 3. Критичность
+## 3. Severity
 
-| Уровень | Код | Число | Смысл | Значимое событие (по умолчанию) |
+| Level | Code | Number | Meaning | Significant Event (default) |
 |---|---|---|---|---|
-| Критичная | `critical` | 4 | Угроза жизни или крупный ущерб | да |
-| Высокая | `high` | 3 | Вероятная угроза безопасности | да |
-| Средняя | `medium` | 2 | Требует внимания | да |
-| Низкая | `low` | 1 | Отклонение без немедленных последствий | нет |
-| Информационная | `info` | 0 | Норма, для истории | нет |
+| Critical | `critical` | 4 | Life-threatening or major damage | Yes |
+| High | `high` | 3 | Potential security threat | Yes |
+| Medium | `medium` | 2 | Requires attention | Yes |
+| Low | `low` | 1 | Deviation without immediate consequences | No |
+| Informational | `info` | 0 | Normal, for history | No |
 
-- Критичность по умолчанию задана для типа (столбец «Крит.»). Правило отображения может переопределить её для конкретного источника.
-- Порог значимости настраивается на тенанте (`severity ≥ medium` по умолчанию). Событие, на которое ссылается сигнал, значимо всегда.
+- The default severity is set for the type (in the “Critical” column). The normalization mapping rule can override it for a specific source.
+- The significance threshold is configured per tenant (`severity ≥ medium` by default). The event referenced by the signal is always significant.
 
-## 4. Приоритет инцидента
+## 4. Incident Priority
 
-| Приоритет | Смысл | Критичность по умолчанию | SLA принятия (по умолчанию) |
+| Priority | Meaning | Default Severity | SLA Acceptance (default) |
 |---|---|---|---|
-| `P1` | Немедленная реакция | `critical` | 30 с |
-| `P2` | Срочная реакция | `high` | 60 с |
-| `P3` | Реакция в пределах смены | `medium` | 5 мин |
-| `P4` | Плановая обработка | `low` | 30 мин |
+| `P1` | Immediate response | `critical` | 30 seconds |
+| `P2` | Urgent response | `high` | 60 seconds |
+| `P3` | Response within shift | `medium` | 5 minutes |
+| `P4` | Planned processing | `low` | 30 minutes |
 
-Правило корреляции вычисляет приоритет сигнала выражением; по умолчанию - из максимальной критичности событий сигнала по таблице. События `info` по умолчанию сигналов не порождают. SLA задаются политикой эскалации; значения в таблице - стартовые настройки.
+The correlation rule calculates the signal priority using an expression; by default, it’s based on the highest severity of the signal events in the table. Events `info` do not generate signals by default. SLA is set by escalation policy; values in the table are default settings.
 
 ---
 
-## 5. Типы событий
+## 5. Event Types
 
-### 5.1 `intrusion` - охранная сигнализация
+### 5.1 `intrusion` - Intrusion
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Severity | Recovery |
 |---|---|---|---|---|
-| `intrusion.zone.alarm` | Тревога в охранной зоне | alarm | high | `intrusion.zone.restore` |
-| `intrusion.zone.restore` | Зона в норме | restore | info | - |
-| `intrusion.zone.armed` | Постановка на охрану | state | info | - |
-| `intrusion.zone.disarmed` | Снятие с охраны | state | info | - |
-| `intrusion.zone.arm_failed` | Отказ постановки на охрану | warning | medium | - |
-| `intrusion.zone.bypassed` | Зона исключена из охраны | warning | low | `intrusion.zone.unbypassed` |
-| `intrusion.zone.unbypassed` | Зона возвращена в охрану | restore | info | - |
-| `intrusion.panic.alarm` | Тревожная кнопка | alarm | critical | - |
-| `intrusion.duress.alarm` | Код принуждения | alarm | critical | - |
-| `intrusion.device.tamper` | Вскрытие корпуса | alarm | high | `intrusion.device.tamper_restore` |
-| `intrusion.device.tamper_restore` | Корпус закрыт | restore | info | - |
+| `intrusion.zone.alarm` | Zone alarm | alarm | high | `intrusion.zone.restore` |
+| `intrusion.zone.restore` | Zone restore | restore | info | - |
+| `intrusion.zone.armed` | Zone armed | state | info | - |
+| `intrusion.zone.disarmed` | Zone disarmed | state | info | - |
+| `intrusion.zone.arm_failed` | Zone arm failed | warning | medium | - |
+| `intrusion.zone.bypassed` | Zone bypassed | warning | low | `intrusion.zone.unbypassed` |
+| `intrusion.zone.unbypassed` | Zone unbypassed | restore | info | - |
+| `intrusion.panic.alarm` | Panic alarm | alarm | critical | - |
+| `intrusion.duress.alarm` | Duress alarm | alarm | critical | - |
+| `intrusion.device.tamper` | Device tamper | alarm | high | `intrusion.device.tamper_restore` |
+| `intrusion.device.tamper_restore` | Device tamper restore | restore | info | - |
 
-### 5.2 `fire` - пожарная сигнализация
+### 5.2 `fire` - Fire
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Severity | Recovery |
 |---|---|---|---|---|
-| `fire.detector.alarm` | Пожар | alarm | critical | `fire.detector.restore` |
-| `fire.detector.prealarm` | Предварительный сигнал (внимание) | warning | high | `fire.detector.restore` |
-| `fire.detector.restore` | Извещатель в норме | restore | info | - |
-| `fire.manual_call_point.alarm` | Ручной пожарный извещатель | alarm | critical | `fire.manual_call_point.restore` |
-| `fire.manual_call_point.restore` | Ручной извещатель в норме | restore | info | - |
-| `fire.loop.fault` | Неисправность шлейфа | fault | medium | `fire.loop.restore` |
-| `fire.loop.restore` | Шлейф в норме | restore | info | - |
-| `fire.extinguishing.started` | Пуск автоматического пожаротушения | alarm | critical | - |
-| `fire.extinguishing.blocked` | Автоматика пожаротушения отключена | warning | high | `fire.extinguishing.unblocked` |
-| `fire.extinguishing.unblocked` | Автоматика пожаротушения включена | restore | info | - |
-| `fire.panel.reset` | Сброс пожарной панели | state | info | - |
+| `fire.detector.alarm` | Detector alarm | alarm | critical | `fire.detector.restore` |
+| `fire.detector.prealarm` | Detector prealarm | warning | high | `fire.detector.restore` |
+| `fire.detector.restore` | Detector restore | restore | info | - |
+| `fire.manual_call_point.alarm` | Manual call point alarm | alarm | critical | `fire.manual_call_point.restore` |
+| `fire.manual_call_point.restore` | Manual call point restore | restore | info | - |
+| `fire.loop.fault` | Loop fault | fault | medium | `fire.loop.restore` |
+| `fire.loop.restore` | Loop restore | restore | info | - |
+| `fire.extinguishing.started` | Extinguishing started | alarm | critical | - |
+| `fire.extinguishing.blocked` | Extinguishing blocked | warning | high | `fire.extinguishing.unblocked` |
+| `fire.extinguishing.unblocked` | Extinguishing unblocked | restore | info | - |
+| `fire.panel.reset` | Panel reset | state | info | - |
 
-### 5.3 `access` - СКУД
+### 5.3 `access` - Access
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Severity | Recovery |
 |---|---|---|---|---|
-| `access.door.granted` | Проход разрешён | info | info | - |
-| `access.door.denied` | Проход запрещён | info | low | - |
-| `access.door.denied_repeated` | Повторные отказы в проходе | warning | medium | - |
-| `access.door.forced` | Взлом двери (открыта без разрешения) | alarm | high | `access.door.closed` |
-| `access.door.held_open` | Дверь удерживается открытой | warning | medium | `access.door.closed` |
-| `access.door.opened` | Дверь открыта | info | info | - |
-| `access.door.closed` | Дверь закрыта | restore | info | - |
-| `access.door.locked` | Дверь заблокирована | state | info | - |
-| `access.door.unlocked` | Дверь разблокирована | state | info | - |
-| `access.credential.unknown` | Неизвестный идентификатор | warning | low | - |
-| `access.credential.blocked` | Заблокированный идентификатор | warning | medium | - |
-| `access.antipassback.violation` | Нарушение antipassback | warning | low | - |
-| `access.reader.tamper` | Вскрытие считывателя | alarm | high | `access.reader.tamper_restore` |
-| `access.reader.tamper_restore` | Считыватель в норме | restore | info | - |
+| `access.door.granted` | Door granted | info | info | - |
+| `access.door.denied` | Door denied | info | low | - |
+| `access.door.denied_repeated` | Door denied repeated | warning | medium | - |
+| `access.door.forced` | Door forced | alarm | high | `access.door.closed` |
+| `access.door.held_open` | Door held open | warning | medium | `access.door.closed` |
+| `access.door.opened` | Door opened | info | info | - |
+| `access.door.closed` | Door closed | restore | info | - |
+| `access.door.locked` | Door locked | state | info | - |
+| `access.door.unlocked` | Door unlocked | state | info | - |
+| `access.credential.unknown` | Credential unknown | warning | low | - |
+| `access.credential.blocked` | Credential blocked | warning | medium | - |
+| `access.antipassback.violation` | Antipassback violation | warning | low | - |
+| `access.reader.tamper` | Reader tamper | alarm | high | `access.reader.tamper_restore` |
+| `access.reader.tamper_restore` | Reader tamper restore | restore | info | - |
 
-### 5.4 `video` - видео и видеоаналитика
+### 5.4 `video` - Video
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Crit. | Restoration |
 |---|---|---|---|---|
-| `video.analytics.motion` | Движение в кадре | info | low | - |
-| `video.analytics.person_detected` | Обнаружен человек | warning | medium | - |
-| `video.analytics.vehicle_detected` | Обнаружено транспортное средство | warning | low | - |
-| `video.analytics.line_crossed` | Пересечение линии | alarm | high | - |
-| `video.analytics.zone_intrusion` | Вход в запретную зону кадра | alarm | high | - |
-| `video.analytics.loitering` | Длительное нахождение | warning | medium | - |
-| `video.analytics.object_left` | Оставленный предмет | alarm | high | - |
-| `video.analytics.object_removed` | Пропажа предмета | alarm | medium | - |
-| `video.analytics.crowd` | Скопление людей | warning | medium | - |
-| `video.analytics.smoke_fire` | Видеодетекция дыма или огня | alarm | critical | - |
-| `video.camera.tamper` | Саботаж камеры (заслонение, расфокус, поворот) | alarm | high | `video.camera.tamper_restore` |
-| `video.camera.tamper_restore` | Изображение камеры в норме | restore | info | - |
-| `video.camera.signal_lost` | Потеря видеосигнала | fault | medium | `video.camera.signal_restored` |
-| `video.camera.signal_restored` | Видеосигнал восстановлен | restore | info | - |
+| `video.analytics.motion` | Analytics motion | info | low | - |
+| `video.analytics.person_detected` | Analytics person detected | warning | medium | - |
+| `video.analytics.vehicle_detected` | Analytics vehicle detected | warning | low | - |
+| `video.analytics.line_crossed` | Analytics line crossed | alarm | high | - |
+| `video.analytics.zone_intrusion` | Analytics zone intrusion | alarm | high | - |
+| `video.analytics.loitering` | Analytics loitering | warning | medium | - |
+| `video.analytics.object_left` | Analytics object left | alarm | high | - |
+| `video.analytics.object_removed` | Analytics object removed | alarm | medium | - |
+| `video.analytics.crowd` | Analytics crowd | warning | medium | - |
+| `video.analytics.smoke_fire` | Analytics smoke fire | alarm | critical | - |
+| `video.camera.tamper` | Camera tamper | alarm | high | `video.camera.tamper_restore` |
+| `video.camera.tamper_restore` | Camera tamper restore | restore | info | - |
+| `video.camera.signal_lost` | Camera signal lost | fault | medium | `video.camera.signal_restored` |
+| `video.camera.signal_restored` | Camera signal restored | restore | info | - |
 
-Атрибуты аналитики: `object_class`, `confidence` (0..1), `track_id`, `bbox`, `snapshot_url`.
+Analytics attributes: `object_class`, `confidence` (0..1), `track_id`, `bbox`, `snapshot_url`.
 
-### 5.5 `perimeter` - периметр
+### 5.5 `perimeter` - Perimeter
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Crit. | Restoration |
 |---|---|---|---|---|
-| `perimeter.sensor.alarm` | Срабатывание периметрального средства обнаружения | alarm | high | `perimeter.sensor.restore` |
-| `perimeter.sensor.restore` | Участок периметра в норме | restore | info | - |
-| `perimeter.fence.cut` | Перекус или разрушение ограждения | alarm | high | `perimeter.sensor.restore` |
-| `perimeter.fence.climb` | Преодоление ограждения | alarm | high | `perimeter.sensor.restore` |
-| `perimeter.gate.opened` | Ворота открыты | info | info | `perimeter.gate.closed` |
-| `perimeter.gate.closed` | Ворота закрыты | restore | info | - |
-| `perimeter.gate.forced` | Несанкционированное открытие ворот | alarm | high | `perimeter.gate.closed` |
-| `perimeter.sensor.tamper` | Вскрытие средства обнаружения | alarm | high | `perimeter.sensor.restore` |
+| `perimeter.sensor.alarm` | Sensor alarm | alarm | high | `perimeter.sensor.restore` |
+| `perimeter.sensor.restore` | Sensor restore | restore | info | - |
+| `perimeter.fence.cut` | Fence cut | alarm | high | `perimeter.sensor.restore` |
+| `perimeter.fence.climb` | Fence climb | alarm | high | `perimeter.sensor.restore` |
+| `perimeter.gate.opened` | Gate opened | info | info | `perimeter.gate.closed` |
+| `perimeter.gate.closed` | Gate closed | restore | info | - |
+| `perimeter.gate.forced` | Gate forced | alarm | high | `perimeter.gate.closed` |
+| `perimeter.sensor.tamper` | Sensor tamper | alarm | high | `perimeter.sensor.restore` |
 
-### 5.6 `technical` - технические неисправности и инженерные системы
+### 5.6 `technical` - Technical
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Crit. | Restoration |
 |---|---|---|---|---|
-| `technical.device.offline` | Устройство не на связи | fault | medium | `technical.device.online` |
-| `technical.device.online` | Связь с устройством восстановлена | restore | info | - |
-| `technical.device.fault` | Неисправность устройства | fault | medium | `technical.device.restore` |
-| `technical.device.restore` | Устройство в норме | restore | info | - |
-| `technical.power.mains_lost` | Пропадание основного питания | fault | medium | `technical.power.mains_restored` |
-| `technical.power.mains_restored` | Основное питание восстановлено | restore | info | - |
-| `technical.power.battery_low` | Разряд резервного источника | fault | medium | `technical.power.battery_ok` |
-| `technical.power.battery_ok` | Резервный источник в норме | restore | info | - |
-| `technical.network.link_down` | Потеря канала связи | fault | medium | `technical.network.link_up` |
-| `technical.network.link_up` | Канал связи восстановлен | restore | info | - |
-| `technical.environment.temperature_high` | Превышение температуры | warning | medium | `technical.environment.normal` |
-| `technical.environment.water_leak` | Протечка | alarm | high | `technical.environment.normal` |
-| `technical.environment.normal` | Параметры среды в норме | restore | info | - |
+| `technical.device.offline` | Device offline | fault | medium | `technical.device.online` |
+| `technical.device.online` | Device online | restore | info | - |
+| `technical.device.fault` | Device fault | fault | medium | `technical.device.restore` |
+| `technical.device.restore` | Device restore | restore | info | - |
+| `technical.power.mains_lost` | Power mains lost | fault | medium | `technical.power.mains_restored` |
+| `technical.power.mains_restored` | Power mains restored | restore | info | - |
+| `technical.power.battery_low` | Power battery low | fault | medium | `technical.power.battery_ok` |
+| `technical.power.battery_ok` | Power battery ok | restore | info | - |
+| `technical.network.link_down` | Network link down | fault | medium | `technical.network.link_up` |
+| `technical.network.link_up` | Network link up | restore | info | - |
+| `technical.environment.temperature_high` | Environment temperature high | warning | medium | `technical.environment.normal` |
+| `technical.environment.water_leak` | Environment water leak | alarm | high | `technical.environment.normal` |
+| `technical.environment.normal` | Environment normal | restore | info | - |
 
-### 5.7 `system` - события самой платформы и коннекторов
+### 5.7 `system` - System
 
-Порождаются платформой, а не устройствами, и проходят тот же конвейер - это позволяет строить правила на отказах интеграций.
+These events are generated by the platform, not by devices, and follow the same pipeline. This allows for the creation of rules based on integration failures.
 
-| Код | Название | Класс | Крит. | Восстановление |
+| Code | Name | Class | Crit. | Restoration |
 |---|---|---|---|---|
-| `system.connector.offline` | Коннектор не на связи | fault | high | `system.connector.online` |
-| `system.connector.online` | Коннектор на связи | restore | info | - |
-| `system.connector.buffer_overflow` | Переполнение буфера коннектора, возможна потеря событий | fault | high | - |
-| `system.source.sequence_gap` | Разрыв порядковых номеров источника | warning | medium | - |
-| `system.source.clock_skew` | Рассогласование часов источника | warning | low | - |
-| `system.heartbeat.missed` | Ожидаемое периодическое событие не получено (правило `absence`) | fault | medium | - |
+| `system.connector.offline` | Connector offline | fault | high | `system.connector.online` |
+| `system.connector.online` | Connector online | restore | info | - |
+| `system.connector.buffer_overflow` | Connector buffer overflow | fault | high | - |
+| `system.source.sequence_gap` | Source sequence gap | warning | medium | - |
+| `system.source.clock_skew` | Source clock skew | warning | low | - |
+| `system.heartbeat.missed` | Heartbeat missed | fault | medium | - |
 
-### 5.8 `generic` - для источников без точного соответствия
+### 5.8 `generic` - Generic
 
-| Код | Название | Класс | Крит. |
+| Code | Name | Class | Crit. |
 |---|---|---|---|
-| `generic.alarm` | Тревога (без уточнения) | alarm | high |
-| `generic.warning` | Предупреждение | warning | medium |
-| `generic.fault` | Неисправность | fault | medium |
-| `generic.restore` | Норма | restore | info |
-| `generic.info` | Информация | info | info |
+| `generic.alarm` | Alarm | alarm | high |
+| `generic.warning` | Warning | warning | medium |
+| `generic.fault` | Fault | fault | medium |
+| `generic.restore` | Restore | restore | info |
+| `generic.info` | Info | info | info |
 
-Используется, когда интегратор ещё не описал точное отображение. Доля событий `generic.*` - метрика качества интеграции.
+Used when the integrator has not yet described the exact mapping. The proportion of events `generic.*` is a metric for integration quality.
 
 ---
 
-## 6. Общие атрибуты нормализованного события
+## 6. General attributes of normalized events
 
-Помимо полей конверта, каждое событие может нести атрибуты из стандартного набора. Произвольные атрибуты коннектора передаются с префиксом `x.`.
+In addition to fields, each event can carry attributes from the standard set. Any connector attribute is transmitted with the prefix `x.`.
 
-| Атрибут | Тип | Применение |
+| Attribute | Type | Application |
 |---|---|---|
-| `credential_id` | строка | СКУД: идентификатор карты (хранится в виде хэша, если так настроено) |
-| `person_ref` | строка | СКУД: внешний идентификатор владельца |
-| `direction` | `in`, `out` | СКУД, периметр, видео |
-| `object_class` | строка | Видеоаналитика |
-| `confidence` | число 0..1 | Видеоаналитика |
-| `track_id` | строка | Видеоаналитика |
-| `snapshot_url`, `clip_url` | URL | Видео: ссылка во внешнюю систему |
-| `loop` | строка | Пожарная и охранная сигнализация: номер шлейфа |
-| `value`, `unit` | число, строка | Измерения среды |
-| `raw_code` | строка | Исходный код события производителя (всегда) |
+| `credential_id` | String | Access control: card identifier (stored as a hash if configured) |
+| `person_ref` | String | Access control: external owner identifier |
+| `direction` | `in`, `out` | Access control, perimeter, video |
+| `object_class` | String | Video analytics |
+| `confidence` | Number 0..1 | Video analytics |
+| `track_id` | String | Video analytics |
+| `snapshot_url`, `clip_url` | URL | Video: link to external system |
+| `loop` | String | Fire and security alarm: circuit identifier |
+| `value`, `unit` | Number, string | Environment measurements |
+| `raw_code` | String | Original code of the event producer (always) |
 
-## 7. Покрытие требований DoD шага 0.2
+## 7. Subsystem Coverage
 
-| Подсистема из DoD | Домен таксономии |
+| Supported subsystem | Domain taxonomy |
 |---|---|
-| Охранная сигнализация | `intrusion` |
-| Пожарная сигнализация | `fire` |
-| СКУД | `access` |
-| Видеоаналитика | `video` |
-| Периметр | `perimeter` |
-| Технические неисправности | `technical`, `system` |
+| Intrusion alarm | `intrusion` |
+| Fire alarm | `fire` |
+| Access control | `access` |
+| Video analytics | `video` |
+| Perimeter | `perimeter` |
+| Technical failures | `technical`, `system` |

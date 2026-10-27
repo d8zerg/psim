@@ -1,7 +1,7 @@
 {
   "uid": "psim-overview",
-  "title": "Обзор платформы",
-  "description": "Open-Source PSIM Platform. Обзор платформы. Пропуски данных требуют проверки сбора.",
+  "title": "Platform overview",
+  "description": "Open-Source PSIM Platform. Platform overview. Check data collection when data is missing.",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -33,50 +33,57 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "Обзор платформы",
+      "title": "Platform overview",
       "url": "/monitoring/d/psim-overview",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Конвейер событий",
+      "title": "Event Pipeline",
       "url": "/monitoring/d/psim-pipeline",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Сервисы и API",
+      "title": "Services and APIs",
       "url": "/monitoring/d/psim-services",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инфраструктура и репликация",
+      "title": "Infrastructure and Replication",
       "url": "/monitoring/d/psim-infrastructure",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Хранилища и ёмкость",
+      "title": "Storage and Capacity",
       "url": "/monitoring/d/psim-storage",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инциденты и подключения",
+      "title": "Incidents and Connections",
       "url": "/monitoring/d/psim-business",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Эксплуатационные проверки",
+      "title": "Operational checks",
       "url": "/monitoring/d/psim-operations",
+      "type": "link",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "RU",
+      "url": "/monitoring/d/psim-overview-ru",
       "type": "link",
       "keepTime": true,
       "includeVars": true
@@ -85,7 +92,7 @@
   "annotations": {
     "list": [
       {
-        "name": "Алерты",
+        "name": "Alerts",
         "enable": true,
         "datasource": {
           "type": "prometheus",
@@ -103,7 +110,7 @@
     "list": [
       {
         "name": "deployment",
-        "label": "Поставка",
+        "label": "Deployment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -120,14 +127,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "node",
-        "label": "Узел",
+        "label": "Node",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -144,7 +151,7 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
@@ -155,8 +162,8 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Текущее состояние",
-      "description": "Сначала проверить отказы и достоверность измерений, затем перейти к подсистеме.",
+      "title": "Current State",
+      "description": "First, check for failures and the reliability of measurements, then proceed to the subsystem.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -168,8 +175,8 @@
     },
     {
       "id": 2,
-      "title": "Алерты critical",
-      "description": "Число активных critical; доступность Prometheus проверяется отдельно.",
+      "title": "Critical Alerts",
+      "description": "Number of active critical instances; Prometheus availability is checked separately.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -185,7 +192,7 @@
         {
           "refId": "A",
           "expr": "count(ALERTS{deployment=~\"$deployment\",alertstate=\"firing\",severity=\"critical\"}) or on() vector(0)",
-          "legendFormat": "Алерты critical",
+          "legendFormat": "Critical Alerts",
           "range": true
         }
       ],
@@ -193,7 +200,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -231,7 +238,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -268,8 +275,8 @@
     },
     {
       "id": 3,
-      "title": "Отказы сервисов",
-      "description": "Ожидаемые экземпляры из инвентаря; отсутствие scrape не скрывается.",
+      "title": "Service failures",
+      "description": "Expected instances from the inventory; the absence of scraping is not concealed.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -285,7 +292,7 @@
         {
           "refId": "A",
           "expr": "sum(1 - up{job=\"psim-services\",deployment=~\"$deployment\",node=~\"$node\"})",
-          "legendFormat": "Отказы сервисов",
+          "legendFormat": "Service failures",
           "range": true
         }
       ],
@@ -293,7 +300,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -331,7 +338,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -368,8 +375,8 @@
     },
     {
       "id": 4,
-      "title": "Инфраструктура",
-      "description": "Неуспешные проверки реальных протоколов и TLS.",
+      "title": "Infrastructure",
+      "description": "Failed tests for real protocols and TLS.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -385,7 +392,7 @@
         {
           "refId": "A",
           "expr": "sum(1 - psim_probe_success{deployment=~\"$deployment\",node=~\"$node\"})",
-          "legendFormat": "Инфраструктура",
+          "legendFormat": "Infrastructure",
           "range": true
         }
       ],
@@ -393,7 +400,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -431,7 +438,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -468,8 +475,8 @@
     },
     {
       "id": 5,
-      "title": "Конвейер p99",
-      "description": "От времени последнего события сигнала до успешной фиксации инцидента. Для таймерных сигналов измеряется отдельно.",
+      "title": "Pipeline p99",
+      "description": "From the latest event contributing to a signal to successful incident commit. Timer signals are measured separately.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -485,7 +492,7 @@
         {
           "refId": "A",
           "expr": "histogram_quantile(0.99, sum by (le) (rate(psim_event_to_incident_seconds_bucket{deployment=~\"$deployment\",node=~\"$node\"}[$__rate_interval])))",
-          "legendFormat": "Значение",
+          "legendFormat": "Value",
           "range": true
         }
       ],
@@ -493,7 +500,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -531,7 +538,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -569,8 +576,8 @@
     {
       "id": 6,
       "type": "row",
-      "title": "Поток и очереди",
-      "description": "Общий обзор производительности; подробности доступны на экране конвейера.",
+      "title": "Flows and Queues",
+      "description": "Overall performance; details are on the pipeline dashboard.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -582,8 +589,8 @@
     },
     {
       "id": 7,
-      "title": "Нормализованные события",
-      "description": "Скорость обработки событий, без вывода об их уникальности.",
+      "title": "Normalized events",
+      "description": "Event processing rate; it does not establish event uniqueness.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -607,7 +614,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -637,7 +644,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -674,8 +681,8 @@
     },
     {
       "id": 8,
-      "title": "Lag потребителей",
-      "description": "Количество записей до конца партиций. Не является задержкой в секундах.",
+      "title": "Consumer Lag",
+      "description": "The number of records up to the end of the partition. It does not represent a delay in seconds.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -699,7 +706,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -729,7 +736,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -767,8 +774,8 @@
     {
       "id": 9,
       "type": "row",
-      "title": "Доступность и резервирование",
-      "description": "Статус каждой зависимости и минимальное свободное место.",
+      "title": "Availability and redundancy",
+      "description": "Status of each dependency and minimum free space.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -780,8 +787,8 @@
     },
     {
       "id": 10,
-      "title": "Проверки зависимостей",
-      "description": "1 - проверка успешна, 0 - отказ; пропуск - нет данных.",
+      "title": "Dependency checks",
+      "description": "1 - successful check, 0 - failure; blank - no data.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -805,7 +812,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -835,7 +842,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -872,8 +879,8 @@
     },
     {
       "id": 11,
-      "title": "Свободное место по томам",
-      "description": "Доля доступного места. Пороги предупреждения 15%, критический 5%.",
+      "title": "Free space on disks",
+      "description": "Percentage of available space. Warning thresholds are 15%, critical threshold is 5%.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -897,7 +904,7 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -927,7 +934,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -965,8 +972,8 @@
     {
       "id": 12,
       "type": "row",
-      "title": "Активные алерты и действия",
-      "description": "Алерты относятся к выбранной поставке; предупреждения и критические отказы имеют прямые ссылки на инструкции.",
+      "title": "Active Alerts and Actions",
+      "description": "Alerts apply to the selected deployment; warnings and critical failures link directly to instructions.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -979,8 +986,8 @@
     {
       "id": 13,
       "type": "table",
-      "title": "Активные алерты",
-      "description": "Pending ещё ожидают выдержки. Firing требуют проверки. Watchdog подтверждает работу конвейера уведомлений.",
+      "title": "Active Alerts",
+      "description": "Pending alerts await the configured duration. Firing alerts require investigation. Watchdog confirms the notification pipeline is running.",
       "gridPos": {
         "x": 0,
         "y": 24,
@@ -1019,7 +1026,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Инструкция устранения",
+                    "title": "Remediation instructions",
                     "url": "../operations/runbooks/${__value.raw}",
                     "targetBlank": true
                   }
@@ -1027,7 +1034,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Алерт"
+                "value": "Alert"
               },
               {
                 "id": "custom.width",
@@ -1043,7 +1050,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Уровень"
+                "value": "Severity"
               },
               {
                 "id": "custom.width",
@@ -1059,7 +1066,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Состояние"
+                "value": "State"
               },
               {
                 "id": "custom.width",
@@ -1075,7 +1082,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Узел"
+                "value": "Node"
               },
               {
                 "id": "custom.width",
@@ -1091,7 +1098,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Контекст"
+                "value": "Context"
               },
               {
                 "id": "custom.width",
@@ -1105,7 +1112,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Уровень",
+            "displayName": "Severity",
             "desc": false
           }
         ]

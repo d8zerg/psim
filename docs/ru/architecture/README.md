@@ -1,0 +1,387 @@
+# Архитектура Open-Source PSIM Platform (arc42)
+
+<!-- language-links -->
+[English](../../architecture/README.md) | [Русский](README.md)
+<!-- /language-links -->
+
+Документ построен по шаблону arc42. Крупные разделы вынесены в отдельные файлы:
+
+| Раздел arc42 | Где |
+|---|---|
+| 1. Введение и цели | этот документ |
+| 2. Ограничения | этот документ |
+| 3. Контекст и границы | этот документ, C4 L1 |
+| 4. Стратегия решения | этот документ |
+| 5. Представление строительных блоков | этот документ, C4 L2-L3 |
+| 6. Представление времени выполнения | [runtime-view.md](runtime-view.md) |
+| 7. Представление развёртывания | [deployment.md](deployment.md) |
+| 8. Сквозные концепции | [crosscutting.md](crosscutting.md) |
+| - Потоки данных и семантика доставки | [data-flows.md](data-flows.md) |
+| - Масштабирование и партиционирование | [scaling.md](scaling.md) |
+| 9. Архитектурные решения | [реестр ADR](../adr/README.md) |
+| 10. Требования к качеству и бюджет задержек | [quality.md](quality.md) |
+| 11. Риски и технический долг | этот документ |
+| 12. Глоссарий | [glossary.md](../domain/glossary.md) |
+
+Модель C4 как код: [c4/L2-Containers.puml](c4/L2-Containers.puml) (PlantUML). Диаграммы в этом документе показывают контекст, потоки и границы компонентов. `task docs:plantuml` воспроизводимо проверяет все UML/C4-схемы; портал содержит готовые SVG.
+
+---
+
+## 1. Введение и цели
+
+### 1.1 Назначение
+
+Платформа реализует сквозной контур: событие от любого источника -> нормализация -> корреляция -> инцидент -> сценарий реагирования -> команды на устройства -> закрытие -> аудит и отчётность. Подробности - в [product brief](../product/product-brief.md) и [границах MVP](../product/mvp-scope.md).
+
+Эксплуатационные дополнения MVP приняты: [модели, размещение функций и инварианты](operational-capabilities.md), [ADR-042](../adr/0042-operational-capabilities.md).
+
+### 1.2 Цели качества
+
+Пять главных целей в порядке приоритета. При конфликте выигрывает цель с меньшим номером.
+
+| № | Цель | Мера | Сценарии качества |
+|---|---|---|---|
+| QG1 | **Корректность доставки** | 0 потерь событий и инцидентов, 0 дубликатов инцидентов при любых сбоях | QS-A1..A4 |
+| QG2 | **Своевременность** | Событие -> инцидент в консоли p99 ≤ 1 с при 50 000 событий/с | QS-P1..P4 |
+| QG3 | **Доступность** | RTO ≤ 60 с, RPO = 0 в кластере; обновление без простоя | QS-A5, QS-O1 |
+| QG4 | **Модифицируемость** | Новый источник и новая логика реакции без изменения ядра | QS-M1..M3 |
+| QG5 | **Безопасность** | Аутентификация каждого входа, минимальные привилегии, неизменяемый аудит | QS-S1..S3 |
+
+Сценарии качества - в [quality.md](quality.md).
+
+### 1.3 Заинтересованные стороны
+
+| Сторона | Ожидания от архитектуры |
+|---|---|
+| Владелец продукта | Предсказуемый объём MVP, масштаб от одной машины до кластера одной поставкой |
+| Ведущий инженер и ИИ-агент | Модули с явными границами, которые можно разрабатывать и тестировать изолированно; воспроизводимое окружение |
+| Интегратор | Стабильный документированный протокол коннекторов и SDK |
+| Эксплуатация заказчика | Понятные топологии, наблюдаемость, runbook, обновления без простоя |
+| Служба безопасности заказчика | Контроль доступа, шифрование, аудит, модель угроз |
+
+---
+
+## 2. Ограничения
+
+### 2.1 Технические
+
+| Ограничение | Источник |
+|---|---|
+| Сервер на C++23: Boost.Asio и Beast, librdkafka, libpq, OpenSSL 3, gRPC и Protobuf | Технические ограничения платформы |
+| Apache Kafka (KRaft) - центральная шина во всех топологиях | Технические ограничения платформы |
+| PostgreSQL 18.x (libpq 18.x), Redis-совместимое хранилище | Технические ограничения платформы; выбор реализации Redis - ADR-015 |
+| ClickHouse для истории событий и аналитики | Принято; ADR-028 |
+| Keycloak как Identity Provider (OIDC) | Технические ограничения платформы |
+| Веб-клиент: React 19, TypeScript, Vite | Технические ограничения платформы |
+| Debian 13 x86_64 - единственная официально поддерживаемая ОС | Принято; ADR-032 |
+| Только компоненты с открытыми лицензиями, допускающими поставку в составе коммерческого продукта | Поставка заказчикам; проверяется в CI |
+| Kubernetes вне MVP | ADR-023 |
+
+### 2.2 Организационные
+
+- Один инженер и ИИ-агент: архитектура должна позволять развивать сервисы по одному, с независимыми тестами; общий код - в библиотеках платформы.
+- Монорепозиторий, документация как код, ADR на каждое значимое решение.
+
+### 2.3 Соглашения
+
+- Именование топиков: `psim.<domain>.<entity>.v<N>`.
+- REST: OpenAPI 3.1, ошибки по RFC 9457, курсорная пагинация.
+- Время - UTC, микросекунды; идентификаторы - UUIDv7 или именные UUID ([aggregates.md](../domain/aggregates.md#01-идентификаторы)).
+- Код и контракты используют английский язык. Документация и интерфейс поддерживают английский и русский языки; язык документации по умолчанию - английский.
+
+---
+
+## 3. Контекст и границы (C4 L1)
+
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+top to bottom direction
+actor "Оператор / старший смены" as OP
+actor "Администратор" as ADM
+actor "Интегратор" as INTG
+actor "Аудитор / руководитель" as AUD
+actor "Инженер эксплуатации" as ENG
+rectangle "Open-Source PSIM Platform" as PSIM
+database "Системы безопасности:\nохрана, пожар, СКУД,\nвидео, периметр" as SEC
+database "Инженерные системы\nи IoT" as ENGSYS
+database "Keycloak / корпоративный IdP" as KC
+database "Почтовый сервер" as SMTP
+database "Внешние системы-получатели\nwebhook" as HOOK
+database "Prometheus, Grafana,\nхранилища логов и трассировок" as OBS
+OP --> PSIM : браузер: консоль
+ADM --> PSIM : браузер: администрирование
+AUD --> PSIM : браузер: аудит, отчёты
+INTG --> PSIM : Connector SDK, conformance kit
+SEC --> PSIM : события / команды через коннекторы (gRPC, mTLS)
+ENGSYS --> PSIM : события / команды через коннекторы
+PSIM --> KC : OIDC, JWKS
+PSIM --> SMTP : SMTP
+PSIM --> HOOK : HTTPS webhook
+PSIM --> OBS : OTLP, /metrics
+ENG --> PSIM : CLI, дашборды
+@enduml
+```
+
+| Внешний участник | Интерфейс | Направление |
+|---|---|---|
+| Коннекторы внешних систем | gRPC поверх TLS 1.3 с mTLS; протокол коннекторов v1 | двунаправленный поток: события -> платформа, команды -> коннектор |
+| Браузер пользователя | HTTPS: REST v1, WebSocket realtime; статика веб-приложения | двунаправленный |
+| Keycloak | OIDC Authorization Code + PKCE для пользователей; client credentials для сервисов; JWKS для проверки токенов | платформа -> Keycloak |
+| Почтовый сервер | SMTP с STARTTLS | платформа -> SMTP |
+| Получатели webhook | HTTPS POST с подписью HMAC | платформа -> получатель |
+| Наблюдаемость | OTLP (gRPC) для трассировок, логов и метрик; HTTP `/metrics` для Prometheus | платформа -> стек наблюдаемости |
+
+Стек наблюдаемости поставляется вместе с платформой, но заказчик может направить OTLP в свою систему.
+
+---
+
+## 4. Стратегия решения
+
+| Задача | Подход | Почему |
+|---|---|---|
+| 50 000 событий/с и рост до миллионов | Конвейер потоковой обработки на Kafka с партиционированием по ключу; каждый этап - масштабируемая группа потребителей | Горизонтальное масштабирование без перепроектирования; порядок в пределах ключа |
+| 0 потерь и дубликатов | Подтверждение коннектору после `acks=all`; детерминированные идентификаторы; exactly-once транзакции Kafka в корреляции; transactional outbox и inbox на границах PostgreSQL | Корректность в каждом звене, а не «в среднем»; проверяется симуляцией |
+| Задержка ≤ 1 с | Бюджет задержек по этапам; горячий путь без синхронных межсервисных вызовов; локальные копии каталога; realtime-канал читает изменения инцидентов из Kafka напрямую | Каждый этап измерим и имеет порог |
+| Корреляция с состоянием на C++ без готового фреймворка | Собственный движок: состояние в RocksDB с changelog-топиком, партиции как единицы параллелизма, event time и водяные знаки | Аналог модели Kafka Streams, адаптированный под C++; риск оценивается сквозными интеграционными и нагрузочными тестами |
+| Модифицируемость | Вендор-нейтральный протокол коннекторов; декларативные правила отображения, корреляции и сценарии; гексагональная архитектура | Новые источники и реакции - конфигурация, не код ядра |
+| Воспроизводимость | Kafka как журнал истины; read-модели перестраиваются проигрыванием; пробный прогон правил на истории | «Машина времени» для разбора и проверки правил |
+| Тестируемость | Детерминированное доменное ядро: время, случайность и ввод-вывод за портами; симуляционный стенд | Ошибки распределённого поведения воспроизводятся по зерну |
+| Одна поставка для всех масштабов | Одинаковые образы и бинарники; топологии различаются конфигурацией и числом экземпляров | Нет отдельной «лёгкой» редакции |
+| Эксплуатация | Наблюдаемость с первого шага: OTLP-трассировка через Kafka-заголовки, метрики сервисов, бизнес-метрики | Отказ виден и имеет runbook |
+
+---
+
+## 5. Строительные блоки
+
+### 5.1 Уровень 2: контейнеры
+
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+left to right direction
+rectangle "Коннекторы\nConnector SDK" as CONN
+rectangle "Connector Gateway" as CGW
+queue "psim.ingest.raw.v1" as K1
+rectangle "Normalizer" as NORM
+queue "psim.catalog.v1" as CATK
+queue "psim.events.normalized.v1" as K2
+rectangle "Event History" as EH
+rectangle "Correlation Engine" as CE
+queue "psim.config.v1" as CFG
+queue "psim.signals.v1" as K3
+rectangle "Incident Service" as INC
+queue "psim.incidents.events.v1" as K4
+rectangle "Response Engine" as RE
+queue "psim.response.events.v1" as K5
+rectangle "Command Service" as CMD
+queue "psim.commands.v1" as K6
+queue "psim.commands.results.v1" as K7
+rectangle "Notification Service" as NOTIF
+rectangle "Projection Service" as PROJ
+rectangle "API Gateway:\nREST + realtime" as RT
+rectangle "Web Application" as WEB
+rectangle "Resource Catalog" as CAT
+database "Планы: S3-совместимое хранилище" as FILES
+rectangle "Rule Management\nв Correlation Engine API" as RULES
+rectangle "все сервисы" as ALL
+queue "psim.audit.v1" as AUDK
+rectangle "Audit Service" as AUDS
+CONN --> CGW : gRPC mTLS
+CGW --> K1 : raw
+K1 --> NORM
+CATK --> NORM
+NORM --> K2 : normalized
+K2 --> EH
+K2 --> CE
+CFG --> CE
+CE --> K3 : signals
+K3 --> INC
+INC --> K4 : outbox
+K4 --> RE
+RE --> K5 : outbox
+K5 --> INC
+RE --> CMD
+CMD --> K6 : outbox
+K6 --> CGW
+CGW --> K7
+K7 --> CMD
+K5 --> NOTIF
+NOTIF --> K5 : outbox
+K4 --> PROJ
+K5 --> PROJ
+K4 --> RT
+K5 --> RT
+PROJ --> RT
+RT --> WEB : HTTPS / WSS
+CAT --> CATK
+CAT --> FILES : FileStore
+RULES --> CFG
+ALL ..> AUDK
+AUDK ..> AUDS
+@enduml
+```
+
+| Контейнер | Технология | Ответственность | Хранилище | Масштабирование |
+|---|---|---|---|---|
+| Connector Gateway | C++, gRPC | Сессии коннекторов, mTLS, валидация, кредиты, запись в Kafka, доставка команд | Redis: реестр сессий | Без состояния; N экземпляров за балансировщиком L4 |
+| Resource Catalog | C++, REST | Локации, устройства, источники, коннекторы, импорт, версии планов, обслуживание | PostgreSQL + FileStore (S3-совместимое хранилище) | 1-2 экземпляра (не на горячем пути) |
+| Normalizer | C++ | Отображение, обогащение, дедупликация, DLQ | Локальная копия каталога в памяти; окно дедупликации в памяти с восстановлением из Kafka | По партициям `psim.ingest.raw.v1` |
+| Event History | C++ | Загрузка всех событий и связей с сигналами в ClickHouse, поиск | ClickHouse | По партициям `psim.events.normalized.v1` |
+| Correlation Engine | C++ | Правила, окна, состояние, сигналы; API управления правилами и пробного прогона | RocksDB + changelog; PostgreSQL для правил | По партициям `psim.events.normalized.v1` |
+| Incident Service | C++, REST | Агрегат инцидента, группировка, назначение, передача ответственности, хронология | PostgreSQL + inbox + outbox | По партициям `psim.signals.v1`; запросы пользователей - любой экземпляр |
+| Response Engine | C++, REST | Сценарии, запуски, SLA и таймеры, эскалации | PostgreSQL + outbox | Чтение Kafka по партициям; таймеры сериализуются блокировкой агрегата PostgreSQL |
+| Command Service | C++, REST | Жизненный цикл команд, подтверждения, таймауты | PostgreSQL + outbox | 2+ экземпляра |
+| Notification Service | C++, REST | Каналы in-app, email, webhook; контакты, квитанции, повторы, агрегация | PostgreSQL | 1-2 экземпляра |
+| Projection Service | C++ | Лента, состояние объектов и устройств, загрузка операторов; факты инцидентов и отчёты | Redis (горячее), PostgreSQL (запросы), ClickHouse (факты и отчёты) | По партициям входных топиков |
+| Audit Service | C++, REST | Цепочка хэшей, поиск, экспорт, журнал Keycloak | PostgreSQL только для добавления и внешний архив подписанных контрольных точек | 2 экземпляра; запись сериализуется блокировкой на тенант |
+| API Gateway | C++, Beast | REST v1, WebSocket realtime, JWT, ABAC, лимиты, маршрутизация | Redis: лимиты | Без состояния; N экземпляров |
+| Web Application | React, TypeScript | Консоль оператора, администрирование, аудит, отчёты | - | Статика за API Gateway или веб-сервером |
+| Admin CLI | C++ | Диагностика, DLQ, перестроение проекций, проверка аудита | - | - |
+
+Качество Web Application проверяется [общим конвейером](../engineering/web-client-quality.md): рабочие сценарии с настоящими сервисами, визуальная регрессия, доступность, восстановление сессии и [измерения загрузки](../engineering/web-client-loading.md). Модули загружаются после проверки роли; кэш определений компонентов не заменяет изоляцию серверных данных. Командные шаги подтверждаются через Response Engine, который связывает серверные команды с результатами выполнения.
+
+Инфраструктура: Kafka (KRaft), Schema Registry (ADR-003), PostgreSQL, Redis-совместимое хранилище, ClickHouse с ClickHouse Keeper (ADR-028), Keycloak, OpenTelemetry Collector, Prometheus, Grafana, хранилища логов и трассировок.
+
+**Управление правилами** размещено в Correlation Engine как отдельный REST-модуль, а не в отдельном сервисе: правила и движок меняются вместе, а это экономит один сервис в MVP. Модуль работает в любом экземпляре и публикует активный набор в `psim.config.v1`.
+
+**Сервис таймеров** - библиотека платформы, а не отдельный сервис. Таймеры хранятся в PostgreSQL сервиса-владельца (Response Engine, Command Service) и обслуживаются экземплярами через блокировку агрегата и атомарное срабатывание в той же транзакции. Подробности - ADR-012.
+
+### 5.2 Уровень 3: компоненты ключевых сервисов
+
+Все сервисы построены одинаково по гексагональной схеме:
+
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+left to right direction
+package "Входящие адаптеры" as Adapters_in {
+rectangle "Kafka consumer" as KC
+rectangle "REST handler" as REST
+rectangle "gRPC handler" as GRPC
+}
+package "Приложение" as App {
+rectangle "Сценарии использования\napplication services" as UC
+}
+package "Доменное ядро" as Domain {
+rectangle "Агрегаты, политики,\nдоменные события" as AGG
+}
+package "Порты" as Ports {
+rectangle "Repository" as P1
+rectangle "EventPublisher / Outbox" as P2
+rectangle "Clock, IdGenerator" as P3
+rectangle "CatalogView" as P4
+}
+package "Исходящие адаптеры" as Adapters_out {
+rectangle "PostgreSQL" as PG
+rectangle "Kafka producer" as KP
+rectangle "RocksDB" as RDB
+rectangle "Redis" as RED
+}
+Adapters_in --> UC
+UC --> AGG
+UC --> Ports
+Ports --> Adapters_out
+@enduml
+```
+
+Правило: доменное ядро - отдельная библиотека CMake без зависимостей от инфраструктурных библиотек и системных часов; проверяется fitness function.
+
+#### Correlation Engine
+
+| Компонент | Ответственность |
+|---|---|
+| Partition Worker | Один на назначенную партицию: чтение пакета, обработка, транзакция Kafka |
+| Rule Evaluator (домен) | Чистая функция `(state, event, rules, now) -> (state', signals)` для каждого вида правил |
+| State Store | Порт состояния; адаптер RocksDB с записью изменений в changelog в той же транзакции |
+| Watermark Tracker | Водяные знаки по партициям и источникам; таймеры окон по event time |
+| RuleSet Loader | Читает `psim.config.v1`, компилирует набор, атомарно переключает на границе смещения |
+| Repartitioner | Для правил с ключом площадки: публикует отфильтрованные события в `psim.correlation.repartition.v1` ([scaling.md](scaling.md#3-корреляция-и-ключи)) |
+| Rule Management API | CRUD, валидация, пробный прогон, активация набора |
+| Dry-run Runner | Прогон правила по историческому диапазону `psim.events.normalized.v1` в изолированном хранилище состояния |
+
+#### Incident Service
+
+| Компонент | Ответственность |
+|---|---|
+| Signal Consumer | Пакетное чтение сигналов; транзакция БД: inbox + изменение агрегата + outbox; фиксация смещения после коммита |
+| Incident Aggregate (домен) | Инварианты I1-I10, модель состояний |
+| Grouping Policy (домен) | Выбор: присоединить к открытому или создать новый |
+| Command API | REST-команды пользователей с ETag и ключами идемпотентности |
+| Response Events Consumer | Обновление `blocking_steps` и хронологии по событиям Response |
+| Outbox Relay | Публикация outbox в `psim.incidents.events.v1` и `psim.audit.v1` |
+
+#### Connector Gateway
+
+| Компонент | Ответственность |
+|---|---|
+| gRPC Server | TLS-терминирование, mTLS, двунаправленные потоки |
+| Session Manager | Модель состояний сессии, heartbeat, вытеснение, регистрация в Redis |
+| Ingest Pipeline | Валидация схемы и принадлежности источника, кредиты, пакетная запись в Kafka, подтверждение после `acks=all` |
+| Catalog View | Локальная копия коннекторов и источников из `psim.catalog.v1` |
+| Command Dispatcher | Чтение `psim.commands.v1`, доставка в локальную сессию, запись результатов |
+
+---
+
+## 9. Архитектурные решения
+
+Реестр - [docs/adr](../adr/README.md). Ключевые архитектурные решения и ADR, в которых они зафиксированы:
+
+| Решение | Где описано | ADR |
+|---|---|---|
+| Normalizer работает с exactly-once (транзакции Kafka), а не at-least-once; трекер источников в `psim.normalizer.state.v1` | [data-flows.md](data-flows.md#32-нормализация-psimingestrawv1---psimeventsnormalizedv1) | [ADR-006](../adr/0006-delivery-semantics.md) |
+| Ключ `psim.signals.v1` - `grouping_key`, а не `correlation_key` | [data-flows.md](data-flows.md#33-корреляция-psimeventsnormalizedv1---psimsignalsv1) | [ADR-007](../adr/0007-partitioning-strategy.md) |
+| Перераспределение для правил с ключом шире зоны через `psim.correlation.repartition.v1` | [scaling.md](scaling.md#3-корреляция-и-ключи) | [ADR-007](../adr/0007-partitioning-strategy.md), [ADR-009](../adr/0009-correlation-state-store.md) |
+| «Эскалирован» - ортогональный уровень, «ложный» - решение, а не состояния инцидента | [state-models.md](../domain/state-models.md#1-инцидент) | [ADR-027](../adr/0027-incident-states.md) |
+| Жизненный цикл команд и уведомлений публикуется в `psim.response.events.v1` | [data-flows.md](data-flows.md#35-реагирование-psimresponseeventsv1) | [ADR-006](../adr/0006-delivery-semantics.md) |
+| Команды читаются всеми экземплярами шлюза широковещательно; быстрый отказ по реестру сессий | [data-flows.md](data-flows.md#36-команды-psimcommandsv1-и-psimcommandsresultsv1) | [ADR-018](../adr/0018-command-routing.md) |
+| Realtime: снимок из проекций со смещениями + дельты напрямую из Kafka | [crosscutting.md](crosscutting.md#9-realtime-снимок-и-дельты) | [ADR-019](../adr/0019-realtime-channel.md) |
+| Сервис таймеров - библиотека, таймеры у сервиса-владельца | раздел 5.1 | [ADR-012](../adr/0012-response-execution-and-timers.md) |
+| Управление правилами - модуль Correlation Engine | раздел 5.1 | [ADR-001](../adr/0001-monorepo-structure.md) |
+| PostgreSQL HA: Patroni + etcd, синхронная реплика | [deployment.md](deployment.md#3-топология-кластер-на-vm) | [ADR-023](../adr/0023-deployment-topologies.md) |
+| REST DTO и сериализация JSON в C++ | [crosscutting.md](crosscutting.md#14-синхронное-api-между-веб-клиентом-и-сервисами) | [ADR-026](../adr/0026-rest-contract-and-dto.md) |
+| ClickHouse для истории событий, связей с сигналами, фактов инцидентов и статистики правил | [ADR-028](../adr/0028-clickhouse-analytical-storage.md) | [ADR-028](../adr/0028-clickhouse-analytical-storage.md) |
+| Детерминированный `source_id` = UUIDv5(`connector_id`, `source_ref`) | [ADR-029](../adr/0029-deterministic-source-id.md) | [ADR-029](../adr/0029-deterministic-source-id.md) |
+| Составной ключ каталога `resource_type:resource_id` | [data-flows.md](data-flows.md#37-каталог-psimcatalogv1) | [ADR-007](../adr/0007-partitioning-strategy.md) |
+
+---
+
+## 11. Риски и технический долг
+
+Неподтверждённые условия выпуска перечислены в [готовности выпуска](../product/release-readiness.md). Архитектурные риски и способы их проверки:
+
+| Риск | Влияние | Мера | Проверка |
+|---|---|---|---|
+| Задержка коммита транзакций Kafka в корреляции съедает бюджет 100 мс | Нарушение QS-P2 | Интервал коммита 20-50 мс, замер при репрезентативной сквозной нагрузке; при необходимости - уменьшение пакета | Нагрузочный профиль LOAD-50K и метрики Kafka |
+| Восстановление состояния корреляции дольше 30 с | Нарушение RTO | Ограничение окна правил (R3), компактный формат состояния; резервные реплики состояния как опция | Восстановление состояния и хаос-сценарии |
+| Последовательная цепочка аудита на тенант - узкое место | Задержка аудита | Аудит не на горячем пути событий: только действия субъектов и изменения агрегатов; пакетная запись | Нагрузочные тесты цепочки аудита |
+| Широковещательное чтение команд всеми экземплярами шлюза | Рост нагрузки при большом числе экземпляров | Объём команд мал; при росте - маршрутизация по реестру сессий (ADR-018) | Нагрузочные тесты маршрутизации команд |
+| Объём хранения Kafka при длительном retention | Стоимость дисков | Сжатие zstd, retention по уровням, модель сайзинга | Модель ёмкости и длительный нагрузочный прогон |
+| Готовые C++-клиенты для Schema Registry отсутствуют | Объём работ ядра | Тонкий собственный клиент с кэшем, только нужные операции | Интеграционные тесты Schema Registry |

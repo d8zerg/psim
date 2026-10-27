@@ -1,38 +1,41 @@
-# ADR-030. Task как единая точка запуска задач разработки
+# ADR-030. Task as the development task entry point
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (развитие - 1.1-1.5)
-- **Связанные:** ADR-001
+<!-- language-links -->
+[English](0030-task-runner.md) | [Русский](../ru/adr/0030-task-runner.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-001
 
-Принято: сборка, генерация и проверки выполняются задачами Task, а не разрозненными скриптами. В репозитории уже есть генерация и проверка контрактов, проверки документации (ссылки, типографика, Mermaid, C4); дальше добавятся сборка C++ (CMake пресеты, Conan), веб (pnpm, Turborepo), локальное окружение (Docker Compose), тесты, пакеты. Нужна одна точка входа, одинаковая для разработчика, ИИ-агента и CI, с зависимостями между шагами и пропуском шагов, входы которых не изменились.
+## Context
 
-## Рассмотренные варианты
+Builds, generation and checks use Task rather than unrelated scripts. The repository already includes contract generation and validation, documentation checks for links, typography, PlantUML and C4, C++ builds with CMake presets and Conan, web builds with pnpm and Turborepo, Docker Compose environments, tests and packages. Developers, AI agents and CI need the same entry point, task dependencies and incremental skipping when inputs have not changed.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Набор shell-скриптов | Нет зависимостей | Нет общего списка задач, зависимостей и инкрементальности; скрипты расползаются |
-| GNU Make | Есть везде | Табуляции и неочевидный синтаксис; переменные и многострочные команды неудобны; инкрементальность только по файлам-целям |
-| just | Простой синтаксис | Нет инкрементальности по входам и выходам; нет включения файлов задач по модулям с пространствами имён |
-| Пользовательские цели CMake | Уже часть сборки C++ | Не покрывают веб, документацию, окружение; требуют конфигурации CMake для любой задачи |
-| **Task (taskfile.dev)** | YAML; один статический бинарник; зависимости, `sources`/`generates` для пропуска неизменившихся шагов; включение Taskfile модулей с пространствами имён; `task --list` как документация; MIT | Ещё один инструмент в окружении разработчика |
+| Shell scripts | No dependencies | No shared task list, dependency model or incremental execution; scripts proliferate |
+| GNU Make | Widely available | Tabs and nonobvious syntax; awkward variables and multiline commands; file-target-only incrementality |
+| just | Simple syntax | No input/output incrementality or namespaced module task files |
+| CMake custom targets | Already part of C++ builds | Do not cover web, documentation or environments; every task requires CMake configuration |
+| **Task (taskfile.dev)** | YAML, one static binary, dependencies, `sources`/`generates` incrementality, namespaced module Taskfiles, `task --list` help, MIT license | Another development tool |
 
-## Решение
+## Decision
 
-1. **Task 3.x** - единственная точка входа для всех задач разработки: `task <namespace>:<task>`. Версия фиксируется в контейнере разработчика (шаг 1.1); на машине разработчика - бинарник релиза с проверкой контрольной суммы.
-2. **Структура:** корневой `Taskfile.yml` с общими переменными (закреплённые образы инструментов, каталоги кэша) и агрегирующими задачами `check`, `gen`, `clean`, `tools:pull`; модули подключают свои `Taskfile.yml` как пространства имён: `contracts`, `docs`; дальше - `cpp`, `web`, `env`, `deploy`.
-3. **Сложная логика** - в скриптах `tools/<область>/*.py`, вызываемых из задач; задачи остаются короткими и читаемыми. Отдельные shell-скрипты как точки входа не создаются.
-4. **Инструменты** запускаются в контейнерах с закреплёнными версиями образов, заданными в корневом Taskfile; локально нужны Docker, Python 3 с PyYAML и Task.
-5. **CI** вызывает те же задачи (`task check`), что и разработчик; правило «зелёный `task check` локально - зелёный CI».
-6. CMake и pnpm остаются системами сборки своих частей; Task их вызывает, а не заменяет.
+1. **Task 3.x** is the single entry point: `task <namespace>:<task>`. Its version is pinned in the development container; host installation uses a release binary with checksum verification.
+2. **Structure:** root `Taskfile.yml` defines common variables for pinned images and caches, plus aggregate tasks `check`, `gen`, `clean` and `tools:pull`. Modules include their `Taskfile.yml` as namespaces: `contracts`, `docs`, then `cpp`, `web`, `env` and `deploy`.
+3. **Complex logic** belongs in `tools/<area>/*.py`, invoked by short, readable tasks. Do not add separate shell-script entry points.
+4. **Tools** run in containers whose image versions are pinned in the root Taskfile. Local orchestration requires Docker, Python 3 with PyYAML and Task.
+5. **CI** calls the same `task check` as developers: a passing local check should pass CI.
+6. CMake and pnpm remain their components' build systems; Task invokes them.
 
-## Последствия
+## Consequences
 
-- `task` без аргументов показывает все задачи с описаниями - это и есть справка по разработке.
-- Удалены `tools/contracts/check.sh` и `contracts/buf.sh`; их шаги стали задачами `contracts:*`.
-- Новые шаги плана добавляют свои задачи в модульные Taskfile, а не скрипты.
+- Running `task` without arguments lists all tasks and descriptions as development help.
+- `tools/contracts/check.sh` and `contracts/buf.sh` were removed; their operations became `contracts:*` tasks.
+- New components add tasks to module Taskfiles rather than separate scripts.
 
-## Проверка
+## Verification
 
-Ревью: новые точки входа - только задачи Task; `task check` в CI (шаг 1.3).
+Review new entry points for Task-only execution; CI runs `task check`.

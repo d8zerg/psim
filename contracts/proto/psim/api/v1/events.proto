@@ -8,7 +8,7 @@ import "google/protobuf/timestamp.proto";
 import "psim/common/v1/types.proto";
 import "psim/processing/v1/event.proto";
 
-// EventHistoryService searches stored events (ADR-028). Owner: Event History. Scenario S7.
+// EventHistoryService searches stored events (ADR-028). Owner: Event History.
 service EventHistoryService {
   // SearchEvents searches events by location, device, type and time; newest first.
   rpc SearchEvents(SearchEventsRequest) returns (SearchEventsResponse) {

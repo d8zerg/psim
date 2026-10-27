@@ -1,10 +1,14 @@
 # Connector Gateway
 
-Шаг 4.2 · [ADR-049](../adr/0049-connector-gateway.md) · [маршрутизация команд](../adr/0018-command-routing.md)
+<!-- language-links -->
+[English](connector-gateway.md) | [Русский](../ru/engineering/connector-gateway.md)
+<!-- /language-links -->
 
-Gateway принимает gRPC/mTLS-сессии коннекторов, проверяет постоянную регистрацию, записывает события в Kafka и доставляет команды. Исходный код - `services/connector-gateway`; административный клиент - `tools/gateway-admin`.
+[ADR-049](../adr/0049-connector-gateway.md) · [Command Routing](../adr/0018-command-routing.md)
 
-## Запуск и проверки
+The gateway accepts gRPC/mTLS sessions from connectors, checks persistent registration, records events in Kafka, and delivers commands. The source code is `services/connector-gateway`; the administrative client is `tools/gateway-admin`.
+
+## Launch and Verifications
 
 ```bash
 task env:up
@@ -15,62 +19,62 @@ task gateway:sanitizers
 task gateway:coverage
 ```
 
-Проверки используют два настоящих процесса, синтетические сертификаты и служебную регистрацию IdP локального окружения. `gateway:bench` использует release-сборку, 16 коннекторов и последующую сверку Kafka; генерация сообщений выполняется до измеряемого интервала. Частота выборки трасс в этом наборе равна 0,001; heartbeat, реестр и подтверждения Kafka остаются включёнными. `gateway:failover` останавливает активный шлюз через SIGKILL и переключает тестовый TCP proxy на второй экземпляр. SDK сохраняет входные события в своём журнале и повторяет подключение без изменения адреса, идентификаторов и последовательностей. Для TSan отдельный Compose override разрешает системный вызов `personality`, необходимый runtime санитайзера на хостах с высокой энтропией ASLR; обычный запуск сохраняет профиль seccomp Docker. Диагностика сохраняется в `build/gateway-test/<preset>`.
+Verifications use two real processes, synthetic certificates, and the IdP registration of the local environment. `gateway:bench` uses a release build, 16 connectors, and subsequent Kafka verification; message generation occurs before the measurable interval. The sampling frequency for traces in this set is 0.001; heartbeat, registry, and Kafka acknowledgments remain enabled. `gateway:failover` stops the active gateway with SIGKILL and switches the test TCP proxy to a second instance. The SDK saves incoming events in its log and reconnects without changing the address, identifiers, or sequences. For TSan, a separate Compose override allows the system call `personality`, required by the runtime sanitizer on hosts with high entropy ASLR; normal startup preserves Docker seccomp profile. Diagnostics are saved in `build/gateway-test/<preset>`.
 
-В обычном стенде `task flow:up` регистрирует демонстрационный коннектор через аутентифицированную административную службу. Его сертификат больше не зашит в код шлюза. Генератор сертификатов и bootstrap IdP предназначены только для изолированного локального окружения.
+In a regular test environment, `task flow:up` registers the demo connector through an authenticated administrative service. Its certificate is no longer embedded in the gateway code. The certificate generator and bootstrap IdP are only intended for isolated local environments.
 
-## Конфигурация
+## Configuration
 
-- `settings.listen_port` - порт gRPC, по умолчанию 8080; административная служба и поток коннектора используют разные проверки идентичности.
-- `settings.tls_directory` - `ca.pem`, `server.pem`, защищённый `server.key`. Внешний транспорт требует TLS 1.3 и клиентский сертификат. Bundle доверия должен содержать цепочку, необходимую для проверки публичных сертификатов коннекторов.
-- `settings.brokers`, `settings.registry` - Kafka и Schema Registry. Для Kafka задаются `kafka_ca_file`, `kafka_certificate_file`, `kafka_private_key_file`; отключение TLS возможно только явным `allow_plaintext` для локального стенда.
-- `settings.pg_host`, защищённый `pg_password_file`, `pg_ca_file`, `pg_certificate_file`, `pg_private_key_file` - PostgreSQL с проверкой имени и CA. Схема `ingest` создаётся версионированным мигратором.
-- `settings.redis_host`, защищённый `redis_password_file`, `redis_ca_file`, `redis_certificate_file`, `redis_key_file` - Redis/Valkey. Ошибка Redis останавливает подтверждение и владение сессией.
-- `settings.issuer`, `settings.jwks_url` - фиксированные параметры IdP, audience `psim`, роли клиента `psim`. Тенант берётся из проверенного `psim_tenant`.
-- `settings.security_audit_tenant` - тенант централизованного аудита для отказов незарегистрированным коннекторам. Для известной регистрации используется её сохранённый тенант. Поле обязательно при рабочем TLS; TLS-отказы до установления проверенной личности остаются в журнале границы транспорта.
-- `settings.max_sessions` - предел одновременных транспортов экземпляра, по умолчанию 256.
+- `settings.listen_port` - gRPC port, default 8080; the administrative service and connector stream use different identity checks.
+- `settings.tls_directory` - `ca.pem`, `server.pem`, and protected `server.key`. External transport requires TLS 1.3 and client certificates. The trust bundle must contain the chain required to verify connector public certificates.
+- `settings.brokers`, `settings.registry` - Kafka and Schema Registry. For Kafka, set `kafka_ca_file`, `kafka_certificate_file`, `kafka_private_key_file`; disabling TLS is only possible explicitly with `allow_plaintext` for local environments.
+- `settings.pg_host`, protected by `pg_password_file`, `pg_ca_file`, `pg_certificate_file`, `pg_private_key_file` - PostgreSQL with name verification and CA. The schema `ingest` is created by a versioned migrator.
+- `settings.redis_host`, protected by `redis_password_file`, `redis_ca_file`, `redis_certificate_file`, `redis_key_file` - Redis/Valkey. Redis errors stop acknowledgment and session ownership.
+- `settings.issuer`, `settings.jwks_url` - Fixed parameters of the IdP, audience `psim`, client roles `psim`. Tenants are taken from verified `psim_tenant`.
+- `settings.security_audit_tenant` - Centralized audit tenant for unregistered connectors. For known registration, it uses its saved tenant. This field is required when TLS is active; TLS failures before establishing a verified identity remain in the transport boundary log.
+- `settings.max_sessions` - Limit of simultaneous transports per instance, default 256.
 
-Служебные пароли и закрытые ключи читаются из защищённых файлов. Пути и доверенные endpoint задаёт оператор; сообщения коннектора и JWT не выбирают адрес JWKS или другую инфраструктуру.
+Service passwords and secret keys are read from protected files. Paths and trusted endpoints are set by the operator; connector messages and JWT do not select JWKS addresses or other infrastructure.
 
-## Управление регистрацией
+## Registration Management
 
-CLI требует mTLS-сертификат `admin.pem`, защищённый `admin.key` с URI `psim://service/gateway-admin`, доверенный `ca.pem` и защищённый файл JWT оператора:
+The CLI requires a mTLS certificate `admin.pem`, with protected private key `admin.key` with URI `psim://service/gateway-admin`, trusted `ca.pem`, and the operator’s protected JWT file:
 
 ```bash
 psim-gateway-admin connector-gateway:8080 /secure/gateway-admin request.json /secure/operator.token
 ```
 
-`request.json` содержит `requestId`, `action`, `connector`, `expectedVersion`, а для добавления сертификата - `certificatePem`. При первоначальной регистрации `connector` содержит `connectorId`, `name`, `connectorType` и необязательные `limits`. Служба сама вычисляет отпечаток и срок сертификата. В сертификате коннектора требуется URI `psim://connector/<connectorId>`.
+`request.json` contains `requestId`, `action`, `connector`, `expectedVersion`, and for adding a certificate, `certificatePem`. During initial registration, `connector` contains `connectorId`, `name`, `connectorType`, and optional `limits`. The service calculates the certificate fingerprint and validity period. The connector certificate requires URI `psim://connector/<connectorId>`.
 
-| Операция | Действие |
+| Operation | Action |
 |---|---|
-| `REGISTRATION_ACTION_INSPECT` | Прочитать регистрацию своего тенанта и её версию |
-| `REGISTRATION_ACTION_REGISTER` | Создать новую регистрацию; `expectedVersion` равен 0 |
-| `REGISTRATION_ACTION_ROTATE` | Добавить новый сертификат с сохранением прежнего; одновременно не больше двух действующих |
-| `REGISTRATION_ACTION_REVOKE` | Отозвать `fingerprint`, закрыть соответствующие потоки и запретить последующие подключения |
-| `REGISTRATION_ACTION_DISABLE` | Отключить регистрацию и закрыть её потоки |
-| `REGISTRATION_ACTION_RECOVER` | Только `admin`: отозвать прежние сертификаты и активировать новый, ранее не использованный |
+| `REGISTRATION_ACTION_INSPECT` | Read your tenant’s registration and its version |
+| `REGISTRATION_ACTION_REGISTER` | Create a new registration; `expectedVersion` is 0 |
+| `REGISTRATION_ACTION_ROTATE` | Add a new certificate with the previous one retained; no more than two active ones at once |
+| `REGISTRATION_ACTION_REVOKE` | Revoke `fingerprint`, close affected streams, and prohibit subsequent connections |
+| `REGISTRATION_ACTION_DISABLE` | Disconnect registration and close its streams |
+| `REGISTRATION_ACTION_RECOVER` | Only `admin`: revoke previous certificates and activate a new, unused one |
 
-Роли `admin` и `integrator` ограничены своим тенантом. MFA администратора настраивается в IdP. CLI не создаёт собственный УЦ и не принимает закрытые ключи коннектора.
+Roles `admin` and `integrator` are limited to their tenant. The administrator’s MFA is configured in the IdP. The CLI does not create its own CA and does not accept connector secret keys.
 
-Каждое изменение проверяет актуальную версию регистрации. Для повтора после сетевой ошибки используются тот же `requestId` и тот же payload. Дедлайн ответа может означать, что запись уже зафиксирована, а подтверждение применения ещё ожидается. Новый идентификатор вместо повтора не разрешает эту неопределённость.
+Every change checks the current version of the registration. For repetition after a network error, the same `requestId` and payload are used. The response deadline may mean that the change is already committed, and confirmation of application is still pending. Using a new identifier instead of retrying does not resolve this uncertainty.
 
-Успешный ответ изменения означает, что живые экземпляры применили ревизию. Срок кэша доверия - секунда; экземпляр с недоступным реестром прекращает обработку. Служебный lease экземпляра истекает через три секунды. Аудит и изменение регистрации фиксируются одной транзакцией, публикация аудита повторяется через outbox.
+A successful response to the change means that live instances have applied the revision. The trust lease lasts for one second; an instance with an unavailable registry stops processing. The service lease expires after three seconds. Audit and registration changes are recorded in one transaction, and the audit publication is repeated through the outbox.
 
-## Семантика сессии
+## Session Semantics
 
-- Первым приходит `Register`. Выбирается `1.1` или `1.0`; новые сообщения допустимы только при согласовании соответствующих возможностей.
-- Канонический lease коннектора хранится в PostgreSQL; запись Redis служит дополнительным ограничением и подсказкой маршрутизации. Потеря этой записи не разрешает вторую сессию. Lease действует не дольше 15 секунд. После аварии старого шлюза повторное подключение ждёт его истечения; при корректном завершении lease освобождается раньше.
-- Heartbeat каждые 5 секунд. События и серверные heartbeat не заменяют клиентский heartbeat. Три пропущенных интервала закрывают поток и публикуют `offline`.
-- Пакет ограничен кредитами, 1000 событиями, 1 МиБ и настройками регистрации. Повторное или убывающее `batch_seq` внутри потока отклоняется.
-- `BatchAck.accepted` включает только записи, подтверждённые всеми in-sync Kafka-репликами. Окончательные ошибки перечисляются отдельно; при неопределённой доставке ACK не выдаётся.
-- Сырые события сохраняют исходное время и идентичность при досылке. `live_observation` требует текущую сессию и недавнее наблюдение; история остаётся историей.
-- Команды доставляются только собственной активной сессии того же тенанта, с неистёкшим дедлайном и объявленной поддержкой команд. Получение и результат публикуются в `psim.commands.results.v1`. Ответ на невыданную этой сессии команду и переполненная очередь не приводят к исполнению.
+- `Register` comes first. `1.1` or `1.0` is selected; new messages are only allowed if they match the corresponding capabilities.
+- The canonical lease of the connector is stored in PostgreSQL; the Redis record serves as an additional constraint and routing hint. Losing this record does not allow a second session. The lease lasts no longer than 15 seconds. After the old gateway fails, reconnection waits for it to expire; if it completes correctly, the lease expires earlier.
+- Heartbeat occurs every 5 seconds. Events and server heartbeat do not replace client heartbeat. Three missed intervals close the stream and publish `offline`.
+- The batch is limited by credits, 1000 events, 1 MiB, and registration settings. Repeated or decreasing `batch_seq` within the stream is rejected.
+- `BatchAck.accepted` includes only records confirmed by all in-sync Kafka replicas. Final errors are listed separately; no ACK is given for uncertain delivery.
+- Raw events retain their original time and identity when delivered. `live_observation` requires the current session and recent observation; history remains history.
+- Commands are delivered only to the active session of the same tenant, with an unexpired deadline and announced support for commands. The receipt and result are published in `psim.commands.results.v1`. Responding to a command not sent by this session or dealing with an overloaded queue does not trigger execution.
 
-## Состояние и эксплуатация
+## Status and Operation
 
-`psim.ingest.state.v1` имеет ключ `connector_id`. В записи находятся тенант, идентификатор сессии и либо изменение связи, либо проверенный `StateReport`. `Envelope.sequence` изменений связи монотонно растёт в PostgreSQL для каждого коннектора и позволяет отклонить переставленные уведомления outbox. Подключение публикует качество `unknown`; оно не делает устройства доступными. Уведомление offline с качеством `stale` инвалидирует имеющуюся актуальность; источник без подтверждённого наблюдения остаётся `unknown`. Старый курсор снимка внутри сессии фильтруется, если уже пришло новое живое наблюдение. Сырые события сохраняют `gateway_session_id`, `live_observation` и `observation_session_id` для последующей нормализации и проекции.
+`psim.ingest.state.v1` has the key `connector_id`. The record contains a tenant, session identifier, and either a changed connection or a verified `StateReport`. `Envelope.sequence` increases monotonically in PostgreSQL for each connector, allowing for the rejection of out-of-order notifications in the outbox. Connection publishes quality `unknown`; this does not make devices available. An offline notification with quality `stale` disables any previously confirmed freshness; a source without verified observation remains `unknown`. The old snapshot cursor within a session is filtered if a new live observation has arrived. Raw events retain `gateway_session_id`, `live_observation`, and `observation_session_id` for subsequent normalization and projection.
 
-`/health/live`, `/health/ready`, `/metrics` и трассировка предоставляются runtime. Шлюз экспортирует число открытых сессий, принятых и окончательно отклонённых событий, доставленных команд, таймаутов heartbeat и отказов при подключении. Метрики не используют идентификаторы коннекторов как labels.
+`/health/live`, `/health/ready`, `/metrics`, and the trace are provided by the runtime. The gateway exports the number of open sessions, accepted and ultimately rejected events, delivered commands, heartbeat delays, and connection failures. Metrics do not use connector identifiers as labels.
 
-Resource Catalog, Normalizer и конечная REST/WebSocket-проекция состояния развиваются в своих шагах. Command Service отвечает за права на действие, подтверждение критичной команды, общий дедлайн и неизвестный результат. Gateway не выполняет команды самостоятельно.
+Resource Catalog, Normalizer, and the REST/WebSocket state projection are described in their service guides. The Command Service is responsible for action rights, confirmation of critical commands, overall deadlines, and unknown results. The Gateway does not execute commands independently.

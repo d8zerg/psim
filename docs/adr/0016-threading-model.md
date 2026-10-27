@@ -1,41 +1,43 @@
-# ADR-016. Модель потоков исполнения и корутины
+# ADR-016. Execution threads and coroutines
 
-- **Статус:** Принято
-- **Принято:** в начале шага 2.2
-- **Шаг плана:** 2.2
-- **Связанные:** ADR-009, ADR-014, ADR-015, ADR-039 (runtime сервиса), [ADR-040](0040-async-primitives.md) (реализация)
+<!-- language-links -->
+[English](0016-threading-model.md) | [Русский](../ru/adr/0016-threading-model.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-009, ADR-014, ADR-015, ADR-039 (service runtime), [ADR-040](0040-async-primitives.md) (implementation)
 
-Сервисы обрабатывают десятки тысяч сообщений в секунду с бюджетом задержки в десятки миллисекунд, работают с Kafka, PostgreSQL, Redis, gRPC и HTTP, должны поддерживать отмену, дедлайны, противодавление и детерминированное тестирование. Нужна единая модель конкурентности для всех сервисов.
+## Context
 
-## Рассмотренные варианты
+Services process tens of thousands of messages per second with latency budgets of tens of milliseconds. They use Kafka, PostgreSQL, Redis, gRPC and HTTP, and need cancellation, deadlines, backpressure and deterministic testing. All services need a shared concurrency model.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Поток на соединение или запрос, блокирующий ввод-вывод | Простой код | Масштаб и задержки; гонки на общем состоянии |
-| Общий `io_context` на пул потоков + strands | Стандартный подход Asio | Состояние партиций требует синхронизации; миграция задач между потоками ухудшает локальность кэша |
-| **Поток на ядро (shard): `io_context` на поток, партиции и соединения закреплены за потоком; корутины C++20 (`asio::awaitable`); блокирующие операции в отдельном пуле** | Нет блокировок на горячем пути: состояние партиции принадлежит одному потоку; предсказуемые задержки; естественное противодавление | Неравномерность нагрузки между шардами (балансировка назначением партиций) |
-| Сторонние фреймворки (Seastar, userver) | Готовые решения | Seastar требует собственного стека и ОС-настроек; userver - большой фреймворк со своей экосистемой, конфликт с решениями по стеку |
+| One thread per connection or request, blocking I/O | Simple code | Scaling and latency limits; races on shared state |
+| Shared `io_context` on a thread pool with strands | Standard Asio approach | Partition state needs synchronization; task migration between threads reduces cache locality |
+| **One thread per core (shard): one `io_context` per thread, with partitions and connections assigned to that thread; C++20 coroutines (`asio::awaitable`); a separate pool for blocking operations** | No locks on the hot path: one thread owns partition state; predictable latency; natural backpressure | Uneven shard load, balanced by partition assignment |
+| External frameworks (Seastar, userver) | Existing implementations | Seastar requires its own stack and OS configuration; userver is a large framework with an ecosystem that conflicts with the selected stack |
 
-## Решение
+## Decision
 
-1. **Шарды:** N потоков исполнения, у каждого свой `io_context`; N - настройка `runtime.shards`, по умолчанию 0 - число ядер, доступных процессу (affinity и cgroup). Назначенная партиция Kafka, её состояние (RocksDB, трекер) и транзакционный продюсер закрепляются за одним шардом. HTTP- и gRPC-соединения распределяются по шардам. Ключ распределяется на шард стабильно (`Shards::index_for`).
-2. **Управляющий цикл** - отдельный поток runtime (ADR-039): служебный HTTP, сигналы, жизненный цикл компонентов. Шарды запускаются до старта компонентов и останавливаются после их дренирования.
-3. **Корутины:** `asio::awaitable` с `co_await` для всего асинхронного кода; отмена - сигналы отмены Asio (`asio::cancellation_signal`, отмена проигравшей ветви операторов `||`); дедлайн - `with_deadline(clock, timeout, операция)` с кодом `COMMON_DEADLINE_EXCEEDED`.
-4. **Блокирующие операции** (RocksDB при больших пакетах, файловый ввод-вывод SDK, DNS, синхронные клиенты) - в ограниченном пуле `BlockingPool`: число потоков и число одновременно выполняемых и ожидающих задач ограничены, вызывающий ждёт свободного места (противодавление), результат возвращается в шард вызывающего; исключения библиотек превращаются в `COMMON_INTERNAL`.
-5. **librdkafka:** очередь событий клиента перенаправляется (`rd_kafka_queue_io_event_enable`) в eventfd, отслеживаемый Asio, - без опроса в отдельном потоке (шаг 2.3).
-6. **gRPC:** асинхронный callback API gRPC работает в собственных потоках gRPC; переход в шард - через `asio::post`.
-7. **Противодавление** (`libs/platform/async`, SR-18): `BoundedQueue` (ограниченная очередь: производитель ждёт места), `Credits` (кредиты: выдача пачкой, взятие по потребности, строгий FIFO без голодания), `Semaphore` с RAII-разрешением; закрытие будит всех ожидающих.
-8. **Время:** порт `Clock` - время событий (`wall`), монотонное время (`steady`) и ожидание (`sleep_until`); `SystemClock` на таймерах Asio, `ManualClock` - время двигается только вызовом `advance` (детерминированные тесты, симуляция шага 2.7).
-9. **Контекст трассировки** OpenTelemetry хранится в потоке, а на шарде чередуются корутины, поэтому `Scope` не удерживается через `co_await`: родительский спан передаётся явно (`StartSpan(..., {.parent = ...})`).
+1. **Shards:** N execution threads, each with its own `io_context`. `runtime.shards` configures N; the default 0 selects the cores available to the process through affinity and cgroups. An assigned Kafka partition, its state (RocksDB and tracker) and its transactional producer belong to one shard. HTTP and gRPC connections are distributed among shards. Keys map consistently to shards (`Shards::index_for`).
+2. **Control loop:** a separate runtime thread (ADR-039) handles administrative HTTP, signals and component lifecycle. Shards start before components and stop after components drain.
+3. **Coroutines:** use `asio::awaitable` and `co_await` throughout asynchronous code. Cancellation uses Asio cancellation signals (`asio::cancellation_signal`, with cancellation of the losing `||` branch). Deadlines use `with_deadline(clock, timeout, operation)` and `COMMON_DEADLINE_EXCEEDED`.
+4. **Blocking operations** (large RocksDB batches, SDK file I/O, DNS, synchronous clients) run in a bounded `BlockingPool`. Both thread count and running plus queued tasks are bounded. The caller waits for capacity, providing backpressure; the result returns to its shard. Library exceptions become `COMMON_INTERNAL`.
+5. **librdkafka:** redirect the client event queue (`rd_kafka_queue_io_event_enable`) to an eventfd monitored by Asio, without a dedicated polling thread.
+6. **gRPC:** the asynchronous callback API runs on gRPC threads; `asio::post` transfers execution to the shard.
+7. **Backpressure** (`libs/platform/async`, SR-18): `BoundedQueue` makes producers wait for space; `Credits` grants batches and consumes on demand with strict FIFO and no starvation; `Semaphore` provides RAII permits. Closing wakes all waiters.
+8. **Time:** the `Clock` port provides event time (`wall`), monotonic time (`steady`) and waiting (`sleep_until`). `SystemClock` uses Asio timers; `ManualClock` advances only through `advance`, supporting deterministic tests and ADR-044 simulation.
+9. OpenTelemetry **trace context** is thread-local, while shard coroutines interleave. Therefore, do not hold a `Scope` across `co_await`: pass the parent span explicitly (`StartSpan(..., {.parent = ...})`).
 
-## Последствия
+## Consequences
 
-- Примитивы шард-локальны: ими пользуются корутины одного `io_context`; между шардами - только `asio::post` и `Shards::post`.
-- Доменное ядро синхронное и чистое; асинхронность - только в слоях application и adapters.
-- Межшардовое взаимодействие - только сообщениями (`asio::post`), без разделяемого изменяемого состояния.
+- Primitives belong to one shard and are used by coroutines on one `io_context`; cross-shard calls use only `asio::post` and `Shards::post`.
+- The domain core is synchronous and pure. Asynchronous code belongs only in application and adapter layers.
+- Shards communicate only through messages (`asio::post`), with no shared mutable state.
 
-## Проверка
+## Verification
 
-Тесты под TSan; бенчмарки накладных расходов примитивов как базовая линия (DoD шага 2.2).
+TSan tests and primitive-overhead benchmarks establish a baseline.

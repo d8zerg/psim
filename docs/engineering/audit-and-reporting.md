@@ -1,48 +1,52 @@
-# Аудит и отчёты в интерфейсе
+# Audit and Reports in the Interface
 
-`/audit` доступен аудитору, `/reports` - руководителю и старшему смены. Модуль использует существующую OIDC-сессию и публичный Gateway. Решение - [ADR-074](../adr/0074-audit-and-reporting-interface.md); серверные операции описаны в [аудите](audit-service.md) и [отчётности](incident-reports.md).
+<!-- language-links -->
+[English](audit-and-reporting.md) | [Русский](../ru/engineering/audit-and-reporting.md)
+<!-- /language-links -->
 
-## Поиск аудита
+`/audit` is accessible to auditors, while `/reports` is available to managers and shift supervisors. The module uses an existing OIDC session and a public Gateway. The solution is [ADR-074](../adr/0074-audit-and-reporting-interface.md); server operations are described in [audit](audit-service.md) and [reports](incident-reports.md).
 
-Задайте период UTC, пользователя, префикс действия, тип и ID объекта, площадку и исход. Период аудита включает обе границы. По умолчанию выбран последний день. Нажмите «Найти записи»: изменение полей само по себе не меняет применённую выборку. До повторного поиска экспорт недоступен. Результат показывает применённый период; новая выборка сбрасывает страницы.
+## Searching for Audit Data
 
-Список использует непрозрачный серверный курсор. Число записей страницы ограничивает сервер, поэтому оно может быть меньше запрошенного даже при наличии следующей страницы. Номер страницы не объявляется общим количеством записей. Раскрытая строка показывает исходное действие, объект, времена, детали и соседние хэши. Строки выводятся как текст.
+Specify the UTC period, user, action prefix, object type and ID, site, and outcome. The audit period includes both boundaries. By default, the last day is selected. Click “Search Records”: changing the fields does not change the applied filter. Export is not available until re-search. The result shows the applied period; a new search will reset the page.
 
-Аудитору с ограниченной областью нужно явно указать разрешённую площадку. Проверка всей цепочки и JSONL-экспорт требуют области `*`; интерфейс не предлагает их ограниченному аудитору. Сервер повторно проверяет доступ и возвращает отказ для чужой площадки.
+The list uses an opaque server cursor. The number of records per page is limited by the server, so it may be less than requested even if there’s another page available. The page number is not presented as the total record count. The displayed row shows the original action, object, times, details, and adjacent hashes. Rows are displayed as text.
 
-## Целостность и JSONL
+Auditors with limited access need to explicitly specify the allowed site. Checking the entire chain and exporting to JSONL require `*`; the interface does not offer this for restricted auditors. The server re-checks access and returns a failure for unauthorized sites.
 
-Проверка относится к последовательности цепочки тенанта независимо от поиска. Ноль в начале означает первую запись, ноль в конце - последнюю. Номера проверяются как uint64 и передаются строками без преобразования в Number. Отрицательные, переполненные и обратные диапазоны не отправляются.
+## Integrity and JSONL
 
-Результат раздельно показывает серверный вердикт, число проверенных записей, первую нарушенную последовательность и описание. Подписанная контрольная точка показывает номер, хэш, ключ, подпись, тенанта и время. Отсутствие точки обозначается явно. Этот экран не выполняет независимую криптографическую проверку в браузере.
+The check applies to the sequence of the tenant’s chain regardless of search results. A zero at the beginning indicates the first record, a zero at the end indicates the last one. Numbers are checked as uint64 and sent as strings without conversion to numbers. Negative, overflowing, and reverse ranges are not sent.
 
-JSONL создаёт новый снимок полной цепочки тенанта, включая записи вне поискового фильтра. Признак выбранных записей сохраняет связь с поиском; полная цепочка и внешние контрольные точки нужны для независимой проверки. При нарушенной цепочке экспорт не создаёт достоверный файл. Проверка скачанного файла:
+The result separately shows the server’s verdict, number of checked records, first violated sequence, and description. The signed checkpoint shows the number, hash, key, signature, tenant, and time. absence of a checkpoint is explicitly indicated. This screen does not perform independent cryptographic checks in the browser.
+
+JSONL creates a new snapshot of the entire tenant chain, including records outside the search filter. A selection flag on records preserves their relationship to the search; the entire chain and external checkpoints are needed for independent verification. If the chain is violated, the export will not create a valid file. Checking the downloaded file:
 
 ```sh
 psim-audit-tool verify psim-audit.jsonl trusted-keys.json checkpoint-directory
 ```
 
-Ключи и внешнюю контрольную точку последней записи снимка получают отдельно от экспортируемого файла. Для исторического снимка нужна согласованная копия внешнего архива до его последней записи. Нативная приёмка берёт её из реального каталога сервиса и сохраняет исходные подписи.
+Keys and the last record’s external checkpoint are obtained separately from the exported file. For historical snapshots, a consistent copy of the external archive before its last record is required. The native acceptance test takes it from the actual service directory and saves original signatures.
 
-## Отчёт руководителя
+## Manager’s Report
 
-По умолчанию выбран период за последние 30 суток. Интервал отчёта - `[from,to)`, не длиннее 400 суток. ID площадок и типов инцидентов разделяются запятыми или пробелами; приоритеты выбираются списком. Пустые фильтры означают все разрешённые данные, а не обход области пользователя.
+By default, the period is selected as the last 30 days. The report interval is `[from,to)`, not longer than 400 days. Site IDs and incident types are separated by commas or spaces; priorities are selected with a list. Empty filters mean all allowed data, without bypassing the user’s access scope.
 
-Доступны итоги и группы по площадке, типу инцидента, приоритету, ответственному и дню UTC. Создание, принятие, решение и SLA имеют собственные времена наблюдения. Число решений не обязано равняться числу созданий за период. Группа ответственного использует последнего назначенного оператора.
+Totals and groups by site, incident type, priority, responsible person, and UTC day are available. Creation, acknowledgement, resolution, and SLA have their own observation times. The number of resolutions does not have to equal the number of creations during the period. The group of responsible person uses the last assigned operator.
 
-Итоги приходят с сервера и не вычисляются усреднением строк. Показаны созданные и решённые инциденты, MTTA/MTTR в секундах, доля ложных тревог, SLA принятия и решения, эскалированные инциденты и знаменатели SLA. Нулевой знаменатель показан как отсутствие наблюдений, а нулевое соблюдение при ненулевом знаменателе - как 0%. Счётчики форматируются через BigInt. Нулевая длительность сама по себе не отличает нулевое измерение от отсутствия наблюдений.
+Totals come from the server and are not averaged. Created and resolved incidents are shown, along with MTTA/MTTR in seconds, false alarms percentage, SLA acknowledgement and resolution compliance, escalated incidents, and SLA denominators. A zero denominator indicates no observations, while zero compliance with a non-zero denominator indicates 0%. Counts are formatted as BigInt. Zero duration does not distinguish zero measurement from no observations.
 
-Графики показывают количество созданных и решённых инцидентов и времена MTTA/MTTR. Они используют первые 20 групп текущей страницы; ограничение обозначено в интерфейсе. Таблица содержит до 50 групп на странице и все метрики. Области графиков и таблицы доступны для прокрутки с клавиатуры. CSV использует применённые параметры и свежую серверную проекцию; он может отличаться от прежнего экрана при обновлении исходных данных.
+Charts show the number of created and resolved incidents and MTTA/MTTR times. They use the first 20 groups on the current page; the limit is indicated in the interface. The table contains up to 50 groups per page and all metrics. Chart and table areas can be scrolled with the keyboard. CSV uses applied parameters and the latest server projection; it may differ from the previous screen when the original data is updated.
 
-## Сессия и ошибки
+## Session and Errors
 
-Эффективные права проверяются через `/v1/me` при входе и каждые пять секунд. Изменение пользователя, тенанта, ролей, площадок, зон или действий создаёт новый контекст без прежнего кэша и полей. Ответы отменённого контекста отбрасываются. Отказ 401/403 скрывает прежние данные; восстановление доступа проверяется явным действием.
+Effective permissions are checked through `/v1/me` upon entry and every five seconds. Changing the user, tenant, roles, sites, zones, or actions creates a new context without previous cache and fields. Responses from canceled contexts are discarded. 401/403 errors hide previous data; restoring access requires explicit action.
 
-Различаются загрузка, отсутствие данных, ошибка запроса и отсутствие сети. Ошибка проверки прав, не являющаяся отказом, сохраняет просмотр последнего результата и блокирует новые запросы до восстановления проверки. При потере сети операции недоступны; результат отмечен как потенциально устаревший. Автоматических повторов проверки целостности и экспорта нет.
+Differences include loading, data absence, request error, and network loss. An access-check error other than an authorization denial retains the last result and blocks new requests until the check is restored. When the network is lost, operations are unavailable; the result is marked as potentially outdated. Automatic retries of integrity and export checks do not occur.
 
-Файл читается авторизованным запросом без HTTP-кэша; media type проверяется до скачивания. Blob URL освобождается при замене и закрытии контекста. Проверка, чтение и экспорт отменяются при закрытии сессии. Интерфейс не содержит операций изменения аудита.
+The file is read with authorized requests without HTTP cache; the media type is checked before downloading. Blob URLs are freed when the context is replaced and closed. Checking, reading, and exporting are canceled when the session closes. The interface does not include operations to change audits.
 
-## Воспроизведение
+## Reproduction
 
 ```sh
 task web:check
@@ -50,6 +54,6 @@ task web:e2e
 task insights:test
 ```
 
-Нативная приёмка использует отдельный Compose-проект, реальные PKCE и настройку TOTP, HTTPS Gateway, Kafka, PostgreSQL, ClickHouse и Audit Service с Ed25519. Сначала проверяются эталонные десять инцидентов за 30 суток с MTTA 60 с, MTTR 120 с, ложными тревогами 20%, SLA принятия 50% и решения 100%. Через браузер проверяются поиск, страницы, детали, JSONL и его независимая проверка, точная локализация изменения и удаления записи прямым SQL, восстановление цепочки, отчёт менее чем за три секунды и CSV с теми же метриками. Проверяется запрет чужой площадки и скрытие данных после удаления роли в Keycloak при прежнем JWT.
+The native acceptance test uses a separate Compose project, real PKCE, and TOTP configuration, HTTPS Gateway, Kafka, PostgreSQL, ClickHouse, and Audit Service with Ed25519. First, ten benchmark incidents over 30 days are checked with MTTA of 60 seconds, MTTR of 120 seconds, false alarms of 20%, acknowledgement SLA compliance of 50%, and resolution SLA compliance of 100%. Through the browser, search, pages, details, JSONL, and its independent verification, precise detection of tampering, and deletion of records with direct SQL, chain restoration, reports within less than three seconds, and CSV with the same metrics are checked. Restrictions on other sites and data hiding after removing roles in Keycloak with the original JWT are checked.
 
-Отчёты, скачанные файлы и журналы сохраняются в `build/insights/<preset>`. Нативный отчёт связывается с хэшем фактически показанной сборки; изменение сборки во время проверки отклоняется. Прямые SQL-изменения выполняются только в тенанте изолированного тестового проекта. Проверка включена в CI для изменений веб-клиента и её инструментов.
+Reports, downloaded files, and logs are saved in `build/insights/<preset>`. The native report is linked to the hash of the actually shown build; changes during the check are rejected. Direct SQL changes are performed only in the isolated test project’s tenant. The check is included in CI for changes to the web client and its tools.

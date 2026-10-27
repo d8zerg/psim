@@ -1,72 +1,75 @@
-# ADR-035. Локальное окружение разработки и интеграционного тестирования
+# ADR-035. Local development and integration-test environment
 
-- **Статус:** Принято
-- **Шаг плана:** 1.4
-- **Связанные:** ADR-002, ADR-003, ADR-015, ADR-028, ADR-031, ADR-034, требования SR-02, SR-19, SR-23 ([threat-register.md](../security/threat-register.md))
+<!-- language-links -->
+[English](0035-local-environment.md) | [Русский](../ru/adr/0035-local-environment.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-002, ADR-003, ADR-015, ADR-028, ADR-031, ADR-034, requirements SR-02, SR-19 and SR-23 ([threat-register.md](../security/threat-register.md))
 
-Шаг 1.4 требует окружение одной командой: Kafka (KRaft, вариант с одним и с тремя брокерами), Schema Registry, PostgreSQL, ClickHouse с Keeper (план 1.1), Redis-совместимое хранилище, Keycloak с преднастроенным realm, OpenTelemetry Collector, Prometheus, Grafana, хранилища логов и трассировок, прокси для внесения сетевых сбоев. DoD: запуск с нуля до рабочего состояния не дольше 5 минут; окружение используется интеграционными тестами конвейера (ADR-034). Окружение работает на Linux-стенде с нативным Docker Engine и плагином Docker Compose (16 CPU, 32 ГБ) рядом с IDE и фоновым конвейером.
+## Context
 
-Часть выбора уже сделана: Kafka 4.x KRaft (ADR-002), Apicurio Registry 3.x с хранением в PostgreSQL (ADR-003), ClickHouse с Replicated-движками и Keeper во всех топологиях (ADR-028), Toxiproxy (ADR-031). Не выбраны хранилища логов и трассировок (окончательно - шаг 9.4, ADR-028 называет кандидатом ClickHouse) и сервер Redis (ADR-015 предложен, принимается на шаге 2.5).
+One command starts Kafka in KRaft mode with one or three brokers, Schema Registry, PostgreSQL, ClickHouse with Keeper, a Redis-compatible store, Keycloak with a configured realm, OpenTelemetry Collector, Prometheus, Grafana, log and trace stores, and fault-injection proxies. Startup from scratch to readiness must take no more than 5 minutes. Pipeline integration tests use this environment (ADR-034). It runs alongside the IDE and background pipeline on a Linux development host with native Docker Engine and the Docker Compose plugin, 16 CPUs and 32 GB RAM.
 
-## Рассмотренные варианты
+Existing choices are Kafka 4.x KRaft (ADR-002), PostgreSQL-backed Apicurio Registry 3.x (ADR-003), replicated ClickHouse engines and Keeper in all topologies (ADR-028), and Toxiproxy (ADR-031). ADR-080 defines release log and trace stores; ADR-015 defines the Redis-compatible server and client.
 
-### Логи и трассировки в окружении разработки
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Development logs and traces
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Jaeger + VictoriaLogs | Лицензия Apache 2.0 | Две несвязанные системы; переход от трассы к логам в Grafana слабее |
-| ClickHouse через экспортёр Collector | Кандидат для поставки (ADR-028) | Схема и запросы для Grafana пришлось бы проектировать сейчас, до шага 9.4 |
-| **Loki + Tempo (одиночные процессы, локальный диск)** | Нативные источники Grafana, переход трасса <-> логи по `trace_id`, прием OTLP, около 160 МБ памяти | AGPL - допустимо для окружения разработки, не поставляется; выбор для поставки остаётся за шагом 9.4 |
+| Jaeger + VictoriaLogs | Apache 2.0 | Separate systems with weaker Grafana trace-to-log navigation |
+| ClickHouse through a Collector exporter | Distribution candidate (ADR-028) | Requires custom schemas and Grafana queries |
+| **Loki + Tempo, single processes with local disks** | Native Grafana sources, trace <-> log navigation through `trace_id`, OTLP ingestion, about 160 MB memory | ADR-080 defines distribution and licensing conditions |
 
-### Redis-совместимое хранилище
+### Redis-compatible store
 
-Используется **Valkey** - вариант, предложенный ADR-015 (BSD-3, протокол Redis). Окружение не предрешает топологию и клиента, их ADR-015 фиксирует на шаге 2.5.
+Use **Valkey**, proposed by ADR-015, with BSD-3 licensing and Redis protocol support. ADR-015 defines topology and client.
 
-### Вариант с тремя брокерами
+### Three-broker variant
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Два файла Compose | Явно | Дублирование описания брокера |
-| **Один файл, брокер `kafka-1` всегда, `kafka-2` и `kafka-3` в профиле `kafka3`; кворум и коэффициенты репликации - переменными** | Одно описание брокера (якорь YAML), одинаковые адреса для клиентов | Смена числа брокеров требует сброса данных (меняется кворум KRaft) - проверяется задачей |
+| Two Compose files | Explicit | Duplicate broker definitions |
+| **One file: `kafka-1` always enabled, `kafka-2` and `kafka-3` in profile `kafka3`; variables define quorum and replication** | One YAML-anchor broker definition; identical client addresses | Broker-count changes require a data reset because the KRaft quorum changes; the task enforces this |
 
-### Доступ к окружению
+### Environment access
 
-Тесты и проверки выполняются внутри сети Compose (имена сервисов), опубликованные порты нужны только человеку. Поэтому порты вынесены в отдельный файл и публикуются только на `127.0.0.1`, а окружение конвейера поднимается под своим именем проекта без портов и не конфликтует с интерактивным.
+Tests run inside the Compose network using service names; published ports serve human users only. A separate file publishes them only on `127.0.0.1`. Pipeline environments use their own project names without published ports and do not conflict with interactive environments.
 
-## Решение
+## Decision
 
-1. **Состав** (`deploy/local/compose.yaml`, образы закреплены по тегу и дайджесту - SR-23):
+1. **Components** in `deploy/local/compose.yaml`, with tags and digests pinned under SR-23:
 
-   | Компонент | Версия | Роль в окружении |
+   | Component | Version | Role |
    |---|---|---|
-   | Apache Kafka | 4.3.1 | KRaft, broker + controller; 1 или 3 узла |
-   | Apicurio Registry | 3.3.3 | Schema Registry, Confluent-совместимый API, хранение в PostgreSQL |
-   | PostgreSQL | 18.6 | Базы `psim` (сервисы, шаг 2.4), `registry`, `keycloak` |
-   | ClickHouse, Keeper | 26.8 (LTS) | Кластер `psim`: 1 шард, 1 реплика, макросы - те же DDL, что в кластере |
-   | Valkey | 9.1 | Redis-совместимое хранилище (ADR-015) |
-   | Keycloak | 26.8 | Realm `psim` (п. 4) |
-   | OpenTelemetry Collector (contrib) | 0.162 | OTLP gRPC и HTTP; трассы -> Tempo, логи -> Loki, метрики -> Prometheus (remote write) |
-   | Prometheus | 3.15 | Метрики Collector и сервисов |
-   | Loki, Tempo | 3.7, 3.1 | Логи и трассировки разработки |
-   | Grafana | 13.2 | Источники Prometheus, Loki, Tempo со связью по `trace_id`; дашборды - шаг 9.4 |
-   | Toxiproxy | 2.12 | Прокси к Kafka, PostgreSQL, Valkey, ClickHouse для сетевых сбоев (C-07) |
+   | Apache Kafka | 4.3.1 | KRaft broker/controller; 1 or 3 nodes |
+   | Apicurio Registry | 3.3.3 | PostgreSQL-backed Schema Registry with Confluent-compatible API |
+   | PostgreSQL | 18.6 | Databases `psim` for services, `registry` and `keycloak` |
+   | ClickHouse, Keeper | 26.8 LTS | Cluster `psim`: one shard and one replica; macros allow the same DDL as the cluster |
+   | Valkey | 9.1 | Redis-compatible store (ADR-015) |
+   | Keycloak | 26.8 | Realm `psim`, described below |
+   | OpenTelemetry Collector contrib | 0.162 | OTLP gRPC and HTTP; traces -> Tempo, logs -> Loki, metrics -> Prometheus remote write |
+   | Prometheus | 3.15 | Collector and service metrics |
+   | Loki, Tempo | 3.7, 3.1 | Development logs and traces |
+   | Grafana | 13.2 | Prometheus, Loki and Tempo sources linked through `trace_id`; ADR-080 dashboards |
+   | Toxiproxy | 2.12 | Kafka, PostgreSQL, Valkey and ClickHouse fault proxies (C-07) |
 
-2. **Kafka.** Слушатели: `INTERNAL` (`kafka-N:19092`) - сервисы и тесты в сети Compose; `FAULT` (анонсируется как `toxiproxy:29N92`) - тот же брокер через Toxiproxy, чтобы тесты вносили задержки и разрывы и в метаданных клиента; `EXTERNAL` (`localhost:9N92`) - инструменты на хосте. Автосоздание топиков выключено: топики создаются из реестра `contracts/topics/topics.yaml` (профиль `single` для одного брокера, `cluster` для трёх), как это будет делать установщик.
-3. **Запуск:** `task env:up [KAFKA=1|3]` - интерактивное окружение с портами на `127.0.0.1`; `task env:test` - смоук-тесты; `env:down`, `env:reset`, `env:ps`, `env:logs`, `env:endpoints`. Готовность образов без оболочки (Loki, Tempo, Collector, Toxiproxy) проверяется по HTTP пробным контейнером.
-4. **Keycloak, realm `psim`** (`config/keycloak/psim-realm.json`): клиент `psim` владеет ролями `operator`, `supervisor`, `admin`, `integrator`, `auditor`, `manager` (ADR-020); `psim-console` - публичный клиент только с Authorization Code + PKCE S256; `psim-services` - учётные данные клиента для сервисов. Требования SR-02 в конфигурации: пароль не короче 12 символов, блокировка при подборе, бездействие сессии 30 мин, максимум 12 ч, собственный поток входа `psim-browser` с одноразовым паролем для ролей, включающих `mfa-required` (`admin`, `supervisor`). Тестовые пользователи `<роль>1`; claim `psim_scopes` - на шаге 7.4.
-5. **Учётные данные** - только для разработки, в открытом виде в репозитории (`psim-dev-*`); TLS в окружении не включается (шаги 2.6, 9.1). Поставка их не использует.
-6. **Конвейер** (ADR-034): `task env:ci-test` поднимает окружение с нуля под проектом `psim-ci` без опубликованных портов, проверяет бюджет запуска 300 с (DoD), создаёт топики, выполняет смоук-тесты и удаляет окружение с данными при любом исходе. Этап `env` в `task ci` включается при изменении окружения, его инструментов или реестра топиков; в `ci:nightly` - всегда. Компонентные тесты адаптеров (TS-03, шаги 2.3-2.8) добавляются в этот этап.
-7. **Смоук-тесты** (`tools/env/envctl.py`): кворум KRaft, запись и чтение через `INTERNAL` и через Toxiproxy, топики по реестру, регистрация схемы Protobuf, три базы PostgreSQL напрямую и через прокси, таблица ReplicatedMergeTree через Keeper, Valkey напрямую и через прокси, политика realm (SR-02), путь трассы, лога и метрики от Collector до хранилищ, источники Grafana, эффект задержки Toxiproxy.
+2. **Kafka listeners:** `INTERNAL` at `kafka-N:19092` for Compose services and tests; `FAULT`, advertised as `toxiproxy:29N92`, for the same broker through Toxiproxy, including fault-injected client metadata access; `EXTERNAL` at `localhost:9N92` for host tools. Topic auto-creation is disabled. `contracts/topics/topics.yaml` creates topics using `single` for one broker or `cluster` for three, matching installer behavior.
+3. **Execution:** `task env:up [KAFKA=1|3]` starts the interactive environment with ports on `127.0.0.1`; `task env:test` runs smoke tests. Other tasks are `env:down`, `env:reset`, `env:ps`, `env:logs` and `env:endpoints`. A probe container checks HTTP readiness for shell-free Loki, Tempo, Collector and Toxiproxy images.
+4. **Keycloak realm `psim`**, from `config/keycloak/psim-realm.json`: client `psim` owns `operator`, `supervisor`, `admin`, `integrator`, `auditor` and `manager` roles (ADR-020). `psim-console` is public and supports only Authorization Code + PKCE S256; `psim-services` uses service client credentials. SR-02 settings require passwords of at least 12 characters, brute-force lockout, 30 min session inactivity and a 12 h maximum. Custom login flow `psim-browser` requires a one-time password for roles including `mfa-required`, namely `admin` and `supervisor`. Test users are `<role>1`; ADR-061 defines `psim_scopes`.
+5. **Credentials** are development-only plaintext values committed as `psim-dev-*`; this environment does not enable TLS. The release does not use them.
+6. **Pipeline integration** (ADR-034): `task env:ci-test` creates project `psim-ci` from scratch without published ports, enforces the 300 s startup budget, creates topics, runs smoke tests and always removes the environment and data. The `env` stage runs in `task ci` when environment files, tools or the topic registry change, and always in `ci:nightly`. Adapter component tests (TS-03) are added to this stage.
+7. **Smoke tests** in `tools/env/envctl.py` cover KRaft quorum; read/write through `INTERNAL` and Toxiproxy; registered topics; Protobuf schema registration; three PostgreSQL databases directly and through proxies; ReplicatedMergeTree through Keeper; direct and proxied Valkey; realm policy (SR-02); trace, log and metric delivery from Collector to stores; Grafana sources; and Toxiproxy delay effects.
 
-## Последствия
+## Consequences
 
-- Холодный запуск с загрузкой образов - около 3,5 мин; с нуля при загруженных образах - около 95 с (1 и 3 брокера); полный `env:ci-test` - около 2 мин. Память - около 4,2 ГБ на окружение.
-- Окружения разработки и конвейера работают одновременно (около 8,5 ГБ).
-- Переход на 3 брокера и обратно - через `task env:reset`.
-- Хранилища логов и трассировок поставки, дашборды и алерты - шаг 9.4; TLS, mTLS и ACL Kafka - шаги 2.6 и 9.1; пользователи ClickHouse и роли PostgreSQL по сервисам - шаги 2.4 и 2.8.
+- Cold startup including image downloads takes about 3.5 min; startup with images already present takes about 95 s for one or three brokers. Full `env:ci-test` takes about 2 min. Each environment uses about 4.2 GB RAM.
+- Development and pipeline environments can run together, using about 8.5 GB.
+- Use `task env:reset` when changing between one and three brokers.
+- ADR-080 defines release log/trace stores, dashboards and alerts. The release generator configures TLS, mTLS, Kafka ACLs and store roles under ADR-043, ADR-014 and ADR-045.
 
-## Проверка
+## Verification
 
-`task env:ci-test` (и `KAFKA=3`) - бюджет запуска и 16 смоук-проверок; отрицательная проверка шага 1.4: окружение с одним брокером при ожидании двух даёт отказы проверок кворума и топиков, окружение удаляется.
+`task env:ci-test`, also with `KAFKA=3`, checks the startup budget and 16 smoke checks. A negative test starts one broker while expecting two: quorum and topic checks fail, and the environment is removed.

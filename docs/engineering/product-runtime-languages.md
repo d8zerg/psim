@@ -1,25 +1,29 @@
-# Языки реализации компонентов
+# Languages for Component Implementation
 
-Статус: Принято.
+<!-- language-links -->
+[English](product-runtime-languages.md) | [Русский](../ru/engineering/product-runtime-languages.md)
+<!-- /language-links -->
 
-Основной язык проекта - C++23. Собственные серверные компоненты, коннекторы, библиотеки, административный CLI и логика восстановления реализуются на C++. Веб-клиент сохраняет TypeScript. C++-компонент не должен передавать продуктовые операции Python-диспетчеру.
+Status: Accepted.
 
-## Проверенные границы
+The primary language of the project is C++23. Own server components, connectors, libraries, administrative CLI, and recovery logic are implemented in C++. The web client uses TypeScript. C++ components must not delegate product operations to a Python dispatcher.
 
-| Область | Реализация и решение |
+## Verified Boundaries
+
+| Domain | Implementation and Solution |
 |---|---|
-| `services/`, `libs/`, `connectors/` | Продуктового Python-кода не обнаружено; основной код - C++ |
-| `tools/psimctl/` | Административные операции, резервное копирование, восстановление и диагностика - C++; Python используется только в тестовом окружении |
-| Агент мониторинга | Отдельный C++-компонент `psim-monitoring-agent`, перенесённый из Python; TLS, протокольные проверки, сбор метрик и HTTP-обработчики - C++ |
-| Исполнитель миграций выпуска | Перенесён из `release_migrations.py` в `psim-pg-migrate release`; блокировки, контрольные суммы, возобновление и барьер contract выполняются в C++ |
-| `tools/deploy/`, `tools/vm/` | Python допустим для генерации конфигурации, установки, доставки, управления стендом и квалификационных сценариев |
-| `tools/contracts/`, `tools/docs/`, `tools/arch/`, `tools/quality/`, `tools/ci/` | Python допустим для генерации и проверок; эти программы не обслуживают продуктовые запросы |
-| Проверочные HTTP-получатели и провайдеры в `tools/` | Тестовые замены внешних систем; не входят в продуктовый runtime |
-| Patroni | Внешняя инфраструктурная зависимость; язык стороннего продукта не определяет язык собственных компонентов |
-| Веб-клиент и сервер статических ресурсов | Существующая инфраструктура поставки веб-клиента; бизнес-API реализует C++ API Gateway |
+| `services/`, `libs/`, `connectors/` | No product Python code detected; primary code is C++ |
+| `tools/psimctl/` | Administrative operations, backup, recovery, and diagnostics are in C++; Python is used only in the test environment |
+| Monitoring Agent | A separate C++ component `psim-monitoring-agent`, transferred from Python; TLS, protocol checks, metric collection, and HTTP handlers are in C++ |
+| Release Migration Executor | Transferred from `release_migrations.py` to `psim-pg-migrate release`; locks, checksums, resumption, and contract gates are implemented in C++ |
+| `tools/deploy/`, `tools/vm/` | Python is allowed for generating configuration, installation, delivery, managing the test environment, and qualification scenarios |
+| `tools/contracts/`, `tools/docs/`, `tools/arch/`, `tools/quality/`, `tools/ci/` | Python is allowed for generation and validation; these programs do not handle product requests |
+| Testing HTTP receivers and providers in `tools/` | External system replacements in tests; not part of the product runtime |
+| Patroni | External infrastructure dependency; the language of the external product does not determine the language of the components |
+| Web client and static resource servers | Existing infrastructure for the web client; the C++ API Gateway implements the business API |
 
-## Автоматическая проверка
+## Automatic Verification
 
-`task arch:language` включён в `task arch:check`. Проверка отклоняет Python в продуктовых каталогах вне тестов и стороннего кода, Python-entrypoint в образах поставки и известные формы передачи операций из C++ в Python. Модульные проверки подтверждают обнаружение таких нарушений. Это проверка конкретных архитектурных границ; содержательный обзор новых вспомогательных скриптов остаётся обязательным.
+`task arch:language` is included in `task arch:check`. The check rejects Python from product directories outside of tests and external code, Python-entrypoints from deployment images, and known forms of transferring operations from C++ to Python. Module-level verifications confirm the detection of such violations. This is a check for specific architectural boundaries; a thorough review of new auxiliary scripts is still required.
 
-Основания: [архитектура](../architecture/README.md), [C++ toolchain](../adr/0032-cpp-toolchain.md), [вспомогательные задачи Task](../adr/0030-task-runner.md).
+References: [architecture](../architecture/README.md), [C++ toolchain](../adr/0032-cpp-toolchain.md), [auxiliary tasks](../adr/0030-task-runner.md).

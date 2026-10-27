@@ -1,24 +1,28 @@
-# ADR-077. Эксплуатационная топология SeaweedFS
+# ADR-077. Operational Topology of SeaweedFS
 
-- **Статус:** Принято
-- **Связанные:** ADR-023, ADR-042, ADR-043, ADR-046
+<!-- language-links -->
+[English](0077-seaweedfs-deployment-topology.md) | [Русский](../ru/adr/0077-seaweedfs-deployment-topology.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-023, ADR-042, ADR-043, ADR-046
 
-Планы этажей хранятся как закрытые неизменяемые объекты; версии и ссылки принадлежат Resource Catalog. Для кластерной поставки нужны размещение реплик на разных узлах, общие метаданные filer и проверяемое восстановление после отказа процесса.
+## Context
 
-## Решение
+Floor plans are stored as private immutable objects; versions and links belong to the Resource Catalog. For cluster delivery, replicas need to be placed on different nodes, with shared filer metadata and verifiable recovery after process failure.
 
-1. На одной машине использовать один master, volume, filer и S3 gateway с размещением `000`. Потеря машины прекращает доступ к файлам; восстановление зависит от резервной копии.
-2. В кластере использовать три master, три volume, два filer и два S3 gateway. Каждый volume получает собственный rack; размещение `010` требует две копии в разных rack одного data center. Локальный VM-стенд моделирует три rack в гостевых ОС на одном физическом хосте.
-3. Метаданные filer хранить в отдельной базе PostgreSQL, обслуживаемой тем же кластером Patroni с синхронной репликацией. Оба filer используют общий PostgreSQL store. Локальные каталоги filer не являются самостоятельным источником метаданных.
-4. Разделить доверие внутренних HTTPS/gRPC SeaweedFS и публичного S3 HTTPS. Внутренние вызовы используют отдельный CA, mTLS и списки разрешённых имён. S3 проверяет SigV4 и предоставляет Catalog права только на bucket `psim-plans`. Анонимные запросы запрещены.
-5. Включить шифрование данных томов средствами SeaweedFS. Метаданные filer с ключами расшифрования входят в защищаемый комплект резервной копии. Копия томов без метаданных не является полной копией планов.
-6. Resource Catalog создаёт новый ключ объекта для каждой версии; S3 gateway не управляет предметными версиями планов. Очистка объектов учитывает ссылки Catalog, защитный интервал и окно PITR по ADR-046.
-7. Восстановление после потери volume включает проверку размещения и исправление недостающих реплик через `volume.fix.replication`. Возврат процесса сам по себе не доказывает восстановление числа копий.
+## Solution
 
-## Проверка
+1. On one machine, use one master, volume, filer, and S3 gateway with `000` placement. Loss of a machine stops file access; recovery depends on a backup.
+2. In the cluster, use three masters, three volumes, two filers, and two S3 gateways. Each volume has its own rack; `010` requires two copies in different racks of one data center. The local VM environment simulates three racks in guest OSs on a single physical host.
+3. Metadata of the filer are stored in a separate PostgreSQL database, managed by the same Patroni cluster with synchronous replication. Both filers use the same PostgreSQL store. Local filer directories are not independent metadata sources.
+4. Separate trust for internal HTTPS/gRPC SeaweedFS and public S3 HTTPS. Internal calls use a separate CA, mTLS, and allowed names lists. S3 checks SigV4 and only grants Catalog permissions to bucket `psim-plans`. Anonymous requests are prohibited.
+5. Enable volume data encryption with SeaweedFS. Metadata of the filer with decryption keys is included in the protected backup set. A volume copy without metadata is not a complete plan copy.
+6. The Resource Catalog creates a new object key for each version; S3 gateway does not manage object versions. Object cleanup takes into account Catalog links, protection interval, and PITR window according to ADR-046.
+7. Recovery after a volume loss includes checking placement and fixing missing replicas via `volume.fix.replication`. Restarting the process alone does not prove recovery of the number of copies.
 
-C-15 должен остановить по одному volume, filer и S3 gateway, проверить чтение текущего плана во время отказа, восстановить процесс, проверить загрузку следующей версии и число реплик. Анонимное чтение проверяется на существующем объекте. Согласованность резервной копии с PITR и полное учение восстановления относятся к регламенту резервного копирования.
+## Verification
 
-Статус проверок и границы локального стенда фиксируются в [поставке топологий](../engineering/deployment-topologies.md) и [журнале прогресса](../progress.md).
+C-15 should stop one volume, filer, and S3 gateway, check current plan reading during failure, recover the process, check loading of the next version and number of replicas. Anonymous reading is checked on an existing object. Consistency of backup with PITR and complete recovery are part of the backup procedure.
+
+Status checks and local environment limits are recorded in [topology deployment](../engineering/deployment-topologies.md) and [release conditions](../product/release-readiness.md).

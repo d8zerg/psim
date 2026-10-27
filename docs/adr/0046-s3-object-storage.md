@@ -1,45 +1,48 @@
-# ADR-046. S3-совместимое файловое хранилище
+# ADR-046. S3-compatible file storage
 
-- **Статус:** Принято
-- **Шаг плана:** 2.9
-- **Связанные:** ADR-016, ADR-042, ADR-043
+<!-- language-links -->
+[English](0046-s3-object-storage.md) | [Русский](../ru/adr/0046-s3-object-storage.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-016, ADR-042, ADR-043
 
-Поэтажные планы и последующие файловые функции требуют закрытого объектного хранилища с ограничением памяти, проверкой целостности и определённым поведением после неизвестного результата записи. Каталог ресурсов управляет версиями планов отдельно от версионирования S3.
+## Context
 
-## Рассмотренные варианты
+Floor plans and subsequent file functions require a private object storage with memory limits, integrity checks, and defined behavior after an unknown result of a write. The resource catalog manages plan versions separately from S3 versioning.
 
-| Вариант | Свойства | Решение |
+## Proposed Options
+
+| Option | Properties | Solution |
 |---|---|---|
-| AWS SDK for C++, модуль S3 | Apache-2.0, SigV4, условные запросы, потоковые тела и обработчик отмены | Выбран |
-| MinIO C++ SDK | Apache-2.0, компактный клиент; собственные особенности буферизации multipart и настройки транспорта | Не выбран для этого адаптера |
-| SeaweedFS | Apache-2.0, S3 gateway, filer, распределённые master/volume; единый бинарный файл | Выбран для MVP |
-| Garage | AGPL-3.0, отдельный S3-сервис с моделью распределённого хранения | Не выбран; ограничение статического связывания не распространяется автоматически на отдельный сервер |
+| AWS SDK for C++, S3 module | Apache-2.0, SigV4, conditional requests, streaming bodies, and cancellation handler | Selected |
+| MinIO C++ SDK | Apache-2.0, compact client; custom features for multipart buffering and transport settings | Not selected for this adapter |
+| SeaweedFS | Apache-2.0, S3 gateway, filer, distributed master/volume; single binary file | Selected for MVP |
+| Garage | AGPL-3.0, separate S3 service with distributed storage model | Not selected; static binding limitations do not automatically apply to separate servers |
 
-## Решение
+## Solution
 
-1. Зафиксировать AWS SDK for C++ `1.11.692` через Conan с модулем S3; остальные сервисные модули выключить. Транспорт libcurl использует OpenSSL. Разрешить SPDX `curl` для libcurl: это разрешительная лицензия, требующая сохранения уведомления; включить его в комплект лицензий поставки. Вызовы SDK, файловую систему и SHA-256 выполнять в `BlockingPool`; число одновременных операций ограничить семафором на shard.
-2. Выбрать SeaweedFS `4.48`, образ закрепить digest. Локально запускать master, volume, filer и S3 gateway одним `weed server`. На Debian 13 x86_64 использовать бинарный файл той же версии с GitHub Releases; установка не требует закрытого ПО. Конфигурацию, каталог данных и unit-файлы поставки закрепить на шаге 9.1.
-3. Одна машина использует локальный том, резервное копирование по регламенту 9.3. Кластер использует три master с Raft, несколько volume-серверов с репликами в разных доменах отказа и несколько filer/S3 gateways за балансировщиком. Filer metadata должны находиться в поддерживаемом общем отказоустойчивом хранилище; его конфигурация и интеграция с PostgreSQL платформы определяются и проверяются в 9.1. Эта фаза не заявляет уже проверенную отказоустойчивость кластера.
-4. Не создавать анонимную identity. Установщик имеет отдельную административную identity, приложение - только Read/Write своего bucket `psim-plans`, читатель - только Read. Не выдавать приложению создание bucket, управление IAM, перечисление чужих bucket и публичные ACL. Метаданные предметной авторизации остаются в Resource Catalog на шаге 4.4.
-5. Использовать явные файлы access/secret key через `security::read_secret`, TLS с CA, проверкой имени и общим профилем `TlsOptions`, включая CRL и сертификат клиента при настройке. Отключить окружение proxy, перенаправления, ambient credentials и внутренние повторы SDK. URL, ключи, секреты и серверные диагностические тела не включать в ошибки и метки метрик.
-6. Ключ объекта неизменяемый. Загрузка делает ограниченный снимок регулярного файла, вычисляет SHA-256 и отправляет условный PUT `If-None-Match: *`, checksum SHA-256 и метаданные digest. RAM ограничена блоками передачи, временный диск - лимитом объекта до 20 МиБ на операцию. Снимок устраняет изменение отправляемых байтов между вычислением digest и повтором.
-7. Неизвестный результат PUT проверять HEAD. Тот же размер и SHA-256 дают успешное восстановление результата; другой объект - конфликт. Только подтверждённое отсутствие разрешает ещё одну условную запись. Если срок операции истёк, возвращать ошибку с неизвестным результатом; следующий вызов с теми же ключом и байтами может выполнить сверку. Операционные повторы ограничены.
-8. Скачивание получает независимо ожидаемые размер и SHA-256, сверяет HEAD и читает с `If-Match` по непрозрачному ETag. Поток пишется во временный файл, хэшируется и проверяется до атомарного создания назначения. Ошибка, отмена, превышение размера и несовпадение digest удаляют временный результат. Существующее назначение не перезаписывается. ETag не считается digest или версией плана.
-9. HEAD и GET допускают ограниченные повторы под единым сроком операции. DELETE отправляется один раз: после транспортной ошибки результат может быть неизвестен. Отмена отмечает флаг запроса SDK; нативный вызов дренируется до завершения, чтобы не освобождать живые потоки и файлы.
-10. Публичные операции адаптера - put/get/head/remove; создание bucket и IAM относятся к установке. Версии планов, PNG/JPEG-валидация, права пользователей и очистка неподвязанных объектов - шаг 4.4. Резервирование и восстановление объектов, ссылок и доверия - шаг 9.3.
+1. Register AWS SDK for C++ `1.11.692` through Conan with the S3 module; disable other services. The libcurl transport uses OpenSSL. Allow SPDX `curl` for libcurl: this is a permissive license requiring retention of its notice; include it in the license package. Calls to the SDK, file system, and SHA-256 should be done with `BlockingPool`; limit concurrent operations with a semaphore on the shard.
+2. Select SeaweedFS `4.48`, and lock the digest. Locally run master, volume, filer, and S3 gateway with `weed server`. On Debian 13 x86_64, use the binary file from GitHub Releases; installation does not require closed software. Configuration, data directory, and unit files are defined by ADR-077.
+3. One machine uses a local volume, with backup [under the recovery procedure](../engineering/administration-and-recovery.md). The cluster uses three masters with Raft, several volume servers with replicas in different failure domains, and several filer/S3 gateways behind a balancer. Filer metadata should be stored in a supported, shared highly available storage; its configuration and integration with the PostgreSQL platform are defined in ADR-077. Testing individual components does not confirm the overall cluster’s fault tolerance in physical failure domains.
+4. Do not create an anonymous identity. The installer has a separate administrative identity, the application only has Read/Write access to its bucket `psim-plans`, and the reader only has Read access. Do not allow the application to create buckets, manage IAM, list other buckets, or set public ACLs. Domain authorization metadata remains in the Resource Catalog.
+5. Use explicit access/secret keys through `security::read_secret`, TLS with a CA, name verification, and common profile `TlsOptions`, including CRL and client certificates when configured. Disable environment proxy settings, redirections, ambient credentials, and internal SDK retries. URLs, keys, secrets, and server diagnostic bodies should not be included in errors and metrics.
+6. Object keys are immutable. Uploading creates a bounded snapshot of the regular file, calculates SHA-256, and sends a conditional PUT `If-None-Match: *`, along with SHA-256 checksum and metadata digest. RAM is limited by transfer blocks; temporary disk limits objects to 20 MiB per operation. The snapshot prevents changes to the sent bytes between digest calculation and repetition.
+7. Check for unknown results of PUT with HEAD. The same size and SHA-256 provide successful recovery of the result; other objects cause conflicts. Only confirmed absence allows another conditional write. If the operation time expires, return an error with an unknown result; the next call with the same keys and bytes can perform verification. Operation retries are limited.
+8. Downloading receives an independently expected size and SHA-256, checks HEAD, and reads from `If-Match` using an opaque ETag. The stream is written to a temporary file, hashed, and verified before atomic creation of the destination. Errors, cancellations, size exceedances, and digest mismatches remove the temporary result. The existing destination is not overwritten. ETag is not considered a digest or version of the plan.
+9. HEAD and GET allow bounded retries within one operation time. DELETE is sent once: after a transport error, the result may be unknown. Cancellation marks the flag in the SDK call; native calls are drained until completion to avoid freeing active streams and files.
+10. Public operations of the adapter include put/get/head/remove; bucket creation and IAM are part of installation. Plan versions, PNG/JPEG validation, user permissions, and cleanup of unbound objects are defined in ADR-051. Object backup and recovery, links, and trust are defined in ADR-081.
 
-## Проверка
+## Verification
 
-AWS CRT требует GCC libatomic. Адаптер связывает системный `libatomic.a` из Debian 13 статически, чтобы исполняемые файлы работали в базовом образе Debian без дополнительной общей библиотеки. Лицензия `GPL-3.0-or-later WITH GCC-exception-3.1` уже разрешена политикой; отдельный компонент `gcc-libatomic` с версией GCC включается в SBOM.
+AWS CRT requires GCC libatomic. The adapter statically binds the system `libatomic.a` from Debian 13 to work in the basic Debian image without additional shared libraries. License `GPL-3.0-or-later WITH GCC-exception-3.1` is already allowed by policy; a separate component `gcc-libatomic` with GCC version is included in the SBOM.
 
-Объекты до 20 МиБ, бинарное содержимое и SHA-256, условная запись и конфликты, metadata/delete, отказ доступа и неверные credentials, TLS с неверным CA и именем. Потеря ответа после PUT должна оставлять проверяемый объект и допускать безопасную сверку. Ограничения размера, отмена, дедлайн и сетевой разрыв не публикуют частичный файл. Компонентные проверки выполняются на настоящем SeaweedFS; библиотека проверяется под ASan/UBSan и TSan и на Debian 13 x86_64.
+Objects up to 20 MiB, binary content and SHA-256, conditional writes and conflicts, metadata/delete, access denials, incorrect credentials, TLS with incorrect CA and name. Loss of response after PUT should leave the checked object and allow safe verification. Size limits, cancellations, deadlines, and network breaks do not publish partial files. Component checks are performed on the current SeaweedFS; the library is tested under ASan/UBSan and TSan on Debian 13 x86_64.
 
-## Источники
+## Sources
 
 - [AWS SDK for C++](https://github.com/aws/aws-sdk-cpp/tree/1.11.692).
-- [Лицензия curl](https://curl.se/docs/copyright.html).
-- [Условные записи S3](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html).
-- [SeaweedFS и лицензия](https://github.com/seaweedfs/seaweedfs/tree/4.48).
-- [Схема развёртывания SeaweedFS](https://github.com/seaweedfs/seaweedfs/wiki/Production-Setup).
+- [curl License](https://curl.se/docs/copyright.html).
+- [S3 conditional requests](https://docs.aws.amazon.com/AmazonS3/latest/userguide/conditional-writes.html).
+- [SeaweedFS and license](https://github.com/seaweedfs/seaweedfs/tree/4.48).
+- [SeaweedFS deployment diagram](https://github.com/seaweedfs/seaweedfs/wiki/Production-Setup).

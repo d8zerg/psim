@@ -1,33 +1,37 @@
-# ADR-078. Общие квоты REST API в Valkey
+# ADR-078. Shared quotas for REST API in Valkey
 
-- **Статус:** Принято
-- **Связанные:** ADR-015, ADR-023, ADR-058, ADR-059
+<!-- language-links -->
+[English](0078-shared-api-rate-limits.md) | [Русский](../ru/adr/0078-shared-api-rate-limits.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-015, ADR-023, ADR-058, ADR-059
 
-Локальный token bucket API Gateway выдавал отдельный запас на каждом экземпляре. При добавлении реплик совокупная квота пользователя увеличивалась. Для временных общих счётчиков уже используется Valkey; данные команд, идемпотентности и владения писателем остаются в PostgreSQL.
+## Context
 
-## Решение
+The local token bucket API Gateway provided separate quotas for each instance. When replicas were added, the total user quota increased. For temporary shared counters, Valkey is already used; command data, idempotency and writer ownership remain in PostgreSQL.
 
-1. Квота REST-запросов задаётся парой тенант/пользователь и общая для всех реплик и runtime-шардов. Отдельный общий лимит всего тенанта этим решением не вводится.
-2. Сохранить семантику `rate_per_second` и `rate_burst`: token bucket с непрерывным пополнением и допустимым burst. Фиксированное окно не заменяет этот алгоритм.
-3. Выполнять проверку, пополнение, списание и установку TTL одним Lua-скриптом в Valkey. Время предоставляет сервер; время разных процессов Gateway в расчёте не участвует. Ключ удаляется после времени, достаточного для полного пополнения. Несовпадающие параметры одного ключа отклоняются.
-4. Превышение квоты возвращает HTTP 429 с `Retry-After`. Ошибка хранилища возвращает HTTP 503 до передачи запроса владельцу API. Автоматический повтор записи с неизвестным результатом и подстановка локального запаса не выполняются.
-5. Ограничения входящих соединений по транспортному IP, памяти и WebSocket control frames остаются локальными. Авторизация проверяется до общей квоты; её результаты не переносятся в общий кэш.
-6. Использовать отдельную учётную запись API Gateway, TLS и разрешения только на собственные ключи bucket. В кластерном профиле primary определяется через Sentinel. Пароль Sentinel и пароль хранилища независимы.
+## Solution
 
-## Последствия
+1. The REST request quota is set by a pair of tenant/user and is shared across all replicas and runtime shards. No separate shared limit for an entire tenant is introduced with this solution.
+2. Keep the semantics of `rate_per_second` and `rate_burst`: token bucket with continuous replenishment and acceptable burst. A fixed window does not replace this algorithm.
+3. Perform checks, replenishment, token consumption and TTL updates using a single Lua script in Valkey. Time is provided by the server; time of different Gateway processes is not included in calculations. The key is removed after enough time for full replenishment. Inconsistent parameters of one key are rejected.
+4. Exceeding the quota returns HTTP 429 with `Retry-After`. Storage error returns HTTP 503 before the request is sent to the API owner. Automatic retry of writes with unknown outcomes and local quota replacement are not performed.
+5. Limits on incoming connections based on transport IP, memory, and WebSocket control frames remain local. Authorization is checked before the shared quota; its results are not transferred to the shared cache.
+6. Use a separate API Gateway account, TLS, and permissions only for its own bucket keys. In the cluster profile, primary is defined through Sentinel. Sentinel password and storage password are independent.
 
-Перезапуск Gateway сохраняет квоту, масштабирование не умножает burst. Все реплики используют одинаковые настройки. Перед обновлением подготавливаются ACL и секреты; общая квота обеспечивается после перехода всех реплик на новую реализацию.
+## Consequences
 
-Valkey становится обязательной зависимостью допуска авторизованных REST-запросов. Отказы общей квоты учитываются отдельной метрикой, панелью и алертом. Кэш проекций сохраняет собственную политику возврата к PostgreSQL.
+Rebooting the Gateway preserves the quota, scaling does not multiply the burst. All replicas use the same settings. Before updating, ACLs and secrets are prepared; the shared quota is ensured after all replicas switch to the new implementation.
 
-Счётчики временные. Потеря данных Valkey, истечение ключа или переключение его асинхронных реплик могут восстановить начальный burst. Квота не заменяет предметные ограничения и долговечную идемпотентность операций в PostgreSQL.
+Valkey becomes a mandatory dependency for authorized REST requests. Quota failures are considered separately with a metric, panel, and alert. Projection caches maintain their own policy for returning to PostgreSQL.
 
-## Проверка
+Counters are temporary. Loss of Valkey data, key expiration, or asynchronous replica switching can restore the initial burst. The quota does not replace object limits and durable idempotency of operations in PostgreSQL.
 
-`task api:test` и `task api:sanitizers` проверяют две реплики с двумя runtime-шардами, совокупный burst, сохранение квоты при перезапуске Gateway, независимость пользователей, сгенерированные ACL, HTTP 429, HTTP 503 и восстановление после остановки Valkey.
+## Testing
 
-`task test:redis` и `task test:redis:sanitizers` дополнительно проверяют конкурентные клиенты, изоляцию тенантов, непрерывное пополнение, TTL, несовпадающую конфигурацию и обратный ход времени.
+`task api:test` and `task api:sanitizers` test two replicas with two runtime shards, total burst, quota preservation during Gateway reboot, user independence, generated ACLs, HTTP 429, HTTP 503, and recovery after Valkey stops.
 
-Настройка и совместимость - [API Gateway](../engineering/api-gateway.md). Семантика сервера - [Lua scripting](https://valkey.io/topics/eval-intro/) и [TIME](https://valkey.io/commands/time/).
+`task test:redis` and `task test:redis:sanitizers` additionally test concurrent clients, tenant isolation, continuous replenishment, TTL, inconsistent configuration, and backwards clock movement.
+
+Configuration and compatibility - [API Gateway](../engineering/api-gateway.md). Server semantics - [Lua scripting](https://valkey.io/topics/eval-intro/) and [TIME](https://valkey.io/commands/time/).

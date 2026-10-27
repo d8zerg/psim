@@ -1,33 +1,36 @@
-# ADR-050. Эталонные коннекторы и долговечные HTTP-повторы
+# ADR-050. Reference connectors and durable HTTP retries
 
-- Статус: Принято
-- Шаг: 4.3
-- Связанные решения: ADR-017, ADR-042, ADR-048, ADR-049
+<!-- language-links -->
+[English](0050-reference-connectors.md) | [Русский](../ru/adr/0050-reference-connectors.md)
+<!-- /language-links -->
 
-## Контекст
+- Status: Accepted
+- Related decisions: ADR-017, ADR-042, ADR-048, ADR-049
 
-Нужны независимые от производителя источники для демонстрации, проверки команд и нагрузки. Прямой клиент M1 проверяет намеренную повторную отправку и сквозную трассировку; у него нет долговечного буфера SDK. Входящий HTTP-запрос может повториться после потери ответа или перезапуска процесса.
+## Context
 
-## Решение
+Vendor-independent sources are needed for command and load testing. The direct test client checks intentional re-sending and end-to-end reconciliation; it does not have a durable SDK buffer. An incoming HTTP request can be replayed after a response is lost or a process is restarted.
 
-1. Поставлять `psim-simulator` и `psim-webhook` как отдельные программы и Debian-пакеты. Обе используют публичный Connector SDK и mTLS к шлюзу. Прямой клиент сквозной проверки перенести в `tools/event-flow/psim-flow-simulator`; Compose использует его для прежнего сценария с повторной отправкой.
-2. Симулятор создаёт ограниченное число виртуальных устройств, сценарии `alarm`, `fire`, `offline`, `mixed`, `burst`. Каждое событие содержит `generator_run` и `generator_seq` для независимой сверки. Скорость задаёт открытое расписание; задержка генератора измеряется, время события соответствует расписанию. При `--rate 0` измеряется предельная скорость пакетной генерации.
-3. Добавить SDK атомарный `publish_batch`: не более 1000 событий, одна запись журнала и один `fsync`, полная проверка до записи. UUIDv7 и последовательности остаются ответственностью SDK. Пределы передачи настраиваются в границах протокола, кредитов и размера сообщения. По умолчанию сохраняются 32 события и 64 КиБ.
-4. Добавить SDK `publish_once` для исторического события с ключом внешнего отправителя. Исходные поля, назначенная идентичность и квитанция сохраняются одной записью журнала. Повтор возвращает прежнюю квитанцию после подтверждения шлюза, сжатия и перезапуска. Изменение содержимого при том же ключе отклоняется. Ключи автоматически не вытесняются; заполнение реестра останавливает приём новых ключей. Это исключает окно между отдельным реестром HTTP и журналом событий.
-5. Webhook принимает HTTPS TLS 1.3 с Bearer-токеном из защищённого файла. Один экземпляр и токен относятся к одной регистрации коннектора; разные внешние системы используют отдельные экземпляры и каталоги. Принимается только `POST /v1/events`, ограниченные JSON и заголовки, обязательные `Idempotency-Key` и время исходного наблюдения. Дубликаты JSON-полей и неизвестные поля отклоняются. HTTP 202 означает долговечный локальный приём, а не подтверждение Kafka. Ошибки диска и заполнение дают 503; неопределённый исход повторяется с тем же ключом и содержимым.
-6. Webhook не объявляет `commands.v1` и `snapshot.v1`. HTTP-события передаются как история, не подтверждают актуальность состояния оборудования. Симулятор объявляет команды и снимок; SDK сохраняет защиту от повторного исполнения. Состояние виртуального оборудования существует в памяти процесса, после перезапуска опрашивается заново.
-7. HTTP использует четыре рабочих потока, не более 64 соединений, отдельный strand на соединение, дедлайны handshake/read/write по 5 секунд, 8 КиБ заголовков и 64 КиБ тела. Диагностика и метрики доступны с той же аутентификацией. Остановка закрывает приём и даёт SDK 5 секунд на отправку; оставшиеся события остаются в журнале.
-8. Проверять оба настоящих исполняемых файла набором соответствия. HTTP-fixture отправляет события через реальный HTTPS endpoint; возможности не подменяются. Отдельный TLS-приёмник сверяет номера всех нагрузочных событий и порядок источников. Барьер 75 000 событий/с относится к долговечной генерации на одной машине; время доставки и число подтверждений публикуются отдельно. Квалификация производительности всей платформы остаётся отдельной проверкой.
+## Solution
 
-## Альтернативы
+1. Provide `psim-simulator` and `psim-webhook` as separate programs and Debian packages. Both use the public Connector SDK and mTLS with the gateway. The direct client for end-to-end reconciliation should be moved to `tools/event-flow/psim-flow-simulator`; Compose uses it for the original re-sending scenario.
+2. The simulator creates a limited number of virtual devices, with scenarios `alarm`, `fire`, `offline`, `mixed`, `burst`. Each event contains `generator_run` and `generator_seq` for independent verification. Speed is determined by an open schedule; generator delay is measured, and event time matches the schedule. With `--rate 0`, the maximum packet generation speed is measured.
+3. Add SDK atomic `publish_batch`: no more than 1000 events, one log entry, and one `fsync`, after validating the complete batch before writing. UUIDv7 and sequences remain the responsibility of the SDK. Transfer limits are set within the protocol, credits, and message size. By default, 32 events and 64 KiB are saved.
+4. Add SDK `publish_once` for historical events with an external sender key. Original fields, assigned identity, and acknowledgment are saved in one log entry. Replay returns the previous acknowledgment after gateway confirmation, compaction and restart. Changes to content with the same key are rejected. Keys are not automatically overwritten; filling the registry stops accepting new keys. This eliminates the window between the separate HTTP registry and event log.
+5. The webhook accepts HTTPS TLS 1.3 with a Bearer token from a secure file. One instance and token per connector registration; different external systems use separate instances and directories. Only `POST /v1/events` is accepted, with limited JSON and headers, required `Idempotency-Key` and original observation time. Duplicates of JSON fields and unknown fields are rejected. HTTP 202 indicates durable local reception, not confirmation to Kafka. Disk errors and filling result in 503; undefined results are replayed with the same key and content.
+6. The webhook does not announce `commands.v1` and `snapshot.v1`. HTTP events are sent as history, without confirming the status of equipment. The simulator announces commands and snapshots; the SDK protects against repeated execution. The status of virtual equipment exists in process memory, and is rechecked after restart.
+7. HTTP uses four working threads, no more than 64 connections, separate strands per connection, handshake/read/write deadlines of 5 seconds, 8 KiB headers and 64 KiB body. Diagnostics and metrics are available with the same authentication. Stopping closes reception and gives the SDK 5 seconds to send; remaining events remain in the log.
+8. Both actual executable files must be checked for compliance. HTTP-fixture sends events through a real HTTPS endpoint; capabilities are not replaced. A separate TLS receiver checks all load events and source order. A minimum threshold of 75,000 events/second applies to durable generation on one machine; delivery time and number of confirmations are published separately. Performance qualification of the entire platform remains a separate check.
 
-- Повторно использовать прямой клиент без SDK: нет долговечности, автоматического восстановления и одинаковых гарантий эталонных коннекторов.
-- Отдельный HTTP-реестр до или после `publish`: падение между записями создаёт потерю либо дубликат.
-- Ограниченный по времени кэш ключей: после очистки нельзя гарантировать прежнюю квитанцию. Автоматическое удаление ключей требует отдельного согласованного протокола завершения повторов.
-- SQLite для входящих запросов: второй журнал усложняет атомарность и восстановление; текущий журнал SDK уже является точкой долговечного приёма.
+## Alternatives
 
-## Последствия
+- Reuse the direct client without SDK: lacks durability, automatic recovery and the guarantees of reference connectors.
+- Separate HTTP registry before or after `publish`: gaps between records cause loss or duplication.
+- Limited time for key caching: after clearing, it’s impossible to guarantee previous acknowledgment. Automatic key deletion requires a separate agreed protocol for replay termination.
+- SQLite for incoming requests: the second log makes atomicity and recovery difficult; the current SDK log is already a point of durable reception.
 
-Журнал HTTP растёт по числу уникальных ключей. Нужно наблюдать его размер и планировать новый экземпляр с новым пространством ключей при исчерпании квоты. Удалять рабочий каталог ради освобождения места нельзя. Новые записи событий используют Protobuf в Base64 внутри проверяемого JSON-кадра; чтение прежних JSON-событий сохранено. Это уменьшает стоимость сериализации при пакетной генерации. Возврат к старому SDK с новым журналом не поддерживается.
+## Consequences
 
-Постоянное состояние виртуального оборудования и коннекторы MQTT/ONVIF не входят в этот шаг.
+The HTTP log grows with the number of unique keys. Its size must be monitored, and a new instance with new key space must be planned when quotas are exhausted. Deleting the working directory to free space is not allowed. New event records use Protobuf in Base64 within the verified JSON payload; reading previous JSON events is preserved. This reduces serialization cost during packet generation. Returning to the old SDK with a new log is not supported.
+
+Durable state of virtual devices and MQTT/ONVIF connectors are outside this connector scope.

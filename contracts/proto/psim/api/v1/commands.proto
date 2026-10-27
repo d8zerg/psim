@@ -6,7 +6,7 @@ import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "psim/response/v1/command.proto";
 
-// CommandService manages commands to devices. Owner: Command Service. Scenario S8.
+// CommandService manages commands to devices. Owner: Command Service.
 service CommandService {
   // PreviewCommand validates scope, parameters and device capability without dispatch.
   rpc PreviewCommand(PreviewCommandRequest) returns (PreviewCommandResponse) {

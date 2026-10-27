@@ -1,44 +1,48 @@
-# Термины интерфейса ru/en
+# Interface Terms ru/en
 
-Одинаковые понятия используют одинаковые подписи в продукте, витрине и отчётах. Пользовательские названия, идентификаторы и сообщения внешних устройств не переводятся как ключи словаря.
+<!-- language-links -->
+[English](ui-glossary.md) | [Русский](../ru/engineering/ui-glossary.md)
+<!-- /language-links -->
 
-| English | Русский | Значение |
+Similar concepts use the same labels in the product, the showcase, and reports. User-defined names, identifiers, and messages from external devices are not translated as dictionary keys.
+
+| English | Russian | Meaning |
 |---|---|---|
-| Event | Событие | Полученное сообщение об изменении состояния или действии |
-| Signal | Сигнал | Результат обработки события правилом |
-| Alarm | Тревога | Условие отклонения со своим подтверждением и видимостью |
-| Incident | Инцидент | Запись оперативной обработки связанных сигналов и действий |
-| Priority | Приоритет | Критичность P1-P4; не текущее состояние |
-| Active | Активна | Условие тревоги продолжает действовать |
-| Returned to normal | Возврат в норму | Условие перестало действовать; подтверждение учитывается отдельно |
-| Acknowledge alarm | Подтвердить тревогу | Зафиксировать, что тревога замечена; не устранить её причину |
-| Acknowledge incident | Принять инцидент | Начать обработку инцидента по его жизненному циклу |
-| Shelve | Отложить тревогу | Временно скрыть тревогу с основанием и сроком возврата |
-| Suppress | Подавить тревогу | Исключить оповещение по явному правилу и основанию |
-| Owner | Ответственный | Пользователь, отвечающий за обработку |
-| Responsibility transfer | Передача ответственности | Текущий ответственный сохраняется до согласия получателя |
-| Command | Команда | Запрос изменения состояния устройства |
-| Requested | Запрошена | Команда создана, но ещё не исполнена |
-| Awaiting approval | Ожидает подтверждения | Требуется решение другого уполномоченного пользователя |
-| Sent | Отправлена | Команда передана по каналу исполнения |
-| Acknowledged by device | Получена устройством | Получение подтверждено; успешное исполнение ещё не установлено |
-| Executed | Выполнена | Есть подтверждение результата исполнения |
-| Outcome unknown | Исход неизвестен | Результат нельзя установить; автоматический повтор запрещён |
-| Audit reason | Основание | Объяснение действия, сохраняемое вместе с его автором |
-| Current data | Актуальные данные | Соединение и последняя успешная загрузка позволяют выполнять действия |
-| Refreshing | Обновление данных | Текущие строки остаются доступны во время фоновой загрузки |
-| Stale data | Устаревшие данные | Последний известный результат сохранён, действия требуют восстановления актуальности |
-| Source | Источник | Система или устройство, откуда поступило значение |
-| Provenance | Происхождение значения | Источник, преобразования и время получения значения |
-| Scope | Область | Выбранные объекты и границы доступа |
-| Shift supervisor | Старший смены | Роль оперативного контроля и согласования |
-| Training mode | Режим учений | Явно обозначенная учебная работа, отделённая от исполнения реальных команд |
-| Video wall | Видеостена | Крупное представление для наблюдения на расстоянии |
+| `Event` | `Событие` | A message received about a state change or action |
+| `Signal` | `Сигнал` | The result of event processing according to a rule |
+| `Alarm` | `Тревога` | A condition that deviates from its normal state, along with acknowledgement and visibility |
+| `Incident` | `Инцидент` | A record of related signal processing and actions |
+| `Priority` | `Приоритет` | Criticality P1-P4; not the current state |
+| `Active` | `Активна` | The alarm condition continues to act |
+| `Returned to normal` | `Возврат в норму` | The condition has stopped acting; confirmation is considered separately |
+| `Acknowledge alarm` | `Подтвердить тревогу` | Confirm that the alarm was detected; do not remove its cause |
+| `Acknowledge incident` | `Принять инцидент` | Start processing the incident according to its lifecycle |
+| `Shelve` | `Отложить тревогу` | Temporarily hide an alarm with a reason and deadline |
+| `Suppress` | `Подавить тревогу` | Exclude notifications based on explicit rules and reasons |
+| `Owner` | `Ответственный` | The user responsible for processing |
+| `Responsibility transfer` | `Передача ответственности` | The current owner remains until the recipient agrees |
+| `Command` | `Команда` | A request to change the device’s state |
+| `Requested` | `Запрошена` | The command has been created but not yet executed |
+| `Awaiting approval` | `Ожидает подтверждения` | Requires approval from another authorized user |
+| `Sent` | `Отправлена` | The command has been sent through the execution channel |
+| `Acknowledged by device` | `Получена устройством` | Command receipt acknowledged; successful execution has not yet been confirmed |
+| `Executed` | `Выполнена` | There is an acknowledgment of the execution result |
+| `Outcome unknown` | `Исход неизвестен` | The result cannot be determined; automatic re-execution is prohibited |
+| `Audit reason` | `Основание` | Explanation of the action, kept with its author |
+| `Current data` | `Актуальные данные` | Connection and last successful load allow actions to be performed |
+| `Refreshing` | `Обновление данных` | Current rows remain accessible during background loading |
+| `Stale data` | `Устаревшие данные` | Last known result is saved; actions require restoring freshness |
+| `Source` | `Источник` | The system or device from which the value came |
+| `Provenance` | `Происхождение значения` | Origin, transformations, and time of obtaining the value |
+| `Scope` | `Область` | Selected objects and access boundaries |
+| `Shift supervisor` | `Старший смены` | Role of operational control and coordination |
+| `Training mode` | `Режим учений` | Explicitly marked training work, separated from real command execution |
+| `Video wall` | `Видеостена` | Large display for remote observation |
 
-## Словари
+## Dictionaries
 
-В `web/apps/console/src/ui/locales` файлы `product-en.ts` и `product-ru.ts` содержат продуктовые подписи и ICU-сообщения; `demo-en.ts` и `demo-ru.ts` - демонстрационные имена объектов, показатели примера и пояснения макетов. Типы и проверки запрещают отсутствующие ключи и пересечение пространств. Продуктовая консоль загружает только выбранный продуктовый словарь; витрина дополнительно загружает свой словарь того же языка.
+In `web/apps/console/src/ui/locales`, files `product-en.ts` and `product-ru.ts` contain product labels and ICU messages; `demo-en.ts` and `demo-ru.ts` contain demo object names, example values, and explanations of templates. Types and checks prevent missing keys and overlapping namespaces. The product console only loads the selected product dictionary; the showcase additionally loads its own dictionary in the same language.
 
-Язык меняется после загрузки необходимых словарей. До этого доступны прежние строки и язык; ошибка не сбрасывает ввод и выбор. При отказе начальной загрузки предлагается перезагрузка страницы. При отказе смены языка сохраняется текущий экран с сообщением о возможности перезагрузки. Это явное действие пользователя: незавершённая работа автоматически не перезагружается.
+The language changes after loading the required glossaries. Before that, previous rows and language are available; an error does not discard input or selection. If the initial loading fails, the page is offered to reload. If the language change fails, the current screen with a message about possible reloading is saved. This is a user-defined action: unfinished work does not automatically reload.
 
-Псевдолокализация расширяет только литералы примеров в каталоге компонентов. Идентификаторы и введённые значения не изменяются.
+ Pseudolocalization only expands example literals in the component catalog. Identifiers and entered values do not change.

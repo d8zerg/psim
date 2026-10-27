@@ -1,0 +1,27 @@
+@startuml
+!include <C4/C4_Component>
+LAYOUT_LEFT_RIGHT()
+title Incident Service - Components
+ContainerQueue_Ext(kafka, "Kafka", "TLS", "signals, response events, incident events")
+Container_Ext(api, "API Gateway", "HTTPS mTLS", "Authorized user commands")
+ContainerDb_Ext(pg, "PostgreSQL", "TLS", "incident, inbox, outbox, idempotent responses")
+Container_Boundary(service, "Incident Service") {
+ Component(consumer, "Signal Consumer", "C++", "Deduplication and grouping-key locking")
+ Component(policy, "Grouping Policy", "C++ domain core", "Attaching to an open incident or creating")
+ Component(aggregate, "Incident Aggregate", "C++ domain core", "Transitions, priorities, responsibilities, and invariants")
+ Component(commands, "Command API", "REST", "Permissions, ETags and idempotency")
+ Component(response, "Response Events Consumer", "C++", "Required steps and timeline")
+ Component(outbox, "Outbox Relay", "C++", "Publication of committed events")
+}
+Rel(kafka, consumer, "Signals")
+Rel(consumer, policy, "Key and Window")
+Rel(policy, aggregate, "Changing an incident")
+Rel(api, commands, "Command and Version")
+Rel(commands, aggregate, "Authorized Action")
+Rel(kafka, response, "Response Events")
+Rel(response, aggregate, "Status of mandatory steps")
+Rel(consumer, pg, "inbox + aggregate + outbox")
+Rel(commands, pg, "aggregate + outbox + response")
+Rel(outbox, pg, "Stored records")
+Rel(outbox, kafka, "incident events / audit")
+@enduml

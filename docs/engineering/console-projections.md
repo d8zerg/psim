@@ -1,28 +1,32 @@
-# Модели консоли
+# Console Read Models
 
-Projection Service обслуживает `/v1/feed/incidents`, `/v1/feed/operators` и `/v1/feed/locations/{locationId}/status`. API Gateway передаёт исходный JWT по HTTPS. Владелец модели проверяет роль, тенант и области площадки или зоны. Решение описано в [ADR-059](../adr/0059-console-projections.md).
+<!-- language-links -->
+[English](console-projections.md) | [Русский](../ru/engineering/console-projections.md)
+<!-- /language-links -->
 
-## Хранение и актуальность
+The Projection Service serves `/v1/feed/incidents`, `/v1/feed/operators`, and `/v1/feed/locations/{locationId}/status`. The API Gateway transmits the original JWT via HTTPS. The model owner checks the role, tenant, and access scope of the site or zone. The solution is described in [ADR-059](../adr/0059-console-projections.md).
 
-PostgreSQL хранит общий каталог, инциденты, наблюдения, state reports, состояние связи, обслуживание, дежурство и позиции шести исходных топиков. Обновление ресурса, ревизии и позиции фиксируется одной транзакцией. Снимок использует Repeatable Read. Закрытые инциденты исключаются из активной ленты; загрузка операторов учитывает назначенные инциденты, основное и резервное дежурство.
+## Storage and Freshness
 
-Наблюдение события и подтверждение доступности хранятся раздельно. Историческое или информационное событие не подтверждает состояние. Отчёт должен покрывать текущую эпоху и последовательность источника. Отчёт прежней эпохи или с меньшим курсором не заменяет текущие значения. Состояние жизненного цикла устройства и коннектора, текущая сессия, наблюдаемое состояние, значения и качество доступны независимо.
+PostgreSQL stores a shared catalog, incidents, observations, state reports, connection status, maintenance state, duty, and positions for six source topics. Resource updates, revisions, and positions are recorded in one transaction. Snapshots use Repeatable Read. Closed incidents are excluded from the active feed; operator workload includes assigned incidents, primary and backup duties.
 
-Срок свежести наблюдения - 60 секунд, допуск будущего времени - 30 секунд. Старое подтверждение остаётся stale после восстановления. Online требует свежего state report текущей сессии и активных ресурсов. Явное отключение текущей сессии исключает online, даже если lease ещё существует. Ошибка Redis не подтверждает доступность.
+Event observations and availability confirmation are stored separately. Historical or informational events do not confirm the current state. The report must cover the current epoch and sequence of sources. A report from a previous epoch or with a lower cursor does not replace current values. The lifecycle status of devices and connectors, current session, observed state, values, and quality are available independently.
 
-Redis хранит исходные данные тенанта по ключу поколения и ревизии на 5 секунд с пределом 1 MiB. Авторизация, обслуживание, свежесть и lease вычисляются при каждом чтении. Ошибка или отсутствие кэша приводит к PostgreSQL. Чтение ограничено 100000 ресурсами тенанта и 10000 инцидентами; превышение возвращает ошибку вместо частичного снимка.
+The observation freshness is 60 seconds, with a tolerance for future time of 30 seconds. Old acknowledgments remain stale after restoration. Online requires a fresh state report from the current session and active resources. Explicit termination of the current session disables online, even if the lease still exists. Redis errors do not confirm availability.
 
-## Настройка и обновление
+Redis stores the source data of tenants by generation and revision for 5 seconds with a limit of 1 MiB. Authorization, maintenance state, freshness, and lease are calculated at each read. Cache errors or misses fall back to PostgreSQL. Reading is limited to 100,000 resources per tenant and 10,000 incidents; exceeding a limit returns an error instead of a partial snapshot.
 
-`settings.console_enabled`, `settings.console_writer` и `settings.reports_enabled` по умолчанию включены. Для отдельного писателя консоли отключите `reports_enabled`. Для дополнительных читающих экземпляров отключите `console_writer`; для отдельного экземпляра отчётности отключите `console_enabled`. PostgreSQL, Kafka, TLS listener и JWT настраиваются как у [отчётности](incident-reports.md). `console_replay_timeout_ms` ограничивает начальное восстановление, по умолчанию 300000 мс.
+## Configuration and Updates
 
-`redis_host`, `redis_password_file`, `redis_ca_file`, `redis_certificate_file` и `redis_key_file` задаются у Projection Service. TLS обязателен без явного локального `allow_plaintext`. Для кэша снимков эти параметры использует Projection Service; отдельное подключение API Gateway к Valkey обслуживает общие квоты REST-запросов.
+`settings.console_enabled`, `settings.console_writer`, and `settings.reports_enabled` are enabled by default. For individual console writers, disable `reports_enabled`. For additional readers, disable `console_writer`; for individual reporting instances, disable `console_enabled`. PostgreSQL, Kafka, TLS listener, and JWT are configured as in the [reporting](incident-reports.md) section. `console_replay_timeout_ms` limits initial restoration to 300,000 ms by default.
 
-Писатель удерживает PostgreSQL advisory lock на выделенном соединении. Второй писатель не становится готовым. Потеря соединения блокирует запись; readiness зависит от загрузки модели и работающего consumer. Сначала запустите Projection Service, затем настройте `projection_host` и `projection_port` Gateway и переключите трафик. До переключения сверяйте активные инциденты и состояния с прежним Gateway; при недостаточной истории Kafka требуется перенос данных или восстановление из резервной копии. Старые `access.incident_feed`, `access.feed_offsets` и `gateway_state` автоматически не удаляются. После проверки и окончания окна отката их можно удалить вручную; схема `access` сохраняет аудит отказов Gateway.
+`redis_host`, `redis_password_file`, `redis_ca_file`, `redis_certificate_file`, and `redis_key_file` are set by the Projection Service. TLS is required without an explicit local `allow_plaintext`. For snapshot caching, these parameters are handled by the Projection Service; API Gateway uses a separate Valkey connection for shared REST request quotas.
 
-## Перестроение
+The writer holds PostgreSQL advisory lock on the allocated connection. The second writer is not ready. Losing the connection blocks writing; readiness depends on model loading and working consumers. First, start the Projection Service, then configure `projection_host` and `projection_port` Gateways and switch traffic. Before switching, verify active incidents and states with the previous Gateway; if Kafka has insufficient history, data transfer or restoration from a backup is required. Old `access.incident_feed`, `access.feed_offsets`, and `gateway_state` are not automatically deleted. After checking and closing the rollback window, they can be manually deleted; the `access` schema preserves gateway failure auditing.
 
-Остановите писателя, оставив доступными Kafka и PostgreSQL. Запустите поставляемую утилиту в окружении с доступом к ним:
+## Rebuild
+
+Stop the writer while keeping Kafka and PostgreSQL accessible. Run the provided utility in an environment with access to them:
 
 ```bash
 PSIM_PG_PASSWORD_FILE=/run/secrets/postgres \
@@ -33,13 +37,13 @@ PSIM_KAFKA_KEY_FILE=/run/tls/client.key \
 psim-console-tool rebuild
 ```
 
-Утилита использует переменные PostgreSQL `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. Локальный plaintext требует явного `PSIM_KAFKA_ALLOW_PLAINTEXT=1` и `PSIM_PG_SSLMODE=disable`.
+The utility uses PostgreSQL variables `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. Local plaintext requires explicit `PSIM_KAFKA_ALLOW_PLAINTEXT=1` and `PSIM_PG_SSLMODE=disable`.
 
-Утилита получает тот же lock, читает read_committed Kafka с начала доступной истории до сохранённых позиций и создаёт отдельное поколение. После сравнения всех ресурсов переключает его одной транзакцией. При работающем писателе, неполной истории или различии данных переключение отклоняется. Рабочее поколение сохраняется. После успеха запустите писателя: он продолжит с сохранённых позиций. Токен снимка версии 2 содержит поколение, тенант, время выпуска и позиции топиков инцидентов и реагирования. Возобновление не зависит от процесса Gateway; подробнее - [realtime](realtime.md).
+The utility gets the same lock, reads read_committed Kafka from the available history to saved positions, and creates a separate generation. After comparing all resources, it switches with one transaction. An active writer, incomplete history, or data differences cause the switch to be rejected. The active generation is saved. After success, start the writer: it will continue from the saved positions. The version 2 snapshot token contains the generation, tenant, issuance time, and positions of incidents and responses topics. Resumption does not depend on the Gateway process; for details, see [realtime](realtime.md).
 
-Полная потеря PostgreSQL требует достаточной истории Kafka либо резервной копии. Retention исходных топиков ограничен; сравнение защищает существующую модель от неполного перестроения, но не восстанавливает удалённые исходные события. Старые поколения сохраняются для диагностики; автоматическая очистка не выполняется.
+Complete loss of PostgreSQL requires sufficient Kafka history or backup. Retention of source topics is limited; comparison protects the existing model from incomplete rebuilds, but does not restore deleted source events. Old generations are saved for diagnosis; automatic cleanup is not performed.
 
-## Проверка и наблюдаемость
+## Verification and Observability
 
 ```bash
 task projection:test
@@ -48,6 +52,6 @@ task projection:sanitizers
 task projection:coverage
 ```
 
-Проверки используют настоящие HTTPS/JWT, Kafka, PostgreSQL и Valkey. Проверяются области доступа, независимые курсоры, дежурство, обслуживание устройства, смена эпохи, отключение коннектора, потеря кэша и lease, равенство перестроения и отказ неполной истории. Coverage дополнительно запускает Catalog, отчётность, M1 и модульные тесты.
+Verifications use real HTTPS/JWT, Kafka, PostgreSQL, and Valkey. They check access scopes, independent cursors, duty, device maintenance state, epoch change, connector disconnection, cache and lease loss, consistency of rebuilds, and rejection of incomplete history. Coverage additionally runs Catalog, reporting, the end-to-end baseline, and module tests.
 
-Артефакты - `build/resource-catalog/<preset>/projection-result.json`, `projection-servers.log` и `api-responses.json`. Гистограмма `psim_console_update_seconds` измеряет Kafka CreateTime -> PostgreSQL COMMIT для живых обновлений; replay исключён. Проверка отправляет 300 обновлений и требует p99 не выше 100 мс в обычной сборке. Это локальный замер, не подтверждение полной нагрузки платформы. `psim_console_query_seconds`, `psim_console_cache_hits_total` и `psim_console_cache_misses_total` показывают чтение; панель Grafana и алерт задержки используют эти метрики.
+Artifacts are `build/resource-catalog/<preset>/projection-result.json`, `projection-servers.log`, and `api-responses.json`. The histogram `psim_console_update_seconds` measures Kafka CreateTime -> PostgreSQL COMMIT for live updates; replay is excluded. The verification sends 300 updates and requires p99 not exceeding 100 ms in normal build. This is a local measurement, not confirmation of the platform’s full load. `psim_console_query_seconds`, `psim_console_cache_hits_total`, and `psim_console_cache_misses_total` show reading; Grafana panel and delay alert use these metrics.

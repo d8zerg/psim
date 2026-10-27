@@ -1,56 +1,59 @@
-# ADR-014. Асинхронный драйвер PostgreSQL
+# ADR-014. Asynchronous PostgreSQL driver
 
-- **Статус:** Принято
-- **Шаг плана:** 2.4
-- **Связанные:** ADR-008, ADR-016
+<!-- language-links -->
+[English](0014-postgresql-async-driver.md) | [Русский](../ru/adr/0014-postgresql-async-driver.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-008, ADR-016
 
-Сервисы работают на Boost.Asio с корутинами (ADR-016) и не должны блокировать потоки цикла событий на запросах к БД. Нужны пул соединений, транзакции, пакетная вставка (`COPY`), `LISTEN/NOTIFY` (реле outbox), pipeline mode для снижения задержек и TLS. Нужно интегрировать официальный клиент с принятой моделью исполнения, сохранив контроль над дедлайнами, соединениями и гарантиями доставки.
+## Context
 
-## Рассмотренные варианты
+Services use Boost.Asio coroutines under ADR-016 and must not block event-loop threads on database requests. They need connection pooling, transactions, batch insertion with `COPY`, `LISTEN/NOTIFY` for outbox relays, pipeline mode to reduce latency, and TLS. Integrate the official client with the chosen execution model while retaining control of deadlines, connections and delivery guarantees.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| libpqxx | Зрелая, удобный C++ API | Синхронная: нужен пул потоков для блокирующих вызовов; нет pipeline mode в асинхронном виде |
-| ozo (Yandex) | Асинхронный на Asio | Проект не развивается; старые стандарты C++ |
-| Собственная реализация протокола PostgreSQL | Полный контроль | Большой объём: аутентификация SCRAM, TLS, типы, `COPY` |
-| **Тонкий собственный адаптер над libpq в неблокирующем режиме, интегрированный с Asio** | libpq 18.x - эталонная реализация протокола, TLS, SCRAM; неблокирующий API и pipeline mode; сокет соединения отслеживается `asio::posix::stream_descriptor` | Своя обвязка: пул, корутинный API, разбор результатов |
-| Синхронная libpq в выделенном пуле потоков | Проще всего | Потоки на каждое соединение; хуже задержки и масштаб |
+| libpqxx | Mature, convenient C++ API | Synchronous: requires blocking-call threads; no asynchronous pipeline mode |
+| ozo from Yandex | Asynchronous Asio integration | Inactive development and older C++ standards |
+| Custom PostgreSQL protocol implementation | Full control | Large scope: SCRAM authentication, TLS, types and `COPY` |
+| **Small custom adapter over nonblocking libpq, integrated with Asio** | libpq 18.x is the reference protocol, TLS and SCRAM implementation; nonblocking API and pipeline mode; socket readiness observed through `asio::posix::stream_descriptor` | Custom pooling, coroutine API and result decoding |
+| Synchronous libpq in a dedicated thread pool | Simplest approach | Threads per connection; poorer latency and scaling |
 
-## Решение
+## Decision
 
-Тонкий адаптер `libs/platform/pg` над libpq 18.x для PostgreSQL 18.x: `PQsetnonblocking`, `PQenterPipelineMode`, ожидание готовности сокета через Asio; корутинный API (`co_await conn.query(...)`), пул с дедлайнами, транзакции с уровнями изоляции, `COPY FROM STDIN` для пакетной вставки, `LISTEN/NOTIFY`, подготовленные выражения. Отображение типов - ограниченный набор (int, bigint, text, uuid, timestamptz, jsonb, bytea, массивы).
+Use a small `libs/platform/pg` adapter over libpq 18.x for PostgreSQL 18.x: `PQsetnonblocking`, `PQenterPipelineMode`, Asio socket-readiness waits, a coroutine API (`co_await conn.query(...)`), pooling with deadlines, transaction isolation levels, `COPY FROM STDIN` for batch insertion, `LISTEN/NOTIFY` and prepared statements. Type mapping covers a restricted set: int, bigint, text, uuid, timestamptz, jsonb, bytea and arrays.
 
-## Последствия
+## Consequences
 
-- Объём работ шага 2.4 включает адаптер; доменный код от него изолирован портами репозиториев.
-- Запасной вариант при проблемах - синхронная libpq в пуле блокирующих операций за тем же интерфейсом.
+- The platform library contains the adapter; repository ports isolate domain code from it.
+- The fallback is synchronous libpq in the blocking-operation pool behind the same interface.
 
-## Проверка
+## Verification
 
-Интеграционные тесты против PostgreSQL в Docker: разрыв соединения, переключение мастера, отмена по дедлайну; бенчмарк пропускной способности вставки и задержки запроса.
+Integration tests against PostgreSQL in Docker cover disconnection, primary failover and deadline cancellation. Benchmarks measure insert throughput and query latency.
 
-## Правила реализации
+## Implementation rules
 
-1. **Зависимость:** libpq 18.6 собирается статически из официального архива, SHA-256 закреплён в `tools/conan/recipes/libpq`. OpenSSL берётся из общего графа Conan; рецепт включён в lockfile и SBOM, лицензия PostgreSQL разрешена политикой поставки. Локальный рецепт используется до появления libpq 18.x в Conan Center.
-2. **Соединение:** DNS разрешается асинхронно, затем `PQconnectStartParams`/`PQconnectPoll` работают с готовым `hostaddr`. Asio наблюдает дубликат сокета, которым владеет libpq. Клиент подключается к одному endpoint, в кластере - к HAProxy; по умолчанию требует доступного для записи узла. TLS по умолчанию использует `verify-full`; отключение допускается явной настройкой стенда.
-3. **Запросы:** только параметризованный extended query protocol; подготовленные выражения, SQL NULL и бинарный `bytea`. Результат владеет `PGresult`, предоставляет текстовые значения, OID колонок и проверяемое чтение целых чисел. `uuid`, `timestamptz`, `jsonb` и массивы передаются с указанным типом или приводятся в константном SQL.
-4. **Дедлайны:** ожидания сокета и подключения ограничены. Таймаут, отмена и разрыв транспорта закрывают соединение; незавершённый запрос не достаётся следующему пользователю пула. Закрытие клиента не гарантирует мгновенную остановку серверного запроса: серверные `statement_timeout` и `idle_in_transaction_session_timeout` ограничивают его продолжительность. Пул имеет FIFO-ожидание и ограничение числа соединений, выдаёт исключительный lease и удаляет соединения с незавершёнными транзакциями.
-5. **Pipeline:** ограниченный пакет запросов с одной точкой синхронизации; без явного BEGIN пакет образует неявную транзакцию. После SQL-ошибки все результаты вычитываются до `PGRES_PIPELINE_SYNC`, затем режим завершается. `COPY` выполняется отдельно, вне pipeline. Правила следуют [документации pipeline](https://www.postgresql.org/docs/18/libpq-pipeline-mode.html).
-6. **Транзакции:** уровни read committed, repeatable read и serializable; явные асинхронные COMMIT/ROLLBACK. Незавершённый RAII-объект закрывает соединение. COMMIT проверяет командный тег: ответ ROLLBACK после ошибки не считается успешной фиксацией. Запросы записи и COMMIT автоматически не повторяются: при разрыве их исход может быть неизвестен.
-7. **Миграции:** упорядоченный манифест, отдельные expand и contract, транзакционная блокировка на схему, SHA-256 применённых SQL и проверка истории. CLI `psim-pg-migrate` запускает выбранную фазу; contract разрешает процесс выпуска после вывода несовместимой старой версии. Миграции должны состоять из команд, разрешённых внутри транзакции.
-8. **Inbox/outbox:** таблицы изолированы по схеме сервиса. Inbox, изменения репозитория и записи outbox входят в одну транзакцию. Повтор идентификатора с другим содержимым отклоняется. `in_transaction` служит шаблоном единицы работы; доменное ядро продолжает зависеть только от портов.
-9. **Реле:** одна транзакционно заблокированная публикация пакета на схему. Kafka подтверждает весь пакет до обновления `published_at`; ошибка или падение оставляют записи для повтора. Доставка PostgreSQL -> Kafka имеет семантику at least once, единственный зафиксированный эффект обеспечивается inbox потребителя. Опрос таблицы обязателен, `LISTEN/NOTIFY` - дополнительный сигнал; утрата уведомления не приводит к утрате записи.
-10. **Ошибки:** возвращаются коды общего каталога и SQLSTATE. Текст SQL, значения параметров, строка подключения и сообщения PostgreSQL не попадают в ошибки и логи адаптера.
+1. **Dependency:** statically build libpq 18.6 from the official archive, with SHA-256 pinned in `tools/conan/recipes/libpq`. OpenSSL comes from the shared Conan graph. Include the recipe in the lockfile and SBOM; distribution policy permits the PostgreSQL license. Use the local recipe until libpq 18.x is available in Conan Center.
+2. **Connection:** resolve DNS asynchronously, then call `PQconnectStartParams`/`PQconnectPoll` with a ready `hostaddr`. Asio observes a duplicate of the libpq-owned socket. The client connects to one endpoint, HAProxy in a cluster, and requires a writable node by default. TLS defaults to `verify-full`; disabling it requires an explicit laboratory setting.
+3. **Queries:** use only the parameterized extended query protocol, supporting prepared statements, SQL NULL and binary `bytea`. Results own `PGresult`, expose text values and column OIDs, and validate integer reads. Pass `uuid`, `timestamptz`, `jsonb` and arrays with explicit types or cast them in constant SQL.
+4. **Deadlines:** bound socket and connection waits. Timeout, cancellation or transport failure closes the connection; an unfinished request never reaches the next pool borrower. Closing the client does not guarantee immediate server-query cancellation. Server `statement_timeout` and `idle_in_transaction_session_timeout` bound query duration. The pool limits connections, uses FIFO waits, grants exclusive leases and removes connections with unfinished transactions.
+5. **Pipeline:** use a bounded batch with one synchronization point. Without explicit BEGIN, the batch forms an implicit transaction. After an SQL error, drain all results through `PGRES_PIPELINE_SYNC` before leaving pipeline mode. Run `COPY` separately outside the pipeline. Follow the [pipeline documentation](https://www.postgresql.org/docs/18/libpq-pipeline-mode.html).
+6. **Transactions:** support read committed, repeatable read and serializable with explicit asynchronous COMMIT/ROLLBACK. An unfinished RAII object closes the connection. Check the COMMIT command tag: ROLLBACK returned after an error is not a successful commit. Never automatically retry writes or COMMIT; disconnection can leave their outcome unknown.
+7. **Migrations:** use an ordered manifest, separate expand and contract phases, a transaction lock per schema, SHA-256 of applied SQL and history verification. `psim-pg-migrate` runs the selected phase. The release process authorizes contract only after incompatible old versions are removed. Migrations must contain statements allowed inside transactions.
+8. **Inbox/outbox:** isolate tables by service schema. Inbox, repository changes and outbox writes share one transaction. Reject an identifier repeated with different content. `in_transaction` implements the unit-of-work pattern; domain cores continue to depend only on ports.
+9. **Relay:** allow one transactionally locked batch publication per schema. Kafka acknowledges the whole batch before `published_at` is updated; errors or crashes leave records for retry. PostgreSQL -> Kafka delivery is at-least-once; the consumer inbox ensures one committed effect. Polling is mandatory; `LISTEN/NOTIFY` is an additional signal, so losing a notification does not lose a record.
+10. **Errors:** return shared catalog codes and SQLSTATE. SQL text, parameter values, connection strings and PostgreSQL messages are excluded from adapter errors and logs.
 
-Неблокирующие отправка и чтение реализованы по [документации libpq](https://www.postgresql.org/docs/18/libpq-async.html); параметры соединения и требования к DNS - по [управлению соединениями](https://www.postgresql.org/docs/18/libpq-connect.html).
+Nonblocking sending and reading follow [libpq documentation](https://www.postgresql.org/docs/18/libpq-async.html); connection parameters and DNS requirements follow [connection management](https://www.postgresql.org/docs/18/libpq-connect.html).
 
-## Артефакты и верификация
+## Artifacts and verification
 
-- `libs/platform/pg`: соединения, пул, транзакции, миграции, единица работы, inbox/outbox и реле; публичные интерфейсы и примеры - в [README библиотеки](../../libs/platform/pg/README.md).
-- `tools/pg-migrate`: CLI миграций; `task bench:pg` измеряет COPY, pipeline и p50/p99 запроса на локальном окружении.
-- `task test:component`: настоящие PostgreSQL и Kafka; разрывы, дедлайны, откаты, миграции, публикация и повторы.
-- `task test:pg:sanitizers`: компонентные сценарии PostgreSQL под ASan/UBSan и TSan, включая отмену и SIGKILL.
-- Рабочий процесс теста принудительно завершается SIGKILL до COMMIT, после COMMIT и после подтверждения Kafka; восстановление проверяет отсутствие потерь зафиксированных событий и повторных эффектов inbox.
-- Проверка полноценного HA-кластера с Patroni и переключением узлов относится к сборке топологии на шаге 9.1; адаптер проверяется на разрыв соединения и выбор доступного для записи endpoint.
+- `libs/platform/pg`: connections, pool, transactions, migrations, unit of work, inbox/outbox and relay. Public interfaces and examples are in the [library README](../../libs/platform/pg/README.md).
+- `tools/pg-migrate`: migration CLI. `task bench:pg` measures COPY, pipeline and query p50/p99 in the local environment.
+- `task test:component`: real PostgreSQL and Kafka, covering disconnects, deadlines, rollbacks, migrations, publication and retries.
+- `task test:pg:sanitizers`: PostgreSQL component scenarios under ASan/UBSan and TSan, including cancellation and SIGKILL.
+- Test workers are killed with SIGKILL before COMMIT, after COMMIT and after Kafka acknowledgment. Recovery verifies no committed-event loss and no duplicate inbox effects.
+- Full Patroni HA-cluster and node-failover checks belong to cluster-topology qualification. Adapter tests cover disconnection and selection of a writable endpoint.

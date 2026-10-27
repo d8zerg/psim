@@ -1,22 +1,26 @@
-# ADR-064. Философия тревог и нагрузка оператора
+# ADR-064. Philosophy of Operator Alarms and Load
 
-- **Статус:** Принято
-- **Связанные:** [ADR-063](0063-interface-principles.md)
+<!-- language-links -->
+[English](0064-alarm-philosophy.md) | [Русский](../ru/adr/0064-alarm-philosophy.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-063](0063-interface-principles.md)
 
-Тревога требует определённого действия оператора. События без такого действия остаются в истории и не становятся звуковыми тревогами. P1 означает немедленную реакцию на критичные последствия, P2 - высокую срочность, P3 - плановую реакцию, P4 - низкую срочность. Приоритет назначается по последствиям и времени допустимой реакции, а не по типу устройства.
+## Solution
 
-Состояние состоит из независимых признаков условия и подтверждения: normal, active-unacknowledged, active-acknowledged, returned-unacknowledged. Откладывание оператором и подавление по правилам - отдельные признаки с причиной, автором, временем окончания и аудитом. Откладывание не означает устранение; возврат условия в норму не означает подтверждение. Состояния инцидента из proto сохраняют собственную модель и не подменяются этой проекцией тревоги.
+An alarm requires a specific action from the operator. Events without such action remain in history and do not become audible alarms. P1 indicates immediate response to critical consequences, P2 high urgency, P3 planned response, P4 low urgency. Priority is determined by consequences and acceptable response time, not by device type.
 
-Исходные проектные пороги нагрузки: предупреждение при более 6 новых тревогах за час на оператора, наплыв при более 10 за 10 минут, отдельный стресс-сценарий от 500 событий. Это настраиваемая политика продукта для прототипа, а не заявленное требование стандарта. Группировка сохраняет количество, приоритет, старейшее время и доступ к каждому событию. Индивидуальная тревога не теряется при ограничении частоты live-региона.
+The status consists of independent conditions and acknowledgments: normal, active-unacknowledged, active-acknowledged, returned-unacknowledged. Operator shelving and suppression according to rules are separate conditions with cause, author, completion time, and audit. Shelving does not mean resolution; returning a condition to normal does not mean acknowledgment. Incident states from the proto retain their own model and are not replaced by this alarm projection.
 
-Звук требует явного включения, имеет громкость и проверку динамиков. P1 повторяется с ограниченным интервалом до подтверждения или явного отключения звука; это не подтверждает тревогу. P2 звучит один раз, P3/P4 без звука. Скрытая вкладка сохраняет визуальный счётчик; браузерный запрет звука отображается явно. Отсутствие звука не меняет состояние тревоги. Бесконечное мигание не используется.
+Original project thresholds for load: warning when more than 6 new alarms occur per hour for the operator, alarm flooding when more than 10 occur in 10 minutes, separate stress scenario with at least 500 events. This is a customizable product policy for the prototype, not a declared standard requirement. The group retains quantity, priority, oldest time, and access to each event. Individual alarms are not lost when limiting the live region’s frequency.
 
-## Проверка
+Audible alarms require explicit activation, with volume and speaker testing. P1 repeats at limited intervals until acknowledgment or explicit disconnection of the sound; this does not confirm an alarm. P2 sounds once, P3/P4 without sound. The hidden tab retains a visual counter; browser-based sound prohibition is displayed explicitly. Absence of sound does not change the alarm state. Infinite blinking is not used.
 
-Типизированный автомат, недопустимые переходы, последовательности возврата и подтверждения, истечение откладывания, ограничение повторов звука, отключённая вкладка и наплыв без потери счётчиков. Серверные владельцы состояния реализуются отдельно от витрины.
+## Verification
 
-## Источники
+Typed state machine, unacceptable transitions, sequences of return and acknowledgment, shelving expiry, limit on sound repetitions, inactive tab, and alarm flooding without loss of counters. Server status owners are implemented separately from the interface.
 
-[EEMUA Publication 191](https://www.eemua.org/products/publications/digital/eemua-publication-191) и [IEC 62682](https://webstore.iec.ch/en/publication/65543) задают контекст управления тревогами. Для нормативной проверки потребуется доступ к полным текстам; в этом ADR фиксируется собственная проверяемая политика интерфейса.
+## Sources
+
+[EEMUA Publication 191](https://www.eemua.org/products/publications/digital/eemua-publication-191) and [IEC 62682](https://webstore.iec.ch/en/publication/65543) provide context for alarm management. For normative verification, full texts must be accessed; this ADR records the interface’s own verified policy.

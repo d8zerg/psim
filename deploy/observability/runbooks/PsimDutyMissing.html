@@ -1,16 +1,16 @@
 <!doctype html>
-<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PsimDutyMissing</title><style>body{font:17px/1.65 system-ui,sans-serif;background:#f5f7fa;color:#182230;margin:0}header,main{max-width:1000px;margin:auto;padding:24px}header{display:flex;gap:24px;flex-wrap:wrap;border-bottom:1px solid #d0d5dd}main{padding-top:12px}h1{font-size:30px;line-height:1.25}h2{font-size:22px;margin-top:32px}a{color:#155eef}code{background:#e4e7ec;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}li{margin:12px 0}article{background:white;border:1px solid #d0d5dd;border-radius:8px;padding:12px 24px;margin:16px 0}@media(prefers-color-scheme:dark){body{background:#101828;color:#eaecf0}article{background:#1d2939;border-color:#475467}a{color:#84adff}code{background:#344054}header{border-color:#475467}}</style></head><body><header><a href="/monitoring/d/psim-overview">Обзор платформы</a><a href="/operations/runbooks/">Все инструкции</a><a href="/monitoring/d/psim-business">Связанный дашборд</a></header><main><h1>PsimDutyMissing</h1>
-<p>На площадках отсутствует текущий дежурный.</p>
-<h2>Диагностика</h2>
-<p>Проверить tenant, число площадок без назначения и раздел дежурств в консоли.</p>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>PsimDutyMissing</title><style>body{font:17px/1.65 system-ui,sans-serif;background:#f5f7fa;color:#182230;margin:0}header,main{max-width:1000px;margin:auto;padding:24px}header{display:flex;gap:24px;flex-wrap:wrap;border-bottom:1px solid #d0d5dd}main{padding-top:12px}h1{font-size:30px;line-height:1.25}h2{font-size:22px;margin-top:32px}a{color:#155eef}code{background:#e4e7ec;padding:2px 5px;border-radius:4px;overflow-wrap:anywhere}li{margin:12px 0}article{background:white;border:1px solid #d0d5dd;border-radius:8px;padding:12px 24px;margin:16px 0}@media(prefers-color-scheme:dark){body{background:#101828;color:#eaecf0}article{background:#1d2939;border-color:#475467}a{color:#84adff}code{background:#344054}header{border-color:#475467}}</style></head><body><header><a href="/monitoring/d/psim-overview">Platform overview</a><a href="/operations/runbooks/">All runbooks</a><a href="/monitoring/d/psim-business">Related dashboard</a><a data-language-switch data-counterpart="/operations/runbooks/PsimDutyMissingRu" href="/operations/runbooks/PsimDutyMissingRu" lang="ru" hreflang="ru">Русский</a></header><main><h1>PsimDutyMissing</h1>
+<p>Sites have no current duty assignee.</p>
+<h2 id="diagnostics">Diagnostics</h2>
+<p>Check tenant, the number of sites without assignments and duty assignments in the console.</p>
 <ol>
-<li>Открыть связанный дашборд, сохранить интервал и выбрать узел или сервис из алерта.</li>
-<li>Проверить актуальность сбора, доступность реплик и последние ошибки. Сопоставить с изменениями конфигурации.</li>
-<li>На узле выполнить <code>docker compose -f /var/lib/psim-platform/config/&lt;node&gt;/compose.json ps</code>.</li>
-<li>Для контейнера проверить <code>docker compose -f /var/lib/psim-platform/config/&lt;node&gt;/compose.json logs --tail=100 &lt;service&gt;</code>; для нативного сервиса - <code>systemctl status psim-&lt;service&gt;</code>.</li>
+<li>Open the related dashboard, retain the time interval and select the node or service named in the alert.</li>
+<li>Check collection freshness, replica availability and recent errors. Compare them with configuration changes.</li>
+<li>Run on the node <code>docker compose -f /var/lib/psim-platform/config/&lt;node&gt;/compose.json ps</code>.</li>
+<li>For a container, check <code>docker compose -f /var/lib/psim-platform/config/&lt;node&gt;/compose.json logs --tail=100 &lt;service&gt;</code>; for a native service, use <code>systemctl status psim-&lt;service&gt;</code>.</li>
 </ol>
-<h2>Восстановление</h2>
-<p>Назначить текущего дежурного с доступом к площадке и проверить разрешение адресатов. Резервный получатель не заменяет текущего дежурного.</p>
-<h2>Подтверждение результата</h2>
-<p>Проверка компонента успешна; серия метрик обновляется; алерт перешёл в resolved после полного окна вычисления. Проверить зависимые очереди и функциональную операцию.</p>
-<p>Если состояние не восстановлено, сохранить диагностические данные без секретов и передать ответственному за подсистему. Не отключать алерт вместо устранения причины.</p></main></body></html>
+<h2 id="recovery">Recovery</h2>
+<p>Assign a current duty user with site access and verify recipient resolution. A fallback recipient does not replace the current duty assignee.</p>
+<h2 id="verification">Verification</h2>
+<p>The component check succeeds, metric series update and the alert becomes resolved after a full evaluation window. Check dependent queues and a functional operation.</p>
+<p>If recovery is incomplete, retain diagnostics without secrets and send them to the subsystem owner. Do not disable the alert instead of fixing its cause.</p></main><script>document.querySelector('[data-language-switch]').addEventListener('click',function(){let section=location.hash;if(!section){const current=[...document.querySelectorAll('h2[id]')].filter(node=>node.getBoundingClientRect().top<=120).at(-1);if(current)section='#'+encodeURIComponent(current.id);}this.href=this.dataset.counterpart+location.search+section;});</script></body></html>

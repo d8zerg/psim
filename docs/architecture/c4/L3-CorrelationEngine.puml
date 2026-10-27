@@ -1,0 +1,27 @@
+@startuml
+!include <C4/C4_Component>
+LAYOUT_LEFT_RIGHT()
+title Correlation Engine - Components
+ContainerQueue_Ext(kafka, "Kafka", "TLS", "normalized, config, signals, changelog")
+ContainerDb_Ext(pg, "PostgreSQL", "TLS", "Rules and historical replay jobs")
+Container_Boundary(engine, "Correlation Engine") {
+ Component(worker, "Partition Worker", "C++", "Batch transaction and offsets")
+ Component(evaluator, "Rule Evaluator", "C++ domain core", "Pure rule and signal evaluation")
+ Component(state, "State Store", "RocksDB", "State with recovery from changelog")
+ Component(time, "Watermark Tracker", "C++", "Watermarks and window timers")
+ Component(loader, "RuleSet Loader", "C++", "Compilation and atomic version switch")
+ Component(repartition, "Repartitioner", "C++", "Rules with a key broader than a zone")
+ Component(management, "Rule Management API", "REST / HTTPS", "Validation, activation, and isolated execution")
+}
+Rel(kafka, worker, "Event batch")
+Rel(worker, evaluator, "state, event, rules, now")
+Rel(worker, state, "Reading and Storing State")
+Rel(worker, time, "Event Time")
+Rel(loader, evaluator, "Immutable rule set")
+Rel(kafka, loader, "Configuration Version")
+Rel(worker, repartition, "Filtered events")
+Rel(repartition, kafka, "repartition")
+Rel(worker, kafka, "signals + changelog + offsets")
+Rel(management, pg, "Versions and Tasks")
+Rel(management, kafka, "Activating the configuration")
+@enduml

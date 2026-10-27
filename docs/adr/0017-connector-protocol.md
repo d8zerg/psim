@@ -1,54 +1,58 @@
-# ADR-017. Протокол коннекторов и управление потоком
+# ADR-017. Connector protocol and flow control
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (реализация - 4.1, 4.2)
-- **Связанные:** ADR-004, ADR-006, ADR-018, [state-models.md](../domain/state-models.md#4-сессия-коннектора)
+<!-- language-links -->
+[English](0017-connector-protocol.md) | [Русский](../ru/adr/0017-connector-protocol.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, ADR-006, ADR-018, [state-models.md](../domain/state-models.md#4-connector-session)
 
-Коннекторы интеграторов передают события и исполняют команды. Протокол должен: аутентифицировать коннектор; не терять события (подтверждение после записи в Kafka, досылка после обрыва); защищать платформу от перегрузки; доставлять команды и конфигурацию; быть реализуемым на любом языке без SDK; эволюционировать без поломки существующих коннекторов.
+## Context
 
-## Рассмотренные варианты
+Integrator connectors send events and execute commands. The protocol must authenticate connectors, prevent event loss through acknowledgement after Kafka persistence and retransmission after disconnection, protect the platform from overload, deliver commands and configuration, support any implementation language without requiring the SDK, and evolve without breaking existing connectors.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| REST/HTTP POST пакетов | Повсеместная поддержка | Команды требуют обратного канала (long polling или вебхуки в сторону коннектора); нет управления потоком |
-| MQTT | Популярен в IoT | Брокер MQTT в поставке; QoS 2 - не сквозная гарантия до Kafka; слабая типизация полезной нагрузки |
-| Прямая запись коннекторов в Kafka | Нет шлюза | Коннекторы получают доступ к шине; нет валидации, лимитов и контроля принадлежности источников; связывает внешние системы с внутренней топологией |
-| WebSocket с JSON | Простота | Своя реализация подтверждений и потока; объём JSON |
-| **gRPC: двунаправленный поток сессии, Protobuf, mTLS, управление потоком на кредитах** | Типизация и кодогенерация на всех языках; один поток для событий, подтверждений, команд и конфигурации; HTTP/2 и TLS 1.3 | Нужны gRPC-библиотеки на стороне коннектора (есть для всех основных языков) |
+| REST/HTTP POST batches | Widely supported | Commands require a reverse channel, such as long polling or webhooks to the connector; no flow control |
+| MQTT | Popular in IoT | Adds an MQTT broker to the distribution; QoS 2 does not guarantee delivery all the way to Kafka; weak payload typing |
+| Direct connector writes to Kafka | No gateway | Connectors gain bus access; no validation, limits or source-ownership checks; external systems depend on internal topology |
+| WebSocket with JSON | Simple | Custom acknowledgements and flow control; larger JSON payloads |
+| **gRPC: bidirectional session stream, Protobuf, mTLS and credit-based flow control** | Types and code generation across languages; one stream for events, acknowledgements, commands and configuration; HTTP/2 and TLS 1.3 | Requires connector-side gRPC libraries, available for all major languages |
 
-## Решение
+## Decision
 
-Сервис `psim.connector.v1.ConnectorGateway` с методом `Session(stream ClientMessage) returns (stream ServerMessage)`.
+Use `psim.connector.v1.ConnectorGatewayService` with `Session(stream SessionRequest) returns (stream SessionResponse)`.
 
-| Сообщение | Направление | Назначение |
+| Message | Direction | Purpose |
 |---|---|---|
-| `Register` | коннектор -> шлюз | Первое сообщение: версия протокола, версия коннектора, последний подтверждённый номер по источникам (необязательно) |
-| `Registered` | шлюз -> коннектор | Идентификатор сессии, согласованная версия, начальные кредиты, параметры (интервал heartbeat, максимальный пакет) |
-| `Heartbeat` | в обе стороны | Каждые 5 с; таймаут сессии 15 с |
-| `EventBatch` | коннектор -> шлюз | Номер пакета, до 1 000 событий или 1 МБ |
-| `BatchAck` | шлюз -> коннектор | Пакет записан в Kafka (`acks=all`) или отклонён с кодами по событиям |
-| `Credits` | шлюз -> коннектор | Выдача кредитов в событиях |
-| `Command` | шлюз -> коннектор | Команда устройству (`command_id`, устройство, возможность, параметры, дедлайн) |
-| `CommandAck`, `CommandResult` | коннектор -> шлюз | Получение и результат исполнения |
-| `ConfigUpdate` | шлюз -> коннектор | Конфигурация коннектора из каталога (список устройств и источников) |
-| `Goodbye` | в обе стороны | Корректное завершение с причиной (дренирование, вытеснение) |
+| `Register` | connector -> gateway | First message: supported protocol versions, connector version, process identifier, configuration version and capabilities |
+| `Registered` | gateway -> connector | Session identifier, negotiated version, initial credits and settings: heartbeat interval and maximum batch |
+| `Heartbeat` | both directions | Every 5 s; session timeout 15 s |
+| `EventBatch` | connector -> gateway | Batch sequence; up to 1,000 events or 1 MB |
+| `BatchAck` | gateway -> connector | Batch persisted to Kafka (`acks=all`) or rejected with per-event codes |
+| `Credits` | gateway -> connector | Credits measured in events |
+| `Command` | gateway -> connector | Device command: `command_id`, device, capability, parameters and deadline |
+| `CommandAck`, `CommandResult` | connector -> gateway | Receipt and execution result |
+| `ConfigUpdate` | gateway -> connector | Catalog connector configuration: devices and sources |
+| `StateReport` | connector -> gateway | Current observations or a requested snapshot after capability negotiation; missing sources remain unknown |
+| `Goodbye` | both directions | Graceful termination with a reason, such as draining or replacement |
 
-Правила:
+Rules:
 
-1. **Аутентификация:** mTLS; отпечаток сертификата сопоставляется с регистрацией коннектора в каталоге (C1, C2).
-2. **Управление потоком:** коннектор отправляет не больше событий, чем выдано кредитов; кредиты возвращаются по мере подтверждения записи. Поверх этого действует управление потоком HTTP/2.
-3. **Подтверждение** - только после `acks=all`; неподтверждённое коннектор досылает в новой сессии с теми же `event_id` и `source_seq`.
-4. **Команды:** коннектор исполняет `command_id` не более одного раза и при повторной доставке возвращает сохранённый результат.
-5. **Версии:** пакет `psim.connector.v1`; согласование версии в `Register`; шлюз поддерживает текущую и предыдущую мажорную версию.
-6. **Ошибки:** статусы gRPC + `google.rpc.ErrorInfo` с кодом из каталога.
+1. **Authentication:** mTLS; the certificate fingerprint maps to a catalog connector registration (C1, C2).
+2. **Flow control:** a connector sends no more events than its granted credits. Credits return as writes are acknowledged. HTTP/2 flow control also applies.
+3. **Acknowledgement:** only after `acks=all`. The connector resends unacknowledged events in a new session with the same `event_id` and `source_seq`.
+4. **Commands:** the connector executes each `command_id` at most once and returns the saved result on redelivery.
+5. **Versions:** package `psim.connector.v1`; negotiate the version in `Register`; the implementation supports 1.1 and compatibility mode 1.0. State and snapshot capabilities are negotiated separately; historical events cannot replace current observations ([ADR-048](0048-connector-sdk.md), [ADR-049](0049-connector-gateway.md)).
+6. **Errors:** gRPC statuses plus `google.rpc.ErrorInfo` containing a catalog code.
 
-## Последствия
+## Consequences
 
-- Connector SDK для C++ реализует протокол, буфер на диске и повторы; интеграторы на других языках используют сгенерированный клиент и тестовый набор соответствия.
-- Протокол фиксируется в `contracts/proto/psim/connector/v1` на шаге 0.5.
+- The C++ Connector SDK implements the protocol, disk buffer and retries. Integrators using other languages use a generated client and the conformance suite.
+- The protocol is defined in `contracts/proto/psim/connector/v1`.
 
-## Проверка
+## Verification
 
-Тестовый набор соответствия (шаг 4.1) проверяет каждое правило протокола; фаззинг декодирования сообщений шлюзом.
+The conformance suite checks each protocol rule; fuzzing checks gateway message decoding.

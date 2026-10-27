@@ -1,47 +1,51 @@
-# Слой ClickHouse
+# ClickHouse Layer
 
-Шаг 2.8 · [ADR-028](../../../docs/adr/0028-clickhouse-analytical-storage.md) · [ADR-045](../../../docs/adr/0045-clickhouse-layer.md) · `psim::platform::clickhouse`
+<!-- language-links -->
+[English](README.md) | [Русский](../../../docs/ru/repository/libs/platform/clickhouse/README.md)
+<!-- /language-links -->
 
-Нативный клиент `clickhouse-cpp/2.6.1` с TLS, асинхронный пул, построитель ограниченных запросов, шаблон загрузчика Kafka и миграции expand/contract. История событий и бизнес-проекции реализуются на этом слое в шагах 4.5, 5.4 и 6.5.
+[ADR-028](../../../docs/adr/0028-clickhouse-analytical-storage.md) · [ADR-045](../../../docs/adr/0045-clickhouse-layer.md) · `psim::platform::clickhouse`
 
-## Клиент и запросы
+The native client `clickhouse-cpp/2.6.1` uses TLS, an asynchronous pool, request building, a Kafka loader template, and expand/contract migrations. Event history and business projections are implemented on this layer by Event History and Projection Service.
 
-`Pool` привязан к одному executor/shard. Он ограничивает число соединений через `Semaphore`, ожидание свободного соединения - через `acquire_timeout`; синхронный клиент исполняется только в `BlockingPool`. Настройки задаются типом `PoolOptions`. Все зависимости должны жить до завершения операций.
+## Client and Requests
 
-По умолчанию включён TLS с проверкой CA и DNS-имени, SNI, общим профилем `security::TlsOptions`, сертификатом клиента и CRL при наличии. Пароль читается через `read_secret` из файла владельца процесса с правами `0400`. `allow_plaintext` - явное исключение для изолированной разработки. Ошибки не содержат SQL, параметры, пароль и текст ответа сервера.
+`Pool` is associated with one executor/shard. It limits the number of connections through `Semaphore`, and the waiting time for a free connection is controlled by `acquire_timeout`. The synchronous client is executed only in `BlockingPool`. Settings are determined by the value `PoolOptions`. All dependencies must remain active until the operations are completed.
 
-`select(Select)` требует таблицу, явный список столбцов, `tenant`, полуоткрытый интервал времени `[from_ms, to_ms)` и положительный предел строк. Идентификаторы проверяются отдельно; значения, включая бинарные строки и фильтры `equals`, передаются нативными параметрами. Параметры tenant/time зарезервированы внутри построителя и не переопределяются фильтрами. `FINAL` включён по умолчанию. `max_execution_time`, `max_result_rows`, `max_result_bytes` и контроль результата на клиенте запрещают возвращать частичный ответ как успешный.
+By default, TLS with CA verification and DNS name, SNI, the common profile `security::TlsOptions`, the client certificate, and CRL are enabled, if available. The password is read through `read_secret` from the file of the process owner with rights `0400`. `allow_plaintext` is a special exception for isolated development. Errors do not contain SQL, parameters, passwords, or server response text.
 
-`execute_ddl` принимает только доверенные константы установки и миграций. Это административный интерфейс; пользовательские запросы через него не проходят. В поставке у загрузчика только SELECT/INSERT на его таблицы, у читателя только SELECT, у мигратора отдельная учётная запись.
+`select(Select)` requires a table, an explicit column list, `tenant`, a half-open time interval `[from_ms, to_ms)`, and a positive row limit. Identifiers are checked separately; values including binary strings and filters `equals` are passed as native parameters. Parameters tenant/time are reserved within the builder and cannot be overridden by filters. `FINAL` is included by default. `max_execution_time`, `max_result_rows`, `max_result_bytes`, and the client-side validation prevent returning a partial response as a successful result.
 
-После ошибки соединение уничтожается; новый сеанс выбирает следующую реплику. Неизвестный результат вставки не вызывает скрытый повтор. Нативный вызов завершается под ограничениями сокета и сервера до возврата соединения в пул; отмена Asio не может мгновенно прервать синхронный драйвер. Таймаут сокета ограничивает отдельную операцию ввода-вывода, а не полное время произвольного DDL. `close()` будит ожидающих и запрещает новые операции, активные вызовы завершаются со своим сеансом.
+`execute_ddl` only accepts trusted configuration and migration constants. This is an administrative interface; user requests through it are not processed. In the delivery, the loader only has SELECT/INSERT operations on its tables, while the reader only has SELECT operations. The migrator has a separate account.
 
-## Загрузчик
+After an error occurs, the connection is destroyed; a new session selects the next replica. An unknown result of an insertion does not trigger a hidden repetition. A native call ends under the constraints of the socket and server before returning the connection to the pool; canceling Asio cannot immediately stop the synchronous driver. The socket timeout limits individual input/output operations, not the total time for any DDL. `close()` wakes up pending operations and prevents new ones from occurring; active calls end with their own session.
 
-`Loader` получает `Pool`, `pg::Pool`, `kafka::Consumer`, заранее инициализированный транзакционный `kafka::Producer`, `LoaderOptions` и `Converter`. Вызывайте `run_once()` последовательно; при ошибке применяйте ограниченный backoff или завершайте сервис. Продюсер должен иметь устойчивый уникальный transactional id с fencing прежнего экземпляра. Пересоздание экземпляра не меняет consumer group, имя загрузчика и назначения.
+## Loader
 
-`Converter` получает представления Kafka-сообщений одной партиции и возвращает столбцовый `Converted`: одна строка на успешное сообщение, индексы некорректных записей - в `rejected`. Protobuf разбирается существующим `ProtobufSerde<T>`; поля добавляются непосредственно в типизированные столбцы, без массива промежуточных строк и JSON. Пример преобразования - [компонентная фикстура](tests/support.hpp). Некорректные индексы, пропущенные записи и ошибки, отличные от `PROCESSING_PAYLOAD_INVALID`, останавливают загрузку.
+`Loader` receives `Pool`, `pg::Pool`, `kafka::Consumer`, a pre-initialized transactional `kafka::Producer`, `LoaderOptions`, and `Converter`. Call `run_once()` sequentially; if an error occurs, apply a limited backoff strategy or terminate the service. The producer must have a stable unique transactional id with fencing from the previous instance. Recreating an instance does not change the consumer group, loader name, or destination.
 
-Последовательность:
+`Converter` receives Kafka messages from one partition and returns a column-based `Converted`: one row for each successful message, while indices of invalid records are returned in `rejected`. Protobuf is parsed using the existing `ProtobufSerde<T>`; fields are added directly to the typed columns, without using intermediate maps or JSON. An example of the conversion is shown in the [component fixture](tests/support.hpp). Invalid indices, missing records, and errors other than `PROCESSING_PAYLOAD_INVALID` will stop the loading process.
 
-1. Собрать пакет до `max_messages`, `max_bytes` или `flush_after`, сгруппировать по партициям. Следующий пакет не читается во время вставки: противодавление ограничивает память.
-2. Сохранить нативные столбцы, DLQ и границы смещений в `psim_clickhouse.pending_batches` PostgreSQL. Это журнал только незавершённых пакетов. Его схема создаётся `Loader::initialize()` учётной записью установки.
-3. Вставить пакет в ClickHouse с SHA-256 токеном назначения, топика, партиции, диапазона смещений и содержимого. Записать подтверждение вставки в PostgreSQL.
-4. При наличии отклонённых записей одной Kafka-транзакцией опубликовать DLQ и зафиксировать входные смещения. Пакет без DLQ фиксирует только смещения обычным commit после долговечного подтверждения вставки. Удалить завершённую запись журнала.
+Sequence:
 
-После перезапуска сначала обрабатывается журнал назначенных партиций, с теми же байтами и токеном. Изменение размера пакета или срабатывания таймера не меняет незавершённый пакет. При сбое в том же процессе чтение возвращается к безопасным смещениям через `seek_and_wait` в BlockingPool. Уже зафиксированные Kafka-смещения предотвращают повтор DLQ после падения перед очисткой журнала. Некорректные записи сохраняют исходные байты и заголовки с кодом ошибки и координатами источника.
+1. Build the batch to `max_messages`, `max_bytes`, or `flush_after`, and group them by partitions. The next batch will not be read during insertion: backpressure limits memory.
+2. Save the native columns, DLQ, and offset boundaries in `psim_clickhouse.pending_batches` and PostgreSQL. This is a log of only unfinished batchs. Its schema is created with the `Loader::initialize()` installation account.
+3. Insert the batch into ClickHouse with a token derived from SHA-256 of the destination, topic, partition, offset range, and content. Record the confirmation of insertion in PostgreSQL.
+4. When there are erroneous records in a Kafka transaction, publish the DLQ and record the input offsets. A batch without DLQ only records the offsets using a regular commit after a durable confirmation of insertion. Remove the completed log entry.
 
-Дедупликация ClickHouse имеет конечное окно по числу блоков и времени. Настройки `replicated_deduplication_window` и `replicated_deduplication_window_seconds` должны покрывать объём всех загрузчиков и максимальное время восстановления. Внутри окна повтор точного пакета не добавляет физических строк. После истечения окна страховка ADR-028 - `ReplicatedReplacingMergeTree` со стабильным ключом записи и чтение через `FINAL`; до слияния частей физические повторы возможны. Это не бессрочная транзакция между Kafka, PostgreSQL и ClickHouse. При физической потере подтверждённых данных таблицы восстанавливаются из источников, как предусмотрено ADR-028.
+After restarting, the log of assigned partitions is processed first, with the same bytes and token. Changing the batch size or triggering a timer does not change an unfinished batch. In case of failure in the same process, reading reverts to safe offsets through `seek_and_wait` to BlockingPool. Already registered Kafka offsets prevent repeated DLQ after a crash before clearing the log. Incorrect records retain the original bytes and headers along with the error code and source coordinates.
 
-При изменении преобразования сначала дренируйте прежний журнал. Имя загрузчика версионируется при изменении семантики. Таблица должна обеспечивать стабильные ключ, версию и партиционирование для повтора; применение временных значений и случайности в преобразователе запрещено.
+The deduplication of ClickHouse has a finite window in terms of the number of blocks and time. Settings `replicated_deduplication_window` and `replicated_deduplication_window_seconds` should cover all loaders’ capacities and the maximum recovery time. Within the window, repeated exact batchs do not add physical rows. After the window expires, ADR-028 protection applies - `ReplicatedReplacingMergeTree` with a stable write and read key through `FINAL`. Until the parts are merged, physical repetitions are possible. This is not an unlimited distributed transaction between Kafka, PostgreSQL, and ClickHouse. In case of physical loss of confirmed data, tables are recovered from sources, as specified by ADR-028.
 
-## Миграции и метрики
+When changing the transformation, first drain the previous log. The name of the loader is versioned when its semantics change. The table must ensure stable keys, versioning, and partitioning for reproducibility; the use of wall-clock time and randomness in the transformer is prohibited.
 
-`Migrator` сохраняет SHA-256 плана и номер выполненного DDL в PostgreSQL. Advisory lock сериализует выполнение для целевого кластера/базы; шаги фиксируются отдельно. После сбоя последний DDL может повториться, поэтому каждый оператор должен быть идемпотентным. История с изменённым checksum, пропущенными или более новыми версиями отклоняется. `contract` запускается отдельной фазой после дренирования старых сервисов и завершения соответствующего `expand`. SQL с `ON CLUSTER` использует одинаковые Replicated-DDL и макросы во всех топологиях.
+## Migrations and Metrics
 
-`Metrics` регистрирует длительность запросов и вставок, размер пакетов, подтверждённые строки, ошибки, DLQ и возраст последнего события Kafka. Имена начинаются с `psim_clickhouse_`; идентификаторы тенантов, SQL и значения не становятся метками.
+`Migrator` stores the SHA-256 fingerprint of the plan and the number of executed DDL operations in PostgreSQL. The Advisory lock serializes the execution for the target cluster/database; steps are recorded separately. After a failure, the last DDL operation may be reexecuted, so each operation must be idempotent. History with changed checksums, skipped or newer versions is rejected. `contract` is initiated as a separate phase after draining old services and completing the corresponding `expand`. SQL operations with `ON CLUSTER` use the same Replicated-DDL and macros across all topologies.
 
-## Проверки
+`Metrics` records the duration of requests and inserts, batch size, confirmed rows, errors, DLQ, and the age of the last event in Kafka. Names start with `psim_clickhouse_`; identifiers for tenants, SQL statements, and values do not become tags.
+
+## Verifications
 
 ```bash
 task env:up
@@ -52,8 +56,9 @@ task test:component
 task bench:clickhouse
 ```
 
-Профиль `clickhouse-ha` добавляет две изолированные реплики с нативным mTLS, общим Keeper и учётными записями с ограниченными правами. Эти реплики хранят данные в отдельных анонимных томах, которые заменяются для компонентного прогона. Остановка и запуск одной реплики сохраняют её данные. Основной ClickHouse локального окружения сохраняется отдельно. Компонентные проверки запускаются по порядку: сетевые сбои не должны затронуть параллельный тест.
 
-Проверяются бинарные параметры, изоляция тенантов, доверие TLS, роли, ограничения, повторная вставка, потеря соединения и переключение реплики, остановка настоящего процесса реплики и сверка после запуска (`test:clickhouse:replica`), миграции, прямое преобразование Protobuf в столбцы, транзакционная DLQ. SIGKILL после подготовки, вставки, подтверждения в БД и фиксации Kafka проверяет восстановление с другим размером пакета, число физических строк, уникальность идентификаторов и единственную DLQ-запись. Все четыре границы проверяются как для пакетов с DLQ, так и без отклонённых записей.
+The `clickhouse-ha` profile adds two isolated replicas with the native mTLS. These replicas share a common Keeper and least-privilege accounts. They store data in separate, anonymous volumes, which are replaced during component runs. Stopping and starting one replica preserves its data. The main ClickHouse from the local environment is stored separately. Component checks are executed in order: network failures must not affect parallel tests.
 
-Бенчмарк `psim_clickhouse_throughput` измеряет подготовку столбцов и синхронную нативную вставку с TLS, затем сверяет число строк. Порог - 100 000 строк/с; это пропускная способность адаптера, сквозная производительность предметного Event History проверяется на шагах 4.5 и 10.1. Порог покрытия модуля - 75% по совокупности модульных и компонентных сценариев.
+Binary parameters are checked, tenant isolation is verified, TLS trust is confirmed, roles and restrictions are evaluated, reinsertion is tested, connection loss and replica switching are monitored, the actual process of replica termination are checked, and verification occurs after startup (`test:clickhouse:replica`). Migration, direct conversion of Protobuf to columns, and transaction DLQ are also tested. SIGKILL is used after preparation, insertion, acknowledgment in the DB, and Kafka storage to verify recovery with a different batch size, number of physical rows, uniqueness of identifiers, and unique DLQ entries. All four boundaries are tested for batchs with and without rejected records.
+
+The `psim_clickhouse_throughput` benchmark measures column preparation and synchronous native insertion with TLS, then checks the number of rows. The threshold is 100,000 rows per second; this is the throughput of the adapter. Event History throughput is measured by its service benchmark and full system load qualification. The module coverage threshold is 75% across all module and component scenarios.

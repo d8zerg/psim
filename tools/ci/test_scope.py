@@ -48,18 +48,27 @@ class AffectedTargets(unittest.TestCase):
                          {"core", "core_test", "svc", "psimctl"})
 
     def test_unrelated_change_selects_nothing(self):
-        self.assertEqual(self.affected("docs/progress.md", "README.md"), set())
+        self.assertEqual(self.affected("docs/product/release-readiness.md", "README.md"), set())
 
     def test_service_change_does_not_touch_its_dependencies(self):
         self.assertEqual(self.affected("services/incident-service/src/main.cpp"), {"svc"})
 
 
 class Patterns(unittest.TestCase):
+    def test_translated_assets_and_reference_tools_run_documentation_checks(self):
+        for path in ("docs/ru/engineering/connector-sdk.md", "tools/contracts/reference.py",
+                     "tools/docs/locales/proto.yaml", "deploy/observability/runbooks/PsimServiceUnavailableRu.html",
+                     "deploy/observability/ru/dashboards/overview.json"):
+            with (self.subTest(path=path), patch.object(scope, "git", return_value="base"),
+                  patch.object(scope.arch_check, "load_codemodel", return_value=(None, TARGETS)),
+                  patch.object(scope, "changed_files", return_value=[path])):
+                self.assertTrue(scope.compute(".", "unused", False)["docs"])
+
     def test_full_scope_patterns(self):
         config = scope.yaml.safe_load(open(scope.CONFIG, encoding="utf-8"))
         for path in ("CMakeLists.txt", "cmake/PsimCompiler.cmake", "conan.lock", "tools/toolchain/Dockerfile"):
             self.assertTrue(scope.matches(path, config["full"]), path)
-        for path in ("libs/platform/core/src/build_info.cpp", "docs/progress.md", "contracts/proto/x.proto"):
+        for path in ("libs/platform/core/src/build_info.cpp", "docs/product/release-readiness.md", "contracts/proto/x.proto"):
             self.assertFalse(scope.matches(path, config["full"]), path)
 
     def test_rule_fuzzing_follows_contract_dependencies(self):
@@ -73,7 +82,7 @@ class Patterns(unittest.TestCase):
             self.assertTrue(scope.compute(".", "unused", False)["fuzz_rules"])
         with (patch.object(scope, "git", return_value="base"),
               patch.object(scope.arch_check, "load_codemodel", return_value=(None, targets)),
-              patch.object(scope, "changed_files", return_value=["docs/progress.md"])):
+              patch.object(scope, "changed_files", return_value=["docs/product/release-readiness.md"])):
             self.assertFalse(scope.compute(".", "unused", False)["fuzz_rules"])
 
 

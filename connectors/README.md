@@ -1,7 +1,11 @@
-# Коннекторы
+# Connectors
 
-- [SDK и руководство интегратора](../docs/engineering/connector-sdk.md): публичная цель `psim::platform_connector`, пример и набор соответствия.
-- [Эталонные коннекторы](../docs/engineering/reference-connectors.md): `simulator/` - виртуальные устройства, нагрузка, команды и снимки; `webhook/` - HTTPS-приём событий с долговечными повторами.
+<!-- language-links -->
+[English](README.md) | [Русский](../docs/ru/repository/connectors/README.md)
+<!-- /language-links -->
+
+- [SDK and Integrator Guide](../docs/engineering/connector-sdk.md): the public target `psim::platform_connector`, example, and conformance suite.
+- [Reference Connectors](../docs/engineering/reference-connectors.md): `simulator/` - virtual devices, load, commands, and snapshots; `webhook/` - HTTPS event reception with durable retry handling.
 
 ```bash
 task connectors:conformance
@@ -10,4 +14,4 @@ task connectors:bench
 task connectors:coverage
 ```
 
-Прямой gRPC-клиент сквозной проверки находится в `tools/event-flow/psim-flow-simulator`; `libs/sim` - отдельный ручной модельный стенд.
+The direct gRPC client for end-to-end verification is located in `tools/event-flow/psim-flow-simulator`; `libs/sim` is a separate manually run simulation environment.

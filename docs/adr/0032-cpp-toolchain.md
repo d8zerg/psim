@@ -1,61 +1,64 @@
-# ADR-032. C++ toolchain: Debian 13 x86_64, clang 21 и libstdc++, Conan 2, CMake пресеты
+# ADR-032. C++ toolchain: Debian 13 x86_64, Clang 21, libstdc++, Conan 2 and CMake presets
 
-- **Статус:** Принято
-- **Обновлено:** Debian 13 x86_64 как единственная официально поддерживаемая ОС MVP
-- **Шаг плана:** 1.1
-- **Связанные:** ADR-001, ADR-030, ADR-031, ADR-034, требования SR-23 и SR-24 ([threat-register.md](../security/threat-register.md))
+<!-- language-links -->
+[English](0032-cpp-toolchain.md) | [Русский](../ru/adr/0032-cpp-toolchain.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Updated:** Debian 13 x86_64 is the only officially supported MVP operating system
+- **Related:** ADR-001, ADR-030, ADR-031, ADR-034, requirements SR-23 and SR-24 ([threat-register.md](../security/threat-register.md))
 
-Сервер пишется на C++23 и поставляется для Debian 13 x86_64. Сборка, разработка в dev container и проверка исполнения используют Debian 13. Хост разработчика может быть любым Linux с нативным Docker Engine и плагином Docker Compose; Docker daemon работает непосредственно на хосте. Официальная поддержка относится к целевой ОС сервера.
+## Context
 
-Нужны воспроизводимый набор инструментов, единая ABI стандартной библиотеки для приложения и зависимостей, clang-tidy, санитайзеры и покрытие. Совместимость с другими версиями ОС не определяет выбор компилятора, библиотек или их версий. Версии выбираются по возможностям C++23, качеству и результатам проверок.
+The server uses C++23 and targets Debian 13 x86_64. Builds, dev-container development and execution validation use Debian 13. Developers may use any Linux host with native Docker Engine and the Docker Compose plugin; the Docker daemon runs directly on the host. Official support applies to the target server OS.
 
-## Рассмотренные варианты
+The project needs reproducible tools, one standard-library ABI for applications and dependencies, clang-tidy, sanitizers and coverage. Unsupported OS versions do not determine compiler or library selection. Versions are selected by C++23 capabilities, quality and verification results.
 
-### Компилятор и стандартная библиотека
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Compiler and standard library
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| GCC и libstdc++ из Debian 13 | Стандартный набор дистрибутива, простой runtime | Для clang-tidy и llvm-cov нужен отдельный набор LLVM |
-| clang и libc++ | Единый набор LLVM | Дополнительная стандартная библиотека в поставке |
-| **clang 21 и системная libstdc++ из Debian 13** | Компилятор, анализаторы и санитайзеры одного выпуска; штатный C++ runtime целевой ОС | Зависимости собираются тем же профилем для единой ABI |
+| Debian 13 GCC and libstdc++ | Standard distribution tools and simple runtime | clang-tidy and llvm-cov require a separate LLVM toolset |
+| Clang and libc++ | One LLVM toolset | Another standard library in the distribution |
+| **Clang 21 and Debian 13 system libstdc++** | Compiler, analyzers and sanitizers from one release; native target-OS C++ runtime | Dependencies must use the same profile for one ABI |
 
-### Среда сборки
+### Build environment
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Инструменты на хосте | Удобно для локальной работы | Версии и пакеты зависят от окружения разработчика |
-| **Контейнер Debian 13 x86_64, тот же образ для dev container** | Одна воспроизводимая среда; артефакты проверяются на целевой ОС | Первый запуск требует загрузки и сборки образа |
+| Host tools | Convenient locally | Versions and packages depend on the developer's environment |
+| **Debian 13 x86_64 container, also used as the dev container** | One reproducible environment; artifacts are checked on the target OS | First use requires image download and build |
 
-### Зависимости
+### Dependencies
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Conan 2, профиль проекта, lock-файл** | Версии и ревизии рецептов закреплены; единая ABI; управление параметрами библиотек | Первая сборка зависимостей занимает десятки минут |
-| Пакеты дистрибутива | Быстрая установка | Доступные версии и параметры сборки задаёт дистрибутив |
-| vcpkg | Управление зависимостями C++ | Второй менеджер зависимостей не нужен |
+| **Conan 2 with project profile and lockfile** | Pinned versions and recipe revisions; shared ABI; configurable library options | Initial dependency build takes tens of minutes |
+| Distribution packages | Fast installation | Distribution determines versions and build options |
+| vcpkg | C++ dependency management | A second manager is unnecessary |
 
-## Решение
+## Decision
 
-1. **Целевая ОС:** только Debian 13 x86_64. Другие дистрибутивы и архитектуры добавляются после MVP отдельным решением и проверками.
-2. **Компилятор:** clang 21 и lld 21 из [apt.llvm.org](https://apt.llvm.org/), стандарт C++23 без расширений; стандартная библиотека - системная libstdc++ из Debian 13. CMake допускает Clang и GCC; для GCC используется штатный линкер дистрибутива. Официальный конвейер использует clang 21.
-3. **Компоновка:** libstdc++ и libgcc используются динамически из целевой ОС. Пакеты DEB определяют зависимости по фактическим символам через `dpkg-shlibdeps` (ADR-034). Статическая компоновка C++ runtime и зависимость только от glibc не требуются.
-4. **Контейнер сборки:** `tools/toolchain/Dockerfile` на `debian:trixie`, закреплённом по дайджесту в корневом Taskfile. В образе: clang, clang-tidy, clang-format, llvm-cov, GCC с заголовками libstdc++, CMake, Ninja, Conan, ccache, buf, Task и инструменты DEB. Этот же образ используется в `.devcontainer/`; образ идентифицируется хэшем Dockerfile.
-5. **Зависимости:** Conan 2, профиль `tools/conan/profiles/clang21-libstdcxx` для контекстов host и build; версии в `conanfile.py`, ревизии в `conan.lock`. Библиотеки приложения по умолчанию статические, чтобы не требовать установки отдельных пакетов Conan; это выбор поставки, а не ограничение ОС. Параметры конкретной библиотеки задаются в `conanfile.py`. Зависимости собираются в Release; конфигурации проекта отображаются на Release через `CMAKE_MAP_IMPORTED_CONFIG_*`.
-6. **CMake:** пресеты `debug`, `release`, `relwithdebinfo`, `asan` (ASan + UBSan), `tsan`, `coverage`; Ninja и ccache; сборки в `build/debian13/<пресет>`, кэши в `.cache/debian13/`.
-7. **Защита и качество:** строгие предупреждения и `-Werror` для собственного кода; усиление защиты стека, PIE, RELRO, неисполняемый стек, `_FORTIFY_SOURCE=3` вне Debug и `_GLIBCXX_ASSERTIONS` без изменения ABI. Сгенерированный и сторонний код не получает предупреждения проекта.
-8. **Воспроизводимость:** `-ffile-prefix-map`, `--build-id=sha1`, запрет `__DATE__` и `__TIME__`, `SOURCE_DATE_EPOCH=0`; в артефакты встраиваются версия и коммит. `task cpp:reproducible` сравнивает две сборки release побайтно без ccache.
-9. **Контракты:** protoc и `grpc_cpp_plugin` берутся из контекста build Conan; версии генератора и runtime совпадают. Сторонние импорты proto вендорятся задачей `contracts:vendor`.
-10. **Санитайзеры:** ASan + UBSan проверяют приложение. Для TSan зависимости контекста host инструментируются профилем `clang21-libstdcxx-tsan`; инструменты контекста build используют обычный профиль. Параметры инструментирования участвуют в package id, кэши вариантов не смешиваются.
+1. **Target OS:** Debian 13 x86_64 only. Additional distributions and architectures require a post-MVP decision and verification.
+2. **Compiler:** Clang 21 and lld 21 from [apt.llvm.org](https://apt.llvm.org/); C++23 without extensions; Debian 13 system libstdc++. CMake accepts Clang and GCC; GCC uses the distribution linker. The official pipeline uses Clang 21.
+3. **Linking:** use target-OS libstdc++ and libgcc dynamically. DEB dependencies are derived from actual symbols by `dpkg-shlibdeps` (ADR-034). Static C++ runtime linking or glibc-only dependencies are not required.
+4. **Build container:** `tools/toolchain/Dockerfile` uses `debian:trixie`, pinned by digest in the root Taskfile. It includes Clang, clang-tidy, clang-format, llvm-cov, GCC with libstdc++ headers, CMake, Ninja, Conan, ccache, buf, Task and DEB tools. `.devcontainer/` uses the same image, identified by its Dockerfile hash.
+5. **Dependencies:** Conan 2 uses `tools/conan/profiles/clang21-libstdcxx` for host and build contexts; versions are in `conanfile.py`, revisions in `conan.lock`. Application libraries default to static linking to avoid separate Conan packages at installation; this is a distribution choice, not an OS restriction. `conanfile.py` defines per-library options. Dependencies build in Release, with project configurations mapped through `CMAKE_MAP_IMPORTED_CONFIG_*`.
+6. **CMake:** presets `debug`, `release`, `relwithdebinfo`, `asan` (ASan + UBSan), `tsan` and `coverage`; Ninja and ccache; builds in `build/debian13/<preset>`, caches in `.cache/debian13/`.
+7. **Security and quality:** strict warnings and `-Werror` for project code; stack hardening, PIE, RELRO, nonexecutable stack, `_FORTIFY_SOURCE=3` outside Debug and `_GLIBCXX_ASSERTIONS` without ABI changes. Generated and third-party code do not receive project warnings.
+8. **Reproducibility:** `-ffile-prefix-map`, `--build-id=sha1`, prohibited `__DATE__` and `__TIME__`, and `SOURCE_DATE_EPOCH=0`; artifacts embed version and commit. `task cpp:reproducible` compares two release builds byte for byte without ccache.
+9. **Contracts:** protoc and `grpc_cpp_plugin` come from the Conan build context; generator and runtime versions match. `contracts:vendor` vendors external proto imports.
+10. **Sanitizers:** ASan + UBSan check the application. TSan instruments host-context dependencies through `clang21-libstdcxx-tsan`; build-context tools use the ordinary profile. Instrumentation options contribute to package IDs, keeping variant caches separate.
 
-## Последствия
+## Consequences
 
-- Одна команда `task cpp:build` или `task cpp:test` запускает сборку в целевой среде.
-- Нативная установка использует стандартный C++ runtime Debian 13; OCI-образы используют `distroless/cc-debian13:nonroot` (ADR-034).
-- Компилятор и стандартная библиотека согласованы во всём графе зависимостей; новые библиотеки добавляются через Conan с обновлением lock-файла.
-- Изменение стандарта языка или набора инструментов обосновывается возможностями и проверками, а не совместимостью с неподдерживаемыми ОС.
+- `task cpp:build` or `task cpp:test` runs the build in the target environment.
+- Native installation uses Debian 13's standard C++ runtime; OCI images use `distroless/cc-debian13:nonroot` (ADR-034).
+- Compiler and standard library agree throughout the dependency graph. Add libraries through Conan and update the lockfile.
+- Language-standard and toolchain changes are justified by capabilities and checks, not unsupported-OS compatibility.
 
-## Проверка
+## Verification
 
-`task cpp:test` - сборка и модульные тесты; `task cpp:runtime-test` - тесты и `psimctl` в чистом Debian 13 x86_64 без toolchain; `task release:package:test` - установка, запуск и удаление DEB с вычисленными зависимостями; `task cpp:reproducible` - побайтное сравнение сборок; санитайзеры - `task cpp:test:sanitizers`.
+`task cpp:test` builds and runs unit tests; `task cpp:runtime-test` runs tests and `psimctl` in clean Debian 13 x86_64 without a toolchain; `task release:package:test` installs, starts and removes DEBs with computed dependencies; `task cpp:reproducible` compares builds byte for byte; `task cpp:test:sanitizers` runs sanitizers.

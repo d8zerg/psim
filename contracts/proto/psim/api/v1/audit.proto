@@ -8,7 +8,7 @@ import "google/api/httpbody.proto";
 import "google/protobuf/timestamp.proto";
 import "psim/audit/v1/audit.proto";
 
-// AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service. Scenario S10.
+// AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service.
 service AuditService {
   // SearchAuditRecords searches audit records; newest first.
   rpc SearchAuditRecords(SearchAuditRecordsRequest) returns (SearchAuditRecordsResponse) {

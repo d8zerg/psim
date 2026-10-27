@@ -1,0 +1,159 @@
+# Permanent quality requirements. IDs are stable across languages and releases.
+version: 1
+requirements:
+- id: G-01
+  category: slo
+  name:
+    en: Throughput
+    ru: Пропускная способность
+  target:
+    en: 50,000 events/s sustained for 24 hours; 1.5x peak for 10 minutes
+    ru: 50 000 событий/с устойчиво в течение 24 ч, пиковый ×1,5 в течение 10 мин
+- id: G-02
+  category: slo
+  name:
+    en: Event to signal latency
+    ru: Задержка событие -> сигнал
+  target:
+    en: p99 <= 300 ms
+    ru: p99 ≤ 300 мс
+- id: G-03
+  category: slo
+  name:
+    en: Event to incident in the console latency
+    ru: Задержка событие -> инцидент в консоли
+  target:
+    en: p99 <= 1 s
+    ru: p99 ≤ 1 с
+- id: G-04
+  category: slo
+  name:
+    en: REST API response latency
+    ru: Задержка отклика REST API
+  target:
+    en: p99 <= 200 ms for console read operations
+    ru: p99 ≤ 200 мс для операций чтения консоли
+- id: G-05
+  category: slo
+  name:
+    en: Data loss
+    ru: Потери данных
+  target:
+    en: 0 events and 0 incidents, verified by end-to-end sequence reconciliation
+    ru: 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей)
+- id: G-06
+  category: slo
+  name:
+    en: Duplicate incidents
+    ru: Дубликаты инцидентов
+  target:
+    en: 0 across restarts and retries
+    ru: 0 при любых перезапусках и повторах
+- id: G-07
+  category: slo
+  name:
+    en: Cluster recovery time objective
+    ru: RTO, кластерная топология
+  target:
+    en: <= 60 s after failure of any one node
+    ru: ≤ 60 с при отказе любого одного узла
+- id: G-08
+  category: slo
+  name:
+    en: Incident recovery point objective
+    ru: RPO для инцидентов
+  target:
+    en: 0 in the cluster topology
+    ru: 0 в кластерной топологии
+- id: G-09
+  category: slo
+  name:
+    en: Upgrades
+    ru: Обновление
+  target:
+    en: No processing downtime in the cluster topology
+    ru: Без простоя обработки в кластерной топологии
+- id: G-10
+  category: slo
+  name:
+    en: Console
+    ru: Консоль
+  target:
+    en: Smooth incident feed with 10,000 active incidents
+    ru: Плавная работа ленты с 10 000 активных инцидентов
+- id: G-11
+  category: engineering
+  name:
+    en: Compiler and clang-tidy warnings
+    ru: Предупреждения компилятора и clang-tidy
+  target:
+    en: 0; warnings are errors (`-Werror`)
+    ru: 0 (`-Werror`)
+- id: G-12
+  category: engineering
+  name:
+    en: Sanitizers (ASan, UBSan, TSan)
+    ru: Санитайзеры (ASan, UBSan, TSan)
+  target:
+    en: Mandatory in CI, 0 findings
+    ru: Обязательны в CI, 0 срабатываний
+- id: G-13
+  category: engineering
+  name:
+    en: Domain core coverage
+    ru: Покрытие доменного ядра
+  target:
+    en: '>= 90% of lines and >= 80% of branches'
+    ru: ≥ 90% строк, ≥ 80% ветвей
+- id: G-14
+  category: engineering
+  name:
+    en: Infrastructure code coverage
+    ru: Покрытие инфраструктурного кода
+  target:
+    en: '>= 75%'
+    ru: ≥ 75%
+- id: G-15
+  category: engineering
+  name:
+    en: Fuzzing
+    ru: Фаззинг
+  target:
+    en: 'Rule parser and validator: 10 minutes without crashes in CI; all external parsers and the rule DSL: 24
+      hours per target without crashes for release qualification'
+    ru: 'Парсер и валидатор правил: 10 мин без падений в CI; все внешние парсеры и DSL правил: 24 ч на каждую цель
+      без падений при квалификации выпуска'
+- id: G-16
+  category: engineering
+  name:
+    en: Contract compatibility
+    ru: Совместимость контрактов
+  target:
+    en: Automatic CI verification without manual exceptions
+    ru: Автоматическая проверка в CI, без ручных исключений
+- id: G-17
+  category: engineering
+  name:
+    en: Performance regression
+    ru: Регрессия производительности
+  target:
+    en: 'Automatic CI gate: a regression greater than 5% blocks merging'
+    ru: 'Автоматический барьер в CI: падение > 5% блокирует слияние'
+- id: G-18
+  category: engineering
+  name:
+    en: Builds
+    ru: Сборки
+  target:
+    en: Reproducible, with SBOM and signed artifacts
+    ru: Воспроизводимые, с SBOM и подписанными артефактами
+- id: G-19
+  category: engineering
+  name:
+    en: Documentation
+    ru: Документация
+  target:
+    en: 'Self-contained documentation of the implemented platform: arc42 and C4 architecture, ADRs, guides and API
+      references; English by default and a complete Russian version'
+    ru: 'Самодостаточная документация конечного состояния платформы: архитектура (arc42 + C4), ADR, руководства
+      и API-справочники; EN по умолчанию и полная версия RU'

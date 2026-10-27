@@ -1,33 +1,49 @@
-# Участие в Open-Source PSIM Platform
+# Contributing to Open-Source PSIM Platform
 
-Проект находится в разработке MVP. Перед началом работы ознакомьтесь с [README](README.md), [планом](docs/psim-mvp-development-plan.md), [прогрессом](docs/progress.md) и [архитектурными решениями](docs/adr/README.md).
+<!-- language-links -->
+[English](CONTRIBUTING.md) | [Русский](docs/ru/repository/CONTRIBUTING.md)
+<!-- /language-links -->
 
-## Предложения и ошибки
+The MVP is under development. Before contributing, read the [README](README.md), [product scope](docs/product/mvp-scope.md), [release conditions](docs/product/release-readiness.md) and [architecture decisions](docs/adr/README.md).
 
-Создайте [issue](https://github.com/d8zerg/psim/issues) с описанием задачи, ожидаемого поведения и примера использования. Для ошибки укажите версию или коммит, ОС, способ установки, шаги воспроизведения и очищенные от секретов логи.
+## Proposals and bugs
 
-О проблемах безопасности сообщайте по [SECURITY.md](SECURITY.md).
+Open an [issue](https://github.com/d8zerg/psim/issues) describing the task, expected behavior and a usage example. For a bug, include the version or commit, OS, installation method, reproduction steps and logs with secrets removed.
 
-Изменение границ MVP, публичных контрактов или архитектурного решения сначала обсуждается в issue и оформляется в ADR. Небольшое исправление можно прислать сразу в pull request.
+Report security issues according to [SECURITY.md](SECURITY.md).
 
-## Разработка и проверка
+Discuss changes to MVP scope, public contracts or architecture decisions in an issue first, then record them in an ADR. Small fixes can be submitted directly as pull requests.
 
-Основной язык проекта - C++. Сервисы, коннекторы, `psimctl`, бизнес-логика и исполнители административных операций реализуются на C++. Python подходит для вспомогательных задач сборки, генерации, развёртывания и тестовых сценариев. Границы и результаты проверки описаны в [правилах выбора языков](docs/engineering/product-runtime-languages.md).
+## Development and verification
 
-Официально поддерживаемая ОС - Debian 13 x86_64. Разработка, сборка, тестирование и локальные конвейеры используют нативный Docker Engine на Linux с плагином Docker Compose. Сборка выполняется закреплёнными контейнерными инструментами; установка описана в [README](README.md#разработка). Доступен [dev container](.devcontainer/devcontainer.json), использующий тот же Docker Engine хоста.
+C++ is the project's primary language. Services, connectors, `psimctl`, business logic and administrative-operation executors are implemented in C++. Python is appropriate for supporting build, generation, deployment and test tasks. Boundaries and verification results are described in the [runtime language rules](docs/engineering/product-runtime-languages.md).
 
-1. Создайте ветку от актуальной основной ветки и внесите изменение.
-2. Соблюдайте [стандарт C++](docs/engineering/cpp-coding-standard.md) и [стандарт TypeScript](docs/engineering/typescript-coding-standard.md).
-3. Обновите документацию и контракты, если меняется поведение. Соблюдайте [политику совместимости](docs/engineering/compatibility-and-support.md).
-4. Выполните `task ci` перед каждым коммитом. Для значимого изменения поведения добавьте проверку, которая воспроизводит проблему или подтверждает новый инвариант.
-5. Откройте pull request: опишите проблему, получившееся поведение, выполненные проверки и ограничения. Сошлитесь на issue, если оно есть.
+The officially supported OS is Debian 13 x86_64. Development, builds, tests and local pipelines use native Docker Engine on Linux with the Docker Compose plugin. Builds use pinned container tools; setup is described in the [README](README.md#development). A [dev container](.devcontainer/devcontainer.json) uses the same host Docker Engine.
 
-Для парсера и валидатора правил `task fuzz:rules` выполняет 10 минут фаззинга с ASan/UBSan в контейнере инструментов. Корпус, журнал и отчёт сохраняются в `build/rules/fuzz/`. Этот прогон входит в `task ci` при изменении соответствующих компонентов. Полные 24-часовые прогоны всех целей относятся к финальной проверке готовности MVP на шаге 10.3 [плана](docs/psim-mvp-development-plan.md#шаг-103-безопасность).
+1. Create a branch from the current main branch and implement the change.
+2. Follow the [C++ standard](docs/engineering/cpp-coding-standard.md) and [TypeScript standard](docs/engineering/typescript-coding-standard.md).
+3. Update documentation and contracts when behavior changes. Follow the [compatibility policy](docs/engineering/compatibility-and-support.md).
+4. Run `task ci` before every commit. For a significant behavior change, add a check reproducing the problem or establishing the new invariant.
+5. Open a pull request describing the problem, resulting behavior, checks performed and limitations. Reference an issue when available.
 
-`task rules:test`, `task rules:sanitizers` и `task rules:coverage` проверяют управление правилами и изолированный исторический прогон с настоящими PostgreSQL, Kafka и ClickHouse. Семантика и ограничения описаны в [руководстве по правилам](docs/engineering/correlation-rules.md).
+For the rule parser and validator, `task fuzz:rules` runs ten minutes of fuzzing with ASan/UBSan in the toolchain container. The corpus, log and report are stored in `build/rules/fuzz/`. This run is part of `task ci` when relevant components change. Release qualification requires a 24-hour run of every fuzz target without crashes or sanitizer errors.
 
-## Данные и лицензия
+`task rules:test`, `task rules:sanitizers` and `task rules:coverage` check rule management and isolated historical runs with real PostgreSQL, Kafka and ClickHouse. Semantics and limitations are described in the [rules guide](docs/engineering/correlation-rules.md).
 
-Код проекта распространяется под [MIT](LICENSE). Присылайте только код и материалы, которые вправе распространять на этих условиях. Новая зависимость проходит существующую проверку лицензий и уязвимостей в CI.
 
-В примерах и тестах используйте синтетические данные. Не добавляйте действующие ключи, пароли, сертификаты с закрытыми ключами, реальные персональные данные или планы объектов заказчиков. Демонстрационные коннекторы и сценарии должны воспроизводиться без доступа к чужому оборудованию.
+**Documentation languages.** English is the default in the repository, portal and release archive. The [shared glossary](docs/domain/glossary.md) maps EN/RU terminology; the [UI glossary](docs/engineering/ui-glossary.md) fixes interface wording. Update both language versions in the same change, preserving API identifiers, paths, commands, requirement identifiers and ADR numbers.
+
+The page registry is `docs/localization.yaml`. Keep page identifiers stable when moving files, update both paths and relative links, and register both counterparts for a new page. Matching heading levels define section correspondence. A missing translation never falls back to another language.
+
+Run maintenance commands inside the dev container:
+
+1. Edit the English source and its Russian counterpart, then review their meaning and executable examples together.
+2. For contract changes, run `task contracts:gen`. Update reviewed descriptions in `tools/docs/locales/artifacts.yaml` and `tools/docs/locales/proto.yaml`; run `python3 -I tools/docs/proto_reference.py . --update`. For dashboards, run `python3 -I tools/docs/localized_assets.py . --update` after updating the shared description catalog.
+3. Record the review of explicitly selected pairs with `task docs:review -- CONTRIBUTING.md` (replace the example path with the changed pages). This validates structure and identifiers before updating hashes; it does not establish translation accuracy by itself. HTML runbook pairs use the same registry and review command.
+4. Run `task docs:check`. It rejects missing or stale counterparts, inconsistent identifiers and examples, broken links and Russian prose left in English pages, then checks the portal and standalone archive in both languages.
+
+## Data and license
+
+The project is distributed under the [MIT license](LICENSE). Submit only code and materials you are entitled to distribute under those terms. New dependencies must pass the existing CI license and vulnerability checks.
+
+Use synthetic data in examples and tests. Do not include active keys, passwords, certificates containing private keys, real personal data or customer floor plans. Demonstration connectors and scenarios must be reproducible without access to someone else's equipment.

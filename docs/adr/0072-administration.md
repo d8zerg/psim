@@ -1,28 +1,32 @@
-# ADR-072. Модуль администрирования
+# ADR-072. Administration Module
 
-- **Статус:** Принято
-- **Связанные:** [ADR-020](0020-authorization-model.md), [ADR-051](0051-resource-catalog.md), [ADR-058](0058-api-gateway-and-configuration.md), [ADR-061](0061-live-access-validation.md), [ADR-069](0069-application-shell-and-session-recovery.md)
+<!-- language-links -->
+[English](0072-administration.md) | [Русский](../ru/adr/0072-administration.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-020](0020-authorization-model.md), [ADR-051](0051-resource-catalog.md), [ADR-058](0058-api-gateway-and-configuration.md), [ADR-061](0061-live-access-validation.md), [ADR-069](0069-application-shell-and-session-recovery.md)
 
-Маршруты `/admin` и `/integrations` лениво загружают административные формы. Они используют OIDC-сессию оболочки и публичный REST API Gateway. Интегратор получает управление коннекторами и отображениями; администратор также получает каталог, импорт, обслуживание, планы этажей, типы инцидентов, SLA, правила, сценарии и настройки.
+## Solution
 
-Структура вложенных форм генерируется из OpenAPI вместе с REST-типами. В интерфейсе редактируются отдельные поля, списки, словари и варианты правила или шага; ручное составление JSON не требуется. Варианты oneof взаимно исключаются. Идентификаторы создаются браузером, серверные версии и метаданные недоступны для редактирования. Сервер остаётся владельцем семантической проверки, области доступа и аудита.
+The `/admin` and `/integrations` routes lazily load administrative forms. They use the OIDC session of the shell and a public REST API Gateway. The integrator receives control over connectors and mappings; the administrator also gets a catalog, import, maintenance, floor plans, incident types, SLA, rules, scenarios, and settings.
 
-Редактируемая копия сохраняет версию исходного чтения. Фоновая сверка не заменяет введённые поля. Конфликт требует явного перечитывания; изменения не повторяются автоматически. Неопределённый исход допускает только точный повтор запроса с прежним Idempotency-Key. Новое содержимое получает новый ключ. Отказ актуальной авторизации скрывает ранее прочитанные сведения. Смена контекста уничтожает запросы и редактируемые копии. Учения, видеостена и потеря сети запрещают изменения.
+The nested form structure is generated from OpenAPI along with REST types. In the interface, individual fields, lists, dictionaries, and rule or step variations are edited; manual JSON editing is not required. The oneof variations are mutually exclusive. Identifiers are created by the browser; server versions and metadata are not editable. The server remains the owner of semantic validation, access scope, and auditing.
 
-Правило сохраняется как черновик, затем проверяется сервером и пробно запускается по выбранному диапазону истории. Активация сохраняет остальные активные правила и использует версию всего набора. Сценарий проверяется до публикации; публикация относится к сохранённой версии. Изменение формы снимает результат проверки.
+The edited copy retains the original read version. Background checking does not replace entered fields. Conflicts require explicit rereading; changes do not automatically repeat. An unknown outcome allows only an exact repetition of the request with the previous Idempotency-Key. New content gets a new key. Failure of current authorization hides previously read information. Context change destroys requests and edited copies. Exercises, video walls, and network loss prohibit changes.
 
-Файлы передаются бинарно через Gateway. Импорт сначала проверяется без записи; применение относится к тому же выбранному файлу. Планы принимают PNG/JPEG и размеры, используют версию этажа; исторические версии читаются через авторизованный API. Blob URL освобождаются при замене и закрытии. Сертификаты поступают из внешней PKI; закрытый ключ интерфейс не принимает.
+The rule is saved as a draft, then checked by the server and tested on the selected range of history. Activation retains other active rules and uses the version of the entire set. The scenario is checked before publication; publication refers to the saved version. Changing the form destroys the test result.
 
-Роли и области принадлежат Keycloak. Панель показывает актуальные эффективные права из `/v1/me` и открывает консоль управления выбранного realm для назначения клиентских ролей и атрибутов области. Для этого требуется отдельная административная сессия Keycloak. Приложение не получает токен управления IdP и не расширяет права администратора площадки. Повторное чтение прав и серверная introspection применяют изменения к действующим сессиям.
+Files are transmitted binary through the Gateway. Import is first checked without writing; application applies to the same selected file. Floor plans accept PNG/JPEG and sizes, using the floor version; historical versions are read through the authorized API. Blob URLs are released when replaced and closed. Certificates come from an external PKI; the interface does not accept private keys.
 
-## Альтернативы
+Roles and scopes belong to Keycloak. The panel shows current effective rights from `/v1/me` and opens a management console for assigning client roles and scope attributes to the selected realm. This requires a separate administrative session in Keycloak. The application does not receive control tokens from IdP and does not expand the site administrator’s rights. Rereading rights and server introspection apply changes to active sessions.
 
-- Произвольный JSON-редактор: не выполняет требование формы сценария и усложняет настройку без разработчика.
-- Отдельные вручную описанные вложенные модели: дублируют публичный контракт и увеличивают риск расхождения.
-- Собственное хранилище пользователей и ролей: создаёт второго владельца идентичности и расходится с ADR-020.
+## Alternatives
 
-## Проверка
+- Any JSON editor: Does not meet form scenario requirements and complicates setup without developers.
+- Separately described nested models: Duplicate the public contract and increase the risk of discrepancies.
+- Own user and role storage: Creates a second identity owner and conflicts with ADR-020.
 
-Проверяются формы, версии и точный повтор, запрет записи без связи, отзыв прав, ru/en, клавиатура, доступность, импорт и отклонение файлов. Браузерная приёмка с реальными сервисами охватывает подключение коннектора, отображение нормализации, иерархию и импорт, правило с пробным прогоном и публикацию сценария.
+## Verification
+
+Forms, versions, and exact repetition are checked. Writing without connection is prohibited, rights are revoked, ru/en, keyboard, accessibility, import, and file rejection are checked. Browser acceptance with real services includes connecting connectors, normalization mappings, hierarchy, and import, rule with test run, and scenario publication.

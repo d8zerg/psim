@@ -1,18 +1,22 @@
-# ADR-066. Локальные шрифты и предметные иконки
+# ADR-066. Local Fonts and Object Icons
 
-- **Статус:** Принято
-- **Связанные:** [ADR-063](0063-interface-principles.md)
+<!-- language-links -->
+[English](0066-ui-font-and-icons.md) | [Русский](../ru/adr/0066-ui-font-and-icons.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-063](0063-interface-principles.md)
 
-Семейство интерфейса - IBM Plex Sans, технических значений - IBM Plex Mono. Используются локальные WOFF2 с латиницей и кириллицей, без обращений к внешним CDN. Цифры таблиц и таймеров табличные. Загрузка шрифта не меняет выбор, фокус и высоту строки; fallback сохраняет читаемость до загрузки. Лицензия поставляется вместе со шрифтами.
+## Solution
 
-Базовые пиктограммы - именованные импорты lucide-react. Импорт полного реестра запрещён; предметные значки строятся из ограниченного набора. Семантический Icon требует доступную подпись на уровне типов. Декоративная иконка требует явного признака decorative и скрыта от accessibility tree. IconButton требует собственную подпись независимо от рисунка.
+The interface family is IBM Plex Sans, with IBM Plex Mono for technical values. Local WOFF2 fonts in Latin and Cyrillic are used, without relying on external CDNs. Table numbers and timers use tabular formatting. Loading fonts does not change text selection, focus, or line height; a fallback option ensures readability until the font is loaded. The license is provided along with the fonts.
 
-## Проверка
+The basic pictograms are named imports from lucide-react. Importing the entire registry is prohibited; object icons are constructed from a limited set of elements. The semantic Icon requires a accessible label at the type level. The decorative icon requires a clear “decorative” attribute and is hidden from the accessibility tree. IconButton requires its own label, regardless of the icon’s design.
 
-Шрифт работает без сети; проверяются кириллица, табличные цифры, соответствие лицензии и бюджету. TypeScript отклоняет Icon и IconButton без подписи; тесты подтверждают accessible name. Сборка не включает неиспользуемые иконки.
+## Verification
 
-## Источники
+The fonts work without an internet connection; Cyrillic characters, tabular numbers, license compliance, and budget are checked. TypeScript rejects Icons and IconButtons without labels; tests confirm that the accessible name is present. Unused icons are not included in the build.
+
+## Sources
 
 [IBM Plex](https://github.com/IBM/plex), [Lucide React](https://lucide.dev/guide/react/).

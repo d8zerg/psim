@@ -1,157 +1,164 @@
-# Требования к качеству и бюджет задержек
+# Quality requirements and latency budgets
 
-Версия 0.1 · Шаг плана 0.3 · Статус: черновик
+<!-- language-links -->
+[English](quality.md) | [Русский](../ru/architecture/quality.md)
+<!-- /language-links -->
 
-Раздел 10 arc42. Цели качества - в [README](README.md#12-цели-качества); исходные SLO - разделы 1.3 и 1.4 [плана](../psim-mvp-development-plan.md#13-нефункциональные-цели-slo-mvp). Методы проверки, барьеры и стенды - [стратегия качества](../quality/strategy.md) и [матрица верификации](../quality/verification-matrix.md).
+Section 10 arc42. Quality goals are in [README](README.md#12-quality-goals); maintained SLOs and engineering quality requirements are in [requirements registry](../quality/requirements.yaml). Verification methods, gates and baselines are in [quality strategy](../quality/strategy.md) and [verification matrix](../quality/verification-matrix.md).
+
+These are qualification targets and design budgets. Completed checks and outstanding release qualification are recorded in [release readiness](../product/release-readiness.md).
 
 ---
 
-## 1. Дерево качества
+## 1. Quality Tree
 
-```mermaid
-mindmap
-  root((Качество))
-    Корректность доставки
-      0 потерь событий
-      0 потерь инцидентов
-      0 дубликатов инцидентов
-      Воспроизводимость read-моделей
-    Производительность
-      50 000 событий/с устойчиво
-      Событие -> сигнал p99 ≤ 300 мс
-      Событие -> консоль p99 ≤ 1 с
-      REST чтение p99 ≤ 200 мс
-      10 000 инцидентов в ленте
-    Доступность
-      RTO ≤ 60 с
-      RPO = 0
-      Обновление без простоя
-    Модифицируемость
-      Новый источник без изменения ядра
-      Новая реакция конфигурацией
-      Эволюция схем без поломки потребителей
-    Безопасность
-      Аутентификация каждого входа
-      Минимальные привилегии
-      Неизменяемый аудит
-    Эксплуатируемость
-      Отказ виден и имеет runbook
-      Диагностика штатными средствами
+```plantuml
+@startmindmap
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+* Quality
+** Delivery correctness
+*** 0 event losses
+*** 0 incident losses
+*** 0 duplicates of incidents
+*** Reproducibility of read models
+** Performance
+*** Sustained 50,000 events/s
+*** Event -> signal p99 ≤ 300 ms
+*** Event -> console p99 ≤ 1 s
+*** REST read time p99 ≤ 200 ms
+*** 10,000 incidents in the feed
+** Availability
+*** RTO ≤ 60 seconds
+*** RPO = 0
+*** Update without downtime
+** Modifiability
+*** A new source without modifying the platform core
+*** New response through configuration
+*** Schema evolution Without Consumer Failures
+** Security
+*** Authentication of each input
+*** Minimum privileges
+*** Unmodifiable Audit
+** Operability
+*** The failure is visible and has a runbook
+*** Diagnosis using standard tools
+@endmindmap
 ```
 
-## 2. Сценарии качества
+## 2. Quality Scenarios
 
-Формат: источник -> стимул -> окружение -> реакция -> мера.
+Format: Source -> Trigger -> Environment -> Response -> Metric.
 
-### 2.1 Корректность и доступность
+### 2.1 Correctness and Availability
 
-| ID | Стимул и окружение | Реакция | Мера |
+| ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-A1 | Экземпляр Correlation Engine падает посреди транзакции при `LOAD-50K` | Партиции переназначаются, состояние восстанавливается из changelog, обработка продолжается с зафиксированного смещения | 0 потерянных и 0 дублированных сигналов; восстановление ≤ 30 с |
-| QS-A2 | Connector Gateway падает после записи пакета в Kafka, до подтверждения коннектору | SDK переподключается и досылает пакет; Normalizer отсекает дубликаты | 0 потерь, 0 дубликатов в `psim.events.normalized.v1` |
-| QS-A3 | Incident Service получает тот же сигнал повторно (повтор после падения) | Inbox отбрасывает повтор | Число инцидентов равно эталонному |
-| QS-A4 | Коннектор теряет связь на 10 мин при штатной нагрузке источника | SDK буферизует на диске и досылает после восстановления | 0 потерь; доставка буфера ≤ 2 мин после восстановления связи |
-| QS-A5 | Отказывает любой один узел кластера под `LOAD-50K` | Kafka выбирает новых лидеров, PostgreSQL переключается на синхронную реплику, сервисы перераспределяют партиции | RTO ≤ 60 с, RPO = 0 |
-| QS-A6 | Проекции удалены | Проекции перестраиваются проигрыванием Kafka | Результат идентичен рабочему |
+| QS-A1 | The Correlation Engine instance fails mid-transaction at `LOAD-50K` | Partitions are reassigned, state is restored from changelog, processing continues with a fixed offset | 0 lost and 0 duplicate signals; recovery ≤ 30 seconds |
+| QS-A2 | The Connector Gateway fails after a batch is written to Kafka, before the connector is confirmed | SDK reconnects and sends the batch; Normalizer removes duplicates | 0 losses, 0 duplicates in `psim.events.normalized.v1` |
+| QS-A3 | The Incident Service receives the same signal repeatedly (repetition after failure) | Inbox discards duplicates | Number of incidents equals the target |
+| QS-A4 | The connector loses connection for 10 minutes under normal source load | SDK buffers on disk and sends again after recovery | 0 losses; buffer delivery ≤ 2 minutes after reconnecting |
+| QS-A5 | Any one cluster node fails under `LOAD-50K` | Kafka selects new leaders, PostgreSQL switches to synchronous replication, services redistribute partitions | RTO ≤ 60 seconds, RPO = 0 |
+| QS-A6 | Projections are removed | Projections are rebuilt by replaying Kafka | Result is identical to the working one |
 
-### 2.2 Производительность
+### 2.2 Performance
 
-| ID | Стимул и окружение | Реакция | Мера |
+| ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-P1 | `LOAD-50K` в течение 24 ч | Конвейер обрабатывает поток без роста лага | Лаг потребителей не растёт; SLO задержек соблюдены |
-| QS-P2 | Событие, завершающее правило `conjunction`, при `LOAD-50K` | Сигнал публикуется | Событие -> сигнал p99 ≤ 300 мс |
-| QS-P3 | Новый инцидент при `LOAD-50K` и 500 открытых консолях | Инцидент доставлен и отрисован | Событие -> консоль p99 ≤ 1 с |
-| QS-P4 | Пик ×1,5 (75 000 событий/с) 10 мин | Задержка растёт в пределах бюджета, лаг рассасывается после пика | Лаг возвращается к норме ≤ 5 мин после пика; 0 потерь |
-| QS-P5 | Оператор открывает карточку инцидента | REST-запрос обслуживается | p99 ≤ 200 мс |
-| QS-P6 | В ленте 10 000 активных инцидентов | Прокрутка и фильтрация | ≥ 50 кадров/с |
+| QS-P1 | `LOAD-50K` for 24 hours | Pipeline processes stream without increased lag | Consumer lag does not increase; SLOs for delays are met |
+| QS-P2 | Event ending the `conjunction` rule at `LOAD-50K` | Signal is published | Event -> signal p99 ≤ 300 ms |
+| QS-P3 | New incident at `LOAD-50K` with 500 open consoles | Incident is delivered and rendered | Event -> console p99 ≤ 1 second |
+| QS-P4 | Peak ×1.5 (75,000 events/s) for 10 minutes | Delay increases within budget, lag dissipates after peak | Lag returns to normal ≤ 5 minutes after peak; 0 losses |
+| QS-P5 | Operator opens incident card | REST request is served | p99 ≤ 200 ms |
+| QS-P6 | 10,000 active incidents in the feed | Scrolling and filtering | ≥ 50 frames/s |
 
-### 2.3 Модифицируемость
+### 2.3 Modifiability
 
-| ID | Стимул и окружение | Реакция | Мера |
+| ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-M1 | Интегратор подключает новый тип оборудования | Коннектор на SDK и правила отображения | 0 изменений кода и образов ядра |
-| QS-M2 | Администратор добавляет новое правило корреляции | Правило проходит валидацию, пробный прогон и активируется | Без перезапуска сервисов; применяется атомарно |
-| QS-M3 | Разработчик добавляет необязательное поле в схему события | CI проверяет совместимость | Старые потребители работают без изменений |
+| QS-M1 | Integrator adds a new type of equipment | SDK connector and mapping rules | 0 changes to core code or images |
+| QS-M2 | Administrator adds a new correlation rule | Rule is validated, tested, and activated | No service restarts; applied atomically |
+| QS-M3 | Developer adds an optional field to the event schema | CI checks compatibility | Old consumers work unchanged |
 
-### 2.4 Безопасность
+### 2.4 Security
 
-| ID | Стимул и окружение | Реакция | Мера |
+| ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-S1 | Коннектор с отозванным сертификатом подключается | Отказ на рукопожатии или регистрации | Сессия не открывается; запись аудита |
-| QS-S2 | Оператор запрашивает инцидент чужой площадки через API | Отказ по ABAC | `403`; запись аудита `AccessDenied` |
-| QS-S3 | Запись аудита изменена в базе данных | Проверка целостности | Нарушение обнаружено с точностью до записи |
+| QS-S1 | Connector with revoked certificate is connected | Failure in handshake or registration | Session does not open; audit record |
+| QS-S2 | Operator requests an incident from another site via API | ABAC failure | `403`; audit record `AccessDenied` |
+| QS-S3 | Audit record is modified in the database | Integrity check | Violation detected with precision up to the record |
 
-### 2.5 Эксплуатируемость
+### 2.5 Operability
 
-| ID | Стимул и окружение | Реакция | Мера |
+| ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-O1 | Обновление N -> N+1 в кластере под `LOAD-50K` | Последовательная замена экземпляров, миграции expand/contract | Нет интервала > 5 с без новых сигналов; SLO задержек соблюдены |
-| QS-O2 | Любой отказ из плана хаос-тестов | Отказ виден на дашборде | Алерт со ссылкой на runbook ≤ 2 мин |
-| QS-O3 | Инцидент поддержки | Сбор диагностического пакета CLI | Одна команда; пакет без секретов |
+| QS-O1 | Update N -> N+1 in the cluster under `LOAD-50K` | Sequential replacement of instances, expand/contract migrations | No interval > 5 seconds without new signals; SLOs for delays are met |
+| QS-O2 | Any failure from chaos testing plan | Failure visible on the dashboard | Alert with reference to runbook ≤ 2 minutes |
+| QS-O3 | Incident support | Collecting CLI diagnostic package | One command; package without secrets |
 
 ---
 
-## 3. Разложение SLO по компонентам
+## 3. Decomposition of SLO by Components
 
-| SLO (план 1.3) | Вклад компонентов | Механизм | Проверка |
+| SLO | Component Contributions | Mechanism | Verification |
 |---|---|---|---|
-| 50 000 событий/с, пик ×1,5 | Каждый сервис горячего пути при числе экземпляров из [scaling.md](scaling.md#53-экземпляры-сервисов-при-50-000-событийс-кластер) выдерживает ≥ 1,5 × свою долю; Kafka ≥ 75 000 записей/с на топик | Партиционирование, пакетная обработка | Нагрузочные тесты 4.2, 4.5, 5.2; 10.1 |
-| Событие -> сигнал p99 ≤ 300 мс | SDK + сеть 15, шлюз 25, Normalizer 30, Correlation 100, резерв 130 | Раздел 4 | Гистограммы по этапам; 10.1 |
-| Событие -> консоль p99 ≤ 1 с | До сигнала 170, Incident 50, outbox 30, realtime 200, отрисовка 50, резерв 500 | Раздел 4 | Playwright с замером по event time; 10.1 |
-| REST чтение p99 ≤ 200 мс | API Gateway 15, сервис или проекция 120, сеть и сериализация 30, резерв 35 | Чтение из Redis и индексированного PostgreSQL | Нагрузочный тест API |
-| 0 потерь событий | SDK: буфер на диске; шлюз: подтверждение после `acks=all`; Normalizer, Correlation: EOS-K; Kafka: RF 3, `min.insync.replicas` 2 | [data-flows.md](data-flows.md#2-классы-семантики) | Сквозная сверка `source_seq`; SIM; CHAOS |
-| 0 потерь инцидентов | Incident Service: коммит до фиксации смещения; PostgreSQL: синхронная реплика; outbox | EOS-DB, outbox | SIM; CHAOS |
-| 0 дубликатов инцидентов | Детерминированный `signal_id`; inbox; уникальный открытый `grouping_key` (I3); ключ `psim.signals.v1` = `grouping_key` | [aggregates.md](../domain/aggregates.md#42-агрегат-incident) | SIM 10 000 прогонов |
-| RTO ≤ 60 с | Обнаружение отказа 10 (`session.timeout.ms`); ребалансировка 5; восстановление состояния корреляции ≤ 30; переключение PostgreSQL ≤ 30 (параллельно); резерв 15 | Статическое членство, кооперативная ребалансировка, Patroni | CHAOS 10.2 |
-| RPO = 0 | Kafka `acks=all` + `min.insync.replicas=2`; PostgreSQL синхронная репликация | - | CHAOS 10.2 |
-| Обновление без простоя | Совместимость схем N ↔ N+1; expand/contract; последовательная замена с дренированием; статическое членство | [deployment.md](deployment.md#4-обновление) | S12 |
-| 10 000 инцидентов в ленте | Projection: снимок ленты одним запросом; клиент: виртуализация, дельты по WebSocket | - | Playwright, 8.3 |
+| 50,000 events/s, peak ×1.5 | Each hot path service with [scaling.md](scaling.md#53-service-instances-at-50000-eventss-cluster) instance maintains ≥ 1.5 × its share; Kafka ≥ 75,000 records/s on topic | Partitioning, batch processing | Load tests for gateway, normalization, and correlation |
+| Event -> signal p99 ≤ 300 ms | SDK + network 15, gateway 25, Normalizer 30, Correlation 100, reserve 130 | Section 4 | Histograms by stages; load qualification |
+| Event -> console p99 ≤ 1 second | Before signal 170, Incident 50, outbox 30, realtime 200, rendering 50, reserve 500 | Section 4 | Playwright with event time measurement; load qualification |
+| REST reading p99 ≤ 200 ms | API Gateway 15, service or projection 120, network and serialization 30, reserve 35 | Reading from Redis and indexed PostgreSQL | Load test for API |
+| 0 losses of events | SDK: buffer on disk; gateway: confirmation after `acks=all`; Normalizer, Correlation: EOS-K; Kafka: RF 3, `min.insync.replicas` 2 | [data-flows.md](data-flows.md#2-semantic-classes) | Cross-checking `source_seq`; SIM; CHAOS |
+| 0 losses of incidents | Incident Service: commit before offset commit; PostgreSQL: synchronous replication; outbox | EOS-DB, outbox | SIM; CHAOS |
+| 0 duplicates of incidents | Deterministic `signal_id`; inbox; unique open `grouping_key` (I3); key `psim.signals.v1` = `grouping_key` | [aggregates.md](../domain/aggregates.md#42-aggregate-incident) | SIM 10,000 runs |
+| RTO ≤ 60 seconds | Detection of failure 10 (configured consumer group session timeout); rebalancing 5; recovery of correlation state ≤ 30 seconds; PostgreSQL switching ≤ 30 seconds (parallel); reserve 15 | KIP-848 rebalancing and Patroni | Chaos tests |
+| RPO = 0 | Kafka `acks=all` + `min.insync.replicas=2`; PostgreSQL synchronous replication | - | Chaos tests |
+| Update without downtime | Compatibility of N ↔ N+1 schemas; expand/contract; sequential replacement with draining | [deployment.md](deployment.md#4-update) | S12 |
+| 10,000 incidents in the feed | Projection: snapshot of feed with one request; client: virtualization, deltas via WebSocket | - | Playwright |
 
 ---
 
-## 4. Бюджет задержек
+## 4. Delay Budget
 
-Задержка измеряется от `occurred_at` события (время у источника). Значения - p99 в миллисекундах. Сумма p99 этапов - консервативная оценка сверху: p99 суммы меньше суммы p99.
+The delay is measured from the `occurred_at` event (time at the source). Values are p99 in milliseconds. Stage budgets are engineering allocations. End-to-end p99 must be measured separately; summing stage p99 values does not guarantee an upper bound for end-to-end p99.
 
-### 4.1 Событие -> сигнал (≤ 300 мс)
+### 4.1 Event -> Signal (≤ 300 ms)
 
-| Этап | Участок | Бюджет | Что входит |
+| Stage | Section | Budget | What happens |
 |---|---|---|---|
-| B1 | Коннектор -> шлюз | 15 | Накопление пакета в SDK (`linger` 5 мс), сеть, gRPC |
-| B2 | Шлюз -> `psim.ingest.raw.v1` | 25 | Валидация, запись с `acks=all` |
-| B3 | Normalizer | 30 | Чтение, отображение, обогащение, транзакция и её видимость для `read_committed` |
-| B4 | Correlation Engine | 100 | Чтение, вычисление правил, запись состояния, транзакция (интервал коммита ≤ 50 мс) |
-| | **Итого** | **170** | Резерв 130 |
+| B1 | Connector -> Gateway | 15 | Packaging in the SDK (`linger` 5 ms), network, gRPC |
+| B2 | Gateway -> `psim.ingest.raw.v1` | 25 | Validation, writing from `acks=all` |
+| B3 | Normalizer | 30 | Reading, mapping, enrichment, transaction and visibility for `read_committed` |
+| B4 | Correlation Engine | 100 | Reading, rule calculation, state writing, transaction (commit interval ≤ 50 ms) |
+| | **Total** | **170** | Reserve 130 |
 
-Для правил с перераспределением (ключ шире зоны) добавляется этап B4' - 100 мс; итог 270 мс, в пределах SLO. Для правил `threshold` и `absence` задержка отсчитывается от момента закрытия окна по водяному знаку, а не от события.
+For rules with redistribution (key wider than the zone), an additional stage B4' is added - 100 ms; total 270 ms, within the SLO. For rules `threshold` and `absence`, the delay is calculated from the moment the window closes according to the watermark, not from the event.
 
-### 4.2 Событие -> инцидент в консоли (≤ 1 000 мс)
+### 4.2 Event -> Incident in Console (≤ 1,000 ms)
 
-| Этап | Участок | Бюджет | Что входит |
+| Stage | Section | Budget | What happens |
 |---|---|---|---|
-| B1-B4 | До сигнала | 170 | См. 4.1 |
-| B5 | Incident Service | 50 | Чтение сигнала, транзакция PostgreSQL: inbox, агрегат, outbox |
-| B6 | Outbox relay | 30 | Пробуждение по `LISTEN/NOTIFY`, публикация |
-| B7 | API Gateway realtime | 150 | Чтение `psim.incidents.events.v1`, фильтр ABAC, отправка в WebSocket |
-| B8 | Сеть до браузера | 50 | - |
-| B9 | Отрисовка в браузере | 50 | Применение дельты, отрисовка строки ленты, звук |
-| | **Итого** | **500** | Резерв 500 |
+| B1-B4 | Before signal | 170 | See 4.1 |
+| B5 | Incident Service | 50 | Reading signal, PostgreSQL transaction: inbox, aggregate, outbox |
+| B6 | Outbox relay | 30 | Awakening based on `LISTEN/NOTIFY`, publishing |
+| B7 | API Gateway realtime | 150 | Reading `psim.incidents.events.v1`, ABAC filtering, sending to WebSocket |
+| B8 | Network to browser | 50 | - |
+| B9 | Rendering in browser | 50 | Applying delta, rendering feed row, sound |
+| | **Total** | **500** | Reserve 500 |
 
-Проекции не стоят на пути инцидента в консоль: клиент получает снимок ленты из Projection Service вместе со смещениями, на которых снимок согласован, и далее получает дельты из Kafka через realtime-канал с этих смещений ([crosscutting.md](crosscutting.md#9-realtime-снимок-и-дельты)).
+Projections do not occur on the path of the incident in the console: the client receives a snapshot from the Projection Service along with offsets at which the snapshot is aligned, and then receives deltas from Kafka through the realtime channel from these offsets ([crosscutting.md](crosscutting.md#9-realtime-snapshot-and-deltas)).
 
-### 4.3 Прочие бюджеты
+### 4.3 Other budgets
 
-| Путь | SLO | Разложение |
+| Path | SLO | Distribution |
 |---|---|---|
-| Команда: запрос -> доставка коннектору | ≤ 200 мс | API Gateway 10, Command Service 20, outbox 30, шлюз читает команду 30, доставка в сессию 20; итого 110, резерв 90 |
-| Изменение каталога -> потребители | ≤ 2 с | Outbox 30, чтение и применение копии 100; итого 130 |
-| Срабатывание таймера SLA | ≤ 1 с погрешности | Интервал опроса таймеров 200 мс, обработка 100 |
-| Сигнал -> обработка Incident Service | ≤ 50 мс | B5 |
-| Изменение агрегата -> проекция | ≤ 100 мс | Outbox 30, Projection 70 |
+| Command: request -> delivery to connector | ≤ 200 ms | API Gateway 10, Command Service 20, outbox 30, gateway reads command 30, delivery to session 20; total 110, reserve 90 |
+| Catalog change -> consumers | ≤ 2 s | Outbox 30, reading and applying copy 100; total 130 |
+| SLA timer activation | ≤ 1 s error | Timer polling interval 200 ms, processing 100 |
+| Signal -> processing by Incident Service | ≤ 50 ms | B5 |
+| Aggregate change -> projection | ≤ 100 ms | Outbox 30, Projection 70 |
 
-### 4.4 Как измеряется
+### 4.4 How it is measured
 
-- Каждый этап добавляет в заголовки Kafka метку времени `psim-ts-<stage>` и пишет гистограмму `psim_stage_latency_seconds{stage}` (от входа до выхода этапа) и `psim_e2e_latency_seconds{stage}` (от `occurred_at` до выхода этапа).
-- Браузер в тестовом режиме сообщает время отрисовки инцидента; Playwright сопоставляет его с `occurred_at`.
-- Часы узлов синхронизированы (chrony); рассогласование контролируется метрикой и входит в погрешность.
-- Регрессия задержки этапа больше 5% против базовой линии блокирует слияние (барьер шага 10.1, базовая линия - шаг 3.1).
+- Each stage adds a time tag `psim-ts-<stage>` to Kafka headers and writes a histogram `psim_stage_latency_seconds{stage}` (from input to output of the stage) and `psim_e2e_latency_seconds{stage}` (from `occurred_at` to output of the stage).
+- The browser in test mode reports the time of incident rendering; Playwright associates it with `occurred_at`.
+- Node clock is synchronized (chrony); synchronization errors are controlled by a metric and are included in the error.
+- Regression of stage delay greater than 5% against the baseline blocks merging.

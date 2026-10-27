@@ -1,35 +1,38 @@
-# ADR-047. Сквозной минимальный поток
+# ADR-047. Minimal end-to-end event flow
 
-- **Статус:** Принято
-- **Шаг плана:** 3.1
-- **Связанные:** ADR-001, ADR-004-ADR-008, ADR-016-ADR-020, ADR-029, ADR-039-ADR-043
+<!-- language-links -->
+[English](0047-event-flow.md) | [Русский](../ru/adr/0047-event-flow.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-001, ADR-004-ADR-008, ADR-016-ADR-020, ADR-029, ADR-039-ADR-043
 
-Ф2 проверила платформенные адаптеры отдельно. Веха M1 требует проверить их совместную работу с контрактами, границами процессов и браузером до расширения функциональности.
+## Context
 
-## Решение
+Component checks for platform adapters are supplemented by end-to-end checks for contracts, process boundaries, and browsers.
 
-1. Запустить пять отдельных C++-сервисов: Connector Gateway, Normalizer, Correlation Engine, Incident Service и API Gateway. Генератор `connectors/simulator` использует настоящий gRPC-протокол коннекторов; модельный стенд `libs/sim` остаётся отдельным ручным инструментом.
-2. Использовать существующие топики raw -> normalized -> signals -> incident events, Protobuf и Confluent wire format с идентификаторами Schema Registry. Шлюз подтверждает событие после Kafka acks=all. Normalizer и Correlation Engine фиксируют выходы и смещения одной Kafka-транзакцией. Сервисы не вызывают друг друга напрямую для обработки события.
-3. Использовать один shard на процесс для первой интеграции. `libs/platform/stream` содержит инфраструктуру исполнения и сериализации; прикладные обработчики остаются в своих сервисах. gRPC callback reactor передаёт работу на shard; реакции gRPC не блокируются. Шлюз и симулятор владеют EventEngine на уровне процесса: после освобождения RPC-ресурсов завершают gRPC, дожидаются рабочих потоков и освобождают OpenSSL. Временные файлы PKI и секреты создаются установкой стенда, ключи читаются через `security::read_secret`.
-4. Ограничить демонстрационные данные одним tenant, зарегистрированным коннектором, источником `door-1`, площадкой и зоной. `ALARM` даёт `intrusion.zone.alarm` и сигнал правила, `RESTORE` нормализуется без сигнала. Неизвестный источник или код направляется в DLQ. Идентификаторы источника и сигнала вычисляются по UUIDv5 с фиксированными пространствами имён из `contracts/identifiers`; новые сущности получают UUIDv7.
-5. Incident Service записывает inbox, агрегат и outbox в одной транзакции PostgreSQL. Повтор того же сигнала не изменяет агрегат. Окно группировки - 60 секунд от первого события, сериализация по grouping key - advisory transaction lock. Отдельный outbox relay публикует сохранённые байты с подтверждением Kafka; Kafka offset фиксируется после транзакции БД. Доставка outbox остаётся at-least-once.
-6. Пока отдельного Projection Service нет, API Gateway поддерживает свою минимальную PostgreSQL-проекцию. Она изолирована по имени экземпляра. Каждый запуск API получает отдельную временную Kafka-группу и читает все партиции; он не ждёт session timeout старого процесса после SIGKILL. Проекция и inbox в БД подавляют повторные эффекты начального чтения истории. Снимок и вектор смещений читаются одной транзакцией Repeatable Read. WebSocket использует контракт v1, ограниченный журнал 256 изменений и ограниченные очереди клиентов. Токен содержит вектор смещений, tenant и эпоху экземпляра; после перезапуска или выхода за журнал требуется новый снимок. Этот временный механизм не заменяет реализацию 7.2-7.3.
-7. Коннектор подключается с TLS 1.3 и сертификатом известной URI SAN. REST и первая WebSocket-рамка проверяют JWT Keycloak: issuer, audience, подпись, срок, tenant и роль operator/supervisor. Пользователи входят через Authorization Code + PKCE. Access/refresh token остаются в памяти страницы; sessionStorage хранит только временные параметры PKCE. Тестовый realm имеет явный фиксированный tenant, технические credentials не дают доступа к ленте.
-8. Локальные Kafka, Registry, PostgreSQL, Keycloak и OTLP используют явное исключение plaintext внутри стенда; внешние порты привязаны к loopback. Сертификат коннектора проверяется и здесь. Автоматизация защищённой поставки остаётся в 9.1. Приложения запускаются без root, с read-only root, без capabilities; каталог профилей тестирования монтируется отдельно.
-9. Включить браузерный сценарий в этап окружения CI. Он проверяет двойную отправку, восстановление WebSocket без дополнительного снимка, SIGKILL API с последующей ресинхронизацией, продолжение обновлений и согласованность Kafka/БД. Tempo должен содержать одну причинную трассу всех шести компонентов с существующими родительскими span.
+## Solution
 
-## Границы
+1. Run five separate C++ services: Connector Gateway, Normalizer, Correlation Engine, Incident Service, and API Gateway. The `connectors/simulator` generator uses the actual gRPC protocol for connectors; the model test environment `libs/sim` remains a separate manual tool.
+2. Use existing topics: raw -> normalized -> signals -> incident events, Protobuf, and Confluent wire format with Schema Registry identifiers. The gateway confirms events after Kafka acks=all. Normalizer and Correlation Engine record outputs and offsets in one Kafka transaction. Services do not call each other directly for event processing.
+3. Use one shard per process for the first integration. `libs/platform/stream` contains execution and serialization infrastructure; application handlers remain in their own services. gRPC callback reactors transfer work to shards; gRPC callbacks are not blocked. The gateway and simulator use EventEngine at the process level: after RPC resources are freed, they terminate gRPC, wait for working threads, and release OpenSSL. PKI temporary files and secrets are created during test environment setup; keys are read through `security::read_secret`.
+4. Limit demonstration data to one tenant, registered connector, source `door-1`, site, and access scope. `ALARM` provides `intrusion.zone.alarm` and a rule signal; `RESTORE` is normalized without a signal. Unknown sources or code are sent to DLQ. Source and signal identifiers are calculated using UUIDv5 with fixed namespace from `contracts/identifiers`; new entities receive UUIDv7.
+5. Incident Service records inbox, aggregate, and outbox in one PostgreSQL transaction. Repeating the same signal does not change the aggregate. The grouping window is 60 seconds from the first event; serialization by grouping key uses an advisory transaction lock. A separate outbox relay publishes saved bytes with confirmation to Kafka; Kafka offset is fixed after database transaction. Outbox delivery must be at-least-once.
+6. The initial integration had no separate Projection Service; API Gateway maintained a minimal PostgreSQL projection. It is isolated by instance name. Each API process start creates a separate temporary Kafka group and reads all partitions; it does not wait for session timeout of the old process after SIGKILL. Projection and inbox in the database prevent repeated initial reads. Snapshots and offset vectors are read in one Repeatable Read transaction. WebSocket uses contract v1, with a limit of 256 changes and limited client queues. The token contains offset vector, tenant, and instance epoch; after restart or out of journal, a new snapshot is required. This historical mechanism has been replaced by the general Projection Service and realtime channel via ADR-059 and ADR-060.
+7. Connector uses TLS 1.3 and a certificate from a known URI SAN. REST and the first WebSocket frame check JWT Keycloak: issuer, audience, signature, expiration, tenant, and role as operator/supervisor. Users enter through Authorization Code + PKCE. Access/refresh tokens remain in the page memory; sessionStorage only stores temporary PKCE parameters. The test realm has a fixed tenant; technical credentials do not allow access to the feed.
+8. Local Kafka, Registry, PostgreSQL, Keycloak, and OTLP use explicit plaintext exceptions within the test environment; external ports are loopback-bound. Connector certificates are checked here too. Secure delivery is described in the [test environment guide](../engineering/deployment-topologies.md). Applications run as a non-root user, with a read-only root filesystem and no capabilities; the test profile directory is mounted separately.
+9. Enable browser scenario in the CI environment phase. It checks double sending, WebSocket recovery without additional snapshots, SIGKILL API with subsequent synchronization, continued updates, and Kafka/database consistency. Tempo must contain one causal trace for all six components with existing parent spans.
 
-Это одна вертикаль M1. Connector SDK с локальным буфером и восстановлением последовательности - 4.1; постоянный реестр, heartbeat, отзыв и квоты шлюза - 4.2; каталог и редактируемые mapping - 4.4-4.6; DSL и полный жизненный цикл инцидента - Ф5; постоянные области доступа и проекции - Ф7; маршруты, фильтры, действия оператора и полноценная консоль - Ф8. Проверка времени события в fixture ограничена пятью минутами, пакет - одним событием и 64 КиБ, активные gRPC-сессии - восемью, соединения API - 32, снимок - 1 000 инцидентов. Кластерная отказоустойчивость в этом шаге не заявляется.
+## Boundaries
 
-## Проверка
+This is a limited integration test environment. Product implementations are defined by ADR-048 (Connector SDK), ADR-049 (Connector Gateway), ADR-051 (catalog), ADR-052 (normalization), ADR-053 (incidents), ADR-059 (projection), ADR-061 (authorization), and ADR-071 (console). Event time in fixtures is limited to five minutes, packets to one event and 64 KiB, active gRPC sessions to eight, API connections to 32, snapshots to 1,000 incidents. Cluster resilience is not claimed by this test environment.
 
-Сценарий и команды описаны в [руководстве стенда](../engineering/event-flow.md). Базовая линия измеряет время из `occurred_at` до `produced_at` сигнала, прочитанного read_committed, и до commit строки React через `useLayoutEffect`. Генератор следует открытому расписанию; опоздание свыше 10 мс делает базовую линию недействительной. Измерение на одном хосте использует общие часы ядра. Малый прогон M1 не является нагрузочной приёмкой SLO шага 10.1.
+## Testing
 
-## Источник
+Scenarios and commands are described in the [test environment guide](../engineering/event-flow.md). The base line measures time from `occurred_at` to `produced_at` of a signal read committed, and to the commit line of React through `useLayoutEffect`. The generator follows an open schedule; delays over 10 ms make the base line invalid. Measurement on a single host uses the same kernel clock. The small integration run is not a load test for the full SLO profile.
 
-[gRPC C++ callback lifecycle](https://grpc.io/docs/languages/cpp/best_practices/): OnDone вызывается после Finish и завершения реакций; серверный reactor освобождается только в OnDone.
+## Source
 
-Ограничения тестового шлюза заменены [ADR-049](0049-connector-gateway.md): постоянная регистрация, протокол 1.1, досылка истории, пакеты до 1000 событий и серверный контроль сессий. Остальные ограничения вертикали сохраняются.
+[gRPC C++ callback lifecycle](https://grpc.io/docs/languages/cpp/best_practices/): OnDone is called after Finish and after reactions are completed; the server reactor is freed only in OnDone.
+
+Laboratory gateway restrictions have been replaced with [ADR-049](0049-connector-gateway.md): continuous registration, protocol 1.1, history sending, packets up to 1000 events, and server session control. Projections and realtime have been replaced by ADR-059 and ADR-060 solutions; laboratory test environment restrictions do not automatically apply to secure delivery.

@@ -8,7 +8,7 @@ import "psim/api/v1/problem.proto";
 import "psim/response/v1/plan.proto";
 import "psim/response/v1/run.proto";
 
-// ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
+// ResponsePlanService manages response plans. Owner: Response Engine.
 service ResponsePlanService {
   // ListPlans lists the latest version of each plan.
   rpc ListPlans(ListPlansRequest) returns (ListPlansResponse) {
@@ -48,7 +48,7 @@ service ResponsePlanService {
   }
 }
 
-// ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
+// ResponseRunService executes plan steps. Owner: Response Engine.
 service ResponseRunService {
   // GetIncidentRun returns the active or last run of an incident.
   rpc GetIncidentRun(GetIncidentRunRequest) returns (GetIncidentRunResponse) {
@@ -84,7 +84,7 @@ service ResponseRunService {
   }
 }
 
-// EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.
+// EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine.
 service EscalationPolicyService {
   // ListEscalationPolicies lists policies.
   rpc ListEscalationPolicies(ListEscalationPoliciesRequest) returns (ListEscalationPoliciesResponse) {

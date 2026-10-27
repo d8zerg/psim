@@ -1,116 +1,120 @@
-# Документация Open-Source PSIM Platform
+# Documentation for Open-Source PSIM Platform
 
-- [План разработки MVP](psim-mvp-development-plan.md) · [диаграммы](psim-mvp-diagrams.drawio)
-- [Прогресс по шагам плана](progress.md)
+<!-- language-links -->
+[English](README.md) | [Русский](ru/README.md)
+<!-- /language-links -->
 
-## Продукт
+- [Implemented functions and release conditions](product/release-readiness.md)
+- [Permanent quality requirements](quality/requirements.yaml)
+
+## Product
 
 - [Product Brief](product/product-brief.md)
-- [Роли и пользовательские пути](product/roles-and-journeys.md)
-- [Границы MVP](product/mvp-scope.md)
-- [Эксплуатационные дополнения MVP](architecture/operational-capabilities.md)
-- [Спецификация приёмки S1-S13](product/acceptance-spec.md)
+- [Roles and user journeys](product/roles-and-journeys.md)
+- [MVP scope](product/mvp-scope.md)
+- [Operational capabilities of MVP](architecture/operational-capabilities.md)
+- [S1-S13 acceptance specifications](product/acceptance-spec.md)
 
-## Предметная область
+## Domain
 
-- [Глоссарий](domain/glossary.md)
-- [Bounded contexts и карта контекстов](domain/context-map.md)
-- [Агрегаты, инварианты, доменные события](domain/aggregates.md)
-- [Модели состояний](domain/state-models.md)
-- [Таксономия событий v1 и модель критичности](domain/event-taxonomy.md)
+- [Glossary](domain/glossary.md)
+- [Bounded contexts and context map](domain/context-map.md)
+- [Aggregates, invariants, domain events](domain/aggregates.md)
+- [State models](domain/state-models.md)
+- [Event taxonomy v1 and criticality model](domain/event-taxonomy.md)
 
-- [Сквозной стенд M1](engineering/event-flow.md)
-- [Разработка коннектора и набор соответствия](engineering/connector-sdk.md)
-- [Эталонные коннекторы: симулятор и Webhook/HTTP](engineering/reference-connectors.md)
-- [Normalizer и Event History](engineering/normalization-and-history.md)
-- [Правила и исторический прогон](engineering/correlation-rules.md)
-- [Рабочая корреляция и восстановление состояния](engineering/live-correlation.md)
-- [Resource Catalog: ресурсы, планы и обслуживание](engineering/resource-catalog.md)
+- [End-to-end event flow](engineering/event-flow.md)
+- [Connector development and conformance suite](engineering/connector-sdk.md)
+- [Reference connectors: simulator and Webhook/HTTP](engineering/reference-connectors.md)
+- [Normalizer and Event History](engineering/normalization-and-history.md)
+- [Rules and historical runs](engineering/correlation-rules.md)
+- [Live correlation and state restoration](engineering/live-correlation.md)
+- [Resource Catalog: resources, floor plans and maintenance](engineering/resource-catalog.md)
 - [Incident Service](engineering/incident-service.md)
-- [Command Service: команды устройствам](engineering/command-service.md)
-- [Response Engine: исполнение сценариев](engineering/response-engine.md)
-- [SLA, дежурства и уведомления](engineering/notifications.md)
-- [Audit Service и независимая проверка журнала](engineering/audit-service.md)
-- [Отчёты по инцидентам](engineering/incident-reports.md)
-- [Модели консоли: хранение, актуальность и перестроение](engineering/console-projections.md)
-- [API Gateway: маршрутизация, конфигурация и снимки](engineering/api-gateway.md)
-- [Поиск истории и связь с инцидентами](engineering/event-history.md)
-- [Connector Gateway: регистрация, сессии и управление](engineering/connector-gateway.md)
+- [Command Service: commands to devices](engineering/command-service.md)
+- [Response Engine: scenario execution](engineering/response-engine.md)
+- [SLA, duties, and notifications](engineering/notifications.md)
+- [Audit Service and independent log verification](engineering/audit-service.md)
+- [Incident reports](engineering/incident-reports.md)
+- [Console projections: storage, freshness, and rebuilding](engineering/console-projections.md)
+- [API Gateway: routing, configuration, and snapshots](engineering/api-gateway.md)
+- [Searching event history and linking to incidents](engineering/event-history.md)
+- [Connector Gateway: registration, sessions, and management](engineering/connector-gateway.md)
 
-## Архитектура
+## Architecture
 
-- [Архитектурный документ arc42](architecture/README.md)
-- [Представление времени выполнения](architecture/runtime-view.md)
-- [Развёртывание и топологии](architecture/deployment.md)
-- [Сквозные концепции](architecture/crosscutting.md)
-- [Потоки данных и семантика доставки](architecture/data-flows.md)
-- [Масштабирование и партиционирование](architecture/scaling.md)
-- [Требования к качеству и бюджет задержек](architecture/quality.md)
-- [Модель C4 (Structurizr DSL)](architecture/c4/workspace.dsl) - проверка: `task docs:c4`
+- [Architecture document arc42](architecture/README.md)
+- [Runtime view](architecture/runtime-view.md)
+- [Deployment and topology](architecture/deployment.md)
+- [Cross-cutting concepts](architecture/crosscutting.md)
+- [Data flows and delivery semantics](architecture/data-flows.md)
+- [Scaling and partitioning](architecture/scaling.md)
+- [Quality requirements and latency budgets](architecture/quality.md)
+- [C4 model (PlantUML)](architecture/c4/L2-Containers.puml) - check: `task docs:c4`
 
-## Архитектурные решения
+## Architecture decisions
 
-- [Реестр ADR](adr/README.md) · [шаблон](adr/template.md)
+- [ADR registry](adr/README.md) · [template](adr/template.md)
 
-## Контракты
+## Contracts
 
-- [Контракты v1: состав, соглашения, проверка, покрытие сценариев](../contracts/README.md)
-- [OpenAPI REST v1](../contracts/openapi/psim-api-v1.yaml) · [AsyncAPI топиков](../contracts/asyncapi/psim-topics.yaml) · [справочник proto](../contracts/docs/proto-reference.md)
+- [Contract v1: contents, conventions, verification, scenario coverage](../contracts/README.md)
+- [OpenAPI REST v1](../contracts/openapi/psim-api-v1.yaml) · [AsyncAPI topics](../contracts/asyncapi/psim-topics.yaml) · [proto reference guide](../contracts/docs/proto-reference.md)
 
-## Безопасность
+## Security
 
-- [Модель угроз: методика, активы, границы доверия, допущения](security/threat-model.md)
-- [Реестр угроз и требований безопасности](security/threat-register.md) (генерируется из [threat-model.yaml](security/threat-model.yaml))
+- [Threat model: methodology, assets, trust boundaries, assumptions](security/threat-model.md)
+- [Threat register and security requirements](security/threat-register.md) (generated from [threat-model.yaml](security/threat-model.yaml))
 
-## Качество и верификация
+## Quality and verification
 
-- [Стратегия качества и верификации](quality/strategy.md)
-- [Матрица верификации](quality/verification-matrix.md) (генерируется из [verification.yaml](quality/verification.yaml))
-- [Методика сквозной сверки потерь и дубликатов](quality/reconciliation.md)
-- [Методика замера задержек](quality/latency-measurement.md)
+- [Quality and verification strategy](quality/strategy.md)
+- [Verification matrix](quality/verification-matrix.md) (generated from [verification.yaml](quality/verification.yaml))
+- [Methodology for cross-checking losses and duplicates](quality/reconciliation.md)
+- [Latency measurement methodology](quality/latency-measurement.md)
 
-## Инженерная платформа
+## Engineering platform
 
-- [Стандарт кодирования C++23](engineering/cpp-coding-standard.md)
-- [Стандарт кодирования TypeScript](engineering/typescript-coding-standard.md)
-- Барьеры качества и fitness functions - [ADR-033](adr/0033-code-quality-gates.md); toolchain - [ADR-032](adr/0032-cpp-toolchain.md)
-- Локальный конвейер CI/CD, пакеты, образы, SBOM и подписи - [ADR-034](adr/0034-local-ci-and-supply-chain.md)
-- Портал документации (`task docs:portal`, `task docs:serve`) - [ADR-038](adr/0038-documentation-portal.md)
-- Дизайн-система и обновления без мерцания - [ADR-062](adr/0062-design-system-and-stable-updates.md), [руководство](engineering/design-system.md), [расширенный объём и приёмка](engineering/design-system-acceptance.md)
-- [Термины интерфейса ru/en](engineering/ui-glossary.md)
-- Веб-монорепозиторий (консоль, дизайн-система, клиенты REST и realtime) - [ADR-037](adr/0037-web-monorepo.md), [web/](../web/README.md)
-- Локальное окружение (Kafka, Schema Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, наблюдаемость, Toxiproxy) - [ADR-035](adr/0035-local-environment.md), [deploy/](../deploy/README.md)
+- [C++23 coding standard](engineering/cpp-coding-standard.md)
+- [TypeScript coding standard](engineering/typescript-coding-standard.md)
+- Quality gates and fitness functions - [ADR-033](adr/0033-code-quality-gates.md); toolchain - [ADR-032](adr/0032-cpp-toolchain.md)
+- Local CI/CD pipeline, packages, images, SBOM, and signatures - [ADR-034](adr/0034-local-ci-and-supply-chain.md)
+- Documentation portal (`task docs:portal`, `task docs:serve`) - [ADR-038](adr/0038-documentation-portal.md)
+- Design system and stable interface updates - [ADR-062](adr/0062-design-system-and-stable-updates.md), [guide](engineering/design-system.md), [extended scope and acceptance](engineering/design-system-acceptance.md)
+- [UI terms ru/en](engineering/ui-glossary.md)
+- Web monorepo (console, design system, REST clients, realtime) - [ADR-037](adr/0037-web-monorepo.md), [web/](../web/README.md)
+- Local environment (Kafka, Schema Registry, PostgreSQL, ClickHouse, Valkey, Keycloak, monitoring, Toxiproxy) - [ADR-035](adr/0035-local-environment.md), [deploy/](../deploy/README.md)
 
-## Платформенное ядро
+## Platform core
 
-- Runtime сервиса: конфигурация, логи, метрики, трассировка, health, остановка с дренированием, шаблон сервиса - [ADR-039](adr/0039-service-runtime.md), [сервисы](../services/README.md)
-- Асинхронная модель: шарды, корутины, дедлайны, противодавление, пул блокирующих операций - [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md)
-- Слой Kafka: продюсер, транзакции, потребитель, обработчик с повторами и DLQ, реестр схем - [ADR-041](adr/0041-kafka-layer.md)
-- Слой Valkey/Redis: RESP3, Sentinel, кэш, лимиты и сессии - [ADR-015](adr/0015-redis-client-and-role.md), [интерфейсы и примеры](../libs/platform/redis/README.md)
-- Слой PostgreSQL: libpq, пул, транзакции, миграции и inbox/outbox - [ADR-014](adr/0014-postgresql-async-driver.md), [интерфейсы и примеры](../libs/platform/pg/README.md)
+- Service runtime: configuration, logs, metrics, tracing, health, shutdown with draining, service template - [ADR-039](adr/0039-service-runtime.md), [services](../services/README.md)
+- Asynchronous model: shards, coroutines, deadlines, backpressure, blocking operation pool - [ADR-016](adr/0016-threading-model.md), [ADR-040](adr/0040-async-primitives.md)
+- Kafka layer: producer, transactions, consumer, retry handler and DLQ, schema registry - [ADR-041](adr/0041-kafka-layer.md)
+- Valkey/Redis layer: RESP3, Sentinel, cache, limits and sessions - [ADR-015](adr/0015-redis-client-and-role.md), [interfaces and examples](../libs/platform/redis/README.md)
+- PostgreSQL layer: libpq, pools, transactions, migrations and inbox/outbox - [ADR-014](adr/0014-postgresql-async-driver.md), [interfaces and examples](../libs/platform/pg/README.md)
 
-- Авторизация, Keycloak, наборы областей и отзыв доступа - [ADR-061](adr/0061-live-access-validation.md), [руководство](security/authorization.md)
+- Authorization, Keycloak, scope sets and current access validation - [ADR-061](adr/0061-live-access-validation.md), [guide](security/authorization.md)
 
-- Безопасность платформы: TLS/mTLS, JWT/JWKS, секреты и внешняя PKI - [ADR-043](adr/0043-platform-security.md), [интерфейсы](../libs/platform/security/README.md), [регламент доверия](security/platform-trust.md)
+- Platform security: TLS/mTLS, JWT/JWKS, secrets and external PKI - [ADR-043](adr/0043-platform-security.md), [interfaces](../libs/platform/security/README.md), [trust boundary](security/platform-trust.md)
 
-- Realtime, возобновление из Kafka и оперативные образы - [ADR-060](adr/0060-realtime-delivery.md), [руководство](engineering/realtime.md)
+- Realtime, Kafka recovery, and current state views - [ADR-060](adr/0060-realtime-delivery.md), [guide](engineering/realtime.md)
 
-- [Серверная поддержка оперативного интерфейса](engineering/operational-interface.md)
-- [Оболочка приложения и восстановление сессии](engineering/application-shell.md)
-- [Администрирование](engineering/administration.md)
-- [Размер поставки администрирования](engineering/administration-assets.md)
-- [Аудит и отчёты в интерфейсе](engineering/audit-and-reporting.md)
-- [Размер поставки аудита и отчётов](engineering/audit-and-reporting-assets.md)
+- [Server support for operational interface](engineering/operational-interface.md)
+- [Application shell and session restoration](engineering/application-shell.md)
+- [Administration](engineering/administration.md)
+- [Size of administration assets](engineering/administration-assets.md)
+- [Audit and reporting in the interface](engineering/audit-and-reporting.md)
+- [Size of audit and reporting assets](engineering/audit-and-reporting-assets.md)
 
-- [Квалификация веб-клиента](engineering/web-client-quality.md)
-- [Сравнение загрузки веб-клиента](engineering/web-client-loading.md)
-- [Поставка двух топологий](engineering/deployment-topologies.md)
-- [Локальный стенд KVM](engineering/local-vm-lab.md)
-- [Первоначальное доверие и учётные записи](engineering/deployment-pki.md)
-- [Пакет наблюдаемости и дашборды](engineering/observability.md)
+- [Web Client Qualification](engineering/web-client-quality.md)
+- [Comparison of Web Client Loading](engineering/web-client-loading.md)
+- [Delivery of two deployment topologies](engineering/deployment-topologies.md)
+- [Local KVM Lab](engineering/local-vm-lab.md)
+- [Initial Trust and Accounts](engineering/deployment-pki.md)
+- [Observability Pack and Dashboards](engineering/observability.md)
 
-## Участие и поддержка
+## Participation and Support
 
-- [Участие в проекте](../CONTRIBUTING.md)
-- [Сообщения о проблемах безопасности](../SECURITY.md)
-- [Совместимость API, коннекторов и поддержка выпусков](engineering/compatibility-and-support.md)
+- [Participating in the Project](../CONTRIBUTING.md)
+- [Security Issue Reports](../SECURITY.md)
+- [API Compatibility, Connectors, and Release Support](engineering/compatibility-and-support.md)

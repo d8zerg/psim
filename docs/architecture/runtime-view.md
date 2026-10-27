@@ -1,177 +1,247 @@
-# Представление времени выполнения
+# Runtime View
 
-Версия 0.1 · Шаг плана 0.3 · Статус: черновик
+<!-- language-links -->
+[English](runtime-view.md) | [Русский](../ru/architecture/runtime-view.md)
+<!-- /language-links -->
 
-Раздел 6 arc42. Ключевые сценарии взаимодействия компонентов. Номера этапов B1-B9 - из [бюджета задержек](quality.md#4-бюджет-задержек).
+Section 6 arc42. Key interaction scenarios between components. The numbers of stages B1-B9 are from [the delay budget](quality.md#4-delay-budget).
 
 ---
 
-## R1. Событие -> инцидент в консоли (S3-S6)
+## R1. Event -> Incident in the console (S3-S6)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant SDK as Коннектор (SDK)
-    participant GW as Connector Gateway
-    participant K as Kafka
-    participant N as Normalizer
-    participant CE as Correlation Engine
-    participant IS as Incident Service
-    participant DB as PostgreSQL
-    participant API as API Gateway (realtime)
-    participant UI as Консоль
+    participant "Connector (SDK)" as SDK
+    participant "Connector Gateway" as GW
+    participant "Kafka" as K
+    participant "Normalizer" as N
+    participant "Correlation Engine" as CE
+    participant "Incident Service" as IS
+    participant "PostgreSQL" as DB
+    participant "API Gateway (realtime)" as API
+    participant "Console" as UI
 
-    SDK->>SDK: событие: event_id, source_seq -> буфер на диске
-    SDK->>GW: EventBatch (кредиты)
+    SDK->>SDK: Event: event_id, source_seq -> disk buffer
+    SDK->>GW: EventBatch (Credits)
     GW->>K: produce psim.ingest.raw.v1 (acks=all)
     K-->>GW: ack
-    GW-->>SDK: BatchAck -> удалить из буфера
-    K->>N: raw (партиция по source_id)
-    N->>N: дедупликация, отображение, обогащение из копии каталога
+    GW-->>SDK: BatchAck -> remove from buffer
+    K->>N: raw (partition by source_id)
+    N->>N: Deduplication, mapping, enrichment from a catalog replica
     N->>K: txn: normalized + state + offsets
-    K->>CE: normalized (партиция по site:zone)
-    CE->>CE: правила, состояние RocksDB
+    K->>CE: Normalized (partition by site:zone)
+    CE->>CE: Rules, RocksDB state
     CE->>K: txn: signal + changelog + offsets
-    K->>IS: signal (партиция по grouping_key)
+    K->>IS: signal (partition by grouping_key)
     IS->>DB: txn: inbox + incident + outbox
     IS->>K: outbox relay -> IncidentCreated
-    K->>API: IncidentCreated (все партиции)
-    API->>API: фильтр ABAC по site/zone
+    K->>API: IncidentCreated (all partitions)
+    API->>API: ABAC filter by site/zone
     API->>UI: WebSocket delta
-    UI->>UI: отрисовка, звук
+    UI->>UI: Rendering, sound
+@enduml
 ```
 
-## R2. Принятие инцидента и сценарий (S7)
+## R2. Incident Acceptance and Response Scenario (S7)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant UI as Консоль
-    participant API as API Gateway
-    participant IS as Incident Service
-    participant K as Kafka
-    participant RE as Response Engine
+    participant "Console" as UI
+    participant "API Gateway" as API
+    participant "Incident Service" as IS
+    participant "Kafka" as K
+    participant "Response Engine" as RE
 
-    Note over RE: по IncidentCreated: выбрать сценарий, ResponseRunStarted,<br/>MandatoryStepsChanged -> Incident.blocking_steps
+    note over RE: By IncidentCreated: select a scenario, ResponseRunStarted,\nMandatoryStepsChanged -> Incident.blocking_steps
     UI->>API: POST /v1/incidents/{id}:acknowledge (If-Match: version)
     API->>API: JWT, ABAC
     API->>IS: acknowledge
-    IS->>IS: инварианты I1, I5, outbox IncidentAcknowledged
-    IS-->>UI: 200 + новая version
+    IS->>IS: Invariants I1, I5, outbox IncidentAcknowledged
+    IS-->>UI: 200 + new version
     UI->>API: POST /v1/runs/{run}/steps/{step}:complete
     API->>RE: complete step
-    RE->>RE: RR2, переход графа, outbox StepCompleted и StepActivated
-    K-->>UI: дельты через realtime (R1, шаги 13-16)
+    RE->>RE: RR2, graph transition, outbox StepCompleted and StepActivated
+    K-->>UI: Deltas through realtime (Kafka -> API Gateway -> Console)
     UI->>API: POST /v1/incidents/{id}:resolve
     API->>IS: resolve
-    IS-->>UI: 409 INCIDENT_MANDATORY_STEPS_PENDING (если blocking_steps не пуст)
+    IS-->>UI: 409 INCIDENT_MANDATORY_STEPS_PENDING (if blocking_steps is not empty)
+@enduml
 ```
 
-`blocking_steps` обновляется в Incident Service по событиям Response в конечном счёте. Чтобы исключить решение инцидента, пока событие о новом обязательном шаге ещё в пути, Response Engine публикует `MandatoryStepsChanged` в той же транзакции, что и активацию шага; Incident Service при `resolve` дополнительно проверяет, что применил события запуска до версии, известной клиенту (клиент передаёт её в запросе).
+`blocking_steps` is updated in the Incident Service based on Response events. To prevent resolving an incident while the event activating a mandatory step is still in transit, the Response Engine publishes `MandatoryStepsChanged` in the same transaction as the activation of that step. When `resolve`, the Incident Service additionally checks whether the response-run events have been applied to a version known to the client (which the client provides in its request).
 
-## R3. Команда на устройство (S8)
+## R3. Device Command (S8)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant UI as Консоль
-    participant CS as Command Service
-    participant R as Redis (сессии)
-    participant K as Kafka
-    participant GW as Connector Gateway (все экземпляры)
-    participant SDK as Коннектор
+    participant "Console" as UI
+    participant "Command Service" as CS
+    participant "Redis (sessions)" as R
+    participant "Kafka" as K
+    participant "Connector Gateway (all instances)" as GW
+    participant "Connector" as SDK
 
     UI->>CS: POST /v1/commands (Idempotency-Key = command_id)
-    CS->>CS: CM1, CM2, критичная -> awaiting_approval
-    CS->>R: сессия коннектора есть?
-    alt нет сессии
+    CS->>CS: CM1, CM2, critical -> awaiting_approval
+    CS->>R: Is there a connector session?
+    alt No session
         CS-->>UI: failed COMMAND_CONNECTOR_OFFLINE
-    else есть
+    else There is
         CS->>K: outbox -> psim.commands.v1 (key connector_id), state sent
-        K->>GW: команда
-        GW->>SDK: Command (только экземпляр с сессией)
-        SDK->>SDK: исполнить не более одного раза по command_id
-        SDK-->>GW: CommandAck, затем CommandResult
+        K->>GW: Command
+        GW->>SDK: Command (only instance with a session)
+        SDK->>SDK: Execute no more than once per command_id
+        SDK-->>GW: CommandAck, then CommandResult
         GW->>K: psim.commands.results.v1
-        K->>CS: результат -> acknowledged / executed / failed
+        K->>CS: Results -> Acknowledged / Executed / Failed
         CS->>K: outbox -> psim.response.events.v1
     end
-    Note over CS: таймер deadline_at -> timed_out
+    note over CS: deadline_at timer -> timed_out
+@enduml
 ```
 
-## R4. Эскалация по SLA (S9)
+## R4. SLA escalation (S9)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant K as Kafka
-    participant RE as Response Engine (таймеры)
-    participant IS as Incident Service
-    participant NS as Notification Service
+    participant "Kafka" as K
+    participant "Response Engine (timers)" as RE
+    participant "Incident Service" as IS
+    participant "Notification Service" as NS
 
     K->>RE: IncidentCreated (P2)
-    RE->>RE: взвести таймер ack = created_at + 60 с (PostgreSQL)
-    Note over RE: опрос таймеров каждые 200 мс, блокировка агрегата PostgreSQL
-    RE->>RE: таймер сработал, инцидент не принят
+    RE->>RE: Set the timer ack = created_at + 60 seconds (PostgreSQL).
+    note over RE: Timer polling every 200 ms, locking the PostgreSQL aggregate
+    RE->>RE: The timer has been triggered; the incident has not been acknowledged.
     RE->>K: outbox SlaBreached, EscalationLevelTriggered(1)
     K->>IS: ApplyEscalation -> escalation_level = 1, IncidentEscalated
-    K->>NS: уведомить получателей уровня 1
-    NS->>NS: notification_id детерминирован, каналы in-app и email
-    NS->>K: NotificationSent / Delivered -> аудит
+    K->>NS: Notify recipients at level 1
+    NS->>NS: notification_id is deterministic, with in-app and email channels
+    NS->>K: NotificationSent / Delivered -> Notification
+@enduml
 ```
 
-## R5. Переподключение коннектора после обрыва (S11)
+## R5. Reconnecting the connector after a failure (S11)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant SDK as Коннектор (SDK)
-    participant GW1 as Gateway-1
-    participant GW2 as Gateway-2
-    participant R as Redis
-    participant K as Kafka
+    participant "Connector (SDK)" as SDK
+    participant "Gateway-1" as GW1
+    participant "Gateway-2" as GW2
+    participant "Redis" as R
+    participant "Kafka" as K
 
     SDK->>GW1: EventBatch #41 (seq 1000-1099)
     GW1->>K: produce
-    Note over GW1: GW1 падает до BatchAck
-    SDK->>SDK: связь потеряна, события копятся в буфере
+    note over GW1: GW1 fails before BatchAck
+    SDK->>SDK: Connection lost, events are being stored in the buffer
     SDK->>GW2: connect (mTLS) + Register(last_acked: 999)
-    GW2->>R: сессия коннектора -> GW2 (вытеснить старую)
+    GW2->>R: Connection session -> GW2 (remove the old one)
     SDK->>GW2: EventBatch seq 1000-…
-    GW2->>K: produce (seq 1000-1099 - дубликаты)
-    Note over K: Normalizer отбрасывает seq 1000-1099 по трекеру
+    GW2->>K: Produce (seq 1000-1099 - duplicates)
+    note over K: The Normalizer discards seq 1000-1099 based on the tracker.
+@enduml
 ```
 
-## R6. Активация набора правил (S4)
+## R6. Activation of a set of rules (S4)
 
-```mermaid
-sequenceDiagram
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+skinparam maxMessageSize 240
     autonumber
-    participant UI as Администрирование
-    participant RM as Rule Management (Correlation Engine)
-    participant K as Kafka
-    participant CE as Экземпляры Correlation Engine
+    participant "Administration" as UI
+    participant "Rule Management (Correlation Engine)" as RM
+    participant "Kafka" as K
+    participant "Instances of the Correlation Engine" as CE
 
-    UI->>RM: POST /v1/rules/{id}/versions (черновик)
-    RM->>RM: валидация (R1, R3, R4)
+    UI->>RM: POST /v1/rules (Draft)
+    RM->>RM: Validation (R1, R3, R4)
     UI->>RM: POST /v1/rules/{id}:dry-run {from, to}
-    RM-->>UI: сигналы, которые правило породило бы
-    UI->>RM: POST /v1/rulesets:activate
-    RM->>K: psim.config.v1 ruleset/<tenant> (версия N+1)
-    K->>CE: все экземпляры читают изменение
-    CE->>CE: между пакетами: компиляция, сохранение состояния неизменённых правил, переключение
+    RM-->>UI: Signals that the rule would generate
+    UI->>RM: POST /v1/rule-sets:activate
+    RM->>K: psim.config.v1 ruleset/<tenant> (Version N+1)
+    K->>CE: All instances read the change.
+    CE->>CE: Between batches: compilation, saving unchanged rules, switching
+@enduml
 ```
 
-## R7. Отказ экземпляра Correlation Engine (S11, QS-A1)
+## R7. Failure of the Correlation Engine instance (S11, QS-A1)
 
-1. Экземпляр перестаёт отвечать; брокер исключает его из группы через `session.timeout.ms` (10 с).
-2. Кооперативная ребалансировка передаёт его партиции оставшимся экземплярам.
-3. Новый владелец инициализирует транзакционный продюсер с тем же `transactional.id` - незавершённые транзакции старого владельца прерываются брокером.
-4. Состояние партиции восстанавливается из `psim.correlation.changelog.v1` в локальный RocksDB (≤ 30 с).
-5. Чтение продолжается с зафиксированного смещения; сигналы, опубликованные в прерванной транзакции, невидимы для `read_committed`-потребителей и будут опубликованы повторно с теми же `signal_id`.
+1. With `group.protocol=consumer`, the broker removes an unresponsive member after `group.consumer.session.timeout.ms` (45 s by default, 10 s in the local profile). The classic fallback uses `session.timeout.ms`.
+2. The consumer protocol incrementally reassigns partitions; the classic fallback uses cooperative rebalancing.
+3. The new owner initializes the transaction producer with the same `transactional.id` - unfinished transactions from the previous owner are interrupted by the broker.
+4. The partition state is restored from `psim.correlation.changelog.v1` to the local RocksDB state. The ≤ 30 s recovery target requires qualification under the declared load and failure model.
+5. Reading continues with the committed offset; signals published in interrupted transactions are invisible to `read_committed` consumers and will be republished with the same `signal_id`.
 
-## Аудит и независимая проверка
+## Audit and Independent Verification
 
-Производители публикуют действия через outbox в `psim.audit.v1`; Audit Service читает доступную историю с начала retention. Keycloak импортируется read-only клиентом с долговечным курсором. Два экземпляра сериализуют добавление блокировкой PostgreSQL на тенант. Запись содержит непрерывный номер, предыдущий хэш и хэш детерминированного Protobuf.
+Producers publish actions through the outbox in `psim.audit.v1`; the Audit Service reads the available history from the beginning of retention. Keycloak events are imported by a read-only client with a persistent cursor. Two instances serialize the addition by a PostgreSQL lock for the tenant. The record contains a continuous number, previous hash, and the deterministic Protobuf hash.
 
-Периодическая контрольная точка подписывается Ed25519 и синхронно записывается во внешний архив, затем её копия и Kafka outbox фиксируются транзакцией БД. Проверка пересчитывает записи и сверяет архив независимо от таблицы контрольных точек. Экспорт фиксирует свою вершину и содержит всю цепочку; `psim-audit-tool` проверяет её без БД и сети по отдельно доверенным ключам. [Руководство](../engineering/audit-service.md) описывает права, границы защиты и восстановление.
+The periodic checkpoint is signed with Ed25519 and synchronously recorded in an external archive. Then, a copy of it and the Kafka outbox are stored via a database transaction. The verification process recomputes record hashes and compares the archive independently of the checkpoint tables. The export records its own chain head and contains the entire chain; `psim-audit-tool` verifies it without using the database or network, using separately authorized keys. [Guide](../engineering/audit-service.md) describes the permissions, protection limits, and recovery procedures.
+
+The diagrams describe protocol boundaries. A physical device action is not guaranteed exactly once; an unknown command outcome must be reconciled before a new command is issued. See [command handling](../engineering/command-service.md) and [release readiness](../product/release-readiness.md).

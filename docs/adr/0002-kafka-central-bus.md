@@ -1,39 +1,42 @@
-# ADR-002. Kafka как центральная шина; дистрибутив и версия
+# ADR-002. Kafka as the central bus: distribution and version
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 1.4, 2.3, 9.1)
-- **Связанные:** ADR-006, ADR-007, [data-flows.md](../architecture/data-flows.md)
+<!-- language-links -->
+[English](0002-kafka-central-bus.md) | [Русский](../ru/adr/0002-kafka-central-bus.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-006, ADR-007, [data-flows.md](../architecture/data-flows.md)
 
-Нужна шина, которая выдерживает 50 000 событий/с с ростом до миллионов, хранит поток для проигрывания (перестроение проекций, пробный прогон правил), даёт порядок по ключу, транзакции «чтение - обработка - запись» и репликацию с RPO = 0. Решение 0.1 плана уже фиксирует Kafka; ADR уточняет дистрибутив, версию и режим.
+## Context
 
-## Рассмотренные варианты
+The bus must handle 50,000 events/s with growth to millions, retain streams for replay such as projection rebuilding and rule dry runs, preserve ordering by key, support read-process-write transactions, and provide replication with RPO = 0. Kafka was selected for these requirements; this ADR defines its distribution, version line and mode.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Apache Kafka 4.x (upstream), KRaft** | Лицензия Apache 2.0; транзакции и EOS; эталонная совместимость с librdkafka; без ZooKeeper | JVM на брокерах; эксплуатация на заказчике |
-| Confluent Platform | Готовые инструменты | Часть компонентов под Confluent Community License - не открытая лицензия; поставка в составе продукта ограничена |
-| Redpanda | C++, один бинарник, Kafka API | Business Source License; транзакционная семантика исторически отличалась от Kafka |
-| NATS JetStream | Простота | Нет транзакций «чтение - обработка - запись» как в Kafka; меньше экосистемы для проигрывания и compacted-топиков |
-| Apache Pulsar | Разделение хранения и вычислений | Сложность эксплуатации (BookKeeper), нет зрелого C++-клиента с EOS |
+| **Upstream Apache Kafka 4.x, KRaft** | Apache 2.0; transactions and EOS; reference compatibility with librdkafka; no ZooKeeper | JVM on brokers; customer-operated infrastructure |
+| Confluent Platform | Ready-made tools | Some components use the non-open Confluent Community License, restricting product distribution |
+| Redpanda | C++, one binary, Kafka API | Business Source License; transaction semantics have historically differed from Kafka |
+| NATS JetStream | Simplicity | No Kafka-style read-process-write transactions; a smaller replay and compacted-topic ecosystem |
+| Apache Pulsar | Separate storage and compute | Operational complexity with BookKeeper; no mature C++ client with EOS |
 
-## Решение
+## Decision
 
-Apache Kafka из upstream-дистрибутива Apache, линия 4.x, режим KRaft (ZooKeeper не используется - в 4.x он удалён). Точная минорная версия фиксируется в окружении на шаге 1.4 и обновляется по правилам ADR-024.
+Use the upstream Apache Kafka distribution, version line 4.x, in KRaft mode. ZooKeeper is not used and was removed in 4.x. Pin the exact minor version in environment configuration and upgrade under ADR-024.
 
-- Кластер: 3 узла в совмещённом режиме broker + controller; при 5+ узлах - выделенные контроллеры.
-- Одна машина: 1 узел broker + controller.
-- Java: LTS-версия OpenJDK, поддерживаемая выбранной версией Kafka, из репозиториев дистрибутива или в образе.
-- Клиент: librdkafka (C/C++), версия, поддерживающая протокол потребителей KIP-848 и транзакции; фиксируется в Conan lock.
-- Безопасность: SASL/SCRAM или mTLS для сервисов, ACL по топикам (детализация - шаг 0.6).
+- Cluster: three combined broker/controller nodes; dedicated controllers with five or more nodes.
+- Single machine: one combined broker/controller node.
+- Java: an OpenJDK LTS version supported by the selected Kafka version, provided by distribution repositories or the image.
+- Client: librdkafka for C/C++, with KIP-848 consumer protocol and transaction support, pinned in the Conan lock.
+- Security: SASL/SCRAM or mTLS for services, with topic ACLs; requirements SR-04, SR-08 and SR-19.
 
-## Последствия
+## Consequences
 
-- Kafka обязательна в любой топологии, включая одну машину; это осознанная цена одинаковой семантики.
-- Официальный образ Apache Kafka закрепляется по версии и дайджесту; развёртывание проверяется на Debian 13 x86_64.
-- Эксплуатационная сложность Kafka снижается автоматической настройкой установщика, мониторингом дисков и runbook (риск раздела 20 плана).
+- Kafka is required in every topology, including a single machine. This is the deliberate cost of consistent semantics.
+- Pin the official Apache Kafka image by version and digest; verify deployment on Debian 13 x86_64.
+- Installer automation, disk monitoring and runbooks reduce Kafka's operational burden.
 
-## Проверка
+## Verification
 
-Интеграционные тесты слоя Kafka (шаг 2.3) с принудительными падениями брокера; хаос-тесты шага 10.2.
+Kafka-layer integration tests forcibly terminate brokers; cluster chaos checks exercise failures.

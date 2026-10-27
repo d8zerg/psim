@@ -1,24 +1,28 @@
-# SLA, дежурства и уведомления
+# SLA, Shifts, and Notifications
 
-Response Engine управляет политиками SLA и дежурствами, Notification Service доставляет уведомления. Данные хранятся в PostgreSQL; интеграция использует inbox/outbox и `psim.response.events.v1`. Решения и пределы гарантий зафиксированы в [ADR-056](../adr/0056-sla-and-notifications.md).
+<!-- language-links -->
+[English](notifications.md) | [Русский](../ru/engineering/notifications.md)
+<!-- /language-links -->
 
-## Настройка политики и дежурства
+The Response Engine manages SLA policies and shifts, while the Notification Service delivers notifications. Data is stored in PostgreSQL; integration uses inbox/outbox and `psim.response.events.v1`. Solutions and guarantees are defined in [ADR-056](../adr/0056-sla-and-notifications.md).
 
-Администратор создаёт политику через `POST /v1/escalation-policies` и указывает её `policyId` в `IncidentType.escalationPolicyId`. Политика содержит SLA для используемых приоритетов и последовательные уровни с возрастающей задержкой после нарушения. Дедлайн принятия - создание инцидента плюс `acknowledgeWithin`; решения - принятие плюс `resolveWithin`. Политика и исходный приоритет фиксируются для инцидента. Смена дежурного, ответственного или политики не переносит сроки.
+## Policy and Shift Configuration
 
-`GET /v1/escalation-policies` возвращает политики с пагинацией. `PUT /v1/escalation-policies/{policy_id}` требует `If-Match`. Изменения требуют `Idempotency-Key` с UUID и прав администратора на весь тенант. Дубликат ключа с другим содержимым отклоняется.
+The administrator creates a policy through `POST /v1/escalation-policies` and specifies it in `policyId` and `IncidentType.escalationPolicyId`. The policy includes SLA for used priorities and sequential levels with increasing delay after a breach. The acknowledgement deadline is the creation of an incident plus `acknowledgeWithin`; resolution is due at acknowledgement plus `resolveWithin`. The policy and initial priority are captured for each incident. Changing the shift, responsible person, or policy does not affect deadlines.
 
-Supervisor назначает дежурного через `PUT /v1/sites/{site_id}/duty`. Тело содержит `siteId`, `userId` и обязательный `fallbackUserId`. Пустой `userId` означает отсутствие дежурного. Для изменения существующей записи нужен `If-Match`; `GET` того же адреса возвращает запись и ETag. Учётные записи должны быть активными, иметь роль operator или supervisor и доступ к площадке. Получатель уровня `{"currentDuty": true}` разрешается при отправке эскалации. Отсутствие действующего дежурного включает резервного получателя, предупреждение в тексте уведомления и аудит `response.duty.missing`.
+`GET /v1/escalation-policies` returns policies with pagination. `PUT /v1/escalation-policies/{policy_id}` requires `If-Match`. Changes require `Idempotency-Key` with UUID and administrator rights for the entire tenant. A duplicate key with different content is rejected.
 
-## Контакты и каналы
+The supervisor assigns a shift through `PUT /v1/sites/{site_id}/duty`. The body contains `siteId`, `userId`, and mandatory `fallbackUserId`. An empty `userId` indicates no shift. To change an existing record, `If-Match` is required; `GET` of the same address returns the record and ETag. Accounts must be active, have the role of operator or supervisor, and have access to the site. The recipient `{"currentDuty": true}` is resolved when the escalation notification is sent. Missing a working shift includes a backup recipient, a warning in the notification text, and an audit `response.duty.missing`.
 
-`PUT /v1/notification-contacts/{user_id}` сохраняет `userId`, `siteId`, `email` и `webhookUrl`. Для изменения существующей записи нужны ETag и `Idempotency-Key`; доступ имеет администратор площадки. Роли и область получателя проверяются через каталог идентификаций. Для рассылки по роли используются зарегистрированные контакты площадки, не более ста получателей на запрос.
+## Contacts and Channels
 
-Пользователь читает свои in-app уведомления через `GET /v1/me/notifications` с `unreadOnly`, `pageSize`, `pageToken`. `POST /v1/me/notifications/{notification_id}:read` отмечает прочтение. Другому пользователю запись недоступна; смена области доступа учитывается и при повторе API-запроса. Ответ содержит `unreadCount` для всей доступной коллекции, независимо от текущей страницы.
+`PUT /v1/notification-contacts/{user_id}` stores `userId`, `siteId`, `email`, and `webhookUrl`. To change an existing record, ETag and `Idempotency-Key` are required; access is granted by the site administrator. Roles and recipient access scopes are verified through the identity catalog. Registered contacts on the site are used for role-based sending, with no more than one hundred recipients per request.
 
-SMTP работает поверх TLS с проверкой сертификата и имени сервера. Письмо содержит текст уведомления и контекст инцидента в UTF-8 с MIME base64. Состояние `SENT` означает, что сервер принял письмо; оно не подтверждает доставку в ящик. При определённом временном отказе выполняются повторы. При потере результата после DATA или остановке процесса запись остаётся `UNKNOWN` и не отправляется повторно. Администратор сверяет стабильный Message-ID с журналом relay и вызывает `POST /v1/notifications/{notification_id}:resolve` с `accepted`, `receiptId`, `If-Match` и `Idempotency-Key`. API только фиксирует проверенный исход и не пересылает письмо.
+Users read their in-app notifications through `GET /v1/me/notifications` with `unreadOnly`, `pageSize`, `pageToken`. `POST /v1/me/notifications/{notification_id}:read` marks reading. Another user cannot access the record; changing the access scope is considered when making another API request. The response contains `unreadCount` for all available collections, regardless of the current page.
 
-Оператор эксплуатации находит неопределённые отправки read-only запросом к PostgreSQL; `tenant_id` задаётся переменной psql:
+SMTP works over TLS with certificate verification and server name verification. The message contains the notification text and incident context in UTF-8 with MIME base64. The status `SENT` indicates that the server has received the message; it does not confirm delivery to the inbox. A definitive transient rejection is retried. If the result is lost after DATA or the process stops, the record remains `UNKNOWN` and is not sent again. The administrator compares the stable Message-ID with the relay log and calls `POST /v1/notifications/{notification_id}:resolve` with `accepted`, `receiptId`, `If-Match`, and `Idempotency-Key`. The API only records the verified outcome and does not send the message again.
+
+The operations engineer finds uncertain sends through a read-only request to PostgreSQL; `tenant_id` is set by the psql variable:
 
 ```sql
 SELECT id AS notification_id, site, body->>'channel' AS channel,
@@ -28,41 +32,40 @@ WHERE tenant = :'tenant_id'::uuid AND status = 'unknown'
 ORDER BY id;
 ```
 
-Для SMTP журнал relay проверяется по `Message-ID: <notification_id@psim.invalid>`. Отсутствие строки в ещё не завершённом журнале не является подтверждённым отказом. API сверки принимает только результат, установленный по завершённой обработке на приёмнике.
+For SMTP relay, the log is checked through `Message-ID: <notification_id@psim.invalid>`. The absence of a line in an unfinished log does not confirm a failure. The API accepts only results that have been processed on the receiver.
 
+The webhook receives compact JSON with `notificationId`, recipient, incident, template, data, and identifiers of combined notifications. Headers:
 
-Webhook получает компактный JSON с `notificationId`, получателем, инцидентом, шаблоном, данными и идентификаторами объединённых уведомлений. Заголовки:
+- `Idempotency-Key`: notification identifier.
+- `X-PSIM-Timestamp`: Unix time of the current attempt in seconds; reception window is five minutes.
+- `X-PSIM-Signature`: `sha256=` and HMAC-SHA256 string `timestamp.notificationId.payload` in hex. `payload` contains exact bytes of the body; separator is a period.
 
-- `Idempotency-Key`: идентификатор уведомления.
-- `X-PSIM-Timestamp`: Unix-время текущей попытки в секундах; окно приёма - пять минут.
-- `X-PSIM-Signature`: `sha256=` и HMAC-SHA256 строки `timestamp.notificationId.payload` в hex. `payload` содержит точные байты тела; разделитель - точка.
+The recipient atomically saves the effect and identifier and returns `{"notificationId":"...","accepted":true,"receiptId":"..."}`. Repeating the same body returns the original receipt. Temporary failure or loss of response causes a retry with the same identifier and body. Permanent HTTP failure and exhaustion of attempts with a specific failure result give `FAILED`. If the receiver could save the effect when attempts were exhausted but no receipt was received, `UNKNOWN` is saved. After a crash during the final attempt, the service checks the receipt with the same idempotent request. If the receipt cannot be obtained, `UNKNOWN` is saved; the administrator records the verified outcome through the API `:resolve`.
 
-Получатель атомарно сохраняет эффект и идентификатор и возвращает `{"notificationId":"...","accepted":true,"receiptId":"..."}`. Повтор того же тела возвращает исходную квитанцию. Временный отказ или потеря ответа вызывает повтор с тем же идентификатором и телом. Постоянный HTTP-отказ и исчерпание попыток с определённым отказом дают `FAILED`. Если при исчерпании попыток приёмник мог сохранить эффект, но квитанция не получена, сохраняется `UNKNOWN`. После аварии на последней попытке сервис сверяет квитанцию тем же идемпотентным запросом. Если квитанцию получить нельзя, сохраняется `UNKNOWN`; администратор фиксирует проверенный исход через API `:resolve`.
+After reaching a threshold frequency per user, site, and channel, the original notifications go to `AGGREGATED`. Their `data.summaryId` indicates a durable summary with `aggregatedNotificationIds`. Combined original records are not shown as individual unread notifications. The summary contains the number of messages, original text, and identifier of the first incident through `data`; it is sent at the end of the window; it contains no more than five hundred identifiers. Additions after starting the sending form a separate summary.
 
-После порога частоты по пользователю, площадке и каналу исходные уведомления переходят в `AGGREGATED`. Их `data.summaryId` указывает на долговечную сводку с `aggregatedNotificationIds`. Объединённые исходные записи не показываются отдельными непрочитанными уведомлениями. Сводка содержит число сообщений, исходный текст и идентификатор первого инцидента через `data`; отправляется по окончании окна; содержит не более пятисот идентификаторов. Дополнения после начала отправки образуют отдельную сводку.
+## Configuration
 
-## Конфигурация
+General parameters for PostgreSQL, Kafka, TLS API, and JWKS match those of [Response Engine](response-engine.md). Both services use `directory_base`, `directory_client`, `directory_roles_client`, `directory_secret_file`: a read-only client in Keycloak with read permissions for users and roles. Secrets are read from files in mode 0400 and do not go into logs.
 
-Общие параметры PostgreSQL, Kafka, TLS API и JWKS совпадают с [Response Engine](response-engine.md). Оба сервиса используют `directory_base`, `directory_client`, `directory_roles_client`, `directory_secret_file`: read-only клиент Keycloak с правами чтения пользователей и ролей. Секреты читаются из файлов с режимом 0400 и не попадают в логи.
+The Notification Service additionally uses:
 
-Notification Service дополнительно использует:
-
-| Параметр | Назначение |
+| Parameter | Purpose |
 |---|---|
-| `smtp_host`, `smtp_port`, `smtp_from` | Доверенный SMTP relay с неявным TLS, порт по умолчанию 465 |
-| `delivery_ca_file` | CA SMTP и webhook; пустое значение использует системное хранилище |
-| `webhook_urls` | Список полных разрешённых HTTPS URL |
-| `webhook_secret_file` | HMAC-ключ длиной не менее 32 байт |
-| `delivery_attempts` | Максимум попыток, по умолчанию 6 |
-| `retry_ms` | Базовая задержка повторов, по умолчанию 1000 мс |
-| `rate_limit`, `rate_window_ms` | Порог частоты и окно, по умолчанию 20 и 10000 мс |
-| `fixture_webhook_url` | Один URL локальной проверки; разрешён только с `allow_plaintext=true` |
+| `smtp_host`, `smtp_port`, `smtp_from` | Trusted SMTP relay with implicit TLS, default port 465 |
+| `delivery_ca_file` | CA SMTP and webhook; an empty value uses the system trust store |
+| `webhook_urls` | List of fully allowed HTTPS URLs |
+| `webhook_secret_file` | HMAC key length of at least 32 bytes |
+| `delivery_attempts` | Maximum attempts, default 6 |
+| `retry_ms` | Base delay for retries, default 1000 ms |
+| `rate_limit`, `rate_window_ms` | Threshold frequency and window, default 20 and 10000 ms |
+| `fixture_webhook_url` | One URL for local verification; only allowed with `allow_plaintext=true` |
 
-Рабочая конфигурация использует HTTPS, проверяемые CA и отдельный HMAC-ключ. URL с userinfo, fragment, запрещённой схемой и адресами внутренних сетей отклоняются. DNS проверяется при настройке контакта и перед соединением; redirect не выполняется. SMTP AUTH и автоматические DSN в MVP отсутствуют.
+The production configuration uses HTTPS, verified CA, and a separate HMAC key. URLs with userinfo, fragment, prohibited schemes, and internal network addresses are rejected. DNS is checked when configuring contacts and before connecting; redirection is not performed. SMTP AUTH and automatic DSN are not available in MVP.
 
-## Проверки
+## Verifications
 
-Все процессы, инфраструктура и инструменты сборки запускаются в нативном Docker Engine на Linux:
+All processes, infrastructure, and build tools are run in the native Docker Engine on Linux:
 
 ```
 task notifications:test
@@ -70,4 +73,4 @@ task notifications:sanitizers
 task notifications:coverage
 ```
 
-Артефакты находятся в `build/notifications/<preset>/`: JSON-отчёт, журналы процессов и SQLite-квитанции тестового приёмника. Тестовый SMTP сохраняет фактическое число отправок каждого Message-ID; webhook проверяет HMAC, неизменность тела и дедупликацию. Отдельные режимы приёмника имитируют недоступность и потерю ответа после фиксации приёма.
+Artifacts are located in `build/notifications/<preset>/`: JSON reports, process logs, and SQLite test receipts. The test SMTP keeps track of the actual number of deliveries for each Message-ID; the webhook verifies HMAC, integrity of the body, and deduplication. Individual receiver modes simulate unavailability and loss of response after receipt is captured.

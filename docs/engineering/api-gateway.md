@@ -1,48 +1,52 @@
 # API Gateway
 
-API Gateway предоставляет REST v1 и обслуживает WebSocket `/v1/realtime`. Маршруты формируются из HTTP-аннотаций Protobuf. Владельцы ресурсов проверяют области доступа и фиксируют изменения.
+<!-- language-links -->
+[English](api-gateway.md) | [Русский](../ru/engineering/api-gateway.md)
+<!-- /language-links -->
 
-## Настройка
+The API Gateway provides REST v1 and serves WebSocket `/v1/realtime`. Routes are formed from HTTP annotations in Protobuf. Resource owners check access scopes and record changes.
 
-`settings.tls_certificate_file` и `settings.tls_private_key_file` задают внешний TLS listener. `listen_plaintext` разрешён только при `allow_plaintext: true` для локального стенда. `allowed_origins` содержит точные разрешённые origin; wildcard не применяется.
+## Configuration
 
-Для каждого владельца задаются `<service>_host` и `<service>_port`: `catalog`, `rules`, `incidents`, `commands`, `response`, `history`, `reports`, `projection`, `audit`, `notifications`. `upstream_ca_file` задаёт доверенную цепочку; при необходимости используются `upstream_certificate_file` и `upstream_key_file`. JWT проверяется через `issuer`, `jwks_url` и `jwks_ca_file`.
+`settings.tls_certificate_file` and `settings.tls_private_key_file` set up the external TLS listener. `listen_plaintext` is only allowed with `allow_plaintext: true` for local tests. `allowed_origins` contains exact allowed origins; wildcards are not used.
 
-`rate_per_second` и `rate_burst` задают общую квоту пользователя внутри тенанта для всех реплик и шардов API Gateway. Атомарный token bucket в Valkey использует время сервера и непрерывное пополнение; одинаковый пользователь в разных тенантах получает независимые ключи. Перезапуск Gateway не сбрасывает квоту. Превышение возвращает 429 с `Retry-After`; ошибка хранилища возвращает 503 до передачи запроса владельцу API. Локальная квота при отказе Valkey не подставляется. Счётчики временные и могут сброситься при потере данных Valkey или переключении его асинхронных реплик.
+For each owner, `<service>_host` and `<service>_port` are set: `catalog`, `rules`, `incidents`, `commands`, `response`, `history`, `reports`, `projection`, `audit`, `notifications`. `upstream_ca_file` defines the trusted chain; if needed, `upstream_certificate_file` and `upstream_key_file` are used. JWT is verified through `issuer`, `jwks_url`, and `jwks_ca_file`.
 
-`ip_rate_per_second` и `ip_rate_burst` ограничивают входящие соединения одного транспортного адреса локально. Пределы соединений, памяти и WebSocket control frames также остаются локальными.
+`rate_per_second` and `rate_burst` set the overall user quota within each tenant for all API Gateway replicas and shards. The Valkey atomic token bucket uses server time and continuous replenishment; the same user in different tenants gets independent keys. Rebooting the Gateway does not reset quotas. Exceeding the quota returns 429 with `Retry-After`; a storage error returns 503 before the request is forwarded to the API owner. The Gateway does not fall back to local quotas when Valkey fails. Counters are temporary and can be reset if Valkey data is lost or its asynchronous replicas are switched.
 
-Для общей квоты задаются `redis_host`, `redis_port`, `redis_user`, `redis_password_file`, `redis_ca_file`, `redis_certificate_file` и `redis_key_file`. TLS обязателен без явного `allow_plaintext`. `redis_sentinels`, `redis_primary_name`, `redis_sentinel_user` и `redis_sentinel_password_file` включают обнаружение primary через Sentinel. Пул ограничен; получение соединения, подключение и команда имеют бюджеты по 500 мс. Все реплики должны использовать одинаковые rate и burst: несовпадение параметров существующего bucket отклоняется. Ключ удаляется после времени, достаточного для полного пополнения.
+`ip_rate_per_second` and `ip_rate_burst` limit incoming connections from a single transport address locally. Connection limits, memory, and WebSocket control frames also remain local.
 
-На TLS handshake и заголовки клиента отводится 10 секунд; после проверки доступа запрос и upstream имеют предел 60 секунд. Остановка Gateway отменяет активные операции, включая ожидание upstream.
+For the overall quota, `redis_host`, `redis_port`, `redis_user`, `redis_password_file`, `redis_ca_file`, `redis_certificate_file`, and `redis_key_file` are set. TLS is required without explicit `allow_plaintext`. `redis_sentinels`, `redis_primary_name`, `redis_sentinel_user`, and `redis_sentinel_password_file` include detection of the primary through Sentinel. The pool is limited; obtaining a connection, connecting, and issuing commands have budgets of 500 ms each. All replicas must use the same rate and burst: discrepancies with the existing bucket are rejected. Keys are removed after enough time for full replenishment.
 
-Снимки обслуживает [Projection Service](console-projections.md). Gateway передаёт запрос и исходный JWT по HTTPS. Кэш снимков и проверка текущей сессии коннектора принадлежат Projection Service; API Gateway использует свою учётную запись Valkey для общих квот запросов.
+10 seconds are allocated for TLS handshake and client headers; after access verification, requests and upstream have a limit of 60 seconds. Stopping the Gateway cancels active operations, including waiting for upstream.
 
-## Конфигурация обработки
+Snapshots are served by [Projection Service](console-projections.md). The Gateway sends requests and original JWT via HTTPS. Cache of snapshots and checking the current connector session belong to Projection Service; API Gateway uses its Valkey account for overall request quotas.
 
-`GET /v1/settings` возвращает retention и параметры обработки. `PUT /v1/settings/retention`, `PUT /v1/settings/processing` и `PUT /v1/mappings/{connectorType}` требуют If-Match с текущей версией. Для нового объекта используется `"0"`. Ключ идемпотентности можно передавать также для PUT.
+## Processing Configuration
 
-Изменение retention применяется к новым сохраняемым событиям; сроки ранее подготовленных блоков не пересчитываются.
+`GET /v1/settings` returns retention and processing parameters. `PUT /v1/settings/retention`, `PUT /v1/settings/processing`, and `PUT /v1/mappings/{connectorType}` require If-Match with the current version. For new objects, `"0"` is used. An idempotency key can also be supplied for PUT.
 
-Публикациями владеет Resource Catalog. Настройка `taxonomy_path` указывает поставляемый файл таксономии. Сначала следует остановить публикации прежней административной утилиты; Catalog загрузит её последние версии при запуске. После перехода изменения выполняются через REST.
+Changing retention applies to newly saved events; previously prepared blocks’ durations are not recalculated.
 
-## Совместимость и обновление
+Publishing is managed by Resource Catalog. `taxonomy_path` settings specify the taxonomy file to be provided. First, publishers from the previous administrative tool must be stopped; Catalog will load its latest versions when running. After switching, changes are executed via REST.
 
-Контракты сохраняют `/v1`, существующие номера полей Protobuf и формат WebSocket M1. Поля качества, времени подтверждения, состояния коннекторов и токена снимка добавлены совместимо; старый клиент продолжает получать прежние типы realtime-дельт. Новая ошибка `COMMON_PAYLOAD_TOO_LARGE` возвращается с HTTP 413.
+## Compatibility and Updates
 
-Перед переключением внешнего трафика следует настроить сертификат Gateway, доверие к сертификатам владельцев API и разрешённые origin консоли. Токены должны содержать тенант и области доступа; отсутствие области не предоставляет доступ к ресурсам. Внутренние REST listener владельцев сохраняются для Gateway.
+Contracts maintain `/v1`, existing Protobuf field numbers, and existing WebSocket frame format. Quality, confirmation time, connection status, and snapshot token fields are added compatibly; old clients continue to receive previous realtime delta types. The new error `COMMON_PAYLOAD_TOO_LARGE` returns HTTP 413.
 
-Перед обновлением подготовить учётную запись Valkey и Sentinel для API Gateway, разрешения на его ключи bucket и секреты подключения. Генератор профилей включает их в поставку. Прежние значения rate и burst теперь относятся ко всей группе реплик; умножать лимит на число экземпляров не требуется. Общая квота обеспечивается после переключения всех реплик на новую реализацию. Решение - [ADR-078](../adr/0078-shared-api-rate-limits.md).
+Before switching external traffic, configure the Gateway certificate, trust in API owner certificates, and allowed console origins. Tokens must contain tenant and access scopes; absence of an access scope does not grant access to resources. Owners’ internal REST listeners are retained for Gateway.
 
-Миграция Catalog добавляет таблицу конфигурации; временные снимки Gateway используют отдельную схему PostgreSQL. Схемы существующих событий и таблиц не удаляются. После начала записи конфигурации через REST прежнюю административную утилиту нельзя возобновлять параллельно с Catalog.
+Before updating, prepare Valkey and Sentinel accounts for API Gateway, permissions for its bucket keys and connection secrets. The profile generator includes them in the delivery. Previous rate and burst values now apply to all replicas; there’s no need to multiply the limit by the number of instances. Overall quota is ensured after switching all replicas to the new implementation. Solution - [ADR-078](../adr/0078-shared-api-rate-limits.md).
 
-## Наблюдаемость
+Migrating Catalog adds a configuration table; temporary snapshots use a separate PostgreSQL schema. Existing events and tables are not deleted. After starting configuration via REST, the previous administrative tool cannot be resumed simultaneously with Catalog.
 
-Метрики `/metrics` содержат число и длительность REST-запросов по операции контракта, активные запросы, отказы доступа, ограничения частоты и ошибки передачи. `psim_api_rate_limit_failures_total` отдельно считает отказы общей квоты из-за недоступности хранилища; для него добавлены панель Grafana и алерт Prometheus. Произвольные пути, идентификаторы пользователей и объектов не используются как labels. HTTP span передаётся upstream через W3C trace context. Локальный Prometheus собирает метрики Gateway; Grafana содержит панель API Gateway и алерт повторяющихся ошибок передачи.
+## Observability
 
-Предел памяти проверяется обычной сборкой. ASan сохраняет освобождённые буферы для обнаружения ошибок памяти, поэтому его RSS оценивается отдельно от поставляемой сборки.
+Metrics `/metrics` include number and duration of REST requests per contract operation, active requests, access failures, rate limits, and transmission errors. `psim_api_rate_limit_failures_total` separately counts failures due to storage unavailability; Grafana dashboard and Prometheus alerts are added for this. Arbitrary paths and user or object identifiers are not used as labels. HTTP spans are sent upstream via W3C trace context. Local Prometheus collects Gateway metrics; Grafana includes an API Gateway dashboard and alerts for recurring transmission errors.
 
-## Проверка
+Memory limits are checked during normal build. ASan retains freed buffers to detect memory errors, so its RSS is evaluated separately from the delivered build.
+
+## Testing
 
 ```sh
 task api:test
@@ -50,12 +54,12 @@ task api:sanitizers
 task api:coverage
 ```
 
-Проверка поднимает отдельное Compose-окружение с реальными Keycloak, Kafka, PostgreSQL, Valkey, Catalog и S3. Результат записывается в `build/resource-catalog/<preset>/api-result.json`; журналы Gateway - в соседний `api-servers.log`.
+Testing creates a separate Compose environment with real Keycloak, Kafka, PostgreSQL, Valkey, Catalog, and S3. Results are recorded in `build/resource-catalog/<preset>/api-result.json`; Gateway logs are in the adjacent `api-servers.log`.
 
-Общая квота проверяется на двух репликах с двумя runtime-шардами у каждой. Проверяются совокупный burst, сохранение счётчика после перезапуска одной реплики, независимость пользователей, ACL из генератора поставки, HTTP 429, HTTP 503 при остановке Valkey и восстановление после его возврата. Журнал дополнительных реплик - `api-limit-servers.log`. Компонентные проверки Valkey дополнительно проверяют изоляцию тенантов, пополнение, TTL и несовпадающие настройки.
+Overall quota is tested on two replicas with two runtime shards each. Quota burst, retention of counters after restarting one replica, user independence, ACL from delivery generator, HTTP 429, HTTP 503 when Valkey stops, and recovery after it returns are checked. Additional replica logs - `api-limit-servers.log`. Component tests for Valkey additionally check tenant isolation, replenishment, TTL, and inconsistent settings.
 
-Архитектурные границы и временные ограничения описаны в [ADR-058](../adr/0058-api-gateway-and-configuration.md).
+Architectural boundaries and time limits are described in [ADR-058](../adr/0058-api-gateway-and-configuration.md).
 
 ## Realtime
 
-Подписки, фильтры, возможности клиента, возобновление из Kafka, оперативные образы и параметры `realtime_*` описаны в [руководстве realtime](realtime.md). Gateway читает оба доменных топика целиком, а оперативные образы получает у Projection Service с исходным JWT.
+Subscriptions, filters, client capabilities, Kafka resumption, current state images and `realtime_*` parameters are described in the [realtime guide](realtime.md). The gateway reads both domain topics completely, and current state images are obtained from the Projection Service using the original JWT.

@@ -1,34 +1,37 @@
-# ADR-029. Детерминированный идентификатор источника
+# ADR-029. Deterministic source identifiers
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (реализация - 4.2, 4.4)
-- **Дополняет:** [ADR-005](0005-envelope-and-identifiers.md)
-- **Связанные:** ADR-007, ADR-017
+<!-- language-links -->
+[English](0029-deterministic-source-id.md) | [Русский](../ru/adr/0029-deterministic-source-id.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Extends:** [ADR-005](0005-envelope-and-identifiers.md)
+- **Related:** ADR-007, ADR-017
 
-Коннектор знает источники по своим ссылкам (`source_ref` = `Source.external_ref` в каталоге), а ключ топика `psim.ingest.raw.v1` - `source_id` (ADR-007). По сценариям S1 и S3 событие от источника, ещё не зарегистрированного в каталоге, должно попасть в DLQ Normalizer, а не быть отвергнуто шлюзом: администратор регистрирует устройство и повторно обрабатывает события из DLQ. Если `source_id` - UUIDv7, назначаемый каталогом, шлюз не может вычислить ключ для незарегистрированного источника, а ключ события меняется после регистрации.
+## Context
 
-## Рассмотренные варианты
+Connectors identify sources by `source_ref`, equal to catalog `Source.external_ref`, while `psim.ingest.raw.v1` uses `source_id` as its key (ADR-007). S1 and S3 require events from unregistered sources to reach the Normalizer DLQ instead of being rejected by the gateway: an administrator registers the device and replays the DLQ. With catalog-assigned UUIDv7 `source_id` values, the gateway cannot calculate an unregistered source's key, and registration changes the event key.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Шлюз отвергает события незарегистрированных источников | Простота | Противоречит S1, S3 (DLQ); коннектор должен решать, что делать с отвергнутыми событиями |
-| Ключ `connector_id:source_ref` вместо `source_id` | Не требует каталога | Меняет принятый ADR-007; разные ключи в разных топиках |
-| **`source_id` = UUIDv5(`connector_id`, `source_ref`)** | Шлюз вычисляет идентификатор без обращения к каталогу; идентификатор не меняется при регистрации; источник чужого коннектора не может совпасть по построению | Источник, перенесённый к другому коннектору, получает новый идентификатор |
+| Gateway rejects unregistered-source events | Simple | Violates S1 and S3 DLQ behavior; connectors must handle rejected events |
+| Use `connector_id:source_ref` instead of `source_id` | Needs no catalog | Changes ADR-007; topics use different keys |
+| **`source_id` = UUIDv5(`connector_id`, `source_ref`)** | Gateway calculates it without catalog access; registration preserves it; another connector's source cannot match by construction | Moving a source to another connector changes its identifier |
 
-## Решение
+## Decision
 
-1. `source_id` = UUIDv5 в пространстве имён «source» (из `contracts/`) от имени, составленного по правилам ADR-005 из `connector_id` и `source_ref`.
-2. Каталог при регистрации устройства вычисляет `source_id` тем же способом; ручное задание `source_id` запрещено.
-3. Шлюз вычисляет `source_id` для каждого события и пишет его в `RawEvent` вместе с `source_ref`; проверка CS3 (источник принадлежит коннектору сессии) выполняется по построению.
-4. Перенос источника к другому коннектору - это новый источник (новый `source_id`); история старого сохраняется.
+1. `source_id` is UUIDv5 in the source namespace from `contracts/`, using a name composed from `connector_id` and `source_ref` according to ADR-005.
+2. The catalog computes `source_id` identically when registering a device; manual assignment is forbidden.
+3. The gateway computes `source_id` for every event and writes it to `RawEvent` with `source_ref`. CS3, source ownership by the session's connector, holds by construction.
+4. Moving a source to another connector creates a new source with a new `source_id`; the old source's history remains.
 
-## Последствия
+## Consequences
 
-- В таблице идентификаторов [aggregates.md](../domain/aggregates.md#01-идентификаторы) `source_id` относится к именным UUID.
-- Normalizer направляет события незарегистрированных источников в DLQ с кодом `PROCESSING_DEVICE_NOT_FOUND`; после регистрации их можно обработать повторно (`psimctl dlq replay`).
+- The [identifier table](../domain/aggregates.md#01-identifiers) classifies `source_id` as a name-based UUID.
+- Normalizer routes unregistered-source events to the DLQ with `PROCESSING_DEVICE_NOT_FOUND`. After registration, `psimctl dlq replay` reprocesses them.
 
-## Проверка
+## Verification
 
-Тест: одинаковые `connector_id` и `source_ref` дают одинаковый `source_id` в шлюзе и каталоге; событие незарегистрированного источника попадает в DLQ и после регистрации и повторной обработки нормализуется.
+Identical `connector_id` and `source_ref` values produce the same `source_id` in gateway and catalog. An unregistered-source event reaches the DLQ and normalizes after registration and replay.

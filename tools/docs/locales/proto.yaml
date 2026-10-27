@@ -1,0 +1,537 @@
+'"ack" or "resolve"': '"ack" или "resolve"'
+'(key: correlation_key). Not a public contract': 'Ключ: correlation_key. Не является публичным контрактом'
+'(key: incident_id; command_id or notification_id when there is no incident)': 'Ключ: incident_id; command_id или notification_id
+  при отсутствии инцидента'
+'(key: resource_type:resource_id). Each record is the full current state of a resource': 'Ключ: resource_type:resource_id.
+  Каждая запись содержит полное текущее состояние ресурса'
+'(key: tenant_id/source_id:epoch). Not a public contract': 'Ключ: tenant_id/source_id:epoch. Не является публичным контрактом'
+.proto Type: Тип .proto
+<p align="right"><a href="#top">Top</a></p>: <p align="right"><a href="#top">К началу</a></p>
+A deadline error can mean that the change committed but enforcement is still pending;: Ошибка срока ожидания может означать,
+  что изменение зафиксировано, но применение ещё не завершено;
+A new session always starts with unknown equipment quality: Новая сессия всегда начинается с неизвестного качества данных
+  оборудования
+A string must always contain UTF-8 encoded or 7-bit ASCII text: Строка должна содержать текст UTF-8 или 7-битный ASCII
+AbsenceSpec fires when an expected event does not follow a trigger within the window: AbsenceSpec срабатывает, если ожидаемое
+  событие не следует за триггером в пределах окна
+ActorKind is the kind of subject: ActorKind - вид субъекта
+Additional response metadata; streaming APIs put it in the first response: Дополнительные метаданные ответа; потоковые API
+  передают их в первом ответе
+Always eight bytes: Всегда восемь байтов
+Always eight bytes. More efficient than uint64 if values are often greater than 2^56: Всегда восемь байтов. Эффективнее uint64,
+  если значения часто превышают 2^56
+Always four bytes: Всегда четыре байта
+Always four bytes. More efficient than uint32 if values are often greater than 2^28: Всегда четыре байта. Эффективнее uint32,
+  если значения часто превышают 2^28
+AuditEntry is an action to be recorded in the audit chain: AuditEntry - действие для записи в цепочку аудита
+'AuditEventRecord is the value of topic psim.audit.v1 (key: tenant_id)': AuditEventRecord - значение топика psim.audit.v1
+  с ключом tenant_id
+AuditOutcome is the result of the audited action: AuditOutcome - результат аудируемого действия
+AuditQuery selects audit records: AuditQuery выбирает записи аудита
+Authenticate authenticates the connection; also sent on token refresh: Authenticate аутентифицирует соединение; также отправляется
+  при обновлении токена
+Authenticated confirms authentication: Authenticated подтверждает аутентификацию
+Authenticated receiving session, including when the event is historical replay: Аутентифицированная сессия приёма, в том числе
+  для исторического replay
+BatchAck reports that a batch was durably written (acks=all) or rejected: BatchAck сообщает, что батч долговечно записан с
+  acks=all или отклонён
+Bignum or Fixnum (as required): Bignum или Fixnum (по необходимости)
+Bitmap of the last 4096 sequence numbers below max_sequence; bit i set = max_sequence - i seen: Битовая карта последних 4096
+  номеров от max_sequence назад; установленный бит i означает, что max_sequence - i уже наблюдался
+Catalog configuration version the connector already has: Версия конфигурации каталога, уже имеющаяся у коннектора
+CatalogRecord is the value of compacted topic psim.catalog.v1: CatalogRecord - значение компактируемого топика psim.catalog.v1
+CatalogService manages sites, buildings, floors, zones, device types, devices and connectors: CatalogService управляет площадками,
+  зданиями, этажами, зонами, типами устройств, устройствами и коннекторами
+Changes of one incident (filter.incident_id required): Изменения одного инцидента; требуется filter.incident_id
+Client-chosen id echoed in replies: Идентификатор, выбранный клиентом и повторяемый в ответах
+ClientFrame is a frame sent by the browser: ClientFrame - кадр, отправленный браузером
+Command asks the connector to act on a device. Execute at most once per command_id: Command запрашивает действие коннектора
+  на устройстве. Исполнять не более одного раза для command_id
+CommandAck confirms that the connector received a command: CommandAck подтверждает получение команды коннектором
+CommandDelivery is a command routed to the connector session: CommandDelivery - команда, направленная в сессию коннектора
+'CommandDeliveryRecord is the value of topic psim.commands.v1 (key: connector_id)': CommandDeliveryRecord - значение топика
+  psim.commands.v1 с ключом connector_id
+CommandOutcome reports the final result from the connector or the gateway: CommandOutcome сообщает конечный результат от коннектора
+  или шлюза
+CommandReceipt reports that the connector received a command: CommandReceipt сообщает, что коннектор получил команду
+CommandRequested crosses the durable response -> command boundary. Only Response Engine: CommandRequested пересекает долговечную
+  границу response -> command. Только Response Engine
+CommandResult reports the outcome of a command: CommandResult сообщает исход команды
+'CommandResultRecord is the value of topic psim.commands.results.v1 (key: command_id)': CommandResultRecord - значение топика
+  psim.commands.results.v1 с ключом command_id
+CommandState is the lifecycle state of a command: CommandState - состояние жизненного цикла команды
+CommandUpdated reports a change of a command; the change equals the new state: CommandUpdated сообщает изменение команды;
+  изменение равно новому состоянию
+'ConfigRecord is the value of compacted single-partition topic psim.config.v1 (key: config_key)': ConfigRecord - значение
+  компактируемого однопартиционного топика psim.config.v1 с ключом config_key
+ConfigUpdate sends the catalog configuration of the connector: ConfigUpdate отправляет конфигурацию каталога коннектора
+ConnectorAdministrationService manages registrations over mTLS and delegated operator JWTs: ConnectorAdministrationService
+  управляет регистрациями через mTLS и делегированные JWT оператора
+ConnectorConnection never implies that its equipment has a current observation: ConnectorConnection никогда не означает наличие
+  текущего наблюдения его оборудования
+ConnectorDevice is a device served by the connector: ConnectorDevice - устройство, обслуживаемое коннектором
+ConnectorEvent is one event from a source: ConnectorEvent - одно событие источника
+ConnectorGatewayService is the connector protocol v1 (ADR-017): ConnectorGatewayService - протокол коннектора v1 (ADR-017)
+CorrelationChangelogRecord is the value of internal compacted topic: CorrelationChangelogRecord - значение внутреннего компактируемого
+  топика
+CorrelationRuleService manages correlation rules and the active rule set: CorrelationRuleService управляет правилами корреляции
+  и активным набором правил
+CorrelationScope defines the correlation key of a rule: CorrelationScope определяет ключ корреляции правила
+CorrelationStateEntry is the opaque state of one rule for one correlation key: CorrelationStateEntry - непрозрачное состояние
+  одного правила для одного ключа корреляции
+CreateDeviceRequest is the request of CreateDevice: CreateDeviceRequest - запрос операции CreateDevice
+CreateDeviceTypeRequest is the request of CreateDeviceType: CreateDeviceTypeRequest - запрос операции CreateDeviceType
+CreateEscalationPolicyRequest is the request of CreateEscalationPolicy: CreateEscalationPolicyRequest - запрос операции CreateEscalationPolicy
+CreateIncidentTypeRequest is the request of CreateIncidentType: CreateIncidentTypeRequest - запрос операции CreateIncidentType
+CreateLocationRequest is the request of CreateLocation: CreateLocationRequest - запрос операции CreateLocation
+CreateMaintenanceWindowRequest carries the desired interval: CreateMaintenanceWindowRequest содержит желаемый интервал
+Creation, acknowledgement and resolution metrics use their respective timestamps: Показатели создания, принятия и решения
+  используют соответствующие метки времени
+Credits grants additional events to send: Credits предоставляет дополнительное количество событий для отправки
+Current authoritative location image; intermediate state images may be coalesced: Текущее состояние локации из авторитетного
+  источника; промежуточные состояния могут объединяться
+DataQuality separates observed equipment freshness from resource lifecycle: DataQuality отделяет актуальность наблюдений оборудования
+  от жизненного цикла ресурса
+Deliver only to this session; empty preserves compatibility with earlier producers: Доставлять только в эту сессию; пустое
+  значение сохраняет совместимость с прежними производителями
+Delta is one change; apply only if the aggregate version is newer than known: Delta - одно изменение; применять только при
+  версии агрегата новее известной
+Description: Описание
+'Deterministic id: UUIDv5(connector_id, source_ref), see ADR-029': Детерминированный идентификатор UUIDv5(connector_id, source_ref),
+  см. ADR-029
+DeviceAvailability describes equipment connectivity independently of connector connectivity: DeviceAvailability описывает
+  связность оборудования независимо от связности коннектора
+DryRunSource selects the read-only historical input. Unspecified uses Kafka: DryRunSource выбирает исторический источник только
+  для чтения. Неуказанное значение выбирает Kafka
+DryRunState is the state of a dry run: DryRunState - состояние пробного запуска
+Each record is the full active object; consumers apply it atomically between input batches: Каждая запись содержит полный
+  активный объект; потребители применяют его атомарно между входными батчами
+Empty lease_id acquires a new lease. TTL is bounded to 60 seconds and JWT expiry: Пустой lease_id получает новую аренду. TTL
+  ограничен 60 секундами и сроком JWT
+Empty means the legacy incident_event capability: Пустое значение означает прежнюю возможность incident_event
+Engine-defined encoding, versioned by state_format: Кодирование определяется движком и версионируется через state_format
+Envelope carries the metadata shared by every message on every PSIM topic: Envelope содержит общие метаданные каждого сообщения
+  во всех топиках PSIM
+Error code from contracts/errors/errors.yaml: Код ошибки из contracts/errors/errors.yaml
+Error code from the catalog, for example "INGEST_INVALID_EVENT": Код ошибки из каталога, например "INGEST_INVALID_EVENT"
+Error code from the catalog, for example "REALTIME_SLOW_CONSUMER": Код ошибки из каталога, например "REALTIME_SLOW_CONSUMER"
+Error code when success is false: Код ошибки при success = false
+ErrorFrame reports an error; the connection is closed after fatal errors: ErrorFrame сообщает ошибку; после фатальных ошибок
+  соединение закрывается
+EscalationLevelTriggered reports that an escalation level fired for an incident: EscalationLevelTriggered сообщает срабатывание
+  уровня эскалации инцидента
+Event is a normalized event. envelope.message_id equals the raw event_id,: Event - нормализованное событие. envelope.message_id
+  равен исходному event_id,
+EventBatch is a batch of events; the connector must not exceed granted credits: EventBatch - батч событий; коннектор не должен
+  превышать выданные credits
+EventClass is the behavioural class of a taxonomy type: EventClass - поведенческий класс типа таксономии
+'EventRecord is the value of topic psim.events.normalized.v1 (key: site_id:zone_id)': EventRecord - значение топика psim.events.normalized.v1
+  с ключом site_id:zone_id
+EventRejection is a permanent rejection of one event: EventRejection - окончательное отклонение одного события
+Events carry the aggregate state after the change; envelope.sequence = aggregate version: События содержат состояние агрегата
+  после изменения; envelope.sequence = версия агрегата
+Events rejected permanently; they must not be resent: Окончательно отклонённые события; повторная отправка запрещена
+Every event carries the incident state after the change; envelope.sequence = incident.version: Каждое событие содержит состояние
+  инцидента после изменения; envelope.sequence = incident.version
+ExportAuditRecordsRequest is the request of ExportAuditRecords: ExportAuditRecordsRequest - запрос операции ExportAuditRecords
+ExportAuditRecordsResponse is the response of ExportAuditRecords; the body is JSON lines: ExportAuditRecordsResponse - ответ
+  операции ExportAuditRecords; тело имеет формат JSON lines
+ExportDevicesRequest is the request of ExportDevices: ExportDevicesRequest - запрос операции ExportDevices
+ExportDevicesResponse is the response of ExportDevices; the body is the file: ExportDevicesResponse - ответ операции ExportDevices;
+  тело содержит файл
+ExportIncidentReportRequest is the request of ExportIncidentReport: ExportIncidentReportRequest - запрос операции ExportIncidentReport
+ExportIncidentReportResponse is the response of ExportIncidentReport; the body is CSV: ExportIncidentReportResponse - ответ
+  операции ExportIncidentReport; тело имеет формат CSV
+External acceptance cannot be inferred after transport or process failure: После сбоя транспорта или процесса нельзя делать
+  вывод о приёме внешней системой
+? False for events captured without an active session, or replayed after reconnect. Such events populate history but cannot
+  establish current state
+: False для событий, записанных без активной сессии или повторно отправленных после переподключения. Они пополняют историю,
+  но не устанавливают текущее состояние
+FeedFilter narrows a subscription; the access scope is always applied by the server: FeedFilter сужает подписку; сервер всегда
+  применяет область доступа
+Field: Поле
+Fire events and P1 signals are never suppressed; history and open incidents are preserved: Пожарные события и сигналы P1 никогда
+  не подавляются; история и открытые инциденты сохраняются
+Gateway session in which this observation was captured; old sessions cannot refresh state: Сессия шлюза, в которой получено
+  наблюдение; прежние сессии не могут обновлять актуальность состояния
+GatewayStateRecord carries authenticated connection and equipment observations: GatewayStateRecord содержит аутентифицированные
+  наблюдения соединения и оборудования
+GetActiveRuleSetRequest is the request of GetActiveRuleSet: GetActiveRuleSetRequest - запрос операции GetActiveRuleSet
+GetCommandRequest is the request of GetCommand: GetCommandRequest - запрос операции GetCommand
+GetConnectorRequest identifies a registration: GetConnectorRequest определяет регистрацию
+GetDeviceRequest is the request of GetDevice: GetDeviceRequest - запрос операции GetDevice
+GetDeviceTypeRequest identifies a device type: GetDeviceTypeRequest определяет тип устройства
+GetDryRunRequest is the request of GetDryRun: GetDryRunRequest - запрос операции GetDryRun
+GetEventRequest is the request of GetEvent: GetEventRequest - запрос операции GetEvent
+GetExerciseRequest selects a session belonging to the current user: GetExerciseRequest выбирает сессию текущего пользователя
+GetFloorPlanRequest is the request of GetFloorPlan: GetFloorPlanRequest - запрос операции GetFloorPlan
+GetFloorPlanResponse is the response of GetFloorPlan; the body is the image: GetFloorPlanResponse - ответ операции GetFloorPlan;
+  тело содержит изображение
+GetImportRequest is the request of GetImport: GetImportRequest - запрос операции GetImport
+? GetIncidentFeed returns active incidents of the caller scope and the resume token at which the snapshot is consistent (ADR-019)
+: GetIncidentFeed возвращает активные инциденты в доступной области и resume token, на котором snapshot согласован (ADR-019)
+GetIncidentFeedRequest is the request of GetIncidentFeed: GetIncidentFeedRequest - запрос операции GetIncidentFeed
+GetIncidentFeedResponse is the response of GetIncidentFeed: GetIncidentFeedResponse - ответ операции GetIncidentFeed
+GetIncidentRecoveryRequest compares the known version with the current aggregate: GetIncidentRecoveryRequest сравнивает известную
+  версию с текущим агрегатом
+GetIncidentReportRequest is the request of GetIncidentReport: GetIncidentReportRequest - запрос операции GetIncidentReport
+GetIncidentRequest is the request of GetIncident: GetIncidentRequest - запрос операции GetIncident
+GetIncidentRunRequest is the request of GetIncidentRun: GetIncidentRunRequest - запрос операции GetIncidentRun
+GetIncidentSnapshotsRequest selects versions after a cursor or the latest snapshot at a time: GetIncidentSnapshotsRequest
+  выбирает версии после курсора или последний snapshot на указанный момент
+GetLocationRequest is the request of GetLocation: GetLocationRequest - запрос операции GetLocation
+GetLocationStatusRequest is the request of GetLocationStatus: GetLocationStatusRequest - запрос операции GetLocationStatus
+GetMaintenanceWindowRequest identifies an interval: GetMaintenanceWindowRequest определяет интервал
+GetMappingRuleSetRequest is the request of GetMappingRuleSet: GetMappingRuleSetRequest - запрос операции GetMappingRuleSet
+GetMeRequest is the request of GetMe: GetMeRequest - запрос операции GetMe
+GetOperationalSnapshotRequest selects a historical view without realtime subscription: GetOperationalSnapshotRequest выбирает
+  историческое представление без подписки realtime
+GetOperationsRequest selects one current incident: GetOperationsRequest выбирает один текущий инцидент
+GetOperatorLoadRequest is the request of GetOperatorLoad: GetOperatorLoadRequest - запрос операции GetOperatorLoad
+GetPlanRequest is the request of GetPlan: GetPlanRequest - запрос операции GetPlan
+GetRuleRequest is the request of GetRule: GetRuleRequest - запрос операции GetRule
+GetSettingsRequest is the request of GetSettings: GetSettingsRequest - запрос операции GetSettings
+GetSiteDutyRequest selects a site: GetSiteDutyRequest выбирает площадку
+Goodbye closes the session gracefully: Goodbye корректно закрывает сессию
+GoodbyeReason is the reason to close a session: GoodbyeReason - причина закрытия сессии
+Heartbeat keeps the session alive; sent by both sides: Heartbeat поддерживает активность сессии; отправляется обеими сторонами
+Identifier of the originating event of the whole causal chain: Идентификатор исходного события всей причинной цепочки
+Immutable compiled input; a configuration change cannot reinterpret queued events: Неизменяемый скомпилированный вход; изменение
+  конфигурации не переинтерпретирует события в очереди
+ImportState is the state of an import job: ImportState - состояние задания импорта
+Imported Message Types: Импортированные типы сообщений
+Incident and response changes within the user scope: Изменения инцидентов и реагирования в области доступа пользователя
+IncidentAcknowledged is published when an operator accepts an incident: IncidentAcknowledged публикуется при принятии инцидента
+  оператором
+IncidentAssigned is published on assignment or reassignment: IncidentAssigned публикуется при назначении или переназначении
+IncidentBlockingStepsChanged is published when blocking_steps changes from response events: IncidentBlockingStepsChanged публикуется
+  при изменении blocking_steps по событиям реагирования
+IncidentClosed is published on transition to closed: IncidentClosed публикуется при переходе в closed
+IncidentCommandUpdated appends a device command change to the incident timeline: IncidentCommandUpdated добавляет изменение
+  команды устройства в хронологию инцидента
+IncidentCommentAdded is published when a comment is added: IncidentCommentAdded публикуется при добавлении комментария
+IncidentCreated is published when a signal opens a new incident: IncidentCreated публикуется, когда сигнал открывает новый
+  инцидент
+IncidentEscalated is published when an escalation level is applied: IncidentEscalated публикуется при применении уровня эскалации
+'IncidentEventRecord is the value of topic psim.incidents.events.v1 (key: incident_id)': IncidentEventRecord - значение топика
+  psim.incidents.events.v1 с ключом incident_id
+IncidentLinkAdded is published when an external link is attached: IncidentLinkAdded публикуется при добавлении внешней ссылки
+IncidentNotificationUpdated appends a notification receipt or delivery state: IncidentNotificationUpdated добавляет квитанцию
+  уведомления или состояние доставки
+IncidentOperationalUpdated carries the full state for projections and reconnect replay: IncidentOperationalUpdated содержит
+  полное состояние для проекций и replay после переподключения
+IncidentPriorityChanged is published on computed or manual priority change: IncidentPriorityChanged публикуется при вычисленном
+  или ручном изменении приоритета
+IncidentReopened is published on transition from resolved back to in_progress: IncidentReopened публикуется при возврате из
+  resolved в in_progress
+IncidentResolved is published on transition to resolved: IncidentResolved публикуется при переходе в resolved
+IncidentState is the lifecycle state of an incident: IncidentState - состояние жизненного цикла инцидента
+IncidentTransferConfirmed changes responsibility after recipient confirmation: IncidentTransferConfirmed меняет ответственного
+  после подтверждения получателем
+IncidentTransferRequested preserves the current assignee: IncidentTransferRequested сохраняет текущего ответственного
+IncidentWorkStarted is published on transition to in_progress: IncidentWorkStarted публикуется при переходе в in_progress
+Incremented when the source resets its sequence counter: Увеличивается, когда источник сбрасывает счётчик последовательности
+Intersection of supported features; absent for a protocol 1.0 gateway: Пересечение поддерживаемых возможностей; отсутствует
+  у шлюза протокола 1.0
+Inventory observations initialize periodic absence without fabricating an event: Наблюдения инвентаризации инициализируют
+  периодический absence без создания фиктивного события
+Key "incident-type/<tenant_id>/<incident_type_id>": Ключ "incident-type/<tenant_id>/<incident_type_id>"
+Key "maintenance/<tenant_id>/<maintenance_id>"; terminal versions remain for replay: Ключ "maintenance/<tenant_id>/<maintenance_id>";
+  конечные версии сохраняются для replay
+Key "mapping/<tenant_id>/<connector_type>": Ключ "mapping/<tenant_id>/<connector_type>"
+Key "processing/<tenant_id>": Ключ "processing/<tenant_id>"
+Key "retention/<tenant_id>": Ключ "retention/<tenant_id>"
+Key "ruleset/<tenant_id>": Ключ "ruleset/<tenant_id>"
+Label: Метка
+ListCommandsRequest is the request of ListCommands: ListCommandsRequest - запрос операции ListCommands
+ListConnectorsRequest is the request of ListConnectors: ListConnectorsRequest - запрос операции ListConnectors
+ListDeviceTypesRequest is the request of ListDeviceTypes: ListDeviceTypesRequest - запрос операции ListDeviceTypes
+ListDevicesRequest is the request of ListDevices: ListDevicesRequest - запрос операции ListDevices
+ListEscalationPoliciesRequest is the request of ListEscalationPolicies: ListEscalationPoliciesRequest - запрос операции ListEscalationPolicies
+ListFloorPlanVersionsRequest identifies a floor and a page: ListFloorPlanVersionsRequest определяет этаж и страницу
+ListIncidentEventsRequest is the request of ListIncidentEvents: ListIncidentEventsRequest - запрос операции ListIncidentEvents
+ListIncidentSignalsRequest is the request of ListIncidentSignals: ListIncidentSignalsRequest - запрос операции ListIncidentSignals
+ListIncidentTypesRequest is the request of ListIncidentTypes: ListIncidentTypesRequest - запрос операции ListIncidentTypes
+ListIncidentsRequest is the request of ListIncidents: ListIncidentsRequest - запрос операции ListIncidents
+ListLocationsRequest is the request of ListLocations: ListLocationsRequest - запрос операции ListLocations
+ListMaintenanceWindowsRequest selects intervals and uses cursor pagination: ListMaintenanceWindowsRequest выбирает интервалы
+  и использует курсорную пагинацию
+ListMappingRuleSetsRequest is the request of ListMappingRuleSets: ListMappingRuleSetsRequest - запрос операции ListMappingRuleSets
+ListMyNotificationsRequest is the request of ListMyNotifications: ListMyNotificationsRequest - запрос операции ListMyNotifications
+ListPlansRequest is the request of ListPlans: ListPlansRequest - запрос операции ListPlans
+ListRulesRequest is the request of ListRules: ListRulesRequest - запрос операции ListRules
+ListTimelineRequest is the request of ListTimeline: ListTimelineRequest - запрос операции ListTimeline
+LiveCandidate retains the evidence and matched parts of an open window: LiveCandidate сохраняет свидетельства и совпавшие
+  части открытого окна
+LiveKeyState is the versioned local and changelog encoding of a correlation key: LiveKeyState - версионированное кодирование
+  ключа корреляции для локального состояния и changelog
+LivePending retains an absence trigger until its event-time deadline: LivePending сохраняет триггер absence до его срока по
+  времени событий
+LiveSource tracks event time and the bounded sequence cursor of a source epoch: LiveSource отслеживает время событий и ограниченный
+  курсор последовательности эпохи источника
+LocationKind is the level of a location in the hierarchy: LocationKind - уровень локации в иерархии
+LocationRef places an object in the site hierarchy: LocationRef размещает объект в иерархии площадки
+MIME type for the HTTP body: MIME-тип тела HTTP
+MaintenanceState is persisted, versioned and published for every transition: MaintenanceState сохраняется, версионируется
+  и публикуется при каждом переходе
+MaintenanceWindow is a one-off interval, evaluated using event receipt time: MaintenanceWindow - однократный интервал, проверяемый
+  по времени приёма события
+Manage commits a versioned change and waits until live gateways enforce it: Manage фиксирует версионированное изменение и
+  ждёт его применения активными шлюзами
+ManageRequest is idempotent per tenant, operator and request_id: ManageRequest идемпотентен в пределах тенанта, оператора
+  и request_id
+ManageResponse returns the committed registration and global enforcement revision: ManageResponse возвращает зафиксированную
+  регистрацию и глобальную ревизию применения
+MappingRuleSet is a published version of mapping rules for one connector type: MappingRuleSet - опубликованная версия правил
+  нормализации для одного типа коннектора
+May contain any arbitrary sequence of bytes: Может содержать произвольную последовательность байтов
+'Message identifier: event_id, signal_id or domain event id (UUIDv7 or UUIDv5)': 'Идентификатор сообщения: event_id, signal_id
+  или идентификатор доменного события, UUIDv7 или UUIDv5'
+Message that caused this one: Сообщение, вызвавшее текущее
+Method Name: Метод
+Missing sources remain unknown; complete does not imply that all devices are online: Отсутствующие источники остаются unknown;
+  complete не означает, что все устройства online
+Monotonic within the session; echoed in BatchAck: Монотонно возрастает в пределах сессии; повторяется в BatchAck
+Name: Имя
+Nanosecond fraction, from 0 through 999999999: Дробная часть секунды в наносекундах, от 0 до 999999999
+Nanosecond fraction; its sign matches nonzero seconds: Дробная часть секунды в наносекундах; её знак совпадает со знаком ненулевых
+  секунд
+NormalizerStateRecord is the value of internal compacted topic psim.normalizer.state.v1: NormalizerStateRecord - значение
+  внутреннего компактируемого топика psim.normalizer.state.v1
+'Not paginated: the console needs the whole feed (up to 10 000 incidents)': 'Без пагинации: консоли нужна вся лента, до 10
+  000 инцидентов'
+Notes: Примечания
+NotificationChannel is a delivery channel: NotificationChannel - канал доставки
+NotificationRequested records intent; channel delivery belongs to Notification Service: NotificationRequested фиксирует намерение;
+  доставкой по каналу владеет Notification Service
+NotificationState is the delivery state: NotificationState - состояние доставки
+NotificationUpdated reports a change of a notification; the change equals the new state: NotificationUpdated сообщает изменение
+  уведомления; изменение равно новому состоянию
+Number: Номер
+Number of events the connector may send before the next Credits: Количество событий, которое коннектор может отправить до
+  следующего Credits
+Only registration uses name, connector_type and limits; credentials are derived from PEM: Только регистрация использует name,
+  connector_type и limits; учётные данные выводятся из PEM
+OperationalService owns alarm controls, collaboration, history and isolated exercises: OperationalService владеет управлением
+  тревогами, совместной работой, историей и изолированными упражнениями
+Operator explanation, included in audit when supplied: Объяснение оператора; при наличии включается в аудит
+Optional assertion binding the public certificate to an expected fingerprint: Необязательная проверка соответствия открытого
+  сертификата ожидаемому отпечатку
+'Optional features: "state.v1" observations, "snapshot.v1" queries and "commands.v1" execution': 'Необязательные возможности:
+  наблюдения "state.v1", запросы "snapshot.v1" и исполнение "commands.v1"'
+Optional shortened validity of previous certificates during rotation: Необязательное сокращение срока действия прежних сертификатов
+  при ротации
+Original source timestamp when clock_skew_corrected is set: Исходная метка времени источника при установленном clock_skew_corrected
+'Owner: Correlation Engine (rule management module)': 'Владелец: Correlation Engine, модуль управления правилами'
+'Owner: Incident Service. All source data is resolved using the caller''s current scope': 'Владелец: Incident Service. Все
+  исходные данные разрешаются по текущей области доступа вызывающего субъекта'
+'Owner: Projection Service': 'Владелец: Projection Service'
+'Owner: Resource Catalog': 'Владелец: Resource Catalog'
+'Owner: Resource Catalog; changes are published to psim.config.v1': 'Владелец: Resource Catalog; изменения публикуются в psim.config.v1'
+ParameterType is the type of a command parameter: ParameterType - тип параметра команды
+Ping checks the connection: Ping проверяет соединение
+PlanState is the lifecycle state of a plan version: PlanState - состояние жизненного цикла версии сценария
+PlanUnavailable reports that no published plan matched a newly created incident: PlanUnavailable сообщает, что ни один опубликованный
+  сценарий не подошёл новому инциденту
+Pong answers Ping: Pong отвечает на Ping
+Priority of a signal or an incident; P1 is the highest: Приоритет сигнала или инцидента; P1 - наивысший
+PrioritySource tells whether the priority was computed or set manually (I6): PrioritySource указывает, вычислен приоритет
+  или задан вручную (I6)
+Problem is the error body of every failed REST request (RFC 9457): Problem - тело ошибки каждого неуспешного REST-запроса
+  (RFC 9457)
+Processing arrival time used only for idle detection: Время поступления в обработку, используемое только для определения простоя
+Protocol Documentation: Справочник Protobuf
+Protocol versions supported by the connector, for example ["1.0"]: Версии протокола, поддерживаемые коннектором, например
+  ["1.0"]
+Public certificate only; the private key never leaves the connector: Только открытый сертификат; закрытый ключ никогда не
+  покидает коннектор
+PublishMappingRuleSetRequest is the request of PublishMappingRuleSet: PublishMappingRuleSetRequest - запрос операции PublishMappingRuleSet
+Published atomically with the first tracked incident, independent of later policy edits: Публикуется атомарно с первым отслеживаемым
+  инцидентом, независимо от последующих правок политики
+Published in psim.config.v1 under key "mapping/<tenant_id>/<connector_type>": Публикуется в psim.config.v1 с ключом "mapping/<tenant_id>/<connector_type>"
+Published in psim.config.v1 under key "ruleset/<tenant_id>": Публикуется в psim.config.v1 с ключом "ruleset/<tenant_id>"
+Raw request or response content: Исходное содержимое запроса или ответа
+RawEvent is an event as delivered by a connector, before normalization: RawEvent - событие в виде, полученном от коннектора,
+  до нормализации
+'RawEventRecord is the value of topic psim.ingest.raw.v1 (key: source_id)': RawEventRecord - значение топика psim.ingest.raw.v1
+  с ключом source_id
+Register opens the session: Register открывает сессию
+RegisterConnectorRequest is the request of RegisterConnector: RegisterConnectorRequest - запрос операции RegisterConnector
+Registered confirms the session: Registered подтверждает сессию
+RegistrationAction selects a credential or registration change: RegistrationAction выбирает изменение учётных данных или регистрации
+RepartitionRecord is the value of internal topic psim.correlation.repartition.v1: RepartitionRecord - значение внутреннего
+  топика psim.correlation.repartition.v1
+RepartitionedEvent carries one immutable rule and its selected event: RepartitionedEvent содержит одно неизменяемое правило
+  и выбранное им событие
+Replace the complete location image, including removed resources and expired freshness: Заменить полное состояние локации,
+  включая удалённые ресурсы и истёкшую актуальность данных
+ReportFilter bounds each metric by its observation time, using [from, to): ReportFilter ограничивает каждый показатель временем
+  его наблюдения в интервале [from, to)
+ReportGrouping is the grouping dimension of report rows: ReportGrouping - измерение группировки строк отчёта
+'ReportService builds incident reports (ADR-028: analytics in ClickHouse)': 'ReportService формирует отчёты по инцидентам
+  (ADR-028: аналитика в ClickHouse)'
+Request Type: Тип запроса
+Required for revocation, ignored for other actions: Обязательно для отзыва, игнорируется для других действий
+Resolution is the outcome of an incident: Resolution - результат решения инцидента
+ResourceState is the lifecycle state shared by catalog resources: ResourceState - общее состояние жизненного цикла ресурсов
+  каталога
+Response Type: Тип ответа
+ResponseEventRecord is the value of topic psim.response.events.v1: ResponseEventRecord - значение топика psim.response.events.v1
+ResyncRequired tells the client to take a new snapshot (gap too long or token expired): ResyncRequired требует новый snapshot
+  при слишком большом разрыве или истёкшем токене
+RuleSet is the set of rule versions active for a tenant: RuleSet - набор версий правил, активных для тенанта
+RuleState is the lifecycle state of a rule version: RuleState - состояние жизненного цикла версии правила
+RuleStatisticsRequest selects rule versions in a bounded interval: RuleStatisticsRequest выбирает версии правил в ограниченном
+  интервале
+RunChange maps to domain events ResponseRunStarted, StepActivated, StepCompleted, StepSkipped,: RunChange соответствует доменным
+  событиям ResponseRunStarted, StepActivated, StepCompleted, StepSkipped,
+RunState is the lifecycle state of a run: RunState - состояние жизненного цикла запуска
+RunUpdated reports a change of a response run: RunUpdated сообщает изменение запуска сценария реагирования
+SLA observations use the earlier of completion and deadline; pending ones are excluded: Наблюдения SLA используют более ранний
+  момент завершения или срока; ожидающие исключаются
+SavePlanDraftRequest is the request of SavePlanDraft: SavePlanDraftRequest - запрос операции SavePlanDraft
+SaveRuleDraftRequest is the request of SaveRuleDraft: SaveRuleDraftRequest - запрос операции SaveRuleDraft
+Scalar Value Types: Скалярные типы
+SearchAuditRecordsRequest is the request of SearchAuditRecords: SearchAuditRecordsRequest - запрос операции SearchAuditRecords
+SearchEventsRequest is the request of SearchEvents: SearchEventsRequest - запрос операции SearchEvents
+Seconds until the token expires; the client must re-authenticate before: Секунды до истечения токена; клиент должен повторно
+  аутентифицироваться раньше
+See ADR-005. The payload type is defined by the oneof of the topic record (ADR-004): См. ADR-005. Тип содержимого определяется
+  oneof записи топика (ADR-004)
+Serialized bytes of the identified message: Сериализованные байты сообщения указанного типа
+ServerFrame is a frame sent by the server: ServerFrame - кадр, отправленный сервером
+? Session is the single bidirectional stream of a connector session. The first client message must be Register; the server
+  answers Registered or closes the stream
+: Session - единственный двунаправленный поток сессии коннектора. Первое сообщение клиента должно быть Register; сервер отвечает
+  Registered или закрывает поток
+Session that received the delivery: Сессия, получившая команду
+SessionRequest is a message from the connector to the gateway: SessionRequest - сообщение от коннектора шлюзу
+SessionResponse is a message from the gateway to the connector: SessionResponse - сообщение от шлюза коннектору
+Set when occurred_at was replaced with received_at because of clock skew (ADR-010): Задаётся, когда occurred_at заменено на
+  received_at из-за рассогласования часов (ADR-010)
+SetNotificationContactRequest replaces destinations: SetNotificationContactRequest заменяет адреса доставки
+SetPresenceRequest acquires or renews a session lease; release requires its current lease_id: SetPresenceRequest получает
+  или продлевает аренду сессии; для освобождения нужен текущий lease_id
+SetSiteDutyRequest replaces responsibility: SetSiteDutyRequest заменяет ответственного
+SettingsService manages tenant-wide retention and processing settings: SettingsService управляет сроками хранения и параметрами
+  обработки тенанта
+Severity of a single event: Критичность отдельного события
+Signal is the result of a correlation rule firing or of an external producer (ADR-025): Signal - результат срабатывания правила
+  корреляции или внешнего производителя (ADR-025)
+SignalAttached is published when a signal joins an open incident: SignalAttached публикуется при присоединении сигнала к открытому
+  инциденту
+SignalOriginKind is the kind of signal producer: SignalOriginKind - вид производителя сигнала
+'SignalRecord is the value of topic psim.signals.v1 (key: grouping_key)': SignalRecord - значение топика psim.signals.v1 с
+  ключом grouping_key
+Signed whole seconds: Целые секунды со знаком
+SiteDutyChanged publishes the current site responsibility after a committed replacement: SiteDutyChanged публикует текущего
+  ответственного за площадку после фиксации замены
+SlaBreached reports that an incident missed its SLA: SlaBreached сообщает о нарушении SLA инцидента
+SlaPolicyPinned preserves the original SLA targets for analytical projections: SlaPolicyPinned сохраняет исходные цели SLA
+  для аналитических проекций
+'Snapshot cursors are fixed before the query: later events win over an older snapshot': 'Курсоры snapshot фиксируются до опроса:
+  более поздние события имеют приоритет над старым snapshot'
+Snapshot reports additionally require snapshot.v1; sources without a query remain unknown: Отчёты snapshot дополнительно требуют
+  snapshot.v1; источники без опроса остаются unknown
+Source reference as known to the connector (Source.external_ref in the catalog): Ссылка источника, известная коннектору, Source.external_ref
+  в каталоге
+Source reference known to the connector (Source.external_ref): Ссылка источника, известная коннектору, Source.external_ref
+Source sequence number for events, aggregate version for domain events: Порядковый номер источника для событий или версия
+  агрегата для доменных событий
+SourceCursor identifies the ordering boundary captured before querying equipment: SourceCursor определяет границу порядка,
+  зафиксированную до опроса оборудования
+SourceSequenceState is the deduplication tracker of one source epoch: SourceSequenceState отслеживает дедупликацию одной эпохи
+  источника
+? 'Specifications: [Protobuf types](https://protobuf.dev/reference/protobuf/google.protobuf/), [HTTP body](https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto)'
+: 'Спецификации: [типы Protobuf](https://protobuf.dev/reference/protobuf/google.protobuf/), [тело HTTP](https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto)'
+StartImportRequest is the request of StartImport; the body is the file: StartImportRequest - запрос операции StartImport;
+  тело содержит файл
+StateObservation is a current equipment observation, never historical event replay: StateObservation - текущее наблюдение
+  оборудования, никогда не replay исторических событий
+StateReport is sent only after negotiating state.v1. A fresh snapshot is queried each session: StateReport отправляется только
+  после согласования state.v1. В каждой сессии запрашивается свежий snapshot
+Step affected by the change, if any: Шаг, затронутый изменением, если есть
+StepFailed, MandatoryStepsChanged, ResponseRunCompleted, ResponseRunCancelled: StepFailed, MandatoryStepsChanged, ResponseRunCompleted,
+  ResponseRunCancelled
+StepState is the state of a step: StepState - состояние шага
+Stream selects what to receive: Stream выбирает получаемые данные
+Strictly increasing within source_ref and source_epoch: Строго возрастает в пределах source_ref и source_epoch
+Subscribe opens a subscription from a resume token: Subscribe открывает подписку с resume token
+Subscribed confirms a subscription: Subscribed подтверждает подписку
+Suppression and condition changes require a supervisor. Visibility controls require an end: Подавление и изменение условия
+  требуют supervisor. Для управления видимостью нужен срок окончания
+Table of Contents: Содержание
+The independent SLA dimension that triggered the level: Независимое измерение SLA, вызвавшее этот уровень
+The selected connector session ended without a final result; do not retry automatically: Выбранная сессия коннектора завершилась
+  без конечного результата; автоматический повтор запрещён
+Time the fact happened in the domain (event time): Время факта в предметной области, event time
+Time the message was written to Kafka: Время записи сообщения в Kafka
+Time the platform received the event (ingest events only): Время приёма события платформой, только для входящих событий
+TimelineEntryKind classifies timeline entries: TimelineEntryKind классифицирует записи хронологии
+Token from a snapshot (GET /v1/feed/incidents) or from the last received Delta: Токен snapshot из GET /v1/feed/incidents или
+  последней полученной Delta
+Token to resume after this delta: Токен для продолжения после этой delta
+Topic psim.ingest.state.v1 is keyed by connector_id; source cursors order equipment updates: Топик psim.ingest.state.v1 имеет
+  ключ connector_id; курсоры источников упорядочивают обновления оборудования
+'Transport: gRPC over TLS 1.3 with mutual TLS; the client certificate identifies the connector': 'Транспорт: gRPC поверх TLS
+  1.3 с взаимной аутентификацией TLS; клиентский сертификат определяет коннектор'
+True only for a recent observation captured in the authenticated gateway session: True только для свежего наблюдения, полученного
+  в аутентифицированной сессии шлюза
+Type: Тип
+'URI of the error type: https://psim.local/errors/<code>': 'URI типа ошибки: https://psim.local/errors/<code>'
+URL identifying the fully qualified message type: URL, определяющий полное имя типа сообщения
+UTC seconds relative to the Unix epoch: Секунды UTC относительно эпохи Unix
+UUIDv7 assigned when the event was created; stable across resends: UUIDv7, назначенный при создании события; не меняется при
+  повторной отправке
+Unique per running connector process, for diagnostics: Уникален для каждого запущенного процесса коннектора, для диагностики
+Unsubscribe closes a subscription: Unsubscribe закрывает подписку
+UpdateAlarmRequest accepts acknowledge, activate, return, shelve, unshelve, suppress or unsuppress: UpdateAlarmRequest принимает
+  acknowledge, activate, return, shelve, unshelve, suppress или unsuppress
+UpdateDeviceRequest is the request of UpdateDevice: UpdateDeviceRequest - запрос операции UpdateDevice
+UpdateDeviceTypeRequest is the request of UpdateDeviceType: UpdateDeviceTypeRequest - запрос операции UpdateDeviceType
+UpdateEscalationPolicyRequest is the request of UpdateEscalationPolicy: UpdateEscalationPolicyRequest - запрос операции UpdateEscalationPolicy
+UpdateIncidentTypeRequest is the request of UpdateIncidentType: UpdateIncidentTypeRequest - запрос операции UpdateIncidentType
+UpdateLocationRequest is the request of UpdateLocation: UpdateLocationRequest - запрос операции UpdateLocation
+UpdateMaintenanceWindowRequest carries the path identity and replacement: UpdateMaintenanceWindowRequest содержит идентификатор
+  из пути и заменяющее значение
+UpdateProcessingSettingsRequest is the request of UpdateProcessingSettings: UpdateProcessingSettingsRequest - запрос операции
+  UpdateProcessingSettings
+UpdateRetentionSettingsRequest is the request of UpdateRetentionSettings: UpdateRetentionSettingsRequest - запрос операции
+  UpdateRetentionSettings
+UploadFloorPlanRequest is the request of UploadFloorPlan; the body is the image: UploadFloorPlanRequest - запрос операции
+  UploadFloorPlan; тело содержит изображение
+Uses variable-length encoding: Использует кодирование переменной длины
+? Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values,
+  use sint32 instead
+: Использует кодирование переменной длины. Неэффективно для отрицательных чисел; если они возможны, используйте sint32
+? Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values,
+  use sint64 instead
+: Использует кодирование переменной длины. Неэффективно для отрицательных чисел; если они возможны, используйте sint64
+Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s: Использует
+  кодирование переменной длины. Знаковое целое; отрицательные числа кодируются эффективнее, чем обычным int32
+Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int64s: Использует
+  кодирование переменной длины. Знаковое целое; отрицательные числа кодируются эффективнее, чем обычным int64
+ValidatePlanRequest is the request of ValidatePlan: ValidatePlanRequest - запрос операции ValidatePlan
+Vendor event code: Код события производителя
+Version of the contracts release that produced the message, for diagnostics: Версия выпуска контрактов, сформировавшего сообщение,
+  для диагностики
+W3C traceparent of the connector span, optional: Необязательный W3C traceparent span коннектора
+Without a trigger it fires when no expected event occurs within each window (heartbeat): Без триггера срабатывает при отсутствии
+  ожидаемого события в каждом окне (heartbeat)
+envelope.causation_id is the source domain event id (idempotency key, AU3): envelope.causation_id - идентификатор исходного
+  доменного события, ключ идемпотентности (AU3)
+envelope.message_id is the deterministic signal_id (ADR-005): envelope.message_id - детерминированный signal_id (ADR-005)
+envelope.message_id is the event_id assigned by the Connector SDK,: envelope.message_id - event_id, назначенный Connector
+  SDK,
+envelope.sequence equals the source sequence number: envelope.sequence равен порядковому номеру источника
+envelope.sequence is the source sequence number, envelope.occurred_at is the event time: envelope.sequence - порядковый номер
+  источника, envelope.occurred_at - время события
+produces these requests; command criticality and device authorization remain server-owned: формирует эти запросы; критичность
+  команды и авторизация устройства остаются под контролем сервера
+'psim.correlation.changelog.v1 (key: rule_id:correlation_key). Not a public contract': psim.correlation.changelog.v1 с ключом
+  rule_id:correlation_key. Не является публичным контрактом
+requested_by preserves the verified user for manual steps and the service for automatic steps: requested_by сохраняет проверенного
+  пользователя для ручных шагов и сервис для автоматических
+retry the exact request with its original request_id to resolve that outcome: для выяснения исхода повторите точный запрос
+  с прежним request_id

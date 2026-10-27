@@ -1,0 +1,26 @@
+@startuml
+!include <C4/C4_Component>
+LAYOUT_LEFT_RIGHT()
+title Connector Gateway - Components
+Container_Ext(sdk, "Connector SDK", "gRPC mTLS", "Events, heartbeat, and command results")
+ContainerDb_Ext(pg, "PostgreSQL", "TLS", "Registrations, Session Ownership, and Revocations")
+ContainerDb_Ext(redis, "Valkey", "TLS / RESP3", "TTL Registry and Constraints")
+ContainerQueue_Ext(kafka, "Kafka", "TLS", "raw, state, commands, results")
+Container_Boundary(gw, "Connector Gateway") {
+ Component(server, "gRPC Server", "gRPC / TLS 1.3", "Authentication and bounded transport")
+ Component(session, "Session Manager", "C++", "Registration, lease, heartbeat, and revocation")
+ Component(ingest, "Ingest Pipeline", "C++", "Validation, credits, and Kafka acknowledgements")
+ Component(commands, "Command Dispatcher", "C++", "Checking ownership, deadlines, and capabilities")
+ Component(catalog, "Catalog View", "C++", "Local copies of sources and configurations")
+}
+Rel(sdk, server, "Protocol v1")
+Rel(server, session, "Register / heartbeat")
+Rel(session, pg, "Authoritative ownership")
+Rel(session, redis, "TTL and Limits")
+Rel(server, ingest, "Batches and state")
+Rel(ingest, catalog, "Verification of Source")
+Rel(ingest, kafka, "Produce; ack after acks=all")
+Rel(kafka, commands, "Commands")
+Rel(commands, session, "Current Session")
+Rel(commands, server, "Command delivery")
+@enduml

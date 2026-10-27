@@ -11,7 +11,7 @@ import "psim/catalog/v1/maintenance.proto";
 import "psim/common/v1/types.proto";
 import "psim/incident/v1/incident.proto";
 
-// FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.
+// FeedService serves console read models. Owner: Projection Service.
 service FeedService {
   // GetOperationalSnapshot returns feed and plan data at a historical server capture time.
   rpc GetOperationalSnapshot(GetOperationalSnapshotRequest) returns (GetOperationalSnapshotResponse) {

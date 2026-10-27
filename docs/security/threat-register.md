@@ -1,172 +1,164 @@
-# Реестр угроз и требований безопасности
+# Threat and security requirement register
 
-Сгенерировано из [threat-model.yaml](threat-model.yaml) задачей `task docs:threats:gen`. Не редактировать вручную.
-Методика, активы и границы доверия - [threat-model.md](threat-model.md).
+Generated from [threat-model.yaml](threat-model.yaml) by `task docs:threats:gen`. Do not edit manually.
+Method, assets and trust boundaries: [threat-model.md](threat-model.md).
 
-## 1. Сводка
+## 1. Summary
 
-| Риск | Угроз |
+| Risk | Threats |
 |---|---|
-| Высокий | 30 |
-| Средний | 16 |
-| Низкий | 3 |
-| **Всего** | **49** |
+| High | 30 |
+| Medium | 16 |
+| Low | 3 |
+| **Total** | **49** |
 
-Требований безопасности: 38.
+Security requirements: 38.
 
-## 2. Угрозы по границам и категориям STRIDE
+## 2. Threats by boundary and STRIDE category
 
-| Граница | S | T | R | I | D | E |
+| Boundary | S | T | R | I | D | E |
 |---|---|---|---|---|---|---|
-| TB1 Коннектор -> Connector Gateway | T01 | T02, T03, T09, T43 | T04 | T05, T10 | T06, T07 | T08 |
-| TB2 Браузер -> API Gateway | T11, T12 | T15, T16, T21, T44, T48 | T17, T45 | T19 | T18, T42 | T13, T14, T20, T49 |
-| TB3 Сервис <-> сервис | T22 | T23 | - | T24 | - | - |
-| TB4 Сервис -> хранилища | - | T25, T29 | - | T26, T30 | T28 | T27 |
-| TB5 Администрирование | - | T31 | T32 | T34 | - | T33, T46 |
-| TB6 Платформа -> внешние системы | T37 | - | - | T36 | T38 | T35, T47 |
-| TB7 Цепочка поставки | - | T39, T40 | - | - | - | T41 |
+| TB1 Connector -> Connector Gateway | T01 | T02, T03, T09, T43 | T04 | T05, T10 | T06, T07 | T08 |
+| TB2 Browser -> API Gateway | T11, T12 | T15, T16, T21, T44, T48 | T17, T45 | T19 | T18, T42 | T13, T14, T20, T49 |
+| TB3 Service <-> Service | T22 | T23 | - | T24 | - | - |
+| TB4 Services -> Storage | - | T25, T29 | - | T26, T30 | T28 | T27 |
+| TB5 Administration | - | T31 | T32 | T34 | - | T33, T46 |
+| TB6 Platform -> External Systems | T37 | - | - | T36 | T38 | T35, T47 |
+| TB7 Supply chain | - | T39, T40 | - | - | - | T41 |
 
-## 3. Угрозы
+## 3. Threats
 
-Порядок: по убыванию риска. Риск = вероятность × ущерб.
+Ordered by descending risk. Risk = likelihood × impact.
 
-| ID | Граница | STRIDE | Угроза | Риск | Меры | Остаточный риск |
+| ID | Boundary | STRIDE | Threat | Risk | Controls | Residual risk |
 |---|---|---|---|---|---|---|
-| T06 | TB1 | D | **Поток событий от коннектора.** Неисправный или злонамеренный коннектор отправляет события сверх лимитов и вытесняет другие источники. | высокий (3×3) | SR-16, SR-18, SR-27 | Пропускная способность одного коннектора ограничена его лимитом. |
-| T11 | TB2 | S | **Кража или подбор учётных данных.** Фишинг или подбор пароля оператора, администратора или старшего смены. | высокий (3×3) | SR-02, SR-26 | Для роли operator MFA не обязательна (настраивается заказчиком). |
-| T01 | TB1 | S | **Подмена коннектора украденным сертификатом.** Злоумышленник с сертификатом коннектора подключается и отправляет события от его имени. | высокий (2×3) | SR-01, SR-10, SR-26 | До отзыва сертификата атакующий может слать события источников этого коннектора; обнаруживается по аудиту сессий и аномалиям. |
-| T02 | TB1 | T | **Ложные события скомпрометированного коннектора.** Коннектор генерирует ложные тревоги для отвлечения или подавляет реальные события. | высокий (2×3) | SR-01, SR-16, SR-27, SR-30 | Правдоподобные ложные события не отличимы на уровне протокола; снижается корреляцией нескольких источников и контролем разрывов номеров. |
-| T03 | TB1 | T | **Перехват и изменение трафика коннектора.** Атакующий в сети объекта изменяет события или команды в канале. | высокий (2×3) | SR-01, SR-08 | Нет при корректной настройке TLS. |
-| T07 | TB1 | D | **Вредоносные сообщения протокола.** Сообщения огромного размера или с некорректной структурой роняют шлюз. | высокий (2×3) | SR-11, SR-12 | Ошибки разбора в сторонних библиотеках (gRPC, protobuf) - через обновление зависимостей. |
-| T12 | TB2 | S | **Кража токена доступа.** Токен извлекается через XSS, журналы прокси или историю браузера. | высокий (2×3) | SR-03, SR-14, SR-15 | Украденный токен действует не дольше 5 мин. |
-| T13 | TB2 | E | **Доступ к инцидентам чужой площадки.** Оператор подставляет идентификатор инцидента, устройства или зоны вне своей области доступа. | высокий (3×2) | SR-05 | Нет при полной матрице тестов прав. |
-| T14 | TB2 | E | **Выполнение действий администратора оператором.** Вызов методов администрирования с токеном роли operator. | высокий (2×3) | SR-05, SR-10 | Нет при полной матрице тестов прав. |
-| T16 | TB2 | T | **Внедрение скрипта через данные коннекторов и пользователей.** Атрибуты событий, названия устройств, комментарии содержат HTML или скрипт, исполняемый в консоли. | высокий (2×3) | SR-11, SR-14 | Нет при соблюдении правил вывода. |
-| T17 | TB2 | R | **Отказ оператора от выполненных действий.** Оператор отрицает, что принял инцидент, пропустил шаг или отправил команду. | высокий (2×3) | SR-10, SR-02 | Действия под чужой учётной записью при её компрометации (см. T11). |
-| T20 | TB2 | E | **Злоупотребление критичными командами одним сотрудником.** Оператор или старший смены массово разблокирует двери или снимает объект с охраны. | высокий (2×3) | SR-06, SR-10, SR-26 | Сговор двух сотрудников; обнаруживается аудитом. |
-| T22 | TB3 | S | **Подмена сервиса во внутренней сети.** Посторонний процесс вызывает API сервисов, минуя API Gateway. | высокий (2×3) | SR-04, SR-19 | Компрометация узла приложений даёт доступ к ключам сервисов этого узла. |
-| T23 | TB3 | T | **Запись в чужие топики.** Скомпрометированный сервис публикует поддельные сигналы, инциденты или команды. | высокий (2×3) | SR-19 | Сервис может подделывать сообщения в своих топиках. |
-| T25 | TB4 | T | **Изменение журнала аудита администратором БД.** Администратор с правами суперпользователя меняет или удаляет записи аудита. | высокий (2×3) | SR-10, SR-26 | Изменение не предотвращается, но обнаруживается проверкой целостности. |
-| T27 | TB4 | E | **Инъекция в запросы к PostgreSQL и ClickHouse.** Фильтры поиска или атрибуты событий меняют смысл запроса. | высокий (2×3) | SR-13, SR-12 | Нет при соблюдении правила параметризованных запросов. |
-| T28 | TB4 | D | **Исчерпание дисков хранилищ.** Поток событий или рост истории заполняет диски Kafka, PostgreSQL или ClickHouse и останавливает конвейер. | высокий (2×3) | SR-18, SR-27 | Ошибка сайзинга требует вмешательства эксплуатации до заполнения. |
-| T30 | TB4 | I | **Открытые хранилища без аутентификации.** Redis, ClickHouse, Kafka или PostgreSQL доступны из сетей пользователей или объектов. | высокий (2×3) | SR-19, SR-08 | Ошибка конфигурации межсетевого экрана у заказчика; проверяется установщиком. |
-| T31 | TB5 | T | **Подавление реакции изменением конфигурации.** Администратор отключает правило пожарной тревоги или меняет отображение так, что тревоги становятся info. | высокий (2×3) | SR-07, SR-10, SR-26 | Тонкие изменения условий правил без отключения обнаруживаются только ревью изменений в аудите. |
-| T34 | TB5 | I | **Утечка секретов из конфигурации, логов и диагностических пакетов.** Пароли и ключи попадают в журналы, трассировки или пакет для поддержки. | высокий (2×3) | SR-09 | Секреты в памяти процессов доступны администратору ОС узла. |
-| T35 | TB6 | E | **SSRF через адреса webhook и автоматических шагов.** Администратор или злоумышленник с его правами указывает адрес внутреннего сервиса или метаданных и получает доступ во внутреннюю сеть. | высокий (2×3) | SR-20, SR-07 | Разрешённые адреса из списка могут быть скомпрометированы на стороне получателя. |
-| T39 | TB7 | T | **Компрометация зависимостей и инструментов сборки.** Вредоносная версия библиотеки или образа инструмента попадает в сборку. | высокий (2×3) | SR-23 | Компрометация закреплённой версии до её публикации. |
-| T42 | TB2 | D | **Вредоносный файл плана или доступ к чужому объекту.** Загрузка изображения с чрезмерным расходом памяти либо обход API для чтения плана другой площадки через публичный bucket. | высокий (2×3) | SR-31, SR-11, SR-06 | Нет при валидации, лимитах и закрытом доступе к хранилищу. |
-| T43 | TB1 | T | **Ложное актуальное состояние после восстановления связи.** Старые события из буфера или снимок перезаписывают свежую тревогу и показывают оператору устройство как исправное. | высокий (2×3) | SR-32, SR-10 | Источники без снимка остаются unknown до подтверждённого наблюдения. |
-| T44 | TB2 | T | **Сокрытие тревог через режим обслуживания.** Пользователь включает подавление чужой зоны или оставляет устройство в обслуживании без окончания, чтобы скрыть тревоги. | высокий (2×3) | SR-33, SR-10 | Администратор может подавить разрешённые политикой сигналы своей области; действие и причина сохранены. |
-| T45 | TB2 | R | **Потеря ответственности при передаче инцидента.** Конкурентная или повторная передача оставляет инцидент без ответственного либо сбрасывает SLA и выполненные шаги. | высокий (2×3) | SR-34, SR-10 | Нет при подтверждении, проверке версии и сохранении SLA. |
-| T46 | TB5 | E | **Рабочие команды и уведомления из диагностического replay.** Прогон истории получает рабочие права и повторно открывает дверь, вызывает webhook или создаёт инцидент в рабочем контуре. | высокий (2×3) | SR-35, SR-29, SR-10 | Нет при изоляции ACL и отсутствии внешних адаптеров. |
-| T47 | TB6 | E | **Команды и утечка области через ответ модели.** Инструкция внутри источника или ответ провайдера пытается выполнить команду либо получить чужой инцидент. | высокий (2×3) | SR-36, SR-05, SR-10 | Модель может ошибиться в тексте; вывод маркируется предположением и не исполняется как действие. |
-| T48 | TB2 | T | **Рабочие эффекты учений и устаревшего lease.** Учебная команда попадает устройству либо повтор устаревшего запроса восстанавливает прежнюю блокировку. | высокий (2×3) | SR-37, SR-29, SR-10 | Присутствие рекомендательное; рабочие изменения независимо проверяют права и версию агрегата. |
-| T49 | TB2 | E | **Смешивание сессий и областей при восстановлении браузера.** Подменённый callback, параллельный refresh или поздний ответ старой сессии сохраняет чужие строки и открывает закрытый модуль. | высокий (2×3) | SR-38, SR-02, SR-05 | XSS получает права текущего браузера; серверная авторизация остаётся обязательной независимо от навигации. |
-| T05 | TB1 | I | **Прослушивание потока событий.** Чтение событий СКУД с персональными данными в сети объекта. | средний (2×2) | SR-08, SR-21 | Нет при корректной настройке TLS. |
-| T09 | TB1 | T | **Повтор старых событий.** Повторная отправка записанных ранее событий для создания ложных инцидентов. | средний (2×2) | SR-30 | Повтор с новыми идентификаторами и номерами не отличим от новых событий (см. T02). |
-| T18 | TB2 | D | **Перегрузка API и realtime-канала.** Массовые запросы, тяжёлые выборки, множество соединений WebSocket. | средний (2×2) | SR-17 | Распределённая атака из сети пользователей ограничивается возможностями балансировщика. |
-| T19 | TB2 | I | **Избыточное раскрытие данных.** Ответы API или ошибки содержат данные вне области доступа или внутренние подробности. | средний (2×2) | SR-05, SR-21 | Ошибки в формате RFC 9457 без стеков и внутренних адресов. |
-| T24 | TB3 | I | **Чтение чужих данных сервисом.** Скомпрометированный сервис читает топики и схемы БД, не нужные ему. | средний (2×2) | SR-19 | Сервисы с широким чтением (Projection Service, API Gateway) видят большую часть данных по назначению. |
-| T32 | TB5 | R | **Отказ от изменений конфигурации.** Администратор отрицает изменение правил, сценариев или прав. | средний (2×2) | SR-10 | Нет. |
-| T36 | TB6 | I | **Утечка данных в уведомлениях.** Электронные письма и webhook содержат персональные данные и подробности инцидентов. | средний (2×2) | SR-21, SR-20 | Содержимое шаблонов, заданных администратором. |
-| T38 | TB6 | D | **Недоступность Keycloak.** Отказ IdP блокирует вход и обновление токенов во время инцидента. | средний (2×2) | SR-03, SR-27 | Новый вход невозможен до восстановления Keycloak; уже открытые сессии работают до истечения refresh-токена. |
-| T08 | TB1 | E | **Коннектор управляет чужими устройствами.** Коннектор пытается инициировать команды или получить команды для устройств другого коннектора. | средний (1×3) | SR-06 | Нет, протокол не содержит команд от коннектора, а доставка идёт только в сессию обслуживающего коннектора. |
-| T15 | TB2 | T | **Подделка межсайтовых запросов.** Сторонний сайт отправляет запрос от имени вошедшего пользователя. | средний (1×3) | SR-15 | Нет, токен не передаётся браузером автоматически. |
-| T26 | TB4 | I | **Хищение данных с носителей и резервных копий.** Копирование дисков узлов хранилищ или файлов резервных копий. | средний (1×3) | SR-22, SR-09 | При отказе заказчика от шифрования дисков - открытые данные на носителях. |
-| T29 | TB4 | T | **Подмена схем в Schema Registry.** Регистрация несовместимой схемы ломает потребителей. | средний (1×3) | SR-28 | Нет при закрытой записи. |
-| T33 | TB5 | E | **Злоупотребление инструментами администрирования.** Повторная обработка DLQ или проигрывание событий для создания ложных инцидентов в обход прав. | средний (1×3) | SR-29, SR-10 | Нет. |
-| T37 | TB6 | S | **Подделка токенов через IdP.** Подмена JWKS, токены с alg none или чужим issuer принимаются платформой. | средний (1×3) | SR-03, SR-08 | Компрометация самого Keycloak - вне платформы. |
-| T40 | TB7 | T | **Подмена артефактов поставки у заказчика.** Изменённые образы или пакеты устанавливаются вместо выпущенных. | средний (1×3) | SR-24 | Нет при проверке подписи. |
-| T41 | TB7 | E | **Выход из контейнера и избыточные привилегии процессов.** Уязвимость сервиса даёт root на узле. | средний (1×3) | SR-24, SR-25 | Уязвимости ядра ОС - через обновления дистрибутива. |
-| T04 | TB1 | R | **Отказ интегратора от отправленных событий и результатов команд.** Спор о том, присылал ли коннектор событие или результат команды. | низкий (1×2) | SR-10 | Подписи отдельных событий коннектором не вводятся в MVP. |
-| T10 | TB1 | I | **Чтение или изменение буфера SDK на узле коннектора.** Локальный пользователь узла коннектора читает или меняет файл буфера. | низкий (1×2) | SR-09 | Защита узла коннектора - ответственность интегратора; SDK создаёт файлы с правами только для своего пользователя. |
-| T21 | TB2 | T | **Вредоносные ссылки во вложениях инцидентов.** Ссылка на фишинговый ресурс или со схемой javascript добавлена к инциденту. | низкий (1×2) | SR-14 | Ссылка на внешний ресурс с допустимой схемой может вести на вредоносный сайт. |
+| T06 | TB1 | D | **Connector event flood.** A faulty or malicious connector exceeds event limits and displaces other sources. | high (3×3) | SR-16, SR-18, SR-27 | Each connector's throughput remains bounded by its configured limit. |
+| T11 | TB2 | S | **Credential theft or guessing.** An operator, administrator or shift supervisor password is phished or guessed. | high (3×3) | SR-02, SR-26 | MFA is optional for the operator role and configured by the customer. |
+| T01 | TB1 | S | **Connector impersonation with a stolen certificate.** An attacker with a connector certificate connects and sends events on behalf of that connector. | high (2×3) | SR-01, SR-10, SR-26 | Until revocation, the attacker can send events for the connector's sources; session audits and anomaly detection help identify this. |
+| T02 | TB1 | T | **False events from a compromised connector.** A connector generates false alarms to distract operators or suppresses real events. | high (2×3) | SR-01, SR-16, SR-27, SR-30 | Plausible false events cannot be distinguished at the protocol level; correlate multiple sources and monitor sequence gaps to reduce the risk. |
+| T03 | TB1 | T | **Interception and modification of connector traffic.** An attacker in the site's network modifies events or commands in transit. | high (2×3) | SR-01, SR-08 | None with correct TLS configuration. |
+| T07 | TB1 | D | **Malicious protocol messages.** Oversized or malformed messages crash the gateway. | high (2×3) | SR-11, SR-12 | Address parsing vulnerabilities in third-party libraries (gRPC, protobuf) by updating dependencies. |
+| T12 | TB2 | S | **Access token theft.** A token is extracted through XSS, proxy logs or browser history. | high (2×3) | SR-03, SR-14, SR-15 | A stolen token is valid for no longer than 5 minutes. |
+| T13 | TB2 | E | **Access to another site's incidents.** An operator supplies the identifier of an incident, device or zone outside their access scope. | high (3×2) | SR-05 | None with a complete authorization test matrix. |
+| T14 | TB2 | E | **Operator execution of administrator actions.** Administration methods are called with an operator role token. | high (2×3) | SR-05, SR-10 | None with a complete authorization test matrix. |
+| T16 | TB2 | T | **Script injection through connector and user data.** Event attributes, device names or comments contain HTML or scripts that execute in the console. | high (2×3) | SR-11, SR-14 | None when output rendering rules are followed. |
+| T17 | TB2 | R | **Operator repudiation of performed actions.** An operator denies accepting an incident, skipping a step or sending a command. | high (2×3) | SR-10, SR-02 | Actions performed under another person's compromised account (see T11). |
+| T20 | TB2 | E | **Abuse of critical commands by one employee.** An operator or shift supervisor unlocks many doors or disarms a site. | high (2×3) | SR-06, SR-10, SR-26 | Collusion between two employees remains possible and is detectable through audit. |
+| T22 | TB3 | S | **Service impersonation on the internal network.** An unauthorized process calls service APIs while bypassing API Gateway. | high (2×3) | SR-04, SR-19 | Compromise of an application node exposes the keys of services running on that node. |
+| T23 | TB3 | T | **Writing to another service's topics.** A compromised service publishes forged signals, incidents or commands. | high (2×3) | SR-19 | A service can forge messages in its own topics. |
+| T25 | TB4 | T | **Database administrator modification of the audit log.** An administrator with superuser privileges changes or deletes audit records. | high (2×3) | SR-10, SR-26 | Integrity verification detects changes but cannot prevent them. |
+| T27 | TB4 | E | **Injection into PostgreSQL and ClickHouse queries.** Search filters or event attributes alter query semantics. | high (2×3) | SR-13, SR-12 | None when parameterized query rules are followed. |
+| T28 | TB4 | D | **Storage disk exhaustion.** Event traffic or growing history fills Kafka, PostgreSQL or ClickHouse disks and stops the pipeline. | high (2×3) | SR-18, SR-27 | Incorrect sizing requires operations staff to intervene before disks fill. |
+| T30 | TB4 | I | **Exposed storage without authentication.** Redis, ClickHouse, Kafka or PostgreSQL are reachable from user or site networks. | high (2×3) | SR-19, SR-08 | Customer firewall misconfiguration; checked by the installer. |
+| T31 | TB5 | T | **Suppressing response through configuration changes.** An administrator disables a fire alarm rule or changes a mapping so that alarms become info events. | high (2×3) | SR-07, SR-10, SR-26 | Subtle rule condition changes without disabling the rule are detectable only by reviewing audited changes. |
+| T34 | TB5 | I | **Secret leakage through configuration, logs and diagnostic bundles.** Passwords and keys appear in logs, traces or support bundles. | high (2×3) | SR-09 | The node's OS administrator can access secrets in process memory. |
+| T35 | TB6 | E | **SSRF through webhook and automatic step addresses.** An administrator or an attacker with administrator privileges specifies an internal service or metadata address and gains access to the internal network. | high (2×3) | SR-20, SR-07 | An allowlisted destination may be compromised on the recipient's side. |
+| T39 | TB7 | T | **Compromise of dependencies and build tools.** A malicious library version or tooling image enters the build. | high (2×3) | SR-23 | Compromise of a pinned version before its publication. |
+| T42 | TB2 | D | **Malicious floor plan file or access to another site's object.** An uploaded image causes excessive memory consumption, or an attacker bypasses the API to read another site's floor plan through a public bucket. | high (2×3) | SR-31, SR-11, SR-06 | None with validation, limits and private storage access. |
+| T43 | TB1 | T | **Incorrect current state after reconnection.** Old buffered events or a snapshot overwrite a recent alarm and incorrectly show the device as healthy. | high (2×3) | SR-32, SR-10 | Sources without snapshots remain unknown until a confirmed observation. |
+| T44 | TB2 | T | **Alarm concealment through maintenance mode.** A user enables suppression for another zone or leaves a device in maintenance without an end time to hide alarms. | high (2×3) | SR-33, SR-10 | An administrator may suppress policy-permitted signals within their scope; the action and reason are retained. |
+| T45 | TB2 | R | **Loss of responsibility during incident handover.** Concurrent or repeated handover leaves an incident without an owner or resets its SLA and completed steps. | high (2×3) | SR-34, SR-10 | None with recipient confirmation, version checks and SLA preservation. |
+| T46 | TB5 | E | **Production commands and notifications from diagnostic replay.** A historical replay acquires production permissions and reopens a door, invokes a webhook or creates an incident in production. | high (2×3) | SR-35, SR-29, SR-10 | None with ACL isolation and no external adapters. |
+| T47 | TB6 | E | **Commands and scope leakage through model responses.** An instruction embedded in a source or a provider response attempts to execute a command or retrieve another user's incident. | high (2×3) | SR-36, SR-05, SR-10 | Model text may be incorrect; output is marked as a suggestion and never executed as an action. |
+| T48 | TB2 | T | **Production effects of exercises and expired leases.** A training command reaches a real device, or replaying a stale request restores a previous lock. | high (2×3) | SR-37, SR-29, SR-10 | Presence is advisory; production changes independently verify authorization and aggregate version. |
+| T49 | TB2 | E | **Session and scope mixing during browser recovery.** A forged callback, concurrent refresh or late response from an old session retains another session's rows and opens a restricted module. | high (2×3) | SR-38, SR-02, SR-05 | XSS gains the current browser's privileges; server authorization remains mandatory regardless of navigation. |
+| T05 | TB1 | I | **Eavesdropping on the event stream.** An attacker reads access-control events containing personal data on the site's network. | medium (2×2) | SR-08, SR-21 | None with correct TLS configuration. |
+| T09 | TB1 | T | **Replay of old events.** Previously recorded events are resent to create false incidents. | medium (2×2) | SR-30 | Replays with new identifiers and sequence numbers cannot be distinguished from new events (see T02). |
+| T18 | TB2 | D | **API and realtime channel overload.** Excessive requests, expensive queries or numerous WebSocket connections overload the service. | medium (2×2) | SR-17 | Protection against a distributed attack from user networks is limited by the load balancer's capacity. |
+| T19 | TB2 | I | **Excessive data disclosure.** API responses or errors disclose data outside the access scope or internal details. | medium (2×2) | SR-05, SR-21 | Return RFC 9457 errors without stack traces or internal addresses. |
+| T24 | TB3 | I | **Service access to unrelated data.** A compromised service reads topics and database schemas it does not need. | medium (2×2) | SR-19 | Services with broad read access (Projection Service, API Gateway) legitimately see most data. |
+| T32 | TB5 | R | **Repudiation of configuration changes.** An administrator denies changing rules, scenarios or permissions. | medium (2×2) | SR-10 | None. |
+| T36 | TB6 | I | **Data leakage in notifications.** Emails and webhooks contain personal data and incident details. | medium (2×2) | SR-21, SR-20 | Content of administrator-defined templates. |
+| T38 | TB6 | D | **Keycloak unavailability.** An IdP failure blocks sign-in and token refresh during an incident. | medium (2×2) | SR-03, SR-27 | New sign-ins remain unavailable until Keycloak recovers; existing sessions work until their refresh tokens expire. |
+| T08 | TB1 | E | **Connector control of another connector's devices.** A connector attempts to initiate commands or receive commands for another connector's devices. | medium (1×3) | SR-06 | None; the protocol accepts no commands initiated by connectors, and delivery targets only the session serving the device. |
+| T15 | TB2 | T | **Cross-site request forgery.** A third-party site sends a request on behalf of an authenticated user. | medium (1×3) | SR-15 | None; the browser does not send the token automatically. |
+| T26 | TB4 | I | **Data theft from storage media and backups.** Storage node disks or backup files are copied. | medium (1×3) | SR-22, SR-09 | If the customer declines disk encryption, data on the media remains in plaintext. |
+| T29 | TB4 | T | **Schema tampering in Schema Registry.** Registering an incompatible schema breaks consumers. | medium (1×3) | SR-28 | None when write access is restricted. |
+| T33 | TB5 | E | **Abuse of administration tools.** DLQ reprocessing or event replay creates false incidents while bypassing authorization. | medium (1×3) | SR-29, SR-10 | None. |
+| T37 | TB6 | S | **Token forgery through the IdP.** The platform accepts substituted JWKS or tokens with alg none or an incorrect issuer. | medium (1×3) | SR-03, SR-08 | Compromise of Keycloak itself is outside the platform's scope. |
+| T40 | TB7 | T | **Release artifact substitution at the customer site.** Modified images or packages are installed instead of released artifacts. | medium (1×3) | SR-24 | None when signatures are verified. |
+| T41 | TB7 | E | **Container escape and excessive process privileges.** A service vulnerability grants root access on the node. | medium (1×3) | SR-24, SR-25 | Address OS kernel vulnerabilities through distribution updates. |
+| T04 | TB1 | R | **Integrator repudiation of sent events and command results.** A dispute arises over whether a connector sent an event or a command result. | low (1×2) | SR-10 | Individual event signatures by connectors are not included in the MVP. |
+| T10 | TB1 | I | **Reading or modifying the SDK buffer on a connector node.** A local user on the connector node reads or modifies the buffer file. | low (1×2) | SR-09 | The integrator is responsible for protecting the connector node; the SDK creates files accessible only to its own user. |
+| T21 | TB2 | T | **Malicious links in incident attachments.** An incident receives a link to a phishing site or a URL using the javascript scheme. | low (1×2) | SR-14 | An external URL with an allowed scheme may still point to a malicious site. |
 
-## 4. Требования безопасности
+## 4. Security requirements
 
-| ID | Область | Требование | Шаги плана | Проверка | Закрывает |
+| ID | Area | Requirement | Components | Verification | Threats covered |
 |---|---|---|---|---|---|
-| SR-01 | AUTHN | Коннектор аутентифицируется только клиентским сертификатом mTLS, выпущенным УЦ оператора установки или организации; отпечаток сертификата привязан к регистрации коннектора в каталоге; отзыв закрывает открытые сессии немедленно; срок сертификата не более 1 года; ротация с перекрытием (C1, C2). | 2.6, 4.2, 4.4 | test | T01, T02, T03 |
-| SR-02 | AUTHN | Пользователи входят только через Keycloak (OIDC Authorization Code + PKCE). Политика паролей (не короче 12 символов), блокировка при подборе, многофакторная аутентификация обязательна для ролей admin и supervisor; тайм-аут бездействия сессии 30 мин, максимальная длительность 12 ч (настраивается). | 1.4, 7.4, 8.2 | config | T11, T17, T49 |
-| SR-03 | AUTHN | Проверка токенов: фиксированный issuer, проверка audience, разрешённые алгоритмы только RS256 и ES256, проверка exp и nbf с допуском не более 30 с; JWKS загружается только с настроенного адреса по TLS и кэшируется с ротацией ключей; срок токена доступа 5 мин, ротация refresh-токена. | 2.6, 7.1 | test | T12, T37, T38 |
-| SR-04 | AUTHN | Межсервисные вызовы: mTLS на внутреннем УЦ и токен сервиса (client credentials) или делегированный токен пользователя; каждый сервис сам проверяет токен и права. | 2.6 | test | T22 |
-| SR-15 | AUTHN | Токены в браузере хранятся только в памяти (не в localStorage и sessionStorage) и никогда не передаются в URL; realtime-канал аутентифицируется первым кадром; CORS только для разрешённых источников; токен передаётся в заголовке Authorization, что исключает CSRF. | 7.2, 8.2 | test | T12, T15 |
-| SR-38 | AUTHN | Оболочка проверяет PKCE state, nonce и ID token настроенного issuer, хранит токены только в памяти, объединяет конкурентные refresh и очищает данные при выходе. Ролевые ссылки не заменяют серверную авторизацию; восстановление нового курсора при изменении области очищает прежний снимок до чтения нового. | 8.2, 8.4 | test | T49 |
-| SR-05 | AUTHZ | Запрет по умолчанию: решение RBAC + ABAC в API Gateway и повторно в сервисе-владельце; фильтрация по области доступа в списках, поиске, realtime-потоке, отчётах и экспорте; каждый отказ - запись аудита (ADR-020). | 7.1, 7.2, 7.4 | test | T13, T14, T19, T47, T49 |
-| SR-06 | AUTHZ | Команды: проверка возможности устройства и области доступа инициатора; критичные команды исполняются только после подтверждения старшим смены, отличным от инициатора (CM3); протокол коннекторов не позволяет коннектору инициировать команды; шлюз доставляет команду только в сессию коннектора, обслуживающего устройство. | 4.2, 6.2 | test | T08, T20, T42 |
-| SR-07 | AUTHZ | Изменения конфигурации реакции (активация набора правил, публикация отображений и сценариев, политики эскалации, архивирование правил) доступны только роли admin, фиксируются в аудите с описанием изменения; отключение или архивирование правил для типов инцидентов с приоритетом по умолчанию P1 или P2 немедленно оповещает старших смены. | 5.1, 6.1, 6.4, 8.4 | test | T31, T35 |
-| SR-29 | AUTHZ | Инструменты администрирования (psimctl) аутентифицируются как пользователи (OIDC device flow) и подчиняются той же модели прав; служебных учётных записей в обход прав нет; аварийная учётная запись Keycloak защищена MFA, её использование в аудите и оповещает администраторов. | 7.4, 9.5 | review | T33, T46, T48 |
-| SR-33 | AUTHZ | Обслуживание доступно администратору своей области, имеет обязательный срок окончания, причину, ответственного и явную политику. Пожарные события и P1 не подавляются; история не удаляется; открытые инциденты и SLA не меняются. Автоматическое завершение переживает перезапуск и отражается в аудите. | 4.4, 5.1, 5.2, 8.4 | test | T44 |
-| SR-34 | AUTHZ | Передача инцидента требует подтверждения получателя, проверки роли, области и версии; до подтверждения отвечает прежний оператор. Повторы идемпотентны, SLA и сценарий сохраняются. Назначение дежурного и принудительное переназначение выполняет старший смены своей области; все действия аудируются. | 5.3, 6.3, 8.3 | test | T45 |
-| SR-35 | AUTHZ | Диагностический replay ограничен областью инициатора и изолирован отдельными ACL, топиками, consumer groups и хранилищами. Исполнитель не может писать рабочие сигналы, инциденты, команды и уведомления и вызывать HTTP/SMTP/устройства. Запуск аудируется. Восстановление проекции и рабочий DLQ - отдельные авторизованные операции. | 5.1, 6.1, 9.5 | test | T46 |
-| SR-36 | AUTHZ | Ассистент получает только серверные факты текущей области пользователя, не получает bearer и инструменты; адрес и модель задаёт администратор. Ответ ограничен сроком, размером и серверными ссылками на источники. После ответа повторно проверяются права и версия источника; отказ сохраняет исходные разрешённые факты. | 8.1a | test | T47 |
-| SR-37 | AUTHZ | Учения имеют отдельное состояние, владельца, версию и срок; учебное действие не создаёт рабочие команды, инциденты и уведомления. Присутствие не предоставляет бизнес-права, lease ограничен временем и идентификатором поколения; подавление тревоги требует права старшего смены, причины и окончания. | 8.1a | test | T48 |
-| SR-08 | CRYPTO | TLS 1.3 на внешних границах (TB1, TB2); внутри платформы - не ниже TLS 1.2 только с AEAD- наборами; проверка сертификатов всегда включена; открытых портов без TLS нет; HSTS для веб. | 2.6, 9.1 | scan | T03, T05, T30, T37 |
-| SR-09 | SECRETS | Секреты не хранятся открыто в конфигурации и переменных окружения, доступных другим процессам: только файлы с правами 0400 пользователя сервиса или хранилище секретов; секреты не попадают в логи, трассировки и диагностические пакеты; закрытые ключи УЦ и подписи контрольных точек аудита хранятся отдельно с ограниченным доступом; процедуры ротации документированы. Автоматический тест: сервисы запускаются с известными тестовыми секретами, затем логи, трассировки и диагностический пакет проверяются на отсутствие их значений. | 2.1, 2.6, 9.1, 9.5 | test | T10, T26, T34 |
-| SR-10 | AUDIT | Аудит всех действий пользователей, отказов в доступе, изменений конфигурации, событий сессий коннекторов (открытие, отказ, отзыв), жизненного цикла команд; цепочка хэшей и подписанные контрольные точки вне БД; права БД запрещают UPDATE, DELETE, TRUNCATE (ADR-021). | 4.2, 6.4, 7.1 | test | T01, T04, T14, T17, T20, T25, T31, T32, T33, T43, T44, T45, T46, T47, T48 |
-| SR-11 | INPUT | Все входящие сообщения проверяются правилами protovalidate на границе (шлюз коннекторов, API Gateway); ограничения размера: сообщение gRPC до 4 МБ, пакет событий до 1 МБ и 1000 событий, тело REST до 1 МБ (импорт до 100 МБ, план этажа до 20 МБ); неизвестные поля в REST отклоняются. | 4.2, 7.1 | test | T07, T16, T42 |
-| SR-12 | INPUT | Фаззинг всех разборщиков недоверенных данных: декодирование протокола коннекторов, импорт CSV и JSON, выражения правил и отображений, кадры realtime. Для парсера и валидатора правил на шаге 5.1 достаточно 10 минут без падений; полный прогон всех целей по 24 ч выполняется на шаге 10.3. | 4.2, 5.1, 10.3 | test | T07, T27 |
-| SR-13 | INPUT | Доступ к PostgreSQL и ClickHouse только параметризованными запросами; конкатенация пользовательского ввода в текст запроса запрещена и проверяется статическим анализом в CI. | 1.2, 2.4, 2.8, 4.5 | scan | T27 |
-| SR-14 | INPUT | Безопасный вывод в веб-клиенте: данные пользователей и коннекторов отображаются только как текст, без вставки HTML; строгий CSP без inline-скриптов; заголовки X-Content-Type-Options, frame-ancestors 'none', Referrer-Policy; ссылки из инцидентов - только http и https с rel="noopener noreferrer". | 7.1, 8.1, 8.6 | test | T12, T16, T21 |
-| SR-30 | INPUT | Защита от повторов: дедупликация по event_id и порядковым номерам источников; дедлайн и идемпотентный command_id у команд; подпись webhook с меткой времени и окном приёма 5 мин; токены возобновления realtime привязаны к пользователю и имеют срок действия. | 4.5, 6.2, 6.3, 7.2 | test | T02, T09 |
-| SR-31 | INPUT | Поэтажные планы принимаются только как PNG/JPEG до 20 МБ с проверкой сигнатуры, декодирования и предела пикселей. Имена объектов генерируются платформой; bucket закрыт. Чтение и запись проходят RBAC и область доступа; версии и SHA-256 входят в независимое резервное копирование. | 4.4, 8.4, 9.1, 9.3 | test | T42 |
-| SR-16 | DOS | Защита ввода: кредиты, лимит событий в секунду на коннектор, ограничения пакета и сообщения, одна активная сессия на коннектор, лимит соединений на шлюз; при переполнении буфера SDK первыми вытесняются события info и порождается system.connector.buffer_overflow; события классов alarm и fault не вытесняются. | 4.1, 4.2 | test | T02, T06 |
-| SR-17 | DOS | Защита API и realtime: лимиты частоты на пользователя и эндпоинт, размер страницы не больше 1000, дедлайны запросов, не больше 5 WebSocket-соединений на пользователя, отключение медленных клиентов, ограничение размера экспорта. | 7.1, 7.2 | test | T18 |
-| SR-18 | DOS | Защита от исчерпания ресурсов: ограниченные очереди и противодавление вместо неограниченного роста; квоты клиентов Kafka; контроль заполнения дисков Kafka, PostgreSQL, ClickHouse с алертами на 70% и 85%; принудительный retention. | 2.2, 2.3, 9.4 | test | T06, T28 |
-| SR-27 | DOS | Доступность реакции на тревоги: алерты на лаг конвейера и нарушение SLO задержки событие -> консоль; консоль показывает потерю связи; лимиты на коннектор не дают одному источнику вытеснить остальные; поведение при деградации описано в runbook. | 4.1, 9.4, 10.1 | test | T02, T06, T28, T38 |
-| SR-19 | NET | Хранилища и внутренние порты доступны только во внутренней сети платформы; установщик выдаёт шаблон правил межсетевого экрана; Kafka, PostgreSQL, Redis-совместимое хранилище и ClickHouse требуют аутентификации и TLS; ACL Kafka по сервисам генерируются из реестра топиков (запись - только в свои топики); роли PostgreSQL и пользователи ClickHouse - по сервисам с минимальными правами. | 2.3, 2.4, 2.5, 2.8, 9.1 | config | T22, T23, T24, T30 |
-| SR-20 | INTEGR | Исходящие вызовы (webhook, автоматические шаги, SMTP) - только на адреса из списка, заданного администратором; частные, loopback, link-local диапазоны и адреса метаданных запрещены по умолчанию, проверка после разрешения DNS; проверка TLS; подпись webhook HMAC-SHA256; тайм-ауты и ограничение размера ответа. | 6.1, 6.3 | test | T35, T36 |
-| SR-28 | INTEGR | Запись схем в Schema Registry - только установщик и CI; сервисы имеют права только на чтение; правила совместимости заданы на всех subject. | 2.3, 9.2 | config | T29 |
-| SR-21 | DATA | Минимизация персональных данных: идентификаторы карт СКУД по умолчанию заменяются ключевым HMAC при нормализации; персональные данные не пишутся в логи; сроки хранения по RetentionSettings; шаблоны уведомлений без персональных данных; экспорт данных - в аудите. | 4.5, 6.3, 6.4 | test | T05, T19, T36 |
-| SR-22 | DATA | Шифрование хранимых данных: полнодисковое шифрование узлов хранилищ рекомендуется и проверяется установщиком с предупреждением; резервные копии PostgreSQL, ClickHouse и конфигурации шифруются. | 9.1, 9.3 | config | T26 |
-| SR-32 | DATA | Состояние устройства отделено от связи и качества actual/stale/unknown. Потеря связи требует нового подтверждения; старые события и снимки не повышают свежесть. Сверка учитывает последовательность и эпоху источника. Снимки и дельты фильтруются по области доступа. | 4.1, 4.2, 4.5, 7.2, 7.3 | test | T43 |
-| SR-23 | SUPPLY | Зависимости зафиксированы lock-файлами (Conan, pnpm, buf.lock); базовые образы и образы инструментов закреплены по дайджесту; SBOM CycloneDX; проверка лицензий и уязвимостей в CI блокирует критичные и высокие; воспроизводимые сборки. | 1.1, 1.3 | scan | T39 |
-| SR-24 | SUPPLY | Артефакты выпуска (образы, пакеты) подписываются; установщик проверяет подписи перед установкой и обновлением; контейнеры работают без root, с файловой системой только для чтения где возможно и без лишних capabilities. | 1.3, 9.2, 10.3 | test | T40, T41 |
-| SR-25 | OPS | Усиление защиты: минимальный набор пакетов ОС; сервисы под выделенными пользователями с ограничениями systemd (NoNewPrivileges, ProtectSystem, PrivateTmp); контейнеры без privileged; административная консоль Keycloak недоступна из сетей пользователей. | 9.1, 10.3 | pentest | T41 |
-| SR-26 | OPS | Мониторинг безопасности: алерты на всплески неудачных входов, отказов коннекторам и отказов в доступе, отключение правил, ошибки периодической проверки целостности аудита, истечение сертификатов (за 30 дней). | 6.4, 9.4 | test | T01, T11, T20, T25, T31 |
+| SR-01 | AUTHN | The connector authenticates only with an mTLS client certificate issued by the deployment operator's or organization's CA. Its fingerprint is bound to the connector registration in the catalog. Revocation immediately closes active sessions. Certificate lifetime is at most 1 year; rotation uses an overlap period (C1, C2). | libs/platform/security, services/connector-gateway, services/resource-catalog | test | T01, T02, T03 |
+| SR-02 | AUTHN | Users sign in only through Keycloak (OIDC Authorization Code + PKCE). Enforce a password policy with at least 12 characters and lockout against guessing. MFA is mandatory for admin and supervisor roles. The session idle timeout is 30 minutes and maximum duration is 12 hours (configurable). | deploy/local, libs/platform/authz, web | config | T11, T17, T49 |
+| SR-03 | AUTHN | Token validation uses a fixed issuer, checks audience, permits only RS256 and ES256, and checks exp and nbf with at most 30 seconds of clock tolerance. JWKS is fetched only from the configured address over TLS and cached with key rotation. Access token lifetime is 5 minutes; refresh tokens rotate. | libs/platform/security, services/api-gateway | test | T12, T37, T38 |
+| SR-04 | AUTHN | Service calls require mTLS with an internal CA and a service token (client credentials) or delegated user token. Each service independently validates the token and permissions. | libs/platform/security | test | T22 |
+| SR-15 | AUTHN | Store browser tokens only in memory, never in localStorage or sessionStorage, and never include them in URLs. Authenticate the realtime channel with its first frame. Allow CORS only for approved origins. Send tokens in the Authorization header to prevent CSRF. | services/api-gateway, web | test | T12, T15 |
+| SR-38 | AUTHN | The shell validates PKCE state, nonce and the configured issuer's ID token, stores tokens only in memory, coalesces concurrent refreshes and clears data on logout. Role-specific navigation does not replace server authorization. When scope changes, acquiring a new cursor clears the previous snapshot before reading a new one. | web | test | T49 |
+| SR-05 | AUTHZ | Deny by default. Apply RBAC + ABAC in API Gateway and again in the owning service. Filter lists, search, realtime streams, reports and exports by access scope. Every denial produces an audit record (ADR-020). | libs/platform/authz, services/api-gateway | test | T13, T14, T19, T47, T49 |
+| SR-06 | AUTHZ | Commands require checks of device capabilities and the requester's access scope. Critical commands execute only after approval by a different shift supervisor (CM3). The connector protocol does not allow connectors to initiate commands. The gateway delivers a command only to the session of the connector serving that device. | services/command-service, services/connector-gateway | test | T08, T20, T42 |
+| SR-07 | AUTHZ | Response configuration changes (activating rule sets, publishing mappings and scenarios, escalation policies and archiving rules) require the admin role and an audit record describing the change. Disabling or archiving rules for incident types with default priority P1 or P2 immediately notifies shift supervisors. | services/audit-service, services/correlation-engine, services/response-engine, web | test | T31, T35 |
+| SR-29 | AUTHZ | Administration tools (psimctl) authenticate as users through OIDC device flow and follow the same authorization model. No service account bypasses permissions. The emergency Keycloak account requires MFA; its use is audited and notifies administrators. | libs/platform/authz, tools/psimctl | review | T33, T46, T48 |
+| SR-33 | AUTHZ | Maintenance is available to administrators within their scope and requires an end time, reason, owner and explicit policy. Fire events and P1 are never suppressed. History is retained; open incidents and SLAs remain unchanged. Automatic completion survives restarts and is audited. | services/correlation-engine, services/resource-catalog, web | test | T44 |
+| SR-34 | AUTHZ | Incident handover requires recipient confirmation and checks of role, scope and version. The previous operator remains responsible until confirmation. Retries are idempotent; SLA and response scenario are preserved. Only a shift supervisor within the relevant scope may assign duty or force reassignment. Audit every action. | services/incident-service, services/notification-service, web | test | T45 |
+| SR-35 | AUTHZ | Diagnostic replay is restricted to the requester's scope and isolated through separate ACLs, topics, consumer groups and storage. Its executor cannot write production signals, incidents, commands or notifications, or call HTTP, SMTP or devices. Audit every run. Projection recovery and production DLQ processing are separate authorized operations. | services/correlation-engine, services/response-engine, tools/psimctl | test | T46 |
+| SR-36 | AUTHZ | The assistant receives only server-provided facts within the user's current scope, without bearer tokens or tools. An administrator configures the endpoint and model. Enforce response time and size limits and server-provided source links. Recheck permissions and source version after the response; failure preserves the original authorized facts. | services/api-gateway, services/incident-service | test | T47 |
+| SR-37 | AUTHZ | Exercises have separate state, owner, version and expiry. Training actions cannot create production commands, incidents or notifications. Presence grants no business permissions; leases are bounded by time and generation identifier. Alarm suppression requires shift supervisor permission, a reason and an end time. | services/api-gateway, services/incident-service | test | T48 |
+| SR-08 | CRYPTO | Require TLS 1.3 at external boundaries (TB1, TB2), and at least TLS 1.2 with AEAD suites inside the platform. Certificate verification is always enabled. No exposed port permits plaintext traffic. Enable HSTS for the web interface. | deploy, libs/platform/security | scan | T03, T05, T30, T37 |
+| SR-09 | SECRETS | Secrets must not appear in plaintext configuration or environment variables accessible to other processes. Use files owned by the service user with mode 0400, or a secret store. Exclude secrets from logs, traces and diagnostic bundles. Store CA private keys and audit checkpoint signing keys separately with restricted access. Document rotation procedures. An automated test starts services with known test secrets, then verifies that their values are absent from logs, traces and the diagnostic bundle. | deploy, libs/platform/runtime, libs/platform/security, tools/psimctl | test | T10, T26, T34 |
+| SR-10 | AUDIT | Audit all user actions, access denials, configuration changes, connector session events (opening, rejection and revocation) and command lifecycle events. Maintain a hash chain and signed checkpoints outside the database. Database permissions prohibit UPDATE, DELETE and TRUNCATE (ADR-021). | services/api-gateway, services/audit-service, services/connector-gateway | test | T01, T04, T14, T17, T20, T25, T31, T32, T33, T43, T44, T45, T46, T47, T48 |
+| SR-11 | INPUT | Validate all incoming messages with protovalidate at the boundary (Connector Gateway and API Gateway). Limit gRPC messages to 4 MB, event batches to 1 MB and 1000 events, and REST bodies to 1 MB (imports up to 100 MB, floor plans up to 20 MB). Reject unknown REST fields. | services/api-gateway, services/connector-gateway | test | T07, T16, T42 |
+| SR-12 | INPUT | Fuzz all parsers of untrusted data, including connector protocol decoding, CSV and JSON imports, rule and mapping expressions, and realtime frames. CI requires 10 crash-free minutes for the rule parser and validator. Release qualification requires a complete 24-hour run of every target. | services/connector-gateway, services/correlation-engine, tools/security | test | T07, T27 |
+| SR-13 | INPUT | Access PostgreSQL and ClickHouse only through parameterized queries. Concatenating user input into query text is prohibited and checked by static analysis in CI. | libs/platform/clickhouse, libs/platform/pg, services/normalizer, tools/cpp | scan | T27 |
+| SR-14 | INPUT | Render user and connector data as text in the web client, without inserting HTML. Use a strict CSP without inline scripts, X-Content-Type-Options, frame-ancestors 'none', and Referrer-Policy. Incident links allow only http and https with rel="noopener noreferrer". | services/api-gateway, web | test | T12, T16, T21 |
+| SR-30 | INPUT | Prevent replay through event_id and source sequence deduplication, command deadlines and idempotent command_id, signed webhooks with a timestamp and a 5-minute acceptance window, and expiring realtime resume tokens bound to the user. | services/api-gateway, services/command-service, services/normalizer, services/notification-service | test | T02, T09 |
+| SR-31 | INPUT | Accept floor plans only as PNG/JPEG up to 20 MB, checking file signatures, decoding and pixel limits. The platform generates object names; the bucket is private. Reads and writes enforce RBAC and access scope. Independent backups include versions and SHA-256. | deploy, services/resource-catalog, tools/psimctl, web | test | T42 |
+| SR-16 | DOS | Protect ingestion with credits, per-connector event rate limits, batch and message limits, one active session per connector and a connection limit per gateway. On SDK buffer overflow, evict info events first and emit system.connector.buffer_overflow. Never evict alarm or fault events. | libs/platform/connector, services/connector-gateway | test | T02, T06 |
+| SR-17 | DOS | Protect the API and realtime channel with per-user and per-endpoint rate limits, a maximum page size of 1000, request deadlines, at most 5 WebSocket connections per user, disconnection of slow clients and export size limits. | services/api-gateway | test | T18 |
+| SR-18 | DOS | Prevent resource exhaustion through bounded queues and backpressure, Kafka client quotas, disk utilization monitoring for Kafka, PostgreSQL and ClickHouse with alerts at 70% and 85%, and enforced retention. | deploy/observability, libs/platform/async, libs/platform/kafka | test | T06, T28 |
+| SR-27 | DOS | Protect alarm response availability with alerts on pipeline lag and event -> console latency SLO violations. The console indicates loss of connectivity. Per-connector limits prevent a source from displacing others. Runbooks describe degraded operation. | deploy/observability, libs/platform/connector, tools/bench | test | T02, T06, T28, T38 |
+| SR-19 | NET | Storage and internal ports are reachable only within the platform network. The installer provides a firewall rule template. Kafka, PostgreSQL, Redis-compatible storage and ClickHouse require authentication and TLS. Generate service-specific Kafka ACLs from the topic registry, allowing writes only to the service's own topics. Use separate PostgreSQL roles and ClickHouse users per service with minimum permissions. | deploy, libs/platform/clickhouse, libs/platform/kafka, libs/platform/pg, libs/platform/redis | config | T22, T23, T24, T30 |
+| SR-20 | INTEGR | Outbound calls (webhooks, automatic steps and SMTP) may target only addresses in the administrator's allowlist. Reject private, loopback, link-local and metadata addresses by default, checking after DNS resolution. Verify TLS, sign webhooks with HMAC-SHA256, and enforce timeouts and response size limits. | services/notification-service, services/response-engine | test | T35, T36 |
+| SR-28 | INTEGR | Only the installer and CI may write schemas to Schema Registry. Services have read-only access. Configure compatibility rules for every subject. | libs/platform/kafka, tools/deploy | config | T29 |
+| SR-21 | DATA | Minimize personal data. By default, replace access-control card identifiers with a keyed HMAC during normalization. Exclude personal data from logs, apply RetentionSettings, use notification templates without personal data and audit data exports. | services/audit-service, services/normalizer, services/notification-service | test | T05, T19, T36 |
+| SR-22 | DATA | Recommend full-disk encryption on storage nodes; the installer checks it and warns when absent. Encrypt PostgreSQL, ClickHouse and configuration backups. | deploy, tools/psimctl | config | T26 |
+| SR-32 | DATA | Device state is separate from connectivity and actual/stale/unknown quality. Loss of connectivity requires fresh confirmation; old events and snapshots cannot improve freshness. Reconciliation considers source sequence and epoch. Filter snapshots and deltas by access scope. | libs/platform/connector, services/api-gateway, services/connector-gateway, services/normalizer, services/projection-service | test | T43 |
+| SR-23 | SUPPLY | Pin dependencies in lockfiles (Conan, pnpm and buf.lock), and base and tooling images by digest. Produce a CycloneDX SBOM. CI checks licenses and vulnerabilities, blocking critical and high findings. Builds must be reproducible. | tools/release, tools/toolchain | scan | T39 |
+| SR-24 | SUPPLY | Sign release artifacts (images and packages). The installer verifies signatures before installation and upgrades. Run containers without root, with a read-only filesystem where possible and without unnecessary capabilities. | tools/deploy, tools/release, tools/security | test | T40, T41 |
+| SR-25 | OPS | Harden the deployment with a minimal OS package set, dedicated service users and systemd restrictions (NoNewPrivileges, ProtectSystem and PrivateTmp). Do not use privileged containers. The Keycloak administration console must be inaccessible from user networks. | deploy, tools/security | pentest | T41 |
+| SR-26 | OPS | Security monitoring alerts on spikes in failed logins, connector rejections and access denials, disabled rules, failed periodic audit integrity checks and certificates expiring within 30 days. | deploy/observability, services/audit-service | test | T01, T11, T20, T25, T31 |
 
-## 5. Требования по шагам плана
+## 5. Requirements by component
 
-Шаг реализует перечисленные требования; общий DoD (раздел 17 плана, п. 7) требует их проверки при завершении шага.
+Component changes require verification of their associated security requirements.
 
-| Шаг | Требования |
+| Component | Requirements |
 |---|---|
-| 1.1 | SR-23 |
-| 1.2 | SR-13 |
-| 1.3 | SR-23, SR-24 |
-| 1.4 | SR-02 |
-| 2.1 | SR-09 |
-| 2.2 | SR-18 |
-| 2.3 | SR-18, SR-19, SR-28 |
-| 2.4 | SR-13, SR-19 |
-| 2.5 | SR-19 |
-| 2.6 | SR-01, SR-03, SR-04, SR-08, SR-09 |
-| 2.8 | SR-13, SR-19 |
-| 4.1 | SR-16, SR-27, SR-32 |
-| 4.2 | SR-01, SR-06, SR-10, SR-11, SR-12, SR-16, SR-32 |
-| 4.4 | SR-01, SR-31, SR-33 |
-| 4.5 | SR-13, SR-21, SR-30, SR-32 |
-| 5.1 | SR-07, SR-12, SR-33, SR-35 |
-| 5.2 | SR-33 |
-| 5.3 | SR-34 |
-| 6.1 | SR-07, SR-20, SR-35 |
-| 6.2 | SR-06, SR-30 |
-| 6.3 | SR-20, SR-21, SR-30, SR-34 |
-| 6.4 | SR-07, SR-10, SR-21, SR-26 |
-| 7.1 | SR-03, SR-05, SR-10, SR-11, SR-14, SR-17 |
-| 7.2 | SR-05, SR-15, SR-17, SR-30, SR-32 |
-| 7.3 | SR-32 |
-| 7.4 | SR-02, SR-05, SR-29 |
-| 8.1 | SR-14 |
-| 8.1a | SR-36, SR-37 |
-| 8.2 | SR-02, SR-15, SR-38 |
-| 8.3 | SR-34 |
-| 8.4 | SR-07, SR-31, SR-33, SR-38 |
-| 8.6 | SR-14 |
-| 9.1 | SR-08, SR-09, SR-19, SR-22, SR-25, SR-31 |
-| 9.2 | SR-24, SR-28 |
-| 9.3 | SR-22, SR-31 |
-| 9.4 | SR-18, SR-26, SR-27 |
-| 9.5 | SR-09, SR-29, SR-35 |
-| 10.1 | SR-27 |
-| 10.3 | SR-12, SR-24, SR-25 |
+| deploy | SR-08, SR-09, SR-19, SR-22, SR-25, SR-31 |
+| deploy/local | SR-02 |
+| deploy/observability | SR-18, SR-26, SR-27 |
+| libs/platform/async | SR-18 |
+| libs/platform/authz | SR-02, SR-05, SR-29 |
+| libs/platform/clickhouse | SR-13, SR-19 |
+| libs/platform/connector | SR-16, SR-27, SR-32 |
+| libs/platform/kafka | SR-18, SR-19, SR-28 |
+| libs/platform/pg | SR-13, SR-19 |
+| libs/platform/redis | SR-19 |
+| libs/platform/runtime | SR-09 |
+| libs/platform/security | SR-01, SR-03, SR-04, SR-08, SR-09 |
+| services/api-gateway | SR-03, SR-05, SR-10, SR-11, SR-14, SR-15, SR-17, SR-30, SR-32, SR-36, SR-37 |
+| services/audit-service | SR-07, SR-10, SR-21, SR-26 |
+| services/command-service | SR-06, SR-30 |
+| services/connector-gateway | SR-01, SR-06, SR-10, SR-11, SR-12, SR-16, SR-32 |
+| services/correlation-engine | SR-07, SR-12, SR-33, SR-35 |
+| services/incident-service | SR-34, SR-36, SR-37 |
+| services/normalizer | SR-13, SR-21, SR-30, SR-32 |
+| services/notification-service | SR-20, SR-21, SR-30, SR-34 |
+| services/projection-service | SR-32 |
+| services/resource-catalog | SR-01, SR-31, SR-33 |
+| services/response-engine | SR-07, SR-20, SR-35 |
+| tools/bench | SR-27 |
+| tools/cpp | SR-13 |
+| tools/deploy | SR-24, SR-28 |
+| tools/psimctl | SR-09, SR-22, SR-29, SR-31, SR-35 |
+| tools/release | SR-23, SR-24 |
+| tools/security | SR-12, SR-24, SR-25 |
+| tools/toolchain | SR-23 |
+| web | SR-02, SR-07, SR-14, SR-15, SR-31, SR-33, SR-34, SR-38 |

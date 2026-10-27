@@ -1,34 +1,40 @@
-# Размер поставки администрирования
+# Administration Bundle Size
 
-## Состав измерений
+<!-- language-links -->
+[English](administration-assets.md) | [Русский](../ru/engineering/administration-assets.md)
+<!-- /language-links -->
 
-Сборка использует закреплённые Node, pnpm и Vite в Docker. Суммируется gzip каждого уникального JS-файла с уровнем 9. Полный граф включает статические и динамические imports, выбранные входом, и скрипты HTML. Начальная загрузка учитывает только статические зависимости и выбранный словарь языка. Карты исходников в бюджет JS не входят.
+## Composition of Measurements
 
-Исходные измерения консоли оператора: начальная загрузка EN/RU - 118094/119478 байт, полный граф приложения - 197935 байт, уникальная поставка - 268,57 КБ. Пределы: 150000, 200000 и 294000 байт соответственно.
+The build uses fixed Node, pnpm, and Vite in Docker. The gzip of each unique JS file is summed at level 9. The total graph includes static and dynamic imports selected by entrypoint, as well as HTML scripts. The initial load only considers static dependencies and the selected language dictionary. Source maps are not included in the JS budget.
 
-## Сравнение вариантов
+The original measurements from the operator console are: initial load EN/RU - 118094/119478 bytes; total application graph - 197935 bytes; unique distribution - 268.57 KB. Limits are 150000, 200000, and 294000 bytes respectively.
 
-| Вариант | Начальная загрузка EN/RU, байт gzip | Полный граф приложения, байт gzip | Уникальная поставка, байт gzip |
+## Comparison of Options
+
+| Option | Initial Load EN/RU, bytes gzip | Total Application Graph, bytes gzip | Unique Distribution, bytes gzip |
 |---|---:|---:|---:|
-| Ленивый административный маршрут, полные метаданные форм | 119193/120577 | 230061 | 287370 |
-| Ленивый маршрут, удалены недоступные для редактирования метаданные | 119022/120405 | 229828 | 287136 |
-| Статический импорт административного модуля | 159293/160676 | 226902 | 284101 |
-| Только достижимые файлы приложения из ленивой сборки | 119022/120405 | 229828 | 229828 |
+| Lazy Administrative Route with Full Metadata | 119193/120577 | 230061 | 287370 |
+| Lazy Route with Uneditable Metadata Removed | 119022/120405 | 229828 | 287136 |
+| Static Import of Administrative Module | 159293/160676 | 226902 | 284101 |
+| Only Reachable Application Files from Lazy Build | 119022/120405 | 229828 | 229828 |
 
-Последняя строка - расчёт состава отдельного производственного артефакта по manifest, без повторной сборки Vite. Она исключает витрину из поставки, но не уменьшает полный граф приложения. Разность небольших начальных измерений также зависит от уровня gzip: штатный начальный барьер использует стандартный уровень; таблица использует уровень 9 для сопоставимости графов.
+The last line calculates the composition of a single production artifact based on the manifest, without re-building Vite. It excludes the showcase from the supply but does not reduce the total application graph. The difference in small initial measurements also depends on the gzip level: the standard initial limit uses the standard level; the table uses level 9 for graph comparison.
 
-Статический импорт уменьшает накладные расходы чанков, но превышает начальный предел. Отложенная загрузка отдельных вкладок или словарей может уменьшить первый переход; их код продолжит входить в полный граф. Удаление недоступных для редактирования метаданных уменьшило граф на 233 байта. Новых зависимостей рабочего приложения нет; YAML-парсер используется только при генерации контрактов.
+Static import reduces overhead but exceeds the initial limit. Delayed loading of individual tabs or dictionaries may reduce the first transition; their code will continue to be included in the total graph. Removing uneditable metadata reduced the graph by 233 bytes. No new dependencies are added to the application; the YAML parser is used only for contract generation.
 
-## Принятый предел
+## Accepted Limit
 
-Сохранить ленивый маршрут и действующие пределы начальной загрузки, витрины, уникальной поставки, CSS и шрифтов. Для полного графа приложения принят предел 240000 байт gzip. Остаточный рост содержит формы всех административных ресурсов, ru/en, управление файлами и версиями, проверки и публикацию правил и сценариев. Запас относительно измеренного варианта - около 10 КБ.
+Keep the lazy route and current limits for initial load, showcase, unique distribution, CSS, and fonts. A limit of 240000 bytes gzip is accepted for the total application graph. The remaining growth includes all administrative resources, ru/en, file and version management, rule and scenario checking and publishing. The margin from the measured option is about 10 KB.
 
-Результаты и предел приняты согласно [ADR-070](../adr/0070-lazy-loading-and-delivery-budgets.md). Барьер 240000 проверяет весь граф приложения. Решение оформлено отдельно в [ADR-073](../adr/0073-administration-delivery-budget.md).
+The results and limits are accepted according to [ADR-070](../adr/0070-lazy-loading-and-delivery-budgets.md). The limit of 240000 checks the entire application graph. The decision is separately documented in [ADR-073](../adr/0073-administration-delivery-budget.md).
 
-## Воспроизведение
+## Reproduction
 
-`tools/admin/assets.mjs` сравнивает сохранённые Vite-артефакты `build/admin-assets/lazy` и `build/admin-assets/eager`. Оба варианта отличаются только ленивым либо статическим импортом административной страницы. Результат - `build/admin-assets/comparison.json`. Обычные барьеры продолжают запускаться через `task web:check`; итоговые размеры фиксируются после функциональной проверки.
+`tools/admin/assets.mjs` compares the saved Vite artifacts `build/admin-assets/lazy` and `build/admin-assets/eager`. Both options differ only in lazy or static import of the administrative page. The result is `build/admin-assets/comparison.json`. Regular limits continue to be triggered through `task web:check`; final sizes are recorded after functional testing.
 
-## Итоговая реализация
+## Final Implementation
 
-После проверки очистки кэша при смене области и замены полных наборов правил краткими результатами полный граф составляет 230857 байт gzip, начальная загрузка EN/RU - 119191/120575 байт, уникальная поставка - 288,16 КБ, CSS - 11,61 КБ. Все принятые пределы проходят. Исходные варианты сравнения сохранены отдельно и не подменяются итоговыми размерами.
+After clearing cache when switching access scopes and replacing full sets of rules with brief results, the total graph size is 230857 bytes gzip, initial load EN/RU - 119191/120575 bytes, unique distribution - 288.16 KB, CSS - 11.61 KB. All accepted limits are met. The original comparison options are saved separately and are not replaced by the final sizes.
+
+These measurements describe the administration module comparison. Current whole-application limits, including audit and reports, are listed in [web client loading](web-client-loading.md).

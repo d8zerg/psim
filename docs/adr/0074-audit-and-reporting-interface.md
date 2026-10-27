@@ -1,20 +1,24 @@
-# ADR-074. Интерфейс аудита и отчётности
+# ADR-074. Audit and Reporting Interface
 
-- **Статус:** Принято
-- **Связанные:** [ADR-021](0021-audit-hash-chain.md), [ADR-057](0057-incident-reporting.md), [ADR-061](0061-live-access-validation.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-073](0073-administration-delivery-budget.md)
+<!-- language-links -->
+[English](0074-audit-and-reporting-interface.md) | [Русский](../ru/adr/0074-audit-and-reporting-interface.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-021](0021-audit-hash-chain.md), [ADR-057](0057-incident-reporting.md), [ADR-061](0061-live-access-validation.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-073](0073-administration-delivery-budget.md)
 
-Маршруты `/audit` и `/reports` лениво загружают общий модуль чтения. Аудит доступен аудитору, отчёты - руководителю и старшему смены. Используются текущая OIDC-сессия и публичные API Gateway; сервер повторно проверяет роль и область для каждого запроса.
+## Solution
 
-Поиск аудита применяет период UTC, пользователя, префикс действия, тип и идентификатор объекта, площадку и исход. Смена фильтра сбрасывает курсор и выбор записи. Строка раскрывает исходное действие, время регистрации, детали и хэши как текст. Проверка целостности относится к диапазону последовательности всей цепочки тенанта, а не к фильтру поиска. Интерфейс раздельно показывает результат проверки, первую нарушенную последовательность и наличие подписанной внешней контрольной точки. Проверка и JSONL-экспорт требуют области `*`. Экспорт содержит полную цепочку снимка и признак выбранных записей для независимой проверки.
+The `/audit` and `/reports` routes lazily load the common reading module. Audit is accessible to auditors, reports are for managers and shift supervisors. The current OIDC session and public API Gateway are used; the server rechecks role and access scope for each request.
 
-Отчёты используют серверные итоги и группировки по площадке, типу инцидента, приоритету, ответственному или дню UTC. Клиент не усредняет средние групп и не подменяет серверные значения. Счётчики uint64 форматируются без потери точности. Отсутствие наблюдений SLA отличается от нулевой доли соблюдения. Значение нулевой длительности само по себе не доказывает наличие измерений. Графики используют SVG и текстовые таблицы без новой библиотеки; число отображаемых групп ограничено явно, полный набор доступен страницами таблицы и в CSV.
+The audit search uses UTC period, user, action prefix, object type and identifier, site and outcome. Changing the filter resets the cursor and selection of records. The row reveals the original action, registration time, details, and hashes as text. Integrity checking applies to the entire sequence of tenant events, not just the search filter. The interface separately shows the verification result, the first violated sequence, and the presence of a signed external checkpoint. Verification and JSONL export require `*` scope. The export includes the complete snapshot sequence and selection markers for independent verification of selected records.
 
-Редактируемые фильтры отделены от применённых. Результат и экспорт связаны с применёнными параметрами; изменение полей требует нового запроса. Автоматического повторения запросов нет. Загрузка, ошибка, пустая выборка и потеря сети имеют разные состояния. Отказ актуальной авторизации скрывает данные. Смена пользователя или эффективной области уничтожает кэш и отменяет запросы, проверки и загрузки файлов. Общий транспорт сохраняет токены только в существующей сессии и запрещает использование ответов отменённого контекста.
+Reports use server summaries and groupings by site, incident type, priority, responsible person, or UTC day. The client does not average groups or replace server values. uint64 counters are formatted without loss of precision. Missing SLA observations are distinct from zero compliance. A zero duration value alone does not prove measurement. Graphs use SVG and text tables without new libraries; the number of displayed groups is explicitly limited, the full set is available via table pages and CSV.
 
-Файлы скачиваются авторизованным запросом с проверкой media type. Blob URL освобождаются при замене и закрытии модуля. Экспорт аудита создаёт новый серверный снимок цепочки; CSV строится с теми же фильтрами, но может отражать более свежую проекцию. Интерфейс не объявляет эти файлы неизменяемой копией прежней страницы.
+Edited filters are separated from applied ones. Results and exports are linked to applied parameters; changing fields requires a new request. Automatic request repetition does not occur. Loading, error, empty selection, and network loss have different states. Failure of current authorization hides data. Changing user or effective scope destroys cache and cancels requests, checks, and file loading. General transport only saves tokens in the existing session and prevents using responses from canceled contexts.
 
-## Проверка
+Files are downloaded with an authorized request and media type check. Blob URLs are freed when modules are replaced and closed. Audit export creates a new server snapshot of the chain; CSV is built with the same filters but may reflect a more recent projection. The interface does not declare these files as immutable copies of previous pages.
 
-Модульные и браузерные проверки охватывают ru/en, доступность, фильтры, страницы, точные счётчики, пустые наблюдения SLA, разрывы сети и отзыв прав. Нативная приёмка использует настоящий PKCE с MFA, Kafka, PostgreSQL, ClickHouse, подписанные контрольные точки и Gateway. Проверяются поиск и экспорт, обнаружение прямого изменения и удаления записи, независимая проверка JSONL, эталонные метрики за период и CSV. Действующие бюджеты сохраняются; увеличение требует отдельного принятого решения.
+## Verification
+
+Module and browser verifications cover ru/en, accessibility, filters, pages, accurate counters, zero SLA observations, network breaks, and permission revocation. Native acceptance uses actual PKCE with MFA, Kafka, PostgreSQL, ClickHouse, signed checkpoints, and Gateway. Searches and exports are checked, direct changes and record deletion are detected, independent JSONL verification is done, reference metrics for the period and CSV are collected. Active budgets are saved; increases require a separate approved decision.

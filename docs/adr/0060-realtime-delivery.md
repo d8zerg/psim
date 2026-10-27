@@ -1,22 +1,26 @@
-# ADR-060. Возобновление realtime из Kafka и оперативные снимки
+# ADR-060. Realtime resume from Kafka and operational snapshots
 
-- **Статус:** Принято
-- **Связанные:** [ADR-019](0019-realtime-channel.md), [ADR-059](0059-console-projections.md)
+<!-- language-links -->
+[English](0060-realtime-delivery.md) | [Русский](../ru/adr/0060-realtime-delivery.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-019](0019-realtime-channel.md), [ADR-059](0059-console-projections.md)
 
-Каждый Gateway читает события инцидентов и реагирования через read_committed Kafka с ручным назначением всех партиций. Consumer не входит в группу и не делит события с другими экземплярами. Снимки Projection Service включают смещения обоих топиков. Токен возобновления не привязан к процессу или узлу Gateway.
+## Solution
 
-Ограниченный журнал в памяти ускоряет короткие разрывы. При отсутствии нужного диапазона Gateway читает его из Kafka до захваченных концов партиций. Данные фильтруются по проверенному тенанту, области, подписке и согласованным типам. Пропуски транзакционных маркеров учитываются как позиции. Возобновление ограничено 15 минутами, доступным retention, числом сообщений, байтами и сроком чтения. Неполный диапазон требует нового снимка.
+Each Gateway reads incident events and responses through manually assigned read_committed Kafka, with all partitions handled individually. Consumers do not join groups or share events with other instances. Snapshots from the Projection Service include offsets for both topics. The recovery token is not tied to any process or Gateway node.
 
-Соединение поддерживает несколько независимых подписок. Пустой список возможностей означает прежний `incident_event`; новые типы включаются явно. Журнал воспроизводит каждое подходящее событие инцидента или поддерживаемое изменение реагирования. Терминальное изменение доставляется и в активную ленту, чтобы клиент удалил закрытый инцидент. Запросы доставки команд, уведомлений и приватные уведомления не передаются в общий поток реагирования.
+A limited log in memory speeds up short interruptions. When no desired range is available, the Gateway reads from Kafka until the captured end of a partition. Data is filtered by verified tenant, access scope, subscription, and agreed types. Missing transaction markers are treated as positions. Recovery is limited to 15 minutes, based on retention, message count, bytes, and reading duration. Incomplete ranges require a new snapshot.
 
-`STREAM_LOCATION_STATUS` передаёт полный актуальный образ выбранного объекта из Projection Service. Он включает устройства, зоны, коннекторы, качество, обслуживание и дежурство. Образ заменяет прежний целиком; промежуточные образы могут объединяться. Это поток текущего состояния, а не журнал истории оборудования. При возобновлении передаётся свежий образ, поэтому старое подтверждение не восстанавливает online или actual.
+The connection supports multiple independent subscriptions. An empty capabilities list indicates the previous `incident_event`; new types are explicitly added. The log records each appropriate incident event or supported response change. Terminal changes are also sent to the active feed so that clients can remove closed incidents. Requests for commands, notifications, and private alerts do not flow into the main response stream.
 
-Gateway не рассчитывает и не хранит отдельную модель оборудования. Он запрашивает Projection Service с исходным JWT, объединяя запросы к одному объекту только для одинаковых тенанта, ролей и областей. Образы проверяются с интервалом 50 мс; это также обнаруживает истечение свежести и lease при отсутствии новых событий Kafka. В каждой группе используется токен действующего соединения. Изменение прав или возможностей отменяет прежние подписки и очищает очередь.
+`STREAM_LOCATION_STATUS` sends a complete current image of the selected object from the Projection Service. It includes devices, regions, connectors, quality, maintenance and duty assignments. The image replaces the previous one; intermediate snapshots can be coalesced. This is the current state, not a device history log. When recovering, a fresh image is sent, so an old acknowledgment does not restore online or actual status.
 
-Очереди, отдельные сообщения, подписки, исторические чтения и соединения ограничены. Медленный получатель отключается; запись имеет отдельный срок. Отправка ошибки `REALTIME_SLOW_CONSUMER` выполняется, если транспорт ещё принимает данные. Клиент возобновляет чтение с последнего полученного токена. Истечение JWT закрывает соединение; обновление выполняется повторным Authenticate. Поддерживается согласование `permessage-deflate` без сохранения контекста между сообщениями.
+The Gateway does not calculate or store individual device models. It requests from the Projection Service with an original JWT, coalescing requests for one site only when tenant, roles and access scopes match. Images are checked every 50 ms; this also detects observation freshness and lease expiry when no new Kafka events occur. Each group uses the current connection token. Changes to rights or capabilities cancel previous subscriptions and clear the queue.
 
-## Проверка
+Queues, individual messages, subscriptions, historical reads, and connections are limited. Slow recipients are disconnected; each write has its own deadline. An `REALTIME_SLOW_CONSUMER` error is sent if transport is still accepting data. The client resumes reading from the last received token. Expiration of the JWT closes the connection; updates are made through a repeated Authenticate message. `permessage-deflate` negotiation is supported without context preservation between messages.
 
-Проверяются два Gateway, переподключение к другому узлу и перезапуск, фильтры площадки, зоны и инцидента, несколько подписок, старый клиент, согласование типов, актуальный оперативный образ, медленный получатель и ограничения памяти. Нагрузочный сценарий измеряет доставку 500 одновременным WSS-клиентам. Методика фиксирует число событий, темп, размер данных и распределение соединений по узлам; результат не подменяет проверку полной нагрузки платформы.
+## Verification
+
+Two Gateways are tested, reconnection to another node, restart, site, region, and incident filters, multiple subscriptions, old client, type matching, current operational snapshot, slow recipient, and memory limits. A load scenario measures delivery for 500 simultaneous WSS clients. The method records event count, rate, data size, and connection distribution across nodes; the result does not replace full platform load testing.

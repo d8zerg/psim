@@ -1,107 +1,110 @@
 # Open-Source PSIM Platform - Product Brief
 
-Версия 0.1 · Шаг плана 0.1 · Статус: черновик на утверждение
+<!-- language-links -->
+[English](product-brief.md) | [Русский](../ru/product/product-brief.md)
+<!-- /language-links -->
 
-Связанные документы: [роли и пользовательские пути](roles-and-journeys.md) · [границы MVP](mvp-scope.md) · [спецификация приёмки](acceptance-spec.md) · [план MVP](../psim-mvp-development-plan.md)
+Related documents: [Roles and User Paths](roles-and-journeys.md) · [MVP Boundaries](mvp-scope.md) · [Acceptance Criteria](acceptance-spec.md) · [Release Conditions](release-readiness.md)
+
+This brief defines product targets. Implemented capabilities, completed checks and outstanding qualification are recorded in [release readiness](release-readiness.md).
 
 ---
 
-## 1. Видение
+## 1. Vision
 
-Open-Source PSIM Platform - вендор-нейтральная платформа управления ситуациями в физической безопасности. Она собирает события любых систем безопасности и инженерной инфраструктуры в один поток, превращает их в инциденты и проводит оператора через регламентированное реагирование до закрытия и отчёта.
+Open-Source PSIM Platform is a vendor-neutral platform for managing physical security situations. It collects events from any security and engineering infrastructure systems into a single stream, converts them into incidents, and guides operators through a regulated response process until closure and reporting.
 
-> Любое событие от любого источника за секунду превращается в инцидент с понятным планом действий, а каждое действие оператора доказуемо зафиксировано.
+> An event from any source can become an incident within one second with a clear action plan, and each operator’s action is documented and verifiable.
 
-## 2. Проблема
+## 2. Problem
 
-| Наблюдение | Следствие для заказчика |
+| Observation | Impact on Customer |
 |---|---|
-| На объекте работают системы разных производителей: охранная и пожарная сигнализация, СКУД, видеоаналитика, периметр, инженерные системы. У каждой своя консоль | Оператор переключается между экранами и пропускает связи между событиями |
-| Существующие PSIM привязаны к оборудованию своего производителя или требуют доработки ядра под каждую интеграцию | Высокая стоимость и срок интеграции, зависимость от вендора |
-| Инструкции реагирования хранятся в бумажном виде или в файлах | Реакция зависит от опыта конкретного оператора, нарушение регламента не видно |
-| Тысячи событий в минуту при массовых срабатываниях | Перегрузка операторов, ложные тревоги маскируют реальные |
-| Действия операторов не фиксируются или фиксируются в изменяемом журнале | Разбор инцидентов и расследования невозможно провести доказательно |
+| Different manufacturers' systems are operating on the asset: security and fire alarm systems, CCTV, video analytics, perimeter surveillance, engineering systems. Each has its own console | Operators switch between screens and miss connections between events |
+| Existing PSIMs are tied to their manufacturer's equipment or require core modifications for each integration | High cost and integration time, dependency on the vendor |
+| Response instructions are stored in paper form or files | Response depends on the operator’s experience, violations go unnoticed |
+| Thousands of events per minute during mass reactions | Overloading of operators, false alarms mask real incidents |
+| Operator actions are not recorded or are recorded in a mutable log | It is impossible to analyze incidents and investigate evidence |
 
-## 3. Позиционирование
+## 3. Positioning
 
-**Для** служб безопасности организаций и системных интеграторов,
-**которым нужно** управлять ситуациями на объектах с оборудованием разных производителей,
-**Open-Source PSIM Platform** - это открытая платформа управления ситуациями под лицензией MIT,
-**которая** подключает любой источник через открытый протокол коннекторов, коррелирует события в реальном времени и ведёт оператора по исполнимым сценариям реагирования.
-**В отличие от** решений, привязанных к оборудованию производителя, и самописных интеграций,
-**платформа** не зависит от вендора, масштабируется от одной машины до кластера одной и той же поставкой и доказуемо не теряет события и инциденты.
+**For** security services and system integrators who need to manage situations on assets with equipment from different manufacturers,
+**Open-Source PSIM Platform** is an open-source platform for situation management under MIT license,
+**which** connects any source through an open connector protocol, correlates events in real time, and guides operators through executable response scenarios.
+**Unlike** solutions tied to manufacturer equipment and ad-hoc integrations,
+**the platform** is independent of the vendor, scales from a single machine to a cluster with the same delivery artifacts, and reliably retains events and incidents.
 
-Обозначения проекта:
+Project Definitions:
 
-| Назначение | Обозначение |
+| Purpose | Definition |
 |---|---|
-| Публичное название продукта | Open-Source PSIM Platform |
-| Репозиторий, пространства имён C++/Protobuf, префиксы топиков и пакеты SDK | `psim` |
-| Техническое название стенда, образов сборки и поставки | `psim-platform` |
+| Public product name | Open-Source PSIM Platform |
+| Repository, C++/Protobuf namespaces, topic prefixes, and SDK packages | `psim` |
+| Technical name for the test environment, build images, and delivery | `psim-platform` |
 
-## 4. Целевые заказчики
+## 4. Target Customers
 
-| Сегмент | Потребность | Роль в MVP |
+| Segment | Need | Role in MVP |
 |---|---|---|
-| Крупные организации с распределёнными объектами (промышленность, энергетика, транспорт, кампусы) | Единый ситуационный центр, регламенты, отчётность | Основной сегмент приёмки |
-| Системные интеграторы | Быстрое подключение оборудования заказчика без доработки ядра | Пользователи Connector SDK |
-| Операторы охранных услуг и мониторинговые центры | Высокая нагрузка, SLA реакции, контроль операторов | Проверяется нагрузочными сценариями |
+| Large organizations with distributed assets (industry, energy, transportation, campuses) | Unified situation center, regulations, reporting | Main acceptance segment |
+| System integrators | Quickly connect customer equipment without core modifications | Connector SDK users |
+| Security service operators and monitoring centers | High load, SLA response, operator control | Load testing scenarios |
 
-## 5. Ценностное предложение
+## 5. Value Propositions
 
-1. **Вендор-нейтральность.** Открытый протокол коннекторов, SDK и тестовый набор соответствия. Новый источник подключается без изменения ядра (S1).
-2. **Корреляция в реальном времени.** События нескольких источников связываются правилами в окне времени. Оператор видит инцидент, а не поток тревог (S4, S5).
-3. **Исполнимые сценарии.** Регламент реагирования выполняется по шагам: чек-листы, решения, обязательные действия, команды на устройства (S7, S8).
-4. **Гарантированная реакция.** SLA на принятие и решение, автоматические эскалации (S9).
-5. **Доказуемость.** Неизменяемый аудит на цепочке хэшей, отчёты MTTA и MTTR (S10, S13).
-6. **Надёжность и масштаб.** 50 000 событий/с, ноль потерь и дубликатов, обновление без остановки, одна поставка для любой топологии (S11, S12).
+1. **Vendor neutrality.** Open connector protocol, SDK, and conformance test suite. New sources are connected without core changes (S1).
+2. **Real-time correlation.** Events from multiple sources are linked by rules in the time window. The operator sees an incident, not a stream of alarms (S4, S5).
+3. **Executable scenarios.** Response procedure is executed step by step: checklists, decisions, mandatory actions, device commands (S7, S8).
+4. **Guaranteed response.** SLA for acknowledgement and resolution, automatic escalation (S9).
+5. **Verifiability.** Tamper-evident audit backed by a hash chain, MTTA and MTTR reports (S10, S13).
+6. **Reliability and scalability.** 50,000 events/second, zero loss and duplicates, continuous updates, one delivery for any topology (S11, S12).
 
-## 6. Отличительные свойства
+## 6. Unique Features
 
-| Свойство | Как подтверждается |
+| Feature | How Verified |
 |---|---|
-| Ноль потерь и дубликатов при сбоях | Детерминированное симуляционное тестирование с внесением сбоев и хаос-тесты со сквозной сверкой |
-| Событие -> инцидент в консоли за p99 ≤ 1 с | Замеры по event time в нагрузочных тестах |
-| Подключение коннектора без изменения ядра | Сторонний разработчик пишет коннектор по документации и проходит тестовый набор соответствия |
-| Воспроизводимость | Любая read-модель перестраивается из Kafka; правила прогоняются на исторических данных |
-| Сквозная наблюдаемость | Одна трассировка от датчика до действия оператора |
+| Zero loss and duplicates in failures | Deterministic simulation testing with fault insertion and chaos tests with cross-checking |
+| Event -> Incident in the console within p99 ≤ 1s | Event time measurements in load tests |
+| Connection of connectors without core changes | Third-party developers write connectors according to documentation and pass conformance tests |
+| Reproducibility | Any read model is rebuilt from Kafka; rules are run against historical data |
+| End-to-end observability | One trace from sensor to operator action |
 
-## 7. Принципы продукта
+## 7. Product Principles
 
-1. **Оператор важнее всего.** Интерфейс рассчитан на работу 24/7: тёмная тема, высокая плотность, горячие клавиши, звуковые оповещения.
-2. **Инцидент, а не тревога.** Платформа группирует и коррелирует события, чтобы оператор работал с ситуацией.
-3. **Регламент исполняется, а не читается.** Сценарий ведёт оператора и не даёт пропустить обязательный шаг.
-4. **Ничего не теряется и ничего не дублируется.** Это свойство проверяется тестами, а не декларируется.
-5. **Одна поставка.** Одна машина, кластер на VM и Kubernetes отличаются конфигурацией, а не функциональностью.
-6. **Открытые стандарты.** gRPC, Protobuf, OpenAPI, AsyncAPI, OIDC, ONVIF, MQTT.
+1. **Operator is the most important.** The interface is designed for 24/7 operation: dark theme, high density, hotkeys, audio notifications.
+2. **Incident, not alarm.** The platform groups and correlates events so operators can work with situations.
+3. **Procedure is executed, not read.** The scenario guides the operator and ensures no mandatory step is missed.
+4. **Nothing is lost or duplicated.** This property is verified by tests, not declared.
+5. **One delivery.** Single-machine and VM-cluster deployments use the same application artifacts and differ in configuration.
+6. **Open standards.** gRPC, Protobuf, OpenAPI, AsyncAPI, OIDC, ONVIF, MQTT.
 
-## 8. Рамки MVP
+## 8. MVP Framework
 
-Сквозной контур: событие от любого источника -> нормализация -> корреляция -> инцидент -> сценарий реагирования -> команды на устройства -> закрытие -> аудит и отчётность. Работа идёт через веб-консоль оператора и веб-администрирование.
+End-to-end workflow: event from any source -> normalization -> correlation -> incident -> response scenario -> device commands -> closure -> audit and reporting. Operation is carried out through the operator’s web console and web administration.
 
-Полный перечень функций и явный список «вне MVP» приведены в [mvp-scope.md](mvp-scope.md).
+Full list of functions and explicit list "outside MVP" are provided in [mvp-scope.md](mvp-scope.md).
 
-Дополнение принято ([ADR-042](../adr/0042-operational-capabilities.md)): достоверное состояние устройств и realtime, хранение планов, разовое обслуживание, минимальная передача ответственности и текущий дежурный, процедуры сертификатов и изолированный replay. Полные графики смен и собственные медиа-вложения остаются после MVP.
+Addition accepted ([ADR-042](../adr/0042-operational-capabilities.md)): reliable device status and realtime, plan storage, one-time maintenance, minimal responsibility transfer and current duty, certificate procedures and isolated replay. Full shift schedules and own media attachments remain after MVP.
 
-## 9. Метрики успеха MVP
+## 9. MVP Success Metrics
 
-| Категория | Метрика | Цель |
+| Category | Metric | Goal |
 |---|---|---|
-| Приёмка | Пройдено сценариев S1-S13 | 13 из 13 |
-| Производительность | Устойчивая нагрузка | 50 000 событий/с в течение 24 ч, пик ×1,5 в течение 10 мин |
-| Задержка | Событие -> инцидент в консоли | p99 ≤ 1 с |
-| Надёжность | Потери и дубликаты инцидентов | 0 |
-| Надёжность | RTO при отказе одного узла кластера | ≤ 60 с |
-| Интеграция | Время подключения нового коннектора сторонним разработчиком по документации | ≤ 5 рабочих дней |
+| Acceptance | Completed S1-S13 scenarios | 13 out of 13 |
+| Performance | Stable load | 50,000 events/second over 24 hours, peak ×1.5 over 10 minutes |
+| Delay | Event -> Incident in console | p99 ≤ 1s |
+| Reliability | Losses and duplicates of incidents | 0 |
+| Reliability | RTO in case of one cluster node failure | ≤ 60 seconds |
+| Integration | Time for third-party developer to connect new connector according to documentation | ≤ 5 working days |
 
-Партнёрский пилот не является условием приёмки или выпуска MVP. Сейчас партнёров нет; проверка на реальном объекте обсуждается при появлении заинтересованного участника.
+A partner pilot is NOT a condition for accepting or releasing the MVP. Currently, there are no partners; evaluation on a real-world object is discussed when an interested participant emerges.
 
-Полный перечень нефункциональных целей - в разделах 1.3 и 1.4 [плана](../psim-mvp-development-plan.md).
+The full list of non-functional requirements with stable IDs can be found in the [quality registry](../quality/requirements.yaml).
 
-## 10. Ограничения
+## 10. Constraints
 
-- Платформы: Debian 13 x86_64 - единственная официально поддерживаемая ОС.
-- Одна редакция - Enterprise.
-- Сертификация в MVP не требуется.
-- PSIM не заменяет сертифицированные системы пожарной сигнализации и пожаротушения: управление пожарной автоматикой остаётся за приёмно-контрольными приборами, PSIM отображает, коррелирует и организует реакцию ([модель угроз](../security/threat-model.md#5-допущения-и-границы-ответственности)).
-- В MVP эксплуатируется один тенант, но идентификатор тенанта присутствует в модели данных и контрактах.
+- Platform: Debian 13 x86_64 - the only officially supported operating system.
+- There is only one edition: Enterprise.
+- Certification is not required for MVP.
+- PSIM does NOT replace certified fire alarm and firefighting systems: fire automation management remains the responsibility of the fire alarm control equipment. PSIM displays, correlates, and organizes responses ([threat model](../security/threat-model.md#5-assumptions-and-responsibilities)).
+- Only one tenant is used in MVP, but the tenant’s identifier is present in the data models and contracts.

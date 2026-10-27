@@ -1,51 +1,54 @@
-# ADR-019. Realtime-канал: WebSocket, снимок и дельты, возобновление по смещениям
+# ADR-019. Realtime channel: WebSocket, snapshots, deltas and offset-based resumption
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (реализация - 7.2, 7.3, 8.2)
-- **Связанные:** ADR-008, ADR-020, [crosscutting.md](../architecture/crosscutting.md#9-realtime-снимок-и-дельты)
+<!-- language-links -->
+[English](0019-realtime-channel.md) | [Русский](../ru/adr/0019-realtime-channel.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-008, ADR-020, [crosscutting.md](../architecture/crosscutting.md#9-realtime-snapshot-and-deltas)
 
-Консоль должна показывать новый инцидент не позже 1 с от события (p99), выдерживать 500 одновременных консолей, восстанавливаться после разрыва связи без потери изменений (S6, S11) и показывать только данные области доступа пользователя.
+## Context
 
-## Рассмотренные варианты
+The console must display a new incident within 1 s of its event at p99, support 500 concurrent consoles, recover from disconnection without missing changes (S6, S11), and display only data within the user's access scope.
 
-### Транспорт
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Transport
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Периодический опрос REST | Просто | Задержка и нагрузка пропорциональны частоте опроса |
-| Server-Sent Events | Просто, через HTTP | Однонаправленный: подписки и фильтры меняются отдельными запросами; ограничения числа соединений HTTP/1.1 в браузере |
-| gRPC-web | Типизация | Потоки только сервер -> клиент; нужен прокси |
-| **WebSocket** | Двунаправленный: подписки, фильтры, подтверждения в одном соединении; повсеместная поддержка | Своя реализация протокола поверх |
+| Periodic REST polling | Simple | Latency and load depend on polling frequency |
+| Server-Sent Events | Simple, uses HTTP | One-way: subscriptions and filters require separate requests; browser HTTP/1.1 connection limits |
+| gRPC-web | Typed | Streams only server -> client; requires a proxy |
+| **WebSocket** | Bidirectional subscriptions, filters and acknowledgements in one connection; widely supported | Requires an application protocol |
 
-### Источник дельт
+### Delta source
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Дельты из Projection Service (push после обновления проекции) | Клиент видит то же, что в проекции | Проекция становится звеном задержки консоли; сложное возобновление |
-| **Дельты напрямую из топиков доменных событий; снимок из проекции со смещениями согласованности** | Проекции не на пути задержки; возобновление по смещениям Kafka без собственного журнала | Каждый экземпляр API Gateway читает топики событий инцидентов целиком (объём мал) |
+| Projection Service pushes deltas after projection updates | Client sees the projection's data | Projection processing contributes to console latency; complex resumption |
+| **Deltas directly from domain-event topics; projection snapshots with consistency offsets** | Projections are outside the latency path; Kafka offsets enable resumption without a separate log | Every API Gateway instance reads entire incident-event topics, whose volume is small |
 
-## Решение
+## Decision
 
-1. Клиент получает снимок `GET /v1/feed/incidents` с вектором смещений `{topic, partition -> offset}`, на котором снимок согласован.
-2. Клиент открывает `wss://.../v1/realtime`, аутентифицируется токеном и подписывается: `subscribe {stream: incidents, filter, resume_token}`. Токен возобновления - закодированный вектор смещений.
-3. API Gateway читает `psim.incidents.events.v1` и `psim.response.events.v1` (без группы потребителей, все партиции), фильтрует по области доступа (ADR-020) и фильтрам подписки, отправляет дельты с текущим токеном.
-4. Клиент применяет дельту, только если `version` агрегата больше известной.
-5. После разрыва клиент переподключается с последним токеном и получает пропущенное. Если смещения вне retention или разрыв дольше `max_resume_gap` (по умолчанию 15 мин) - сервер отвечает `REALTIME_RESYNC_REQUIRED`, клиент берёт новый снимок.
-6. Медленный клиент: очередь отправки ограничена (по умолчанию 1 000 сообщений или 4 МБ); при переполнении - закрытие с кодом `REALTIME_SLOW_CONSUMER` и восстановление по п. 5.
-7. Сообщения - JSON по схемам из контракта realtime-протокола (шаг 0.5); сжатие `permessage-deflate`.
-8. При обновлении токена доступа клиент отправляет `reauth` по тому же соединению; истёкший токен закрывает соединение.
+1. The client receives a `GET /v1/feed/incidents` snapshot with the `{topic, partition -> offset}` vector at which it is consistent.
+2. The client opens `wss://.../v1/realtime`, authenticates with a token and subscribes using `subscribe {stream: incidents, filter, resume_token}`. The resume token encodes the offset vector.
+3. API Gateway reads all partitions of `psim.incidents.events.v1` and `psim.response.events.v1` without a consumer group, filters by access scope (ADR-020) and subscription filters, and sends deltas with the current token.
+4. The client applies a delta only when the aggregate `version` exceeds the known version.
+5. After disconnection, the client reconnects with its latest token and receives missed changes. If offsets are outside retention or the interruption exceeds `max_resume_gap`, 15 min by default, the server returns `REALTIME_RESYNC_REQUIRED` and the client obtains a new snapshot.
+6. For a slow client, the send queue is bounded to 1,000 messages or 4 MB by default. Overflow closes the connection with `REALTIME_SLOW_CONSUMER`; recovery follows rule 5.
+7. Messages use JSON according to realtime-protocol contract schemas, with `permessage-deflate` compression.
+8. After refreshing its access token, the client sends `Authenticate` on the same connection. An expired token closes the connection.
 
-## Последствия
+## Consequences
 
-- Projection Service обязан возвращать вектор смещений вместе со снимком.
-- Горизонтальное масштабирование API Gateway линейно по числу соединений; общий поток событий на экземпляр.
+- Projection Service must return the offset vector with each snapshot.
+- API Gateway scales horizontally with connection count; each instance receives the shared event stream.
 
-## Проверка
+## Verification
 
-Нагрузочный тест 500 консолей (DoD шага 7.2); тест разрыва на 5 мин без потери изменений (DoD шага 8.2).
+Load test with 500 consoles; a 5 min disconnection test with no missed changes.
 
-## Уточнение реализации
+## Implementation refinement
 
-[ADR-060](0060-realtime-delivery.md) фиксирует независимый от узла токен версии 2, ограничения исторического чтения, согласование возможностей, исключение приватных вариантов реагирования и оперативные образы из Projection Service. Повторная аутентификация использует Authenticate. При недоступном диапазоне требуется новый снимок; изменение состояния оборудования передаётся полным актуальным образом с возможным объединением промежуточных образов.
+[ADR-060](0060-realtime-delivery.md) specifies a node-independent version 2 token, historical-read limits, capability negotiation, exclusion of private response variants and current images from Projection Service. Reauthentication uses Authenticate. An unavailable range requires a new snapshot; equipment-state changes carry the complete current image, and intermediate images may be coalesced.

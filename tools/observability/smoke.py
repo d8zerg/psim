@@ -130,7 +130,9 @@ def verify(directory):
                      'expr': 'vector(1)', 'instant': True, 'range': False, 'intervalMs': 15000, 'maxDataPoints': 100}],
         'from': str(int(time.time() * 1000) - 60000), 'to': str(int(time.time() * 1000))}, {'Authorization': auth}))
     assert not result['results']['A'].get('error'), result
-    for path in (ROOT / 'deploy/observability/dashboards').glob('*.json'):
+    dashboard_paths = list((ROOT / 'deploy/observability/dashboards').glob('*.json'))
+    dashboard_paths += list((ROOT / 'deploy/observability/ru/dashboards').glob('*.json'))
+    for path in dashboard_paths:
         uid = json.loads(path.read_text())['uid']
         result = json.loads(http('https://127.0.0.1:19444/monitoring/api/dashboards/uid/' + uid, headers={'Authorization': auth}))
         assert result['dashboard']['uid'] == uid
@@ -183,12 +185,13 @@ def verify(directory):
         for alert in entry['alerts']:
             url = alert['annotations']['runbook_url']
             path = urllib.parse.urlsplit(url).path
-            assert 'Диагностика' in http('https://127.0.0.1:19443' + path).decode()
-    (directory / 'result.json').write_text(json.dumps({'dashboards': 7, 'mutual_tls': True,
+            assert 'Diagnostics' in http('https://127.0.0.1:19443' + path).decode()
+            assert 'Диагностика' in http('https://127.0.0.1:19443' + path + 'Ru').decode()
+    (directory / 'result.json').write_text(json.dumps({'dashboards': len(dashboard_paths), 'mutual_tls': True,
         'infrastructure_protocols': ['kafka', 'postgres', 'valkey', 'keeper', 'clickhouse'],
         'kafka_lag': 2, 'dlq_end_offset': 1, 'logs': True, 'native_logs': True, 'container_logs': True, 'traces': True,
         'prometheus_to_alertmanager_to_journal': True, 'runbook_links': True}, indent=2) + '\n')
-    print('Seven dashboards, verified TLS, OTLP logs/traces and real alert delivery passed', flush=True)
+    print('Fourteen EN/RU dashboards, verified TLS, OTLP logs/traces and real alert delivery passed', flush=True)
 
 
 def main():

@@ -1,16 +1,20 @@
-# Локальный стенд на VM
+# Local Test Environment on VMs
 
-Статус: Принято. Стенд используется для разработки кластерной поставки. Одна физическая машина не воспроизводит независимые физические домены отказа и не заменяет эталонный кластер для подтверждения производительности.
+<!-- language-links -->
+[English](local-vm-lab.md) | [Русский](../ru/engineering/local-vm-lab.md)
+<!-- /language-links -->
 
-## Ресурсы
+Status: Accepted. The test environment is used for developing cluster services. A single physical machine cannot replicate independent physical failure domains and cannot replace the reference cluster for performance validation.
 
-Профиль [local.json](../../deploy/vm/local.json) создаёт три VM Debian 13 x86_64. На каждую выделены 4 vCPU, 12288 МиБ RAM и 60 ГиБ диска. Всего требуется 12 vCPU, 36 ГиБ RAM и 180 ГиБ логического дискового пространства. Диски copy-on-write используют общий базовый образ; первоначальный физический объём существенно меньше логического.
+## Resources
 
-Проверенный хост: AMD Ryzen 9 3900X, 24 логических CPU, 64 ГБ RAM, NVMe. Проверка перед запуском требует дополнительно 8 ГиБ доступной памяти и 20 ГиБ свободного диска для хоста. Учитываются резервирования других работающих управляемых стендов. KVM обязателен; программная эмуляция не используется.
+The [local.json](../../deploy/vm/local.json) profile creates three Debian 13 x86_64 VMs. Each VM is allocated 4 vCPU, 12288 MiB of RAM, and 60 GiB of disk space. In total, 12 vCPU, 36 GiB of RAM, and 180 GiB of logical disk space are required. The disks use copy-on-write; the initial physical size is significantly smaller than the logical size.
 
-## Управление
+Tested host: AMD Ryzen 9 3900X, 24 logical CPUs, 64 GB RAM, NVMe. Additional 8 GiB of available memory and 20 GiB of free disk space are required before startup. Reservations from other running test environments are taken into account. KVM is mandatory; software emulation is not used.
 
-Команды выполняются из корня репозитория на Linux с нативным Docker Engine и доступными `/dev/kvm` и `/dev/net/tun`.
+## Management
+
+Commands are executed from the repository root on Linux with native Docker Engine and `/dev/kvm` and `/dev/net/tun` available.
 
 ```sh
 task vm:doctor
@@ -23,9 +27,9 @@ task vm:up
 task vm:destroy
 ```
 
-`up` создаёт VM или возобновляет их, проверяет завершение cloud-init и сбрасывает первоначальные записи на диски. Повторный `up` сохраняет работающие VM. `bootstrap` устанавливает закреплённые по версиям и SHA-256 пакеты Docker Engine и Compose внутри гостевых ОС. Установка сервисов платформы выполняется отдельно.
+`up` creates or restarts VMs, checks the completion of cloud-init, and writes initial records to disks. A repeated `up` keeps running VMs. `bootstrap` installs Docker Engine and Compose packages with version and SHA-256 checks in guest OSs. Platform services are installed separately.
 
-`down` завершает гостевые ОС и сохраняет диски, SSH-ключи и идентификаторы. `destroy` удаляет контейнер управления и каталог только указанного управляемого стенда. Общий кеш базового образа и пакетов сохраняется. Смена ресурсов, адресов или bootstrap требует явного пересоздания стенда. Публикацию портов можно изменить через `down/up` с сохранением гостевых дисков.
+`down` terminates guest OSs and saves disks, SSH keys, and identifiers. `destroy` deletes control containers and only the directory of the specified test environment. The base image cache and packages are saved. Changing resources, addresses, or bootstrap requires explicit re-building of the environment. Port publishing can be changed via `down/up` with disk preservation.
 
 ```sh
 task vm:node:kill NODE=node-1
@@ -33,24 +37,24 @@ task vm:node:start NODE=node-1
 task vm:wait
 ```
 
-`node:kill` имитирует потерю питания выбранной VM. Сохраняются только данные, сброшенные гостевой ОС на диск. Другие узлы продолжают работать.
+`node:kill` simulates power loss in the selected VM. Only data flushed to disk by the guest OS is saved to disk. Other nodes continue to run.
 
-## Сеть и доступ
+## Network and Access
 
-VM соединены мостом в сетевом пространстве контейнера управления: `10.91.0.11`, `10.91.0.12`, `10.91.0.13`, шлюз и DNS `10.91.0.1`. SSH опубликован только на `127.0.0.1:2211`, `:2212`, `:2213`. Проверка ключа сервера обязательна; ожидаемые ключи задаются до первого подключения. Парольный вход и вход root запрещены. Пользователь `psim` выполняет административные команды через sudo внутри своих VM.
+VMs are connected via a bridge in the control container network: `10.91.0.11`, `10.91.0.12`, `10.91.0.13`, gateway, and DNS `10.91.0.1`. SSH is published only on `127.0.0.1:2211`, `:2212`, `:2213`. Server key verification is required; expected keys are specified before the first connection. Password entry and root access are prohibited. User `psim` executes administrative commands via sudo within its VM.
 
-QEMU и SSH-инструменты работают из контейнера. QEMU использует UID пользователя хоста. Контейнер получает KVM, TUN и необходимые права для собственной сети и управления дочерними процессами; сеть хоста и сокет Docker внутрь него не передаются.
+QEMU and SSH tools operate from the container. QEMU uses the host user UID. The container gets KVM, TUN, and necessary rights for its own network and managing child processes; the host network and Docker sockets are not transmitted to it.
 
-Состояние находится в `.cache/vm/psim-platform-vm`, каталог имеет режим `0700`. Закрытые ключи и NoCloud-носители не добавляются в Git и не включаются в диагностические отчёты. Не выводить содержимое `user-data` и закрытых ключей: NoCloud содержит ключ сервера SSH.
+State is stored in `.cache/vm/psim-platform-vm`, and the directory is in `0700` mode. Private keys and NoCloud images are not added to Git or included in diagnostic reports. Do not display `user-data` and private keys: NoCloud contains server SSH key.
 
-## Проверка
+## Testing
 
 ```sh
 task vm:test
 ```
 
-Проверка использует отдельное имя `psim-platform-vm-test` и SSH-порты `2311-2313`; требуется свободный ресурсный бюджет для трёх VM. Она отказывается использовать уже существующее окружение с таким именем.
+Testing uses a separate name `psim-platform-vm-test` and SSH ports `2311-2313`; it requires free resource budget for three VMs. It does not use an existing environment with such a name.
 
-Проверены семь модульных тестов границ профиля и владения: неверные ресурсы и адреса, повторяющиеся узлы, подмена каталога символьной ссылкой, чужой UID или путь состояния, чужой контейнер повреждённая загрузка образа, отказ запроса к Docker и прерванная запись состояния.
+Seven module-level tests of profile and ownership boundaries have been verified: incorrect resources and addresses, repeated nodes, replacing the directory with a symbolic link, foreign UID or path, foreign container, corrupted image download, Docker request failure, and interrupted state recording.
 
-Нативная проверка подтвердила три независимых гостевых ядра KVM, заданные CPU/RAM/диски, повторный `up` без перезагрузки, TCP между узлами, публикацию порта на localhost, аппаратный watchdog, доступность двух узлов после выключения третьего, сохранность сброшенных данных после аварийного и штатного перезапуска и удаление собственного окружения. Отчёт: `build/vm/qualification.json`. Готовность PostgreSQL, Kafka, SeaweedFS и прикладного конвейера этим тестом не подтверждается.
+The native test confirmed three independent KVM guest kernels, specified CPU/RAM/disks, repeated `up` without rebooting, TCP between nodes, port publishing on localhost, hardware watchdog, availability of two nodes after the third is shut down, preservation of flushed data after emergency and normal reboots, and deletion of the own environment. Report: `build/vm/qualification.json`. PostgreSQL, Kafka, SeaweedFS, and application pipeline are not confirmed by this test.

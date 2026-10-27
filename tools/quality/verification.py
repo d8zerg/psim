@@ -13,6 +13,8 @@ Exit code 1 and a list of problems when verification fails.
 """
 
 import os
+import importlib.util
+from pathlib import Path
 import re
 import sys
 
@@ -27,6 +29,22 @@ KIND_NAMES = {
 GATES = ["pr", "nightly", "release", "on-demand"]
 BARRIERS = {"automated", "manual"}
 ENVS = {"E-DEV", "E-CI", "E-LOCAL", "E-CLUSTER"}
+ENGLISH = {
+    "# Матрица верификации": "# Verification matrix",
+    "Сгенерировано из [verification.yaml](verification.yaml) задачей `task docs:verification:gen`. Не редактировать вручную.":
+        "Generated from [verification.yaml](verification.yaml) by `task docs:verification:gen`. Do not edit manually.",
+    "Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск; `on-demand` запускается вручную и не входит в CI.":
+        "See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks merging, `nightly` blocks the next release, and `release` blocks release; `on-demand` runs manually outside CI.",
+    "## 1. Сводка": "## 1. Summary", "## 2. Цели SLO": "## 2. SLO goals",
+    "## 3. Цели инженерного качества": "## 3. Engineering quality goals",
+    "## 4. Сценарии приёмки": "## 4. Acceptance scenarios", "## 5. Каталог методов": "## 5. Method catalog",
+    "| Вид |": "| Kind |", "Всего": "Total", "| ID | Цель | Порог | Методы |": "| ID | Goal | Target | Methods |",
+    "| Сценарий | Методы |": "| Scenario | Methods |",
+    "| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск |": "| ID | Method | Pass criterion | Environment | Gate | Command |",
+    "Наборы тестов": "Test suites", "Длительная нагрузка": "Soak tests", "Нагрузка": "Load tests",
+    "Хаос и отказы": "Chaos and failures", "Бенчмарки": "Benchmarks", "Безопасность": "Security",
+    "Ручные процедуры": "Manual procedures", ", ручной": ", manual", "регламент": "procedure", " Назначение: ": " Purpose: ",
+}
 
 
 def load(path):
@@ -34,24 +52,13 @@ def load(path):
         return yaml.safe_load(f)
 
 
-def step_key(step):
-    major, minor, suffix = re.fullmatch(r"(\d+)\.(\d+)([a-z]?)", step).groups()
-    return int(major), int(minor), suffix
-
-
-def plan(root):
-    text = open(os.path.join(root, "docs/psim-mvp-development-plan.md"), encoding="utf-8").read()
-    steps = set(re.findall(r"^### Шаг (\d+\.\d+[a-z]?) ", text, re.M))
-    tables = {}
-    for section, nxt in (("### 1.3", "### 1.4"), ("### 1.4", "## 2.")):
-        part = text[text.index(section):text.index(nxt, text.index(section))]
-        rows = re.findall(r"^\| ([^|]+?) \| ([^|]+?) \|$", part, re.M)
-        tables[section[4:]] = {k: v for k, v in rows if k not in ("Атрибут", "Показатель") and not k.startswith("---")}
-    return steps, tables
+def requirements(root):
+    return load(os.path.join(root, "docs/quality/requirements.yaml"))["requirements"]
 
 
 def scenarios(root):
-    text = open(os.path.join(root, "docs/product/acceptance-spec.md"), encoding="utf-8").read()
+    with open(os.path.join(root, "docs/product/acceptance-spec.md"), encoding="utf-8") as source:
+        text = source.read()
     return re.findall(r"^## (S\d+)\. ", text, re.M)
 
 
@@ -59,7 +66,21 @@ def scenarios(root):
 
 def verify(root, reg):
     problems = []
-    steps, tables = plan(root)
+    definitions = requirements(root)
+    required = {}
+    for definition in definitions:
+        rid = definition["id"]
+        if rid in required:
+            problems.append(f"duplicate requirement {rid}")
+        required[rid] = definition
+        if not re.fullmatch(r"G-\d{2}", rid):
+            problems.append(f"invalid requirement id {rid}")
+        if definition.get("category") not in {"slo", "engineering"}:
+            problems.append(f"{rid}: unknown requirement category")
+        for field in ("name", "target"):
+            for lang in ("en", "ru"):
+                if not definition.get(field, {}).get(lang):
+                    problems.append(f"{rid}: missing {field}.{lang}")
     methods = {}
     for m in reg["methods"]:
         mid = m["id"]
@@ -80,34 +101,33 @@ def verify(root, reg):
             problems.append(f"{mid}: automated method needs a Task command, got {m['task']!r}")
         if not m.get("criteria"):
             problems.append(f"{mid}: no pass criteria")
-        for s in m["steps"]:
-            if s not in steps:
-                problems.append(f"{mid}: plan step {s} does not exist")
     used = set()
-    seen_attrs = {}
+    seen_goals = set()
     for g in reg["goals"]:
         gid = g["id"]
-        table = tables.get(g["source"])
-        if table is None:
-            problems.append(f"{gid}: unknown source {g['source']}")
+        if gid in seen_goals:
+            problems.append(f"duplicate goal {gid}")
+        seen_goals.add(gid)
+        if gid not in required:
+            problems.append(f"{gid}: unknown requirement")
             continue
-        if g["attribute"] not in table:
-            problems.append(f"{gid}: attribute {g['attribute']!r} is not a row of plan table {g['source']}")
-        seen_attrs.setdefault(g["source"], set()).add(g["attribute"])
         if not g["methods"]:
             problems.append(f"{gid}: no methods")
         for mid in g["methods"]:
             if mid not in methods:
                 problems.append(f"{gid}: unknown method {mid}")
             used.add(mid)
-        if g["source"] == "1.3" and not any(methods.get(mid, {}).get("barrier") == "automated" for mid in g["methods"]):
+        if required[gid]["category"] == "slo" and not any(methods.get(mid, {}).get("barrier") == "automated" for mid in g["methods"]):
             problems.append(f"{gid}: SLO goal needs at least one automated method")
-    for source, table in tables.items():
-        for attr in table:
-            if attr not in seen_attrs.get(source, set()):
-                problems.append(f"plan {source}: row {attr!r} has no goal in the registry")
+    for rid in required.keys() - seen_goals:
+        problems.append(f"{rid}: requirement has no verification methods")
     mapped = {s["id"]: s for s in reg["scenarios"]}
-    for sid in scenarios(root):
+    expected_scenarios = set(scenarios(root))
+    if len(mapped) != len(reg["scenarios"]):
+        problems.append("duplicate acceptance scenario")
+    for sid in mapped.keys() - expected_scenarios:
+        problems.append(f"{sid}: unknown acceptance scenario")
+    for sid in expected_scenarios:
         if sid not in mapped:
             problems.append(f"scenario {sid} has no verification methods")
     for s in reg["scenarios"]:
@@ -129,11 +149,22 @@ def verify(root, reg):
 
 # ---------------------------------------------------------------- render
 
-def render(root, reg):
-    _, tables = plan(root)
+def render(root, reg, language="en"):
+    if language == "ru":
+        spec = importlib.util.spec_from_file_location("localization", Path(root) / "tools/docs/localization.py")
+        locale = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(locale)
+        reg = locale.localized_artifact(root, "docs/quality/verification.yaml", reg, language)
+    definitions = {r["id"]: r for r in requirements(root)}
     methods = {m["id"]: m for m in reg["methods"]}
     out = []
-    w = out.append
+    def w(line):
+        if language == "en":
+            for source, target in sorted(ENGLISH.items(), key=lambda pair: -len(pair[0])):
+                line = line.replace(source, target)
+        else:
+            line = line.replace("](verification.yaml)", "](../../quality/verification.yaml)")
+        out.append(line)
 
     def refs(ids):
         return ", ".join(f"{i} ({methods[i]['gate']})" for i in ids)
@@ -154,14 +185,15 @@ def render(root, reg):
     w(f"| **Всего** | " + " | ".join(str(sum(1 for m in reg['methods'] if m['gate'] == g)) for g in GATES)
       + f" | **{len(reg['methods'])}** |")
     w("")
-    for source, title in (("1.3", "2. Цели SLO (план, раздел 1.3)"), ("1.4", "3. Цели инженерного качества (план, раздел 1.4)")):
+    for source, title in (("slo", "2. Цели SLO"), ("engineering", "3. Цели инженерного качества")):
         w(f"## {title}")
         w("")
         w("| ID | Цель | Порог | Методы |")
         w("|---|---|---|---|")
         for g in reg["goals"]:
-            if g["source"] == source:
-                w(f"| {g['id']} | {g['attribute']} | {tables[source][g['attribute']]} | {refs(g['methods'])} |")
+            requirement = definitions[g["id"]]
+            if requirement["category"] == source:
+                w(f"| {g['id']} | {requirement['name'][language]} | {requirement['target'][language]} | {refs(g['methods'])} |")
         w("")
     w("## 4. Сценарии приёмки")
     w("")
@@ -178,35 +210,21 @@ def render(root, reg):
             continue
         w(f"### {KIND_NAMES[k]}")
         w("")
-        w("| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |")
-        w("|---|---|---|---|---|---|---|")
+        w("| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск |")
+        w("|---|---|---|---|---|---|")
         for m in items:
             barrier = m["gate"] + (", ручной" if m["barrier"] == "manual" else "")
             task = f"`{m['task']}`" if m["task"] != "-" else "регламент"
             purpose = f" Назначение: {m['purpose']}." if m.get("purpose") else ""
-            w(f"| {m['id']} | {m['name']} | {m['criteria']}.{purpose} | {m['env']} | {barrier} | {task} "
-              f"| {', '.join(sorted(m['steps'], key=step_key))} |")
+            w(f"| {m['id']} | {m['name']} | {m['criteria']}.{purpose} | {m['env']} | {barrier} | {task} |")
         w("")
-    w("## 6. Методы по шагам плана")
-    w("")
-    w("Шаг создаёт перечисленные методы проверки; задача Task метода появляется вместе с шагом.")
-    w("")
-    by_step = {}
-    for m in reg["methods"]:
-        for s in m["steps"]:
-            by_step.setdefault(s, []).append(m["id"])
-    w("| Шаг | Методы |")
-    w("|---|---|")
-    for s in sorted(by_step, key=step_key):
-        w(f"| {s} | {', '.join(by_step[s])} |")
-    w("")
     return "\n".join(out)
 
 
 def main(argv):
-    if len(argv) == 5 and argv[1] == "render":
+    if len(argv) in (5, 6) and argv[1] == "render":
         with open(argv[4], "w", encoding="utf-8") as f:
-            f.write(render(argv[2], load(argv[3])))
+            f.write(render(argv[2], load(argv[3]), argv[5] if len(argv) == 6 else "en"))
         return 0
     if len(argv) == 4 and argv[1] == "verify":
         return verify(argv[2], load(argv[3]))

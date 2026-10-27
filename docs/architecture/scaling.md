@@ -1,118 +1,120 @@
-# Масштабирование и партиционирование
+# Scaling and Partitioning
 
-Версия 0.1 · Шаг плана 0.3 · Статус: черновик
+<!-- language-links -->
+[English](scaling.md) | [Русский](../ru/architecture/scaling.md)
+<!-- /language-links -->
 
-Все числа этого документа - проектные оценки. Они проверяются замерами в минимальном сквозном потоке (шаг 3.1) и на верификации (шаг 10.1), где строится модель сайзинга.
+All numbers in this document are project estimates. They require qualification measurements and load testing before they can support a validated capacity model.
 
 ---
 
-## 1. Принципы
+## 1. Principles
 
-1. **Единица параллелизма - партиция.** Каждый этап конвейера масштабируется добавлением экземпляров в группу потребителей до числа партиций входного топика.
-2. **Число партиций задаётся с запасом при установке.** Увеличение числа партиций у существующего топика меняет распределение ключей и нарушает порядок, поэтому выполняется только через новую версию топика с миграцией (раздел 6).
-3. **Сервисы без состояния или с состоянием, привязанным к партиции.** Состояние корреляции и трекер Normalizer переезжают вместе с партицией; остальное состояние - в PostgreSQL и Redis.
-4. **Горячий путь не зависит от синхронных вызовов.** Справочные данные - локальные копии из compacted-топиков.
+1. **The unit of parallelism is a partition.** Each stage of the pipeline is scaled by adding instances to the consumer group up to the number of partitions in the input stream.
+2. **The number of partitions is set with a margin during installation.** Increasing the number of partitions in an existing stream changes key distribution and disrupts order, so this is only done through a new version of the stream with migration (see section 6).
+3. **Services without state or with state tied to a partition.** The correlation state and Normalizer tracker move with the partition; other states are stored in PostgreSQL and Redis.
+4. **Hot paths do not depend on synchronous calls.** Reference data is local copies from compacted streams.
 
-## 2. Число партиций
+## 2. Number of Partitions
 
-| Топик | Кластер | Одна машина | Обоснование |
+| Stream | Cluster | One Machine | Reason |
 |---|---|---|---|
-| `psim.ingest.raw.v1` | 48 | 12 | 50 000 событий/с ≈ 1 000/с на партицию; запас до ×20 по числу потребителей; 48 делится на 2, 3, 4, 6, 8, 12, 16, 24 |
-| `psim.events.normalized.v1` | 48 | 12 | Как raw; `psim.correlation.changelog.v1` и `psim.normalizer.state.v1` повторяют число партиций своего входа |
-| `psim.correlation.repartition.v1` | 12 | 4 | Только отфильтрованные события правил уровня площадки |
-| `psim.signals.v1` | 12 | 4 | Поток сигналов на порядки меньше потока событий |
+| `psim.ingest.raw.v1` | 48 | 12 | 50,000 events/s ≈ 1,000/second per partition; buffer up to ×20 based on number of consumers; 48 divided by 2, 3, 4, 6, 8, 12, 16, 24 |
+| `psim.events.normalized.v1` | 48 | 12 | Same as raw; `psim.correlation.changelog.v1` and `psim.normalizer.state.v1` replicate the number of partitions of their input |
+| `psim.correlation.repartition.v1` | 12 | 4 | Only filtered events from rules broader than a zone |
+| `psim.signals.v1` | 12 | 4 | Signal flow is dozens of times less than event flow |
 | `psim.incidents.events.v1`, `psim.response.events.v1` | 12 | 4 | - |
-| `psim.commands.v1`, `psim.commands.results.v1` | 6 | 2 | Единицы команд в секунду |
-| `psim.catalog.v1` | 6 | 2 | Читается целиком |
-| `psim.config.v1` | 1 | 1 | Единый порядок изменений конфигурации |
-| `psim.audit.v1` | 6 | 2 | Ключ - тенант; в MVP фактически одна активная партиция |
+| `psim.commands.v1`, `psim.commands.results.v1` | 6 | 2 | One command per second |
+| `psim.catalog.v1` | 6 | 2 | Read entirely |
+| `psim.config.v1` | 1 | 1 | Single order of configuration changes |
+| `psim.audit.v1` | 6 | 2 | Key is tenant; in MVP, it’s actually one active partition |
 | `psim.dlq.*.v1` | 3 | 1 | - |
 
-Числа - значения по умолчанию установщика; на установке задаются профилем нагрузки.
+Numbers are default values during installation; they are set during installation based on load profile.
 
-## 3. Корреляция и ключи
+## 3. Correlation and Keys
 
-Входной ключ `psim.events.normalized.v1` - `site_id:zone_id`. Состояние правила хранится по `correlation_key`. Возможны два случая:
+The input key `psim.events.normalized.v1` is `site_id:zone_id`. Rule state is stored in `correlation_key`. There are two cases:
 
-| Ключ корреляции | Пример | Обработка |
+| Key Correlation | Example | Handling |
 |---|---|---|
-| Выводится из зоны: зона, устройство, источник | «датчик периметра и видеоаналитика в той же зоне за 30 с» | Локально в партиции входа, без перераспределения |
-| Шире зоны: площадка, здание, этаж, тенант | «пять тревог в разных зонах площадки за 10 мин» | Событие, прошедшее фильтр правила, публикуется в `psim.correlation.repartition.v1` по `correlation_key` в той же транзакции; состояние правила живёт у владельца партиции перераспределения |
+| Derived from a zone: zone, device, source | “perimeter sensor and video analytics in the same zone within 30 seconds” | Locally in the input partition, without redistribution |
+| Broader than a zone: site, building, floor, tenant | “five alarms in different zones of one site within 10 minutes” | An event that passed the rule filter is published in `psim.correlation.repartition.v1` according to `correlation_key` in the same transaction; the rule state lives with the partition owner after redistribution |
 
-Фильтр правила применяется до перераспределения, поэтому через топик перераспределения проходит малая доля потока даже для «горячей» площадки. Перераспределение добавляет одну транзакцию к задержке сигнала таких правил; бюджет - в [quality.md](quality.md#4-бюджет-задержек).
+The rule filter applies before redistribution, so only a small portion of the flow passes through the redistribution stream even for “hot” sites. Redistribution adds one transaction to the signal delay for such rules; budget - see [quality.md](quality.md#4-delay-budget).
 
-## 4. Горячие ключи
+## 4. Hot Keys
 
-| Ситуация | Риск | Мера |
+| Situation | Risk | Mitigation |
 |---|---|---|
-| Одна площадка даёт 30% нагрузки (профиль `LOAD-50K`) | Перегрузка части партиций | Ключ включает зону: нагрузка площадки распределяется по её зонам |
-| Одна зона даёт поток, близкий к пропускной способности партиции (массовое срабатывание) | Рост задержки партиции | Метрика перекоса по партициям и алерт; администратор делит зону; лимиты на коннектор в шлюзе |
-| Правило уровня площадки на нефильтрованном потоке | Перегрузка партиции перераспределения | Валидатор правил запрещает правила уровня шире зоны без фильтра по типу события (R-правило в шаге 5.1) |
-| Один инцидент получает тысячи сигналов | Рост хронологии и событий инцидента | Подавление в правилах (`suppression`); агрегирование однотипных сигналов в хронологии |
+| One site provides 30% load (profile `LOAD-50K`) | Overloading some partitions | The key includes the zone: site load is distributed across its zones |
+| One zone provides a flow close to the partition’s throughput capacity (mass activation) | Increase in partition delay | Metric for partition and alert; administrator divides the zone; limits on connectors in the gateway |
+| Site-level rules on unfiltered flow | Overloading of redistribution partition | Rule validators prevent rules broader than a zone without filtering by event type (validity of rule language) |
+| One incident receives thousands of signals | Growth of the timeline and incident events | Suppression in rules (`suppression`); aggregation of similar signals in the timeline |
 
-## 5. Сайзинг
+## 5. Capacity planning
 
-### 5.1 Исходные допущения
+### 5.1 Initial Assumptions
 
-| Параметр | Значение |
+| Parameter | Value |
 |---|---|
-| Размер сырого события (Protobuf) | 400 Б |
-| Размер нормализованного события (Protobuf) | 600 Б |
-| Коэффициент сжатия zstd для пакетов однотипных событий | ×4 |
-| Доля значимых событий (`severity ≥ medium`) | 5% |
-| Размер строки события в ClickHouse после сжатия | 50 Б (проверяется в 10.1) |
-| Сигналов на 1 000 событий | 1 |
-| Активных инцидентов | до 10 000 |
+| Size of raw event (Protobuf) | 400 B |
+| Size of normalized event (Protobuf) | 600 B |
+| zstd compression factor for identical events | ×4 |
+| Percentage of significant events (`severity ≥ medium`) | 5% |
+| Size of event row in ClickHouse after compression | 50 B (requires load measurement) |
+| Signals per 1,000 events | 1 |
+| Active incidents | up to 10,000 |
 
-### 5.2 Оценка при 50 000 событий/с
+### 5.2 Estimation at 50,000 events/s
 
-| Ресурс | Расчёт | Итог |
+| Resource | Calculation | Total |
 |---|---|---|
-| Запись в Kafka, raw | 50 000 × 400 Б / 4 | 5 МБ/с |
-| Запись в Kafka, normalized | 50 000 × 600 Б / 4 | 7,5 МБ/с |
-| Диск Kafka на реплику, raw, 6 ч | 5 МБ/с × 21 600 с | 108 ГБ |
-| Диск Kafka на реплику, normalized, 24 ч | 7,5 МБ/с × 86 400 с | 650 ГБ |
-| Диск Kafka на кластер (RF = 3), с запасом 30% | (108 + 650 + прочее ≈ 50) ГБ × 3 × 1,3 | ≈ 3,2 ТБ |
-| Вставки в ClickHouse, таблица `events` | все события пакетами ≥ 20 000 строк | 50 000 строк/с, 2-3 вставки/с |
-| Диск ClickHouse, все события, 7 сут | 50 000 × 50 Б × 604 800 с | ≈ 1,5 ТБ |
-| Диск ClickHouse, значимые события, 90 сут | 2 500 × 50 Б × 7 776 000 с | ≈ 1 ТБ |
-| Диск ClickHouse на реплику с запасом 30% | (1,5 + 1 + связи и факты ≈ 0,1) ТБ × 1,3 | ≈ 3,4 ТБ |
-| Сигналы | 50 000 / 1 000 | 50/с |
+| Kafka write, raw | 50,000 × 400 B / 4 | 5 MB/s |
+| Kafka write, normalized | 50,000 × 600 B / 4 | 7.5 MB/s |
+| Kafka disk on replica, raw, 6 hours | 5 MB/s × 21,600 s | 108 GB |
+| Kafka disk on replica, normalized, 24 hours | 7.5 MB/s × 86,400 s | 650 GB |
+| Kafka disk on cluster (RF = 3), with 30% buffer | (108 + 650 + etc ≈ 50) GB × 3 × 1.3 | ≈ 3.2 TB |
+| Insertions into ClickHouse, table `events` | All events in batches ≥ 20,000 rows | 50,000 rows/s, 2-3 insertions/s |
+| ClickHouse disk, all events, 7 days | 50,000 × 50 B × 604,800 s | ≈ 1.5 TB |
+| ClickHouse disk, significant events, 90 days | 2,500 × 50 B × 7,776,000 s | ≈ 1 TB |
+| ClickHouse disk on replica with 30% buffer | (1.5 + 1 + links and facts ≈ 0.1) TB × 1.3 | ≈ 3.4 TB |
+| Signals | 50,000 / 1,000 | 50/s |
 
-История событий в ClickHouse ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) - главная статья хранения. Параметры, которые на неё влияют: retention всех и значимых событий, порог значимости, доля значимых событий у конкретного заказчика, фактическая степень сжатия. Модель сайзинга шага 10.1 выдаёт оценку по этим параметрам.
+The history of events in ClickHouse ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) is the largest storage cost. Parameters that affect it include retention for all and significant events, threshold for significance, percentage of significant events for specific clients, actual compression level. The capacity model based on load measurements provides estimates based on these parameters.
 
-Retention нормализованных событий по умолчанию - 24 ч. Он ограничивает глубину пробного прогона правил на истории; увеличение выполняется при установке с пересчётом дисков.
+The default retention for normalized events is 24 hours. It limits the depth of rule testing on history; increase is done during installation with recalculation of disks.
 
-### 5.3 Экземпляры сервисов при 50 000 событий/с, кластер
+### 5.3 Service Instances at 50,000 Events/s, Cluster
 
-| Сервис | Экземпляров | Оценка нагрузки на экземпляр |
+| Service | Instances | Estimated Load per Instance |
 |---|---|---|
-| Connector Gateway | 2 (+1 резерв) | 25 000 событий/с |
-| Normalizer | 3 | ≈ 17 000 событий/с |
-| Correlation Engine | 3 | ≈ 17 000 событий/с |
-| Event History | 2 | 25 000 событий/с, вставка пакетами в ClickHouse |
-| Incident Service | 2 | 25 сигналов/с |
-| Response Engine, Command Service, Notification Service | по 2 | Низкая |
-| Projection Service | 2 | ≈ 5 000 событий/с изменения состояния |
-| API Gateway | 2 | 250 консолей |
-| Audit Service | 1 активный + 1 резервный | Сотни записей/с |
-| Resource Catalog | 2 | Низкая |
+| Connector Gateway | 2 (+1 reserve) | 25,000 events/s |
+| Normalizer | 3 | ≈ 17,000 events/s |
+| Correlation Engine | 3 | ≈ 17,000 events/s |
+| Event History | 2 | 25,000 events/s, insertion in ClickHouse in batches |
+| Incident Service | 2 | 25 signals/s |
+| Response Engine, Command Service, Notification Service | 2 each | Low |
+| Projection Service | 2 | ≈ 5,000 events/s per state change |
+| API Gateway | 2 | 250 consoles |
+| Audit Service | 1 active + 1 reserve | Hundreds of records/s |
+| Resource Catalog | 2 | Low |
 
-### 5.4 Эталонные стенды
+### 5.4 Standard Test Environments
 
-| Стенд | Состав | Целевая нагрузка |
+| Test Environment | Composition | Target Load |
 |---|---|---|
-| Одна машина | 16 vCPU, 64 ГБ ОЗУ, NVMe 4 ТБ | 10 000 событий/с (цель для проверки в 10.1; в плане не задана) |
-| Кластер на VM | 3 узла инфраструктуры (Kafka, PostgreSQL, Redis, ClickHouse с Keeper; ClickHouse - на двух из трёх): 16 vCPU, 64 ГБ, NVMe 8 ТБ; 2 узла приложений: 16 vCPU, 32 ГБ | 50 000 событий/с устойчиво, 75 000 событий/с пиково |
+| One machine | 16 vCPU, 64 GB RAM, NVMe 4 TB | 10,000 events/s (preliminary estimate, requires load confirmation) |
+| Cluster on VMs | 3 infrastructure nodes (Kafka, PostgreSQL, Redis, ClickHouse with Keeper; ClickHouse - on two of three): 16 vCPU, 64 GB, NVMe 8 TB; 2 application nodes: 16 vCPU, 32 GB | 50,000 events/s sustained, 75,000 events/s at peak |
 
-## 6. Масштабирование сверх MVP
+## 6. Scaling Beyond MVP
 
-Путь к миллионам событий/с без изменения архитектуры:
+Path to millions of events/s without changing the architecture:
 
-| Шаг | Что меняется |
+| Step | What changes |
 |---|---|
-| ×2-×10 | Больше брокеров и экземпляров сервисов в пределах заложенных 48 партиций |
-| ×10-×50 | Новая версия топиков с большим числом партиций (`v2`): двойная запись, переключение потребителей по границе времени, вывод `v1` |
-| ×50 и более | Шардирование по площадкам или регионам: несколько кластеров Kafka и конвейеров с федерацией инцидентов (вне MVP, X4, X10); многоуровневое хранение Kafka для длинного retention |
+| ×2-×10 | More brokers and service instances within the 48 partitions established |
+| ×10-×50 | New version of topics with a larger number of partitions (`v2`): double writing, switching consumers by time boundary, retirement of `v1` |
+| ×50 and more | Sharding across sites or regions: multiple Kafka clusters and pipelines with an incident federation (outside MVP, X4, X10); tiered storage in Kafka for long retention |
 
-Ограничения, которые нужно снять до роста ×10: последовательная цепочка аудита на тенант (переход к цепочке на партицию с общей вершиной в контрольной точке), ClickHouse (переход от 1 шарда к нескольким шардам по площадкам, ADR-028).
+Limitations that need to be removed before scaling ×10: sequential audit chain on tenants (transition to a chain on a partition with a shared root at a checkpoint), ClickHouse (transition from 1 shard to multiple shards across sites, ADR-028).

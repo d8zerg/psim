@@ -1,0 +1,55 @@
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+top to bottom direction
+rectangle "HAProxy ×2 + keepalived VIP\n:443 HTTPS/WSS, :7443 gRPC L4" as LB
+package "infra-1" as I1 {
+rectangle "Kafka broker+controller" as K1
+database "PostgreSQL + Patroni" as P1
+rectangle "etcd" as E1
+database "Redis master/replica" as R1
+database "ClickHouse реплика + Keeper" as C1
+database "SeaweedFS master, volume, filer, S3" as F1
+}
+package "infra-2" as I2 {
+rectangle "Kafka broker+controller" as K2
+database "PostgreSQL + Patroni" as P2
+rectangle "etcd" as E2
+database "Redis master/replica" as R2
+database "ClickHouse реплика + Keeper" as C2
+database "SeaweedFS master, volume, filer, S3" as F2
+}
+package "infra-3" as I3 {
+rectangle "Kafka broker+controller" as K3
+database "PostgreSQL + Patroni" as P3
+rectangle "etcd" as E3
+database "Redis master/replica" as R3
+rectangle "ClickHouse Keeper" as C3
+rectangle "SeaweedFS master" as F3
+}
+package "app-1" as A1 {
+rectangle "Экземпляры сервисов PSIM, Keycloak" as SA
+}
+package "app-2" as A2 {
+rectangle "Экземпляры сервисов PSIM, Keycloak" as SB
+}
+rectangle "obs-1: Collector, Prometheus, Grafana,\nлоги и трассировки" as OBS
+LB --> A1
+LB --> A2
+A1 --> I1
+A1 --> I2
+A1 --> I3
+A2 --> I1
+A2 --> I2
+A2 --> I3
+A1 ..> OBS
+A2 ..> OBS
+@enduml

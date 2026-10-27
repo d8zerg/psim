@@ -1,57 +1,61 @@
-# Стандарт кодирования TypeScript
+# TypeScript Coding Standard
 
-Шаг плана 1.2 · [ADR-033](../adr/0033-code-quality-gates.md) · инструменты - [ADR-037](../adr/0037-web-monorepo.md) · стек веб-клиента - раздел 0.1 плана
+<!-- language-links -->
+[English](typescript-coding-standard.md) | [Русский](../ru/engineering/typescript-coding-standard.md)
+<!-- /language-links -->
 
-Стандарт действует для `web/` (pnpm + Turborepo, React 19, Vite, TanStack Query и Router, Zustand, Tailwind CSS 4, shadcn/ui). Правила, которые проверяет инструмент, записаны в его конфигурации: `web/tsconfig.base.json`, `web/eslint.config.js`, `web/.prettierrc.json`, `vitest.config.ts` и `.size-limit.json` пакетов. Ниже - их смысл и правила для ревью.
+[ADR-033](../adr/0033-code-quality-gates.md) · Tools - [ADR-037](../adr/0037-web-monorepo.md)
 
-## 1. Барьеры (`task web:check`, этап `web` конвейера)
+This standard applies to `web/` (pnpm + Turborepo, React 19, Vite, TanStack Query and Router, Zustand, Tailwind CSS 4, shadcn/ui). The rules checked by the tool are specified in its configuration: `web/tsconfig.base.json`, `web/eslint.config.js`, `web/.prettierrc.json`, `vitest.config.ts`, and `.size-limit.json` packages. Below are their meanings and rules for review.
 
-| Что | Требование |
+## 1. Quality Gates (`task web:check`, stage `web` of the pipeline)
+
+| What | Requirement |
 |---|---|
-| Проверка типов | `tsc` без ошибок во всех пакетах |
-| Линтер | ESLint (typescript-eslint `strictTypeChecked`, react-hooks, jsx-a11y), `--max-warnings 0` |
-| Формат | Prettier без изменений |
-| Тесты и покрытие | Vitest; ≥ 80% строк, ветвей, функций и выражений на пакет ([strategy.md](../quality/strategy.md#6-покрытие)) |
-| Бюджеты бандла | size-limit: весь JavaScript с витриной ≤ 260 КБ gzip, начальная загрузка консоли ≤ 150 КБ gzip, CSS ≤ 15 КБ ([ADR-065](../adr/0065-ui-loading-budgets.md)) |
-| Сгенерированные клиенты | REST - из OpenAPI, realtime - из proto; генерируются при каждой сборке в `src/gen`, в git не хранятся |
-| E2E | Playwright по собранной консоли (`task web:e2e`) |
+| Type checking | `tsc` with no errors in all packages |
+| Linter | ESLint (typescript-eslint `strictTypeChecked`, react-hooks, jsx-a11y), `--max-warnings 0` |
+| Formatting | Prettier without changes |
+| Tests and coverage | Vitest; ≥ 80% of lines, branches, functions, and statements per package ([strategy.md](../quality/strategy.md#6-coverage)) |
+| Delivery budgets | Initial load ≤ 150 KB gzip; full application graph ≤ 250 KB; showcase graph ≤ 260 KB; unique JS distribution ≤ 300 KB; CSS ≤ 15 KB ([ADR-065](../adr/0065-ui-loading-budgets.md), ADR-070, ADR-075) |
+| Generated clients | REST - from OpenAPI, realtime - from proto; generated at each build in `src/gen`, not stored in git |
+| E2E | Playwright for the built console (`task web:e2e`) |
 
-## 2. Компилятор
+## 2. Compiler
 
-- Общий `tsconfig` с `strict: true`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`, `isolatedModules`.
-- Только ES-модули; цель - современные браузеры из требований веб-клиента.
+- General `tsconfig` with `strict: true`, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `verbatimModuleSyntax`, `isolatedModules`.
+- Only ES modules; goal is to meet modern browsers' requirements for web clients.
 
-## 3. Типы
+## 3. Types
 
-- `any` запрещён; для неизвестных данных - `unknown` и сужение. Данные из сети проверяются на границе (схемы, сгенерированные из OpenAPI), дальше код работает с проверенными типами.
-- Утверждения типов (`as`) и non-null `!` - только с комментарием, почему это безопасно.
-- Варианты состояний - размеченные объединения с исчерпывающим `switch` (`never` в ветви по умолчанию), а не наборы флагов.
-- Идентификаторы предметной области - брендированные типы (`IncidentId`), а не голые `string`.
-- `enum` не используется; вместо него - объединения строковых литералов или объекты `as const`.
+- `any` is prohibited; for unknown data - `unknown` and narrowing. Network data is checked at the boundary (schemas generated from OpenAPI), beyond which the code works with verified types.
+- Type assertions (`as`) and non-null `!` - only with a comment explaining why it’s safe.
+- State options are exhaustive unions with an exhaustive `switch` (default in branches for `never`), not sets of flags.
+- Object identifiers are branded types (`IncidentId`), not bare `string`.
+- `enum` is not used; instead, it uses unions of string literals or objects `as const`.
 
-## 4. Именование и файлы
+## 4. Naming and files
 
-| Сущность | Стиль | Пример |
+| Entity | Style | Example |
 |---|---|---|
-| Переменные, функции, хуки | `camelCase`, хуки с `use` | `incidentFeed`, `useIncident` |
-| Типы, интерфейсы, компоненты React | `PascalCase` | `IncidentCard` |
-| Константы модуля | `UPPER_SNAKE_CASE` | `MAX_FEED_SIZE` |
-| Файлы компонентов | `PascalCase.tsx` | `IncidentCard.tsx` |
-| Прочие файлы | `kebab-case.ts` | `realtime-client.ts` |
+| Variables, functions, hooks | `camelCase`, hooks with `use` | `incidentFeed`, `useIncident` |
+| Types, interfaces, React components | `PascalCase` | `IncidentCard` |
+| Module constants | `UPPER_SNAKE_CASE` | `MAX_FEED_SIZE` |
+| Component files | `PascalCase.tsx` | `IncidentCard.tsx` |
+| Other files | `kebab-case.ts` | `realtime-client.ts` |
 
 ## 5. React
 
-- Только функциональные компоненты и хуки; правила хуков проверяются линтером.
-- Серверное состояние - TanStack Query; клиентское - Zustand; локальное - `useState`. Данные сервера не копируются в Zustand.
-- Побочные эффекты - в обработчиках событий и запросах, `useEffect` - только для синхронизации с внешними системами.
-- Доступность: семантические элементы, подписи у элементов управления; проверка axe-core в E2E (шаг 8.6).
-- Тексты интерфейса - через локализацию (ru, en); сервер возвращает коды, а не тексты ([crosscutting.md](../architecture/crosscutting.md#15-интернационализация)).
+- Only functional components and hooks; hook rules are checked by the linter.
+- Server state - TanStack Query; client state - Zustand; local state - `useState`. Server data is not copied to Zustand.
+- Side effects - in event handlers and requests, `useEffect` - only for synchronization with external systems.
+- Accessibility: semantic elements, labels on control elements; axe-core check in E2E.
+- Interface texts - through localization (ru, en); the server returns codes, not texts ([crosscutting.md](../architecture/crosscutting.md#15-internationalization)).
 
-## 6. Ошибки и асинхронность
+## 6. Errors and Asynchrony
 
-- Каждое обещание обрабатывается: ожидается, возвращается или явно помечается как фоновое; «плавающие» обещания запрещены линтером.
-- Ошибки API разбираются по коду из каталога ошибок (RFC 9457), а не по тексту.
+- Each promise is handled: awaited, returned, or explicitly marked as background; “floating” promises are prohibited by the linter.
+- API errors are resolved based on code from the error catalog (RFC 9457), not text.
 
-## 7. Подавления
+## 7. Suppression
 
-- Отключение правила линтера - только для строки, с именем правила и причиной; отключение на файл не допускается.
+- Disabling linter rules - only for lines with a rule name and reason; disabling on files is not allowed.

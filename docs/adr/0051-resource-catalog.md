@@ -1,31 +1,34 @@
-# ADR-051. Resource Catalog: ресурсы, файлы и обслуживание
+# ADR-051. Resource Catalog: Resources, files and maintenance
 
-- Статус: Принято
-- Шаг: 4.4
-- Связанные решения: ADR-008, ADR-026, ADR-042, ADR-046, ADR-049
+<!-- language-links -->
+[English](0051-resource-catalog.md) | [Русский](../ru/adr/0051-resource-catalog.md)
+<!-- /language-links -->
 
-## Контекст
+- Status: Accepted
+- Related decisions: ADR-008, ADR-026, ADR-042, ADR-046, ADR-049
 
-Каталог должен хранить иерархию объектов, типы устройств, устройства и источники, публиковать согласованные версии и обслуживать планы этажей. Отказ S3 или процесса не должен повреждать доступный план. Время обслуживания должно сохраняться независимо от процесса.
+## Context
 
-## Решение
+The catalog must store the hierarchy of objects, device types, devices, and sources, publish agreed versions, and serve floor plans. A failure in S3 or the process must not disrupt the available plan. Maintenance deadlines must be maintained independent of the process.
 
-1. `psim-resource-catalog` использует платформенный runtime, HTTPS и проверенный JWT. Тенант берётся из `psim_tenant`, права - из ролей клиента `psim`. `psim_scopes` содержит UUID разрешённых площадок; `*` означает весь тенант. Пустая область не даёт доступа к ресурсам. Управление ресурсами требует роли `admin`; общие типы устройств и управление коннекторами требуют области всего тенанта. Оператор может читать ресурсы своей площадки.
-2. Сервис владеет схемой `catalog`. Изменение ресурса, его версия, запись аудита, результат идемпотентного запроса и outbox фиксируются одной транзакцией. Записи Kafka содержат полный снимок и версию. Аудит сохраняет снимок каждой версии и ссылку на породившее её сообщение, включая промежуточные политики обслуживания. Архивирование сохраняет снимок с `RESOURCE_STATE_ARCHIVED`. Реле библиотеки PostgreSQL обеспечивает доставку с возможными повторами; потребители сравнивают версии.
-3. Изменения иерархии и привязок сериализуются транзакционной advisory-блокировкой тенанта. Это сохраняет проверки родителя, уникальности источников, координат и пустоты локации при нескольких экземплярах. Импорт фиксирует небольшие пакеты, освобождая блокировку между ними. Горизонтальное масштабирование каталога ограничено этой сериализацией; сервис не находится на пути обработки каждого события.
-4. Существующий реестр доверия Gateway остаётся владельцем сертификатов и их отзыва. REST каталога делегирует операции через mTLS с идентичностью `psim://service/resource-catalog` и исходным JWT. Gateway публикует `CatalogRecord.connector` из своей транзакции с outbox. Непубликовавшиеся регистрации переносятся в поток при запуске, с сохранением версии. Каталог строит собственную копию; доступ к схеме `ingest` ему не нужен. Остальные виды `CatalogRecord` публикует каталог.
-5. Задание импорта, входные строки и прогресс хранятся в PostgreSQL. Авторизация фиксируется при приёме задания, ошибки возвращаются по строкам. Внешняя идентичность устройства - `(connector_id, external_id)`; повторный импорт обновляет прежнее устройство. Дубликаты внутри файла отклоняются. Транзакции пакетов и savepoint строки позволяют продолжить импорт после отказа экземпляра. `dryRun` откатывает изменения ресурсов и их outbox, сохраняя отчёт проверки.
-6. Порт `FileStore` отделяет API каталога от S3. Изображение полностью декодируется libpng или libjpeg-turbo, ограничивается 20 МиБ и 16 миллионами пикселей. SVG и подмена типа отклоняются. Декодирование и файловый ввод-вывод выполняются в ограниченном BlockingPool.
-7. До записи S3 каталог создаёт долговечную резервацию уникального ключа. PUT создаёт неизменяемый объект; SHA-256 и размер сверяются. Затем одной транзакцией связываются метаданные, новая версия плана и версия этажа с проверкой `If-Match`. Ошибка сохраняет прежнюю ссылку. Исторические версии доступны через тот же контроль области. Непривязанные резервации истекают через 10 минут; фоновая очистка удаляет объект и затем запись. Удаление блокирует одновременную привязку. Bucket закрыт, временные публичные ссылки не выдаются.
-8. `MaintenanceWindow` хранит устройство или зону, площадку, UTC-интервал с обязательным окончанием, причину, ответственного, явную политику и версию. Начальное состояние задаёт сервер. Терминальные окна не открываются повторно. Переходы `scheduled -> active -> completed` и отмена сохраняются с аудитом и публикуются в `psim.config.v1` по ключу `maintenance/<tenant_id>/<maintenance_id>`. Опрос выполняется каждые 100 мс; при запуске просроченные границы восстанавливаются до открытия REST.
-9. Пожарные типы и wildcard отклоняются в списке подавления. Договор с потребителем также запрещает подавление любых пожарных событий и P1, независимо от выбранного правила. Применение политики в Correlation Engine не изменяет историю и открытые инциденты. Потребитель учитывает сохранённые границы по времени приёма события, а не время поступления старой записи конфигурации.
+## Solution
 
-## Последствия
+1. `psim-resource-catalog` uses platform runtime, HTTPS, and verified JWT. Tenants are retrieved from `psim_tenant`, rights from client roles `psim`. `psim_scopes` contains UUIDs of allowed sites; `*` represents the entire tenant. Empty scopes do not provide access to resources. Resource management requires the role `admin`; general device types and connection management require the tenant-wide scope. The operator can read resources from its site.
+2. The service owns the schema `catalog`. Changes to resources, their versions, audit records, results of idempotent requests, and outboxes are recorded in one transaction. Kafka records contain a full snapshot and version. Audit keeps snapshots of each version and a link to the message that created it, including intermediate maintenance policies. Archiving stores snapshots with `RESOURCE_STATE_ARCHIVED`. PostgreSQL library relays with possible repetitions; consumers compare versions.
+3. Changes to hierarchy and associations are serialized by the tenant’s transaction advisory lock. This preserves checks on parent objects, uniqueness of sources, coordinates, and empty locations in multiple instances. Import commits small batches, freeing up locks between them. Horizontal scaling of the catalog is limited by this serialization; the service does not process each event.
+4. The existing trust registry of the Gateway remains the owner of certificates and their revocation. The REST catalog delegates operations through mTLS with identity `psim://service/resource-catalog` and original JWT. The Gateway publishes `CatalogRecord.connector` from its outbox. Unpublished registrations are transferred to the stream upon startup, with version retention. The catalog builds its own copy; it does not need access to schema `ingest`. The catalog publishes other `CatalogRecord` variants.
+5. Import tasks, input rows, and progress are stored in PostgreSQL. Authorization is recorded when a task is accepted, errors are returned per row. External device identity is `(connector_id, external_id)`; reimport updates the previous device. Duplicates within a file are rejected. Packet transactions and savepoints allow import to continue after an instance fails. `dryRun` rolls back resource changes and their outboxes, retaining audit reports.
+6. Port `FileStore` separates the API catalog from S3. Images are fully decoded using libpng or libjpeg-turbo, limited to 20 MB and 16 million pixels. SVG and type substitution are rejected. Decoding and file input/output are performed in a limited BlockingPool.
+7. Before S3 recording, the catalog creates a durable reservation of unique keys. PUT creates an immutable object; SHA-256 and size are verified. Then, metadata, new plan version, and floor version are linked with verification `If-Match`. Errors retain previous links. Historical versions are available through the same access scope checks. Unbound reservations expire after 10 minutes; background cleanup removes objects and then records. Deletion blocks simultaneous binding. The bucket is private, temporary public links are not provided.
+8. `MaintenanceWindow` stores a device or zone, site, UTC interval with mandatory expiration, reason, responsible person, explicit policy, and version. The initial state is set by the server. Terminal windows are not reopened. Transitions `scheduled -> active -> completed` and cancellations are recorded with audit and published in `psim.config.v1` by key `maintenance/<tenant_id>/<maintenance_id>`. The scheduler polls every 100 ms; during startup, overdue state transitions are recovered until REST is opened.
+9. Fire types and wildcards are rejected in the suppression list. The consumer contract also prohibits suppressing any fire events and P1, regardless of selected rules. Applying policies in the Correlation Engine does not change history or open incidents. The consumer considers stored time boundaries based on event acceptance time, not when the old configuration record arrives.
 
-Для поставки нужны PostgreSQL, Kafka, Schema Registry, Keycloak, закрытый S3 bucket и доверие к Gateway. Два экземпляра используют общую БД и bucket. Повтор задания не требует локальных файлов сервиса. Старые версии планов намеренно сохраняются; политика их удаления и согласованная резервная копия метаданных с объектами входят в эксплуатационные процедуры.
+## Consequences
 
-Границы REST, файлов и обслуживания расширяются добавлением полей и методов. Существующие поля и числовые идентификаторы сохраняются. Возможности пользовательского интерфейса, нормализация с обогащением и применение подавления развиваются отдельно.
+For delivery, PostgreSQL, Kafka, Schema Registry, Keycloak, a private S3 bucket, and trust in the Gateway are required. Two instances use the same database and bucket. Repeated tasks do not require local service files. Old plan versions are intentionally retained; policies for their deletion and consistent metadata backup with objects are part of operational procedures.
 
-## Проверка
+REST boundaries, files and maintenance expand with additional fields and methods. Existing fields and numerical identifiers are retained. User interface capabilities, normalization with enrichment, and suppression applications are developed separately.
 
-`task catalog:test`, `task catalog:bench`, `task catalog:sanitizers`, `task catalog:coverage`, `task contracts:check`. Нагрузочная проверка сверяет идентификаторы всех устройств между входом, REST-экспортом и настоящим потребителем Kafka; измеряет время импорта и задержку публикации. Файловые проверки вводят отказы S3 и фиксации метаданных, проверяют версии, область и очистку. Обслуживание проверяется с двумя экземплярами и после их перезапуска.
+## Verification
+
+`task catalog:test`, `task catalog:bench`, `task catalog:sanitizers`, `task catalog:coverage`, `task contracts:check`. Load testing compares identifiers of all devices between input, REST export, and current Kafka consumer; measures import time and publication delay. File tests inject S3 and metadata write failures, verify versions, access scope and cleanup. Maintenance is tested with two instances and after restarting them.

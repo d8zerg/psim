@@ -1,0 +1,26 @@
+@startuml
+!include <C4/C4_Component>
+LAYOUT_LEFT_RIGHT()
+title Connector Gateway - компоненты
+Container_Ext(sdk, "Connector SDK", "gRPC mTLS", "События, heartbeat и результаты команд")
+ContainerDb_Ext(pg, "PostgreSQL", "TLS", "Регистрации, владение сессией и ревизии")
+ContainerDb_Ext(redis, "Valkey", "TLS / RESP3", "TTL-реестр и ограничения")
+ContainerQueue_Ext(kafka, "Kafka", "TLS", "raw, state, commands, results")
+Container_Boundary(gw, "Connector Gateway") {
+ Component(server, "gRPC Server", "gRPC / TLS 1.3", "Аутентификация и ограниченный транспорт")
+ Component(session, "Session Manager", "C++", "Регистрация, lease, heartbeat и отзыв")
+ Component(ingest, "Ingest Pipeline", "C++", "Валидация, кредиты и подтверждение Kafka")
+ Component(commands, "Command Dispatcher", "C++", "Проверка владения, дедлайна и возможностей")
+ Component(catalog, "Catalog View", "C++", "Локальная копия источников и конфигурации")
+}
+Rel(sdk, server, "Протокол v1")
+Rel(server, session, "Register / heartbeat")
+Rel(session, pg, "Каноническое владение")
+Rel(session, redis, "TTL и лимиты")
+Rel(server, ingest, "Пакеты и состояние")
+Rel(ingest, catalog, "Проверка источника")
+Rel(ingest, kafka, "produce; ack после acks=all")
+Rel(kafka, commands, "Команды")
+Rel(commands, session, "Текущая сессия")
+Rel(commands, server, "Доставка команды")
+@enduml

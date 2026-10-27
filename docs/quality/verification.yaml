@@ -1,1151 +1,1209 @@
-# Verification registry - source of truth (step 0.7). Strategy: strategy.md.
-# Rendered to verification-matrix.md by `task docs:verification:gen`; checked by `task docs:verification`.
-#
-# methods.kind: test, load, soak, chaos, benchmark, fitness, security, manual
-# methods.gate: pr (blocks merge), nightly (blocks next release), release (blocks release), on-demand (manual launch)
-# methods.barrier: automated (pass/fail without a person) or manual (documented procedure and sign-off)
-# methods.task: Task command that runs the method (introduced by the listed plan steps)
-# methods.purpose: required when the method is not linked to a goal or a scenario
-# goals.attribute must equal the first column of plan tables 1.3 and 1.4 exactly.
-
 version: 1
-
 methods:
-  - id: TS-39
-    kind: test
-    name: Пакет наблюдаемости
-    criteria: Семь статических дашбордов, корректные PromQL и конфигурации, переходы алертов и инструкции для C-01-C-15, бизнес-агрегаты без доступа к исходным таблицам, mTLS метрик, OTLP логи и трассы, доставка Prometheus -> Alertmanager -> журнал и браузерный просмотр без ошибок запросов
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task deploy:observability:test
-    steps: ['9.4']
-    purpose: Поставка наблюдаемости и диагностические маршруты отказов; не заменяет квалификацию RPO/RTO
-  - id: TS-38
-    kind: test
-    name: Загрузка и восстановление веб-модулей
-    criteria: Сравнение исходной сборки, статических модулей, отложенных редакторов, языковых словарей и отдельных входов; ru/en, реальные холодный и прогретый HTTP-кэш, полные графы с динамическими imports и данными словарей, запрет преждевременной загрузки закрытого маршрута, ошибка чанка, обновление артефакта и повтор загрузки перевода с сохранением ввода
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task web:loading
-    steps: ['8.6']
-    purpose: Сравнение способов загрузки и проверка действующих пределов до изменения поставки
-  - id: TS-37
-    kind: test
-    name: Аудит и отчёт руководителя через публичный интерфейс
-    criteria: Реальный PKCE с TOTP, поиск и страницы аудита, независимая проверка скачанного JSONL, точное обнаружение изменения и удаления записи в PostgreSQL, запрет чужой площадки, отзыв роли при прежнем JWT, эталонные метрики за 30 суток менее чем за три секунды и совпадающий CSV
-    env: E-LOCAL
-    gate: pr
-    barrier: automated
-    task: task insights:test
-    steps: ['8.5']
-  - id: TS-36
-    kind: test
-    name: Администрирование через публичный интерфейс
-    criteria: Реальный PKCE с MFA, регистрация и продление сертификата, отображение нового типа коннектора, иерархия и импорт, обслуживание, SLA, правило с пробным прогоном, публикация сценария, запрет чужой площадки и недопустимых загрузок
-    env: E-LOCAL
-    gate: pr
-    barrier: automated
-    task: task admin:test
-    steps: ['8.4']
-  - id: TS-35
-    kind: test
-    name: Рабочая консоль оператора
-    criteria: Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности
-    env: E-LOCAL
-    gate: on-demand
-    barrier: automated
-    task: task operator:test
-    steps: ['8.3']
-  - id: B-07
-    kind: benchmark
-    name: Виртуализированная лента оператора
-    criteria: 10000 инцидентов, прокрутка не ниже 50 кадров/с, realtime -> DOM не выше 1 с p99; сырые серии и один браузерный worker
-    env: E-CI
-    gate: on-demand
-    barrier: automated
-    task: task operator:benchmark
-    purpose: Проверить отзывчивость рабочей ленты без подмены полного SLO входного конвейера
-    steps: ['8.3']
-  # --- Test suites ----------------------------------------------------------
-  - id: TS-34
-    kind: test
-    name: Сессия и ролевые маршруты оболочки
-    criteria: PKCE, проверка ID token, одиночный refresh, очистка при выходе, прямой вход, ролевые границы и поздние ответы
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task web:check
-    purpose: Проверить изоляцию сессий и общую оболочку без смешивания рабочих данных пользователей
-    steps: ['8.2']
-  - id: TS-33
-    kind: test
-    name: Серверные операции оперативного интерфейса
-    criteria: Независимая тревога, права, версии, повторы, lease между экземплярами, история, изоляция учений и разрешённые источники ассистента
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task operations:test
-    purpose: Проверить серверные операции оперативного интерфейса без использования имитатора витрины
-    steps: ['8.1a']
-  - id: TS-01
-    kind: test
-    name: Unit-тесты доменного ядра
-    criteria: Все проходят; каждый инвариант aggregates.md и каждый переход state-models.md покрыт тестом
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:test
-    steps: ['1.2', '5.3', '6.1', '6.2']
-  - id: TS-02
-    kind: test
-    name: Property-based тесты инвариантов агрегатов
-    criteria: Для случайных последовательностей команд инварианты соблюдены; 0 дубликатов инцидентов при повторах сигналов
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:test:property
-    steps: ['5.3', '6.1', '6.2']
-  - id: TS-03
-    kind: test
-    name: Компонентные тесты адаптеров против контейнеров
-    criteria: Kafka, PostgreSQL, Redis, ClickHouse - реальные контейнеры окружения 1.4; сценарии разрыва соединений и переключения
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:component
-    steps: ['1.4', '2.3', '2.4', '2.5', '2.8']
-  - id: TS-04
-    kind: test
-    name: Проверка контрактов
-    criteria: task contracts:check зелёный - формат, линтер, buf breaking, OpenAPI и AsyncAPI валидны и актуальны, согласованность реестров
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task contracts:check
-    steps: ['0.5', '1.3']
-  - id: TS-05
-    kind: test
-    name: Контрактные тесты REST против OpenAPI
-    criteria: Все маршруты Protobuf доступны через Gateway; реальные ответы проверяются по psim-api-v1.yaml, коды ошибок из каталога, RFC 9457
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:api-contract
-    steps: ['7.1']
-  - id: TS-06
-    kind: test
-    name: Тестовый набор соответствия протоколу коннекторов
-    criteria: Эталонные коннекторы и симулятор проходят весь набор; обрыв связи 10 мин без потерь
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task connectors:conformance
-    steps: ['4.1', '4.3']
-  - id: TS-07
-    kind: test
-    name: Симуляция конвейера, короткий прогон
-    criteria: Ручной запуск 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 повторных эффектов; эталонная доставка и вычислитель корреляции с независимыми оракулами (ADR-044)
-    env: E-DEV
-    gate: on-demand
-    barrier: automated
-    task: task sim:short
-    steps: ['2.7', '5.2']
-  - id: TS-08
-    kind: test
-    name: Симуляция конвейера, длинный прогон
-    criteria: Ручной запуск 10 000 прогонов; ошибка воспроизводится по зерну, версии модели и параметрам; трасса сохраняется для регрессионного теста (ADR-044)
-    env: E-DEV
-    gate: on-demand
-    barrier: automated
-    task: task sim:long
-    steps: ['2.7', '5.2']
-  - id: TS-09
-    kind: test
-    name: Сквозной смоук-тест конвейера в Docker Compose
-    criteria: Событие симулятора порождает инцидент, видимый через API и realtime; одна трассировка на весь путь
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:smoke
-    steps: ['3.1']
-  - id: TS-10
-    kind: test
-    name: Приёмочные API-тесты сценариев
-    criteria: Сценарии acceptance-spec.md, выполнимые через API и протокол коннекторов, включая негативные проверки
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps: ['3.1', '11.3']
-  - id: TS-11
-    kind: test
-    name: Сквозные UI-тесты Playwright
-    criteria: Сценарии S1, S2, S6-S10, S13 через интерфейс с настоящими Keycloak, Kafka и сервисами; обязательные шаги, перезапуск и сохранение версии сценария, второе подтверждение команды, передача ответственности, завершение и закрытие инцидента
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task web:native
-    steps: ['8.3', '8.4', '8.5', '8.6']
-  - id: TS-12
-    kind: test
-    name: Матрица прав «роль × действие × область»
-    criteria: Все действия и шесть ролей, тенант, площадка и зона; запросы к сервисам и Gateway, компактные наборы областей и отзыв REST/WSS до истечения JWT; отказы в аудите
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:authz
-    steps: ['7.4']
-  - id: TS-13
-    kind: test
-    name: Тест целостности аудита
-    criteria: Изменение, удаление и вставка записи в БД обнаруживаются проверкой с точностью до записи
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:audit-integrity
-    steps: ['6.4']
-  - id: TS-14
-    kind: test
-    name: Устойчивость консоли к разрывам связи
-    criteria: Разрыв не менее 5 мин восстанавливается без потери изменений; просроченный JWT с учётом допуска часов получает 401, новый токен отличается от прежнего; replay и перезапуск Gateway, RESYNC при выходе за окно
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task web:session
-    steps: ['8.2', '8.6']
-  - id: TS-15
-    kind: test
-    name: Производительность ленты консоли
-    criteria: 10 000 активных инцидентов, прокрутка ≥ 50 кадров/с, применение дельты без блокировки интерфейса
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task web:perf
-    steps: ['8.3', '8.6']
-  - id: TS-16
-    kind: test
-    name: Автоматическая проверка доступности интерфейса
-    criteria: axe-core без критичных нарушений на ключевых экранах
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task web:a11y
-    steps: ['8.1']
-    purpose: DoD шага 8.1
-  - id: TS-17
-    kind: test
-    name: Возобновление сценариев и таймеров после перезапуска
-    criteria: Перезапуск Response Engine посреди сценария и перед срабатыванием таймера; погрешность таймеров ≤ 1 с
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:timers
-    steps: ['6.1', '6.3']
-
-  # --- Load and soak --------------------------------------------------------
-  - id: L-01
-    kind: load
-    name: Ночная нагрузка LOAD-5K
-    criteria: Лаг не растёт; задержки этапов не хуже базовой линии более чем на 5%; сверка без потерь
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task load:nightly
-    steps: ['3.1', '10.1']
-  - id: L-02
-    kind: load
-    name: Устойчивая нагрузка LOAD-50K, 1 ч
-    criteria: 50 000 событий/с; событие -> сигнал p99 ≤ 300 мс; событие -> консоль p99 ≤ 1 с; сверка без потерь и дубликатов
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task load:steady
-    steps: ['10.1']
-  - id: L-03
-    kind: soak
-    name: Длительная нагрузка LOAD-50K, 24 ч
-    criteria: Те же пороги, что L-02, на всём интервале; нет роста памяти, лагов и задержек
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task load:soak
-    steps: ['10.1']
-  - id: L-04
-    kind: load
-    name: Пик ×1,5 (75 000 событий/с), 10 мин
-    criteria: 0 потерь; лаг возвращается к норме ≤ 5 мин после пика
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task load:peak
-    steps: ['10.1']
-  - id: L-05
-    kind: load
-    name: Консоли и REST под нагрузкой
-    criteria: 500 консолей; REST чтение p99 ≤ 200 мс; доставка realtime p99 ≤ 200 мс; событие -> отрисовка p99 ≤ 1 с при LOAD-50K
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task load:consoles
-    steps: ['7.2', '10.1']
-  - id: L-06
-    kind: load
-    name: Ввод через два экземпляра шлюза
-    criteria: 50 000 событий/с через 2 экземпляра Connector Gateway до подтверждения Kafka; прочие прикладные процессы на совмещённом локальном профиле временно остановлены; падение экземпляра без потерь
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task deploy:gateway:qualify
-    steps: ['4.2', '9.1']
-  - id: L-07
-    kind: load
-    name: Импорт 50 000 устройств
-    criteria: Импорт ≤ 5 мин; изменения каталога у потребителей ≤ 2 с
-    env: E-LOCAL
-    gate: nightly
-    barrier: automated
-    task: task catalog:bench
-    steps: ['4.4']
-  - id: L-08
-    kind: load
-    name: Поиск по истории событий под нагрузкой записи
-    criteria: Поиск за сутки по зоне ≤ 500 мс при записи 50 000 событий/с в ClickHouse
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task history:bench
-    steps: ['5.4']
-  - id: TS-30
-    kind: test
-    name: Факты инцидентов и отчётность
-    purpose: Метрики, авторизация, повторы и пересчёт фактов для API отчётов
-    criteria: Метрики совпадают с эталоном; повторы и пересчёт не меняют результат; роли и области соблюдены
-    env: E-LOCAL
-    gate: pr
-    barrier: automated
-    task: task reports:test
-    steps: ['6.5']
-  - id: L-09
-    kind: load
-    name: Отчёт за 30 суток
-    criteria: Отчёт строится ≤ 3 с; значения совпадают с эталоном
-    env: E-LOCAL
-    gate: nightly
-    barrier: automated
-    task: task reports:bench
-    steps: ['6.5']
-  - id: L-10
-    kind: load
-    name: Нагрузка одной машины LOAD-10K
-    criteria: 10 000 событий/с на эталонном сервере с SLO задержек кластера
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task load:single-node
-    steps: ['10.1']
-    purpose: Целевая нагрузка топологии «одна машина» (scaling.md, 5.4)
-  - id: L-11
-    kind: load
-    name: Обработка сигналов Incident Service
-    criteria: Два экземпляра; p99 обработки сигнала ≤ 50 мс; сверка сигналов и инцидентов без потерь и дубликатов после SIGKILL экземпляра
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task incidents:bench
-    steps: ['5.3', '10.1']
-    purpose: Бюджет задержки этапа инцидентов (DoD шага 5.3)
-  - id: L-12
-    kind: load
-    name: Доставка команд коннектору
-    criteria: p99 от запроса команды до доставки коннектору ≤ 200 мс; каждая команда получает финальный статус
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task commands:bench
-    steps: ['6.2', '10.1']
-    purpose: Бюджет задержки команд (DoD шага 6.2)
-
-  # --- Chaos ----------------------------------------------------------------
-  - id: C-01
-    kind: chaos
-    name: Отказ брокера Kafka
-    criteria: Под LOAD-50K; сверка без потерь и дубликатов; обработка продолжается; RTO ≤ 60 с
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:kafka-broker
-    steps: ['10.2']
-  - id: C-02
-    kind: chaos
-    name: Остановка экземпляра каждого сервиса
-    criteria: Поочерёдно kill -9 каждого сервиса под нагрузкой; сверка без потерь и дубликатов; RTO ≤ 60 с
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task chaos:service-kill
-    steps: ['3.1', '10.2']
-  - id: C-03
-    kind: chaos
-    name: Переключение мастера PostgreSQL
-    criteria: Отказ лидера Patroni под нагрузкой; 0 потерянных инцидентов (RPO = 0); переключение ≤ 30 с
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:postgres-failover
-    steps: ['10.2']
-  - id: C-04
-    kind: chaos
-    name: Отказ основного узла Redis-совместимого хранилища
-    criteria: Обработка событий не останавливается; сессии коннекторов восстанавливаются
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:redis
-    steps: ['10.2']
-  - id: C-05
-    kind: chaos
-    name: Отказ реплики ClickHouse
-    criteria: Поиск и отчёты работают на второй реплике; загрузка догоняет без потерь после восстановления
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:clickhouse
-    steps: ['10.2']
-  - id: C-06
-    kind: chaos
-    name: Сетевое разделение узла приложений и узлов инфраструктуры
-    criteria: Партиции переходят к доступным экземплярам; после восстановления сверка без потерь и дубликатов
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:partition
-    steps: ['10.2']
-  - id: C-07
-    kind: chaos
-    name: Задержки и потери пакетов
-    criteria: Toxiproxy - задержка 200 мс и потеря 5% на каналах к Kafka и PostgreSQL; нет потерь и дубликатов, деградация задержек в пределах отчёта
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task chaos:network
-    steps: ['1.4', '10.2']
-  - id: C-08
-    kind: chaos
-    name: Заполнение диска
-    criteria: Алерт до остановки; при заполнении - противодавление, а не потеря подтверждённых данных
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:disk-full
-    steps: ['10.2']
-  - id: C-09
-    kind: chaos
-    name: Рассогласование часов узла и источника
-    criteria: Источник с часами +10 мин - события скорректированы и помечены clock_skew; узел с рассогласованием - алерт
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task chaos:clock-skew
-    steps: ['10.2']
-  - id: C-10
-    kind: chaos
-    name: Обрыв связи коннектора на 10 мин
-    criteria: События досылаются из буфера SDK без потерь; команды в период обрыва завершаются финальным статусом
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task chaos:connector-disconnect
-    steps: ['4.1', '10.2']
-  - id: C-11
-    kind: chaos
-    name: Отключение питания узла кластера
-    criteria: Замер RTO ≤ 60 с и RPO = 0 для каждого узла поочерёдно; сверка без потерь
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:node-down
-    steps: ['10.2']
-  - id: C-12
-    kind: chaos
-    name: Обновление N -> N+1 и откат под нагрузкой
-    criteria: Нет интервала > 5 с без новых сигналов; SLO задержек на всём протяжении; сверка без потерь и дубликатов
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task deploy:upgrade:qualify
-    steps: ['10.1']
-  - id: C-13
-    kind: chaos
-    name: Недоступность Keycloak
-    criteria: Открытые сессии работают; новые входы получают понятную ошибку; обработка событий не затронута
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task chaos:idp
-    steps: ['10.2']
-    purpose: Угроза T38 модели угроз
-  - id: C-14
-    kind: chaos
-    name: Восстановление состояния корреляции
-    criteria: После падения Correlation Engine с эталонным объёмом состояния восстановление ≤ 30 с
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:correlation-restore
-    steps: ['5.2', '10.2']
-  - id: C-15
-    kind: chaos
-    name: Отказ узлов файлового хранилища
-    criteria: Остановка volume-сервера, filer, S3 gateway и master-лидера SeaweedFS под чтением и загрузкой планов; текущие планы читаются,
-      отказ загрузки сохраняет прежнюю версию, после восстановления реплики томов восстановлены и SHA-256 всех версий совпадают
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task chaos:filestore
-    steps: ['9.1', '10.2']
-    purpose: Отказоустойчивость хранения планов в кластере (ADR-042, ADR-046)
-
-  # --- Benchmarks -----------------------------------------------------------
-  - id: B-01
-    kind: benchmark
-    name: Слой Kafka
-    criteria: ≥ 200 000 сообщений/с на продюсер и потребитель на эталонном стенде
-    env: E-LOCAL
-    gate: nightly
-    barrier: automated
-    task: task bench:kafka
-    steps: ['2.3']
-  - id: B-02
-    kind: benchmark
-    name: Асинхронные примитивы
-    criteria: Накладные расходы зафиксированы как базовая линия
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task bench:async
-    steps: ['2.2']
-  - id: B-03
-    kind: benchmark
-    name: Normalizer на ядро
-    criteria: Пропускная способность на ядро и p99 этапа ≤ 30 мс на базовой линии
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task bench:normalizer
-    steps: ['4.5']
-  - id: B-04
-    kind: benchmark
-    name: Вычисление правил корреляции
-    criteria: Пропускная способность правил всех видов, стоимость выражений CEL
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task bench:rules
-    steps: ['5.2']
-  - id: B-05
-    kind: benchmark
-    name: Барьер регрессии производительности
-    criteria: Сравнение всех бенчмарков с базовой линией master; ухудшение > 5% блокирует слияние
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task bench:compare
-    steps: ['1.3', '10.1']
-
-  - id: B-06
-    kind: benchmark
-    name: Генератор эталонного симулятора
-    criteria: Не менее 75 000 долговечно сохранённых событий/с с одной машины; TLS-приёмник сверяет все номера и порядок источников
-    env: E-LOCAL
-    gate: pr
-    barrier: automated
-    task: task connectors:bench
-    steps: ['4.3']
-    purpose: Проверка производительности генератора отдельно от платформенного конвейера
-
-  # --- Fitness functions ----------------------------------------------------
-  - id: FF-01
-    kind: fitness
-    name: Направления зависимостей модулей
-    criteria: libs/domain не зависит от инфраструктуры; сервисы не зависят друг от друга (ADR-001)
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:deps
-    steps: ['1.2']
-    purpose: Архитектурные правила (принцип 10 плана, ADR-001)
-  - id: FF-02
-    kind: fitness
-    name: Чистота доменного ядра
-    criteria: В libs/domain запрещены системные часы, случайность, ввод-вывод, исключения как механизм ошибок домена
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:domain-purity
-    steps: ['1.2']
-    purpose: Детерминированное ядро (принцип 4 плана)
-  - id: FF-03
-    kind: fitness
-    name: tenant_id во всех запросах к хранилищам
-    criteria: Статическая проверка SQL репозиториев и запросов ClickHouse (ADR-022)
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:tenant
-    steps: ['2.4', '2.8']
-    purpose: Мультитенантность (ADR-022)
-  - id: FF-04
-    kind: fitness
-    name: Совместимость схем в Schema Registry
-    criteria: Регистрация схем ветки против последнего выпуска с правилами ADR-004
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task contracts:registry-compat
-    steps: ['2.3']
-  - id: FF-05
-    kind: fitness
-    name: Бюджет задержек по этапам
-    criteria: В нагрузочных тестах p99 каждого этапа не превышает бюджет quality.md, раздел 4
-    env: E-CLUSTER
-    gate: release
-    barrier: automated
-    task: task load:budget
-    steps: ['10.1']
-  - id: FF-06
-    kind: fitness
-    name: Наблюдаемость каждого сервиса
-    criteria: После старта каждый сервис отдаёт /health/live, /health/ready, /metrics и экспортирует трассировки
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:observability
-    steps: ['2.1']
-    purpose: Наблюдаемость с первого шага (принцип 7 плана)
-  - id: FF-07
-    kind: fitness
-    name: Запрет конкатенации пользовательского ввода в запросах
-    criteria: Статическая проверка (требование SR-13)
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:sql
-    steps: ['1.2']
-    purpose: Требование безопасности SR-13
-  - id: FF-08
-    kind: fitness
-    name: Документация как код
-    criteria: task docs:check зелёный - ссылки, типографика, Mermaid, C4, реестры угроз и верификации актуальны
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task docs:check
-    steps: ['0.5', '0.6', '0.7']
-  - id: FF-09
-    kind: fitness
-    name: Сборка портала документации
-    criteria: Портал собирается; справочники OpenAPI, AsyncAPI, Protobuf генерируются из репозитория
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task docs:portal
-    steps: ['1.6']
-  - id: FF-10
-    kind: fitness
-    name: Ноль предупреждений компилятора и clang-tidy
-    criteria: Сборка с -Werror; clang-tidy по профилю проекта без замечаний
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:lint
-    steps: ['1.2']
-  - id: FF-11
-    kind: fitness
-    name: Санитайзеры
-    criteria: Unit, property, component тесты под ASan+UBSan и TSan без срабатываний
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:test:sanitizers
-    steps: ['1.2']
-  - id: FF-12
-    kind: fitness
-    name: Пороги покрытия
-    criteria: Доменное ядро ≥ 90% строк и ≥ 80% ветвей; инфраструктура ≥ 75% строк
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:coverage
-    steps: ['1.2']
-  - id: FF-13
-    kind: fitness
-    name: Воспроизводимость сборки
-    criteria: Две независимые сборки одного коммита дают идентичные артефакты
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task cpp:reproducible
-    steps: ['1.1', '1.3']
-  - id: FF-14
-    kind: fitness
-    name: SBOM и подписи артефактов
-    criteria: Каждый артефакт выпуска имеет SBOM CycloneDX и подпись, проверяемую установщиком
-    env: E-CI
-    gate: release
-    barrier: automated
-    task: task release:verify
-    steps: ['1.3']
-
-  - id: FF-15
-    kind: fitness
-    name: Запуск артефактов на целевой платформе
-    criteria: Тестовые исполняемые файлы и psimctl проходят на Debian 13 x86_64 без toolchain; все зависимости от системных разделяемых библиотек разрешаются (ADR-032)
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:runtime-test
-    steps: ['1.1']
-  - id: FF-16
-    kind: fitness
-    name: Формат кода C++
-    criteria: clang-format по .clang-format не меняет ни одного файла проекта
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:format
-    steps: ['1.2']
-    purpose: Стандарт кодирования (шаг 1.2, ADR-033)
-  - id: FF-17
-    kind: fitness
-    name: Самопроверка fitness functions
-    criteria: Для каждого правила arch:deps, arch:domain-purity, arch:sql тест с нарушением даёт отказ
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:selftest
-    steps: ['1.2']
-    purpose: Достоверность архитектурных проверок при пустом доменном ядре (ADR-033)
-  - id: FF-18
-    kind: fitness
-    name: Установка пакетов на целевой платформе
-    criteria: Каждый пакет DEB ставится, запускается и удаляется в чистом образе Debian 13 x86_64; зависимости вычислены dpkg-shlibdeps по фактическим символам исполняемых файлов
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task release:package:test
-    steps: ['1.3']
-    purpose: Поставка для Debian 13 x86_64 (F-PLT-06, ADR-034)
-  - id: FF-19
-    kind: fitness
-    name: Образы без root и лишних прав
-    criteria: Каждый образ запускается не под root, с файловой системой только для чтения, без capabilities и с no-new-privileges
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task release:images:test
-    steps: ['1.3']
-    purpose: Требование SR-24 (ADR-034)
-  - id: FF-20
-    kind: fitness
-    name: Локальное окружение с нуля
-    criteria: Окружение поднимается с нуля не дольше 5 минут (1 и 3 брокера Kafka); смоук-тесты всех компонентов и путей между ними проходят; SR-02 в realm Keycloak
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task env:ci-test
-    steps: ['1.4']
-    purpose: DoD шага 1.4 и требование SR-02 (ADR-035)
-  - id: FF-21
-    kind: fitness
-    name: Качество веб-клиента
-    criteria: Формат, ESLint без предупреждений, строгая проверка типов, Vitest с покрытием не ниже 80% на пакет, бюджеты бандла, клиенты REST и realtime генерируются из контрактов; E2E-смоук консоли в Chromium
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task web:check
-    steps: ['1.5']
-    purpose: Стандарт TypeScript и DoD шага 1.5 (ADR-037)
-
-  - id: FF-22
-    kind: fitness
-    name: Общая авторизация сервисов
-    criteria: В сервисах нет собственных проверок областей и JWT-проверок без общей конфигурации introspection; негативные самопроверки выявляют нарушения
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task arch:authz
-    purpose: Единая реализация RBAC/ABAC и обязательная проверка актуальности идентичности
-    steps: ['7.4']
-
-  # --- Security -------------------------------------------------------------
-  - id: SEC-01
-    kind: security
-    name: Статический анализ безопасности
-    criteria: Профиль clang-tidy с проверками bugprone, cert, security; 0 замечаний
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task cpp:lint
-    steps: ['1.2']
-    purpose: Требования безопасности, проверка scan
-  - id: SEC-02
-    kind: security
-    name: Уязвимости и лицензии зависимостей
-    criteria: Trivy по lock-файлам и SBOM; критичные и высокие уязвимости и запрещённые лицензии блокируют
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task security:deps
-    steps: ['1.3']
-  - id: SEC-03
-    kind: security
-    name: Сканирование образов
-    criteria: Trivy по образам выпуска; критичные и высокие уязвимости блокируют
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task security:images
-    steps: ['1.3']
-    purpose: Требования SR-23, SR-24
-  - id: SEC-04
-    kind: security
-    name: Фаззинг, ночной
-    criteria: Каждая цель фаззинга 1 ч без падений; новые падения сохраняются в корпус
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task fuzz:nightly
-    steps: ['4.2', '10.3']
-  - id: SEC-05
-    kind: security
-    name: Фаззинг, 24 ч
-    criteria: Все разборщики недоверенных данных и DSL правил 24 ч без падений
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task fuzz:release
-    steps: ['10.3']
-  - id: SEC-09
-    kind: security
-    name: Фаззинг парсера и валидатора правил, 10 мин
-    criteria: Парсер и валидатор DSL правил проходят 10 минут без падений и ошибок санитайзеров; корпус и отчёт сохранены
-    env: E-LOCAL
-    gate: pr
-    barrier: automated
-    task: task fuzz:rules
-    steps: ['5.1']
-  - id: SEC-06
-    kind: security
-    name: DAST REST и WebSocket
-    criteria: OWASP ZAP по OpenAPI и realtime; нет находок высокого уровня
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task security:dast
-    steps: ['10.3']
-    purpose: Требования безопасности, проверка pentest и scan
-  - id: SEC-07
-    kind: security
-    name: Конфигурация TLS
-    criteria: testssl.sh по внешним портам - только TLS 1.3 на TB1 и TB2, без слабых наборов
-    env: E-LOCAL
-    gate: release
-    barrier: automated
-    task: task security:tls
-    steps: ['10.3']
-    purpose: Требование SR-08
-
-  - id: SEC-08
-    kind: security
-    name: Платформенное доверие и аутентификация
-    criteria: JWT/JWKS и ротация, отказ чужому issuer/audience/алгоритму, TLS/mTLS с проверкой CA/имени/CRL,
-      продление без потери тестовых событий, отзыв открытого потока, истечение и защищённые файлы секретов;
-      реальные Keycloak, Kafka, PostgreSQL и Valkey; ASan/UBSan и TSan
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task test:security:sanitizers
-    steps: ['2.6']
-    purpose: Платформенные механизмы SR-01, SR-03, SR-04, SR-08, SR-09; полный сервисный цикл остаётся в TS-22
-
-  # --- Manual procedures ----------------------------------------------------
-  - id: M-01
-    kind: manual
-    name: Установка и подключение коннектора сторонним инженером
-    criteria: По каждой полной версии EN и RU независимо, с английским по умолчанию,
-      без помощи разработчиков и без доступа к плану, прогрессу и стартовым диаграммам разработки;
-      проверяются конечное состояние платформы и отсутствие прямых и косвенных ссылок на удалённые материалы;
-      время и замечания фиксируются
-    env: E-LOCAL
-    gate: release
-    barrier: manual
-    task: '-'
-    steps: ['11.2', '11.2a']
-  - id: M-02
-    kind: manual
-    name: Учения по восстановлению из резервной копии
-    criteria: Восстановление на чистом стенде по регламенту; время замерено; планы, ссылки и SHA-256 совпадают, Keycloak и доверие восстановлены, отозванные ключи не дают доступ
-    env: E-LOCAL
-    gate: release
-    barrier: manual
-    task: '-'
-    steps: ['9.3']
-    purpose: DoD шага 9.3
-  - id: M-03
-    kind: manual
-    name: Внутренний пентест по модели угроз
-    criteria: Проверены все угрозы высокого риска threat-register.md; нет открытых критичных и высоких находок
-    env: E-CLUSTER
-    gate: release
-    barrier: manual
-    task: '-'
-    steps: ['10.3']
-    purpose: Требования безопасности, проверка pentest
-  - id: M-04
-    kind: manual
-    name: Воспроизведение демонстрации с нуля
-    criteria: Демонстрационный стенд и сценарии воспроизводятся по инструкции
-    env: E-LOCAL
-    gate: release
-    barrier: manual
-    task: '-'
-    steps: ['11.1']
-    purpose: DoD шага 11.1
-  - id: M-05
-    kind: manual
-    name: Приёмочный прогон S1-S13
-    criteria: Итоговый прогон всех сценариев с подписью владельца продукта
-    env: E-CLUSTER
-    gate: release
-    barrier: manual
-    task: '-'
-    steps: ['11.3']
-
-  # Planned acceptance tests for ADR-042; implementations follow their plan steps.
-  - id: TS-18
-    kind: test
-    name: Файлы планов и восстановление
-    criteria: Загрузка PNG/JPEG до 20 МБ, отказ поддельного типа и превышения пикселей; чужая область и публичный
-      bucket недоступны; отказ замены сохраняет версию; восстановленные объекты и ссылки совпадают по SHA-256
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '4.4'
-    - '9.1'
-    - '9.3'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-  - id: TS-19
-    kind: test
-    name: Достоверное состояние и realtime устройств
-    criteria: Offline после трёх heartbeat; досылка истории и старый снимок не повышают свежесть; сверка возвращает
-      actual; снимок и дельты после разрыва сохраняют версии и область; p99 доставки ≤ 200 мс
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '4.1'
-    - '4.2'
-    - '4.5'
-    - '7.2'
-    - '7.3'
-    - '8.3'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-  - id: TS-20
-    kind: test
-    name: Режим обслуживания и завершение
-    criteria: Выбранные сигналы подавлены, события сохранены; пожарные события и P1 проходят; чужая область отклонена;
-      SLA открытых инцидентов сохранён; окончание ≤ 1 с, включая перезапуск
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '4.4'
-    - '5.1'
-    - '5.2'
-    - '8.4'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-  - id: TS-21
-    kind: test
-    name: Передача ответственности и дежурство
-    criteria: Подтверждение получателя, проверка версии и области, идемпотентность; прежняя ответственность до принятия;
-      SLA и сценарий сохранены; актуальный дежурный либо резервный контакт; аудит
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '5.3'
-    - '6.3'
-    - '8.3'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-  - id: TS-22
-    kind: test
-    name: Жизненный цикл сертификатов
-    criteria: Первоначальная регистрация по CSR; продление с перекрытием без потери событий; отзыв закрывает сессию
-      и блокирует повтор; после восстановления отозванный сертификат не получает доступ
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '2.6'
-    - '4.2'
-    - '9.1'
-    - '9.3'
-    - '9.5'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-  - id: TS-23
-    kind: test
-    name: Изоляция диагностического replay
-    criteria: История с командами, email и webhook даёт 0 изменений рабочих сигналов, инцидентов, команд и уведомлений
-      и 0 внешних вызовов; попытки рабочей записи отклонены ACL; область и параметры запуска в аудите
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:acceptance
-    steps:
-    - '5.1'
-    - '6.1'
-    - '9.5'
-    purpose: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах
-
-  - id: TS-25
-    kind: test
-    name: "Правила: жизненный цикл и изолированный исторический прогон"
-    criteria: Два экземпляра согласуют версии, повторы и аудит; невалидное правило не активируется; все пять видов
-      правил дают одинаковые решения из Kafka и ClickHouse; обслуживание сохраняет объяснение и версии,
-      пожарные события и P1 проходят; задание восстанавливается после SIGKILL; чужая область отклонена;
-      рабочие топики не меняются, записи и фиксация смещений запрещены настоящими ACL
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task rules:test
-    steps: ['5.1']
-    purpose: Настоящие PostgreSQL, Kafka, Schema Registry, ClickHouse, Keycloak и два экземпляра Correlation Engine
-
-  - id: TS-24
-    kind: test
-    name: "Resource Catalog: ресурсы, планы и обслуживание"
-    criteria: Иерархия и источники сохраняют инварианты; версии и повторы запросов согласованы; чужая область отклонена;
-      PNG/JPEG до 20 МиБ и версии планов сохраняются при отказах S3 и БД; orphan очищен; обслуживание завершается ≤ 1 с,
-      включая восстановление при запуске; все изменения и отказы доступа получены потребителем аудита
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task catalog:test
-    steps: ['4.4']
-    purpose: Два настоящих экземпляра, PostgreSQL, Kafka и S3; резервное копирование и применение подавления проверяются отдельно
-  - id: TS-26
-    kind: test
-    name: Перестроение проекций из Kafka
-    criteria: Проекции, перестроенные проигрыванием Kafka, совпадают с рабочими; старые события не дают ложного online или actual;
-      сквозной сценарий M1 проходит после переноса проекции API Gateway
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:projections
-    steps: ['7.3']
-    purpose: Воспроизводимость read-моделей (принцип 6 плана, DoD шага 7.3)
-  - id: TS-27
-    kind: test
-    name: Доставка уведомлений и защита webhook
-    criteria: Email и webhook доставляются через тестовые SMTP и приёмник; отказ и восстановление получателя не теряют и не дублируют
-      уведомления; запрещённые и внутренние адреса webhook отклоняются; доставка фиксируется в аудите
-    env: E-CI
-    gate: nightly
-    barrier: automated
-    task: task test:notifications
-    steps: ['6.3']
-    purpose: DoD шага 6.3 и защита от SSRF
-
-  - id: TS-28
-    kind: test
-    name: Incident Service и авторизация
-    criteria: Два HTTPS-экземпляра, настоящие Kafka, PostgreSQL и Keycloak; переходы, версии, повторы, окно группировки,
-      история, область доступа и подтверждённая передача сохраняют инварианты; SIGKILL и повтор сигналов не теряют и не дублируют эффекты
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task incidents:test
-    steps: ['5.3']
-    purpose: Жизненный цикл инцидентов, общая авторизация и сохранение ответственности
-
-  - id: TS-29
-    kind: test
-    name: История событий и связи инцидентов
-    criteria: Реальные загрузчики, Kafka, ClickHouse и PostgreSQL; поиск и статистика ограничены областью; сигналы продлевают TTL; SIGKILL и повторы сохраняют полное множество связей без логических дубликатов
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task history:test
-    steps: ['5.4']
-    purpose: Полный контекст инцидента, поиск и долговечное продление хранения
-
-  - id: TS-31
-    kind: test
-    name: Общие модели консоли и восстановление Kafka
-    criteria: Настоящие Kafka, PostgreSQL, Valkey и HTTPS; области доступа, независимые курсоры наблюдений и отчётов,
-      дежурство, обслуживание, fallback к PostgreSQL, равенство перестроения и отказ неполной истории; локальный p99 обновления не выше 100 мс
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task projection:test
-    steps: ['7.3']
-    purpose: Согласованные снимки консоли, актуальность состояния и безопасное восстановление
-
-  - id: TS-32
-    kind: test
-    name: Realtime подписки, восстановление и 500 клиентов
-    criteria: Два Gateway, 500 WSS-клиентов и 10000 доставок без потерь; локальный p99 не выше 200 мс;
-      восстановление 500 подписок после перезапуска узла без нового снимка; фильтры, JWT, старый клиент,
-      несколько подписок, приватные варианты, актуальное состояние после lease expiry и отключение медленного получателя
-    env: E-CI
-    gate: pr
-    barrier: automated
-    task: task realtime:test
-    steps: ['7.2']
-    purpose: Совместимая доставка изменений, независимое от узла возобновление и ограничение очередей
-
+- id: TS-39
+  kind: test
+  name: Observability package
+  criteria: Seven static dashboards in both languages, valid PromQL and configurations, alert transitions and instructions
+    for C-01-C-15, business aggregates without access to source tables, mTLS metrics, OTLP logs and traces, Prometheus ->
+    Alertmanager -> journal delivery, and browser rendering without query errors
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task deploy:observability:test
+  purpose: Delivery of observability assets and failure diagnostic procedures; does not replace RPO/RTO qualification
+- id: TS-38
+  kind: test
+  name: Web module loading and recovery
+  criteria: Compare the original build, static modules, deferred editors, language dictionaries and separate entry points;
+    ru/en, real cold and warm HTTP caches, complete graphs including dynamic imports and dictionary data, no premature loading
+    of restricted routes, chunk failure, artifact replacement and translation reload with input preserved
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task web:loading
+  purpose: Compare loading strategies and verify current limits before changing the distribution
+- id: TS-37
+  kind: test
+  name: Audit and supervisor reporting through the public interface
+  criteria: Real PKCE with TOTP, audit search and pagination, independent verification of downloaded JSONL, exact detection
+    of modified and deleted PostgreSQL records, denial of access to another site, role revocation with the previous JWT, reference
+    metrics for 30 days in under three seconds and matching CSV
+  env: E-LOCAL
+  gate: pr
+  barrier: automated
+  task: task insights:test
+- id: TS-36
+  kind: test
+  name: Administration through the public interface
+  criteria: Real PKCE with MFA, certificate registration and renewal, mapping for a new connector type, hierarchy and import,
+    maintenance, SLA, a rule with a trial run, scenario publication, and rejection of access to another site and invalid uploads
+  env: E-LOCAL
+  gate: pr
+  barrier: automated
+  task: task admin:test
+- id: TS-35
+  kind: test
+  name: Operator console
+  criteria: Real PKCE, incident acceptance, checklist and decisions, command preview and execution, SLA and notifications,
+    private floor plan and responsibility handover
+  env: E-LOCAL
+  gate: on-demand
+  barrier: automated
+  task: task operator:test
+- id: B-07
+  kind: benchmark
+  name: Virtualized operator feed
+  criteria: 10000 incidents, scrolling at least 50 frames/s, realtime -> DOM p99 at most 1 s; raw measurement series and one
+    browser worker
+  env: E-CI
+  gate: on-demand
+  barrier: automated
+  task: task operator:benchmark
+  purpose: Verify responsiveness of the operational feed without substituting for the full ingestion pipeline SLO
+- id: TS-34
+  kind: test
+  name: Shell session and role-based routes
+  criteria: PKCE, ID token validation, a single concurrent refresh, cleanup on logout, direct entry, role boundaries and late
+    responses
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task web:check
+  purpose: Verify session isolation and the shared shell without mixing users' operational data
+- id: TS-33
+  kind: test
+  name: Server operations for the operational interface
+  criteria: Independent alarm, permissions, versions, retries, leases across instances, history, exercise isolation and authorized
+    assistant sources
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task operations:test
+  purpose: Verify server operations for the operational interface without a read-model simulator
+- id: TS-01
+  kind: test
+  name: Domain core unit tests
+  criteria: All tests pass; every invariant in aggregates.md and every transition in state-models.md is covered
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:test
+- id: TS-02
+  kind: test
+  name: Property-based aggregate invariant tests
+  criteria: Invariants hold for random command sequences; 0 duplicate incidents when signals are repeated
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:test:property
+- id: TS-03
+  kind: test
+  name: Adapter component tests against containers
+  criteria: Real Kafka, PostgreSQL, Redis and ClickHouse containers in the local environment; connection loss and failover
+    scenarios
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:component
+- id: TS-04
+  kind: test
+  name: Contract validation
+  criteria: task contracts:check passes; formatting, linting, buf breaking, valid and current OpenAPI and AsyncAPI, consistent
+    registries
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task contracts:check
+- id: TS-05
+  kind: test
+  name: REST contract tests against OpenAPI
+  criteria: All Protobuf routes are available through Gateway; actual responses conform to psim-api-v1.yaml, catalog error
+    codes and RFC 9457
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:api-contract
+- id: TS-06
+  kind: test
+  name: Connector protocol conformance suite
+  criteria: Reference connectors and the simulator pass the complete suite; a 10-minute connection outage causes no data loss
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task connectors:conformance
+- id: TS-07
+  kind: test
+  name: Short pipeline simulation
+  criteria: Manually run 200 trials with random failures; in-memory reconciliation finds 0 losses and 0 duplicate effects;
+    reference delivery and correlation evaluator with independent oracles (ADR-044)
+  env: E-DEV
+  gate: on-demand
+  barrier: automated
+  task: task sim:short
+- id: TS-08
+  kind: test
+  name: Long pipeline simulation
+  criteria: Manually run 10 000 trials; reproduce failures from seed, model version and parameters; retain the trace for regression
+    testing (ADR-044)
+  env: E-DEV
+  gate: on-demand
+  barrier: automated
+  task: task sim:long
+- id: TS-09
+  kind: test
+  name: End-to-end pipeline smoke test in Docker Compose
+  criteria: A simulator event creates an incident visible through the API and realtime; one trace covers the entire path
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:smoke
+- id: TS-10
+  kind: test
+  name: Scenario acceptance tests through the API
+  criteria: Scenarios in acceptance-spec.md executable through the API and connector protocol, including negative checks
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+- id: TS-11
+  kind: test
+  name: End-to-end Playwright UI tests
+  criteria: Scenarios S1, S2, S6-S10, S13 through the interface with real Keycloak, Kafka and services; required steps, restart
+    with scenario version preserved, second command approval, responsibility handover, incident resolution and closure
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task web:native
+- id: TS-12
+  kind: test
+  name: Role x action x scope authorization matrix
+  criteria: All actions and six roles, tenant, site and zone; service and Gateway requests, compact scope sets, REST/WSS revocation
+    before JWT expiry and audited denials
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:authz
+- id: TS-13
+  kind: test
+  name: Audit integrity test
+  criteria: Verification detects database record modification, deletion and insertion with record-level precision
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:audit-integrity
+- id: TS-14
+  kind: test
+  name: Console resilience to connection loss
+  criteria: Recover from an outage of at least 5 minutes without losing changes; an expired JWT receives 401 after clock tolerance,
+    and the new token differs from the old one; replay and Gateway restart, RESYNC outside the replay window
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task web:session
+- id: TS-15
+  kind: test
+  name: Console feed performance
+  criteria: 10 000 active incidents, scrolling >= 50 frames/s, delta application without blocking the interface
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task web:perf
+- id: TS-16
+  kind: test
+  name: Automated interface accessibility check
+  criteria: axe-core reports no critical violations on key screens
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task web:a11y
+  purpose: Accessibility of key screens
+- id: TS-17
+  kind: test
+  name: Scenario and timer resumption after restart
+  criteria: Restart Response Engine during a scenario and before a timer fires; timer error <= 1 s
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:timers
+- id: L-01
+  kind: load
+  name: Nightly LOAD-5K test
+  criteria: Lag does not grow; stage latency regresses by no more than 5% against baseline; reconciliation finds no loss
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task load:nightly
+- id: L-02
+  kind: load
+  name: Sustained LOAD-50K for 1 hour
+  criteria: 50 000 events/s; event -> signal p99 <= 300 ms; event -> console p99 <= 1 s; reconciliation finds no loss or duplicates
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task load:steady
+- id: L-03
+  kind: soak
+  name: LOAD-50K soak test for 24 hours
+  criteria: The L-02 thresholds hold throughout the interval; memory use, lag and latency do not grow
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task load:soak
+- id: L-04
+  kind: load
+  name: 1.5x peak (75 000 events/s) for 10 minutes
+  criteria: 0 losses; lag returns to normal within 5 minutes after the peak
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task load:peak
+- id: L-05
+  kind: load
+  name: Consoles and REST under load
+  criteria: 500 consoles; REST read p99 <= 200 ms; realtime delivery p99 <= 200 ms; event -> rendering p99 <= 1 s during LOAD-50K
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task load:consoles
+- id: L-06
+  kind: load
+  name: Ingestion through two gateway instances
+  criteria: 50 000 events/s through 2 Connector Gateway instances up to Kafka acknowledgement; other application processes
+    on the combined local profile are temporarily stopped; instance failure causes no loss
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task deploy:gateway:qualify
+- id: L-07
+  kind: load
+  name: Import of 50 000 devices
+  criteria: Import completes within 5 minutes; consumers receive catalog changes within 2 s
+  env: E-LOCAL
+  gate: nightly
+  barrier: automated
+  task: task catalog:bench
+- id: L-08
+  kind: load
+  name: Event history search under write load
+  criteria: Search one day of data for a zone within 500 ms while writing 50 000 events/s to ClickHouse
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task history:bench
+- id: TS-30
+  kind: test
+  name: Incident facts and reporting
+  purpose: Metrics, authorization, retries and fact recomputation for the reporting API
+  criteria: Metrics match reference values; retries and recomputation preserve results; roles and access scopes are enforced
+  env: E-LOCAL
+  gate: pr
+  barrier: automated
+  task: task reports:test
+- id: L-09
+  kind: load
+  name: Report covering 30 days
+  criteria: Report generation takes <= 3 s; values match the reference
+  env: E-LOCAL
+  gate: nightly
+  barrier: automated
+  task: task reports:bench
+- id: L-10
+  kind: load
+  name: Single-machine LOAD-10K
+  criteria: 10 000 events/s on the reference server with cluster latency SLOs
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task load:single-node
+  purpose: Target load for the single-machine topology (scaling.md, 5.4)
+- id: L-11
+  kind: load
+  name: Incident Service signal processing
+  criteria: Two instances; signal processing p99 <= 50 ms; signal and incident reconciliation finds no loss or duplicates
+    after an instance receives SIGKILL
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task incidents:bench
+  purpose: Incident stage latency budget (signal processing)
+- id: L-12
+  kind: load
+  name: Command delivery to the connector
+  criteria: Command request -> connector delivery p99 <= 200 ms; every command reaches a final status
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task commands:bench
+  purpose: Command latency budget (command delivery)
+- id: C-01
+  kind: chaos
+  name: Kafka broker failure
+  criteria: Under LOAD-50K, reconciliation finds no loss or duplicates; processing continues; RTO <= 60 s
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:kafka-broker
+- id: C-02
+  kind: chaos
+  name: Termination of an instance of each service
+  criteria: Run kill -9 against each service in turn under load; reconciliation finds no loss or duplicates; RTO <= 60 s
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task chaos:service-kill
+- id: C-03
+  kind: chaos
+  name: PostgreSQL primary failover
+  criteria: Patroni leader failure under load; 0 lost incidents (RPO = 0); failover <= 30 s
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:postgres-failover
+- id: C-04
+  kind: chaos
+  name: Redis-compatible storage primary failure
+  criteria: Event processing continues; connector sessions recover
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:redis
+- id: C-05
+  kind: chaos
+  name: ClickHouse replica failure
+  criteria: Search and reports use the second replica; ingestion catches up without loss after recovery
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:clickhouse
+- id: C-06
+  kind: chaos
+  name: Network partition between an application node and infrastructure nodes
+  criteria: Available instances take over partitions; reconciliation after recovery finds no loss or duplicates
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:partition
+- id: C-07
+  kind: chaos
+  name: Packet delays and loss
+  criteria: Toxiproxy injects 200 ms latency and 5% packet loss on Kafka and PostgreSQL connections; no data loss or duplicate
+    effects; record latency degradation in the report
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task chaos:network
+- id: C-08
+  kind: chaos
+  name: Disk exhaustion
+  criteria: Alert before processing stops; a full disk applies backpressure without losing acknowledged data
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:disk-full
+- id: C-09
+  kind: chaos
+  name: Node and source clock skew
+  criteria: A source clock is 10 minutes ahead; events are corrected and marked clock_skew; node clock skew raises an alert
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task chaos:clock-skew
+- id: C-10
+  kind: chaos
+  name: Connector connection loss for 10 minutes
+  criteria: SDK-buffered events are delivered without loss; commands issued during the outage reach a final status
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task chaos:connector-disconnect
+- id: C-11
+  kind: chaos
+  name: Cluster node power loss
+  criteria: Measure RTO <= 60 s and RPO = 0 for each node in turn; reconciliation finds no loss
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:node-down
+- id: C-12
+  kind: chaos
+  name: N -> N+1 upgrade and rollback under load
+  criteria: No interval longer than 5 s without new signals; latency SLOs hold throughout; reconciliation finds no loss or
+    duplicates
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task deploy:upgrade:qualify
+- id: C-13
+  kind: chaos
+  name: Keycloak unavailability
+  criteria: Existing sessions continue; new sign-ins receive a clear error; event processing is unaffected
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task chaos:idp
+  purpose: Threat T38 in the threat model
+- id: C-14
+  kind: chaos
+  name: Correlation state recovery
+  criteria: Correlation Engine recovers within 30 s after crashing with the reference state size
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:correlation-restore
+- id: C-15
+  kind: chaos
+  name: File storage node failures
+  criteria: Stop the SeaweedFS volume server, filer, S3 gateway and master leader during floor plan reads and uploads; existing
+    plans remain readable, failed uploads preserve the previous version, volume replicas recover and SHA-256 matches for every
+    version
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task chaos:filestore
+  purpose: Cluster floor plan storage resilience (ADR-042, ADR-046)
+- id: B-01
+  kind: benchmark
+  name: Kafka layer
+  criteria: At least 200 000 messages/s for both producer and consumer on the reference environment
+  env: E-LOCAL
+  gate: nightly
+  barrier: automated
+  task: task bench:kafka
+- id: B-02
+  kind: benchmark
+  name: Asynchronous primitives
+  criteria: Record overhead as the baseline
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task bench:async
+- id: B-03
+  kind: benchmark
+  name: Normalizer per CPU core
+  criteria: Record per-core throughput and stage p99 <= 30 ms as the baseline
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task bench:normalizer
+- id: B-04
+  kind: benchmark
+  name: Correlation rule evaluation
+  criteria: Throughput for every rule type and cost of CEL expression evaluation
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task bench:rules
+- id: B-05
+  kind: benchmark
+  name: Performance regression gate
+  criteria: Compare all benchmarks against the master baseline; regression greater than 5% blocks merging
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task bench:compare
+- id: B-06
+  kind: benchmark
+  name: Reference simulator event generator
+  criteria: At least 75 000 durably stored events/s from one machine; the TLS receiver reconciles every sequence number and
+    source ordering
+  env: E-LOCAL
+  gate: pr
+  barrier: automated
+  task: task connectors:bench
+  purpose: Verify generator performance independently of the platform pipeline
+- id: FF-01
+  kind: fitness
+  name: Module dependency directions
+  criteria: libs/domain has no infrastructure dependencies; services do not depend on each other (ADR-001)
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:deps
+  purpose: Architecture rules (ADR-001)
+- id: FF-02
+  kind: fitness
+  name: Domain core purity
+  criteria: libs/domain prohibits system clocks, randomness, input/output and exceptions as the domain error mechanism
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:domain-purity
+  purpose: Deterministic domain core
+- id: FF-03
+  kind: fitness
+  name: tenant_id in all storage queries
+  criteria: Static checks of repository SQL and ClickHouse queries (ADR-022)
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:tenant
+  purpose: Multitenancy (ADR-022)
+- id: FF-04
+  kind: fitness
+  name: Schema Registry compatibility
+  criteria: Register working-tree schemas against the latest release using ADR-004 compatibility rules
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task contracts:registry-compat
+- id: FF-05
+  kind: fitness
+  name: Per-stage latency budgets
+  criteria: Each stage's p99 in load tests stays within its budget in quality.md, section 4
+  env: E-CLUSTER
+  gate: release
+  barrier: automated
+  task: task load:budget
+- id: FF-06
+  kind: fitness
+  name: Service observability
+  criteria: After startup, each service serves /health/live, /health/ready and /metrics and exports traces
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:observability
+  purpose: Metrics, logs and traces for every service
+- id: FF-07
+  kind: fitness
+  name: Prohibit concatenation of user input into queries
+  criteria: Static analysis (requirement SR-13)
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:sql
+  purpose: Security requirement SR-13
+- id: FF-08
+  kind: fitness
+  name: Documentation as code
+  criteria: task docs:check passes; links, typography, PlantUML, C4, threat and verification registries are current; both
+    language versions are complete and reviewed
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task docs:check
+- id: FF-09
+  kind: fitness
+  name: Documentation portal build
+  criteria: English is the default; complete English and Russian portals build from maintained sources and generated OpenAPI,
+    AsyncAPI and Protobuf references; offline archive, local search and section-preserving language switches pass browser
+    checks
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task docs:portal
+- id: FF-10
+  kind: fitness
+  name: Zero compiler and clang-tidy warnings
+  criteria: Build with -Werror; clang-tidy reports no findings under the project profile
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:lint
+- id: FF-11
+  kind: fitness
+  name: Sanitizers
+  criteria: Unit, property and component tests pass under ASan+UBSan and TSan without findings
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:test:sanitizers
+- id: FF-12
+  kind: fitness
+  name: Coverage thresholds
+  criteria: Domain core coverage >= 90% of lines and >= 80% of branches; infrastructure coverage >= 75% of lines
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:coverage
+- id: FF-13
+  kind: fitness
+  name: Build reproducibility
+  criteria: Two independent builds of the same commit produce identical artifacts
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task cpp:reproducible
+- id: FF-14
+  kind: fitness
+  name: SBOM and artifact signatures
+  criteria: Every release artifact has a CycloneDX SBOM and a signature verified by the installer
+  env: E-CI
+  gate: release
+  barrier: automated
+  task: task release:verify
+- id: FF-15
+  kind: fitness
+  name: Artifact execution on the target platform
+  criteria: Test executables and psimctl pass on Debian 13 x86_64 without the toolchain; all system shared-library dependencies
+    resolve (ADR-032)
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:runtime-test
+- id: FF-16
+  kind: fitness
+  name: C++ formatting
+  criteria: clang-format with .clang-format changes no project files
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:format
+  purpose: Coding standard (ADR-033)
+- id: FF-17
+  kind: fitness
+  name: Architecture check self-tests
+  criteria: For every arch:deps, arch:domain-purity and arch:sql rule, a violating fixture fails
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:selftest
+  purpose: Verify architecture checks even with an empty domain core (ADR-033)
+- id: FF-18
+  kind: fitness
+  name: Package installation on the target platform
+  criteria: Each DEB package installs, runs and uninstalls in a clean Debian 13 x86_64 image; dpkg-shlibdeps derives dependencies
+    from actual executable symbols
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task release:package:test
+  purpose: Debian 13 x86_64 distribution (F-PLT-06, ADR-034)
+- id: FF-19
+  kind: fitness
+  name: Images without root or unnecessary privileges
+  criteria: Every image runs as a non-root user with a read-only filesystem, no capabilities and no-new-privileges
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task release:images:test
+  purpose: Requirement SR-24 (ADR-034)
+- id: FF-20
+  kind: fitness
+  name: Local environment from scratch
+  criteria: Start a fresh environment within 5 minutes with 1 and 3 Kafka brokers; all component and inter-component smoke
+    tests pass; Keycloak realm enforces SR-02
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task env:ci-test
+  purpose: Reproducible environment and requirement SR-02 (ADR-035)
+- id: FF-21
+  kind: fitness
+  name: Web client quality
+  criteria: Formatting, ESLint without warnings, strict type checks, Vitest coverage >= 80% per package, bundle budgets, REST
+    and realtime clients generated from contracts, and an end-to-end console smoke test in Chromium
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task web:check
+  purpose: TypeScript standard and web client checks (ADR-037)
+- id: FF-22
+  kind: fitness
+  name: Shared service authorization
+  criteria: Services contain neither custom scope checks nor JWT validation without shared introspection configuration; negative
+    self-tests detect violations
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task arch:authz
+  purpose: Shared RBAC/ABAC implementation and mandatory identity freshness checks
+- id: SEC-01
+  kind: security
+  name: Static security analysis
+  criteria: clang-tidy profile with bugprone, cert and security checks; 0 findings
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task cpp:lint
+  purpose: Security requirements verified by scanning
+- id: SEC-02
+  kind: security
+  name: Dependency vulnerabilities and licenses
+  criteria: Trivy scans lockfiles and SBOMs; critical and high vulnerabilities and prohibited licenses block the pipeline
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task security:deps
+- id: SEC-03
+  kind: security
+  name: Image vulnerability scanning
+  criteria: Trivy scans release images; critical and high vulnerabilities block the pipeline
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task security:images
+  purpose: Requirements SR-23, SR-24
+- id: SEC-04
+  kind: security
+  name: Nightly fuzzing
+  criteria: Every fuzz target runs for 1 hour without crashes; new crashing inputs are added to the corpus
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task fuzz:nightly
+- id: SEC-05
+  kind: security
+  name: Fuzzing for 24 hours
+  criteria: Every untrusted-data parser and the rule DSL run for 24 hours without crashes
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task fuzz:release
+- id: SEC-09
+  kind: security
+  name: Rule parser and validator fuzzing for 10 minutes
+  criteria: Rule DSL parser and validator run for 10 minutes without crashes or sanitizer findings; retain the corpus and
+    report
+  env: E-LOCAL
+  gate: pr
+  barrier: automated
+  task: task fuzz:rules
+- id: SEC-06
+  kind: security
+  name: REST and WebSocket DAST
+  criteria: OWASP ZAP scans OpenAPI and realtime; no high-severity findings
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task security:dast
+  purpose: Security requirements verified by penetration testing and scanning
+- id: SEC-07
+  kind: security
+  name: TLS configuration
+  criteria: testssl.sh checks external ports; only TLS 1.3 on TB1 and TB2, with no weak cipher suites
+  env: E-LOCAL
+  gate: release
+  barrier: automated
+  task: task security:tls
+  purpose: Requirement SR-08
+- id: SEC-08
+  kind: security
+  name: Platform trust and authentication
+  criteria: JWT/JWKS and key rotation, rejection of incorrect issuer/audience/algorithm, TLS/mTLS with CA/name/CRL verification,
+    renewal without losing test events, revocation of an active stream, expiry and protected secret files; real Keycloak,
+    Kafka, PostgreSQL and Valkey; ASan/UBSan and TSan
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task test:security:sanitizers
+  purpose: Platform mechanisms for SR-01, SR-03, SR-04, SR-08, SR-09; the complete service lifecycle remains in TS-22
+- id: M-01
+  kind: manual
+  name: Installation and connector integration by an independent engineer
+  criteria: Use each complete EN and RU version independently, with English as the default, without developer assistance or
+    development-only materials; verify actual platform behavior and absence of direct and indirect dependencies on removed
+    materials; record elapsed time and findings
+  env: E-LOCAL
+  gate: release
+  barrier: manual
+  task: '-'
+- id: M-02
+  kind: manual
+  name: Backup recovery exercise
+  criteria: Restore into a clean environment using the procedure and measure elapsed time; floor plans, links and SHA-256
+    match, Keycloak and trust recover, and revoked keys cannot grant access
+  env: E-LOCAL
+  gate: release
+  barrier: manual
+  task: '-'
+  purpose: Recovery from an independent backup
+- id: M-03
+  kind: manual
+  name: Internal penetration test against the threat model
+  criteria: Test every high-risk threat in threat-register.md; no open critical or high-severity findings
+  env: E-CLUSTER
+  gate: release
+  barrier: manual
+  task: '-'
+  purpose: Security requirements verified by penetration testing
+- id: M-04
+  kind: manual
+  name: Reproduce the demonstration from scratch
+  criteria: Reproduce the demonstration environment and scenarios using the instructions
+  env: E-LOCAL
+  gate: release
+  barrier: manual
+  task: '-'
+  purpose: Reproducible synthetic demonstration
+- id: M-05
+  kind: manual
+  name: S1-S13 acceptance run
+  criteria: Final execution of every scenario, signed off by the product owner
+  env: E-CLUSTER
+  gate: release
+  barrier: manual
+  task: '-'
+- id: TS-18
+  kind: test
+  name: Floor plan files and recovery
+  criteria: Upload PNG/JPEG up to 20 MB; reject forged file types and pixel-limit violations; deny other access scopes and
+    public bucket access; a failed replacement preserves the version; restored objects and links match by SHA-256
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-19
+  kind: test
+  name: Reliable device state and realtime updates
+  criteria: Offline after three missed heartbeats; historical delivery and old snapshots cannot improve freshness; reconciliation
+    restores actual; snapshots and deltas after disconnection preserve versions and access scope; delivery p99 <= 200 ms
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-20
+  kind: test
+  name: Maintenance mode and completion
+  criteria: Selected signals are suppressed and events retained; fire events and P1 pass through; reject other access scopes;
+    preserve open-incident SLAs; completion within 1 s, including restart recovery
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-21
+  kind: test
+  name: Responsibility handover and duty assignment
+  criteria: Recipient confirmation, version and scope checks, idempotence; the previous owner remains responsible until acceptance;
+    preserve SLA and scenario; use the current duty assignee or fallback contact; audit actions
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-22
+  kind: test
+  name: Certificate lifecycle
+  criteria: Initial registration through CSR; overlapping renewal without event loss; revocation closes the session and blocks
+    reconnection; revoked certificates remain denied after recovery
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-23
+  kind: test
+  name: Diagnostic replay isolation
+  criteria: History containing commands, email and webhooks causes 0 changes to production signals, incidents, commands and
+    notifications and 0 external calls; ACLs reject production writes; audit scope and run parameters
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:acceptance
+  purpose: Operational criteria in ADR-042
+- id: TS-25
+  kind: test
+  name: Rule lifecycle and isolated historical replay
+  criteria: Two instances maintain consistent versions, retries and audit; invalid rules cannot activate; all five rule types
+    produce identical decisions from Kafka and ClickHouse; maintenance preserves explanations and versions, while fire events
+    and P1 pass through; jobs recover after SIGKILL; reject other access scopes; production topics remain unchanged and real
+    ACLs prohibit writes and offset commits
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task rules:test
+  purpose: Real PostgreSQL, Kafka, Schema Registry, ClickHouse, Keycloak and two Correlation Engine instances
+- id: TS-24
+  kind: test
+  name: Resource Catalog resources, floor plans and maintenance
+  criteria: Hierarchy and sources preserve invariants; versions and request retries remain consistent; reject other access
+    scopes; PNG/JPEG up to 20 MiB and floor plan versions survive S3 and database failures; clean up orphans; maintenance
+    ends within 1 s, including startup recovery; the audit consumer receives every change and access denial
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task catalog:test
+  purpose: Two real instances, PostgreSQL, Kafka and S3; backup and suppression application are tested separately
+- id: TS-26
+  kind: test
+  name: Projection rebuild from Kafka
+  criteria: Projections rebuilt by Kafka replay match production projections; old events cannot produce false online or actual
+    state; the end-to-end event scenario passes after API Gateway projection migration
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:projections
+  purpose: Reproducibility of read models from Kafka
+- id: TS-27
+  kind: test
+  name: Notification delivery and webhook protection
+  criteria: Email and webhooks reach test SMTP and HTTP receivers; receiver failure and recovery cause no notification loss
+    or duplication; reject prohibited and internal webhook addresses; audit delivery
+  env: E-CI
+  gate: nightly
+  barrier: automated
+  task: task test:notifications
+  purpose: Notification delivery and SSRF protection
+- id: TS-28
+  kind: test
+  name: Incident Service and authorization
+  criteria: Two HTTPS instances, real Kafka, PostgreSQL and Keycloak; transitions, versions, retries, grouping window, history,
+    access scope and confirmed handover preserve invariants; SIGKILL and repeated signals cause no lost or duplicate effects
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task incidents:test
+  purpose: Incident lifecycle, shared authorization and responsibility preservation
+- id: TS-29
+  kind: test
+  name: Event history and incident links
+  criteria: Real ingestion workers, Kafka, ClickHouse and PostgreSQL; search and statistics enforce access scope; signals
+    extend TTL; SIGKILL and retries preserve the full link set without logical duplicates
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task history:test
+  purpose: Complete incident context, search and durable retention extension
+- id: TS-31
+  kind: test
+  name: Shared console models and Kafka recovery
+  criteria: Real Kafka, PostgreSQL, Valkey and HTTPS; access scopes, independent observation and report cursors, duty, maintenance,
+    PostgreSQL fallback, rebuild equality and rejection of incomplete history; local update p99 <= 100 ms
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task projection:test
+  purpose: Consistent console snapshots, state freshness and safe recovery
+- id: TS-32
+  kind: test
+  name: Realtime subscriptions, recovery and 500 clients
+  criteria: Two Gateways, 500 WSS clients and 10000 deliveries without loss; local p99 <= 200 ms; restore 500 subscriptions
+    after a node restart without a new snapshot; filters, JWT, old clients, multiple subscriptions, private variants, current
+    state after lease expiry and slow-consumer disconnection
+  env: E-CI
+  gate: pr
+  barrier: automated
+  task: task realtime:test
+  purpose: Compatible change delivery, node-independent resumption and bounded queues
 goals:
-  # --- Plan 1.3: SLO --------------------------------------------------------
-  - {id: G-01, source: '1.3', attribute: 'Пропускная способность', methods: [L-01, L-02, L-03, L-04, L-06, B-01, B-03]}
-  - {id: G-02, source: '1.3', attribute: 'Задержка событие -> сигнал', methods: [L-02, L-03, FF-05, B-03, B-04]}
-  - {id: G-03, source: '1.3', attribute: 'Задержка событие -> инцидент в консоли', methods: [L-05, TS-11, FF-05, TS-31, TS-32]}
-  - {id: G-04, source: '1.3', attribute: 'Задержка отклика REST API', methods: [L-05]}
-  - {id: G-05, source: '1.3', attribute: 'Потери данных', methods: [TS-07, TS-08, TS-28, L-03, C-01, C-02, C-06, C-07, C-08, C-10, C-11]}
-  - {id: G-06, source: '1.3', attribute: 'Дубликаты инцидентов', methods: [TS-02, TS-07, TS-08, TS-28, C-02, C-11]}
-  - {id: G-07, source: '1.3', attribute: 'RTO, кластерная топология', methods: [C-01, C-02, C-03, C-11, C-14, C-15]}
-  - {id: G-08, source: '1.3', attribute: 'RPO для инцидентов', methods: [C-03, C-11]}
-  - {id: G-09, source: '1.3', attribute: 'Обновление', methods: [C-12]}
-  - {id: G-10, source: '1.3', attribute: 'Консоль', methods: [TS-15, TS-14]}
-  # --- Plan 1.4: engineering quality ----------------------------------------
-  - {id: G-11, source: '1.4', attribute: 'Предупреждения компилятора и clang-tidy', methods: [FF-10]}
-  - {id: G-12, source: '1.4', attribute: 'Санитайзеры (ASan, UBSan, TSan)', methods: [FF-11]}
-  - {id: G-13, source: '1.4', attribute: 'Покрытие доменного ядра', methods: [FF-12, TS-01, TS-02]}
-  - {id: G-14, source: '1.4', attribute: 'Покрытие инфраструктурного кода', methods: [FF-12, TS-03]}
-  - {id: G-15, source: '1.4', attribute: 'Фаззинг', methods: [SEC-09, SEC-04, SEC-05]}
-  - {id: G-16, source: '1.4', attribute: 'Совместимость контрактов', methods: [TS-04, FF-04, TS-05]}
-  - {id: G-17, source: '1.4', attribute: 'Регрессия производительности', methods: [B-05, B-02, FF-05, L-01]}
-  - {id: G-18, source: '1.4', attribute: 'Сборки', methods: [FF-13, FF-14, FF-15, SEC-02]}
-  - {id: G-19, source: '1.4', attribute: 'Документация', methods: [FF-08, FF-09, M-01]}
-
+- id: G-01
+  methods:
+  - L-01
+  - L-02
+  - L-03
+  - L-04
+  - L-06
+  - B-01
+  - B-03
+- id: G-02
+  methods:
+  - L-02
+  - L-03
+  - FF-05
+  - B-03
+  - B-04
+- id: G-03
+  methods:
+  - L-05
+  - TS-11
+  - FF-05
+  - TS-31
+  - TS-32
+- id: G-04
+  methods:
+  - L-05
+- id: G-05
+  methods:
+  - TS-07
+  - TS-08
+  - TS-28
+  - L-03
+  - C-01
+  - C-02
+  - C-06
+  - C-07
+  - C-08
+  - C-10
+  - C-11
+- id: G-06
+  methods:
+  - TS-02
+  - TS-07
+  - TS-08
+  - TS-28
+  - C-02
+  - C-11
+- id: G-07
+  methods:
+  - C-01
+  - C-02
+  - C-03
+  - C-11
+  - C-14
+  - C-15
+- id: G-08
+  methods:
+  - C-03
+  - C-11
+- id: G-09
+  methods:
+  - C-12
+- id: G-10
+  methods:
+  - TS-15
+  - TS-14
+- id: G-11
+  methods:
+  - FF-10
+- id: G-12
+  methods:
+  - FF-11
+- id: G-13
+  methods:
+  - FF-12
+  - TS-01
+  - TS-02
+- id: G-14
+  methods:
+  - FF-12
+  - TS-03
+- id: G-15
+  methods:
+  - SEC-09
+  - SEC-04
+  - SEC-05
+- id: G-16
+  methods:
+  - TS-04
+  - FF-04
+  - TS-05
+- id: G-17
+  methods:
+  - B-05
+  - B-02
+  - FF-05
+  - L-01
+- id: G-18
+  methods:
+  - FF-13
+  - FF-14
+  - FF-15
+  - SEC-02
+- id: G-19
+  methods:
+  - FF-08
+  - FF-09
+  - M-01
 scenarios:
-  - {id: S1, methods: [TS-06, TS-10, TS-11, M-01, TS-22, TS-24, TS-28, TS-29, TS-36]}
-  - {id: S2, methods: [TS-10, TS-11, L-07, TS-18, TS-24, TS-29, TS-31, TS-36]}
-  - {id: S3, methods: [TS-09, TS-10, L-02]}
-  - {id: S4, methods: [TS-07, TS-10, L-02, TS-20, TS-23]}
-  - {id: S5, methods: [TS-02, TS-07, TS-08, C-02, TS-28, TS-29]}
-  - {id: S6, methods: [L-05, TS-11, TS-12, TS-19, TS-32, TS-35]}
-  - {id: S7, methods: [TS-10, TS-11, TS-17, L-08, TS-21, TS-28, TS-29, TS-35]}
-  - {id: S8, methods: [TS-10, TS-11, TS-12, C-10, TS-23, TS-29, TS-35]}
-  - {id: S9, methods: [TS-08, TS-10, TS-11, TS-17, TS-21, TS-28, TS-35]}
-  - {id: S10, methods: [TS-13, TS-10, TS-11, TS-20, TS-21, TS-22, TS-23, TS-24, TS-28, TS-37]}
-  - {id: S11, methods: [C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-15, TS-14, TS-18, TS-19, TS-22, TS-24, TS-32]}
-  - {id: S12, methods: [C-12]}
-  - {id: S13, methods: [L-09, TS-30, TS-10, TS-11, M-05, TS-37]}
+- id: S1
+  methods:
+  - TS-06
+  - TS-10
+  - TS-11
+  - M-01
+  - TS-22
+  - TS-24
+  - TS-28
+  - TS-29
+  - TS-36
+- id: S2
+  methods:
+  - TS-10
+  - TS-11
+  - L-07
+  - TS-18
+  - TS-24
+  - TS-29
+  - TS-31
+  - TS-36
+- id: S3
+  methods:
+  - TS-09
+  - TS-10
+  - L-02
+- id: S4
+  methods:
+  - TS-07
+  - TS-10
+  - L-02
+  - TS-20
+  - TS-23
+- id: S5
+  methods:
+  - TS-02
+  - TS-07
+  - TS-08
+  - C-02
+  - TS-28
+  - TS-29
+- id: S6
+  methods:
+  - L-05
+  - TS-11
+  - TS-12
+  - TS-19
+  - TS-32
+  - TS-35
+- id: S7
+  methods:
+  - TS-10
+  - TS-11
+  - TS-17
+  - L-08
+  - TS-21
+  - TS-28
+  - TS-29
+  - TS-35
+- id: S8
+  methods:
+  - TS-10
+  - TS-11
+  - TS-12
+  - C-10
+  - TS-23
+  - TS-29
+  - TS-35
+- id: S9
+  methods:
+  - TS-08
+  - TS-10
+  - TS-11
+  - TS-17
+  - TS-21
+  - TS-28
+  - TS-35
+- id: S10
+  methods:
+  - TS-13
+  - TS-10
+  - TS-11
+  - TS-20
+  - TS-21
+  - TS-22
+  - TS-23
+  - TS-24
+  - TS-28
+  - TS-37
+- id: S11
+  methods:
+  - C-01
+  - C-02
+  - C-03
+  - C-04
+  - C-05
+  - C-06
+  - C-07
+  - C-08
+  - C-09
+  - C-10
+  - C-11
+  - C-15
+  - TS-14
+  - TS-18
+  - TS-19
+  - TS-22
+  - TS-24
+  - TS-32
+- id: S12
+  methods:
+  - C-12
+- id: S13
+  methods:
+  - L-09
+  - TS-30
+  - TS-10
+  - TS-11
+  - M-05
+  - TS-37

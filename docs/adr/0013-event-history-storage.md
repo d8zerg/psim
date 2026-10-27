@@ -1,34 +1,37 @@
-# ADR-013. Хранение истории событий в MVP и долговременный архив
+# ADR-013. MVP event-history storage and long-term archive
 
-- **Статус:** Заменено [ADR-028](0028-clickhouse-analytical-storage.md)
-- **Шаг плана:** 0.4 (реализация - 4.5, 5.4)
-- **Связанные:** [scaling.md](../architecture/scaling.md#5-сайзинг), X8 в [mvp-scope.md](../product/mvp-scope.md#2-вне-mvp)
+<!-- language-links -->
+[English](0013-event-history-storage.md) | [Русский](../ru/adr/0013-event-history-storage.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Superseded by [ADR-028](0028-clickhouse-analytical-storage.md)
+- **Related:** [scaling.md](../architecture/scaling.md#5-capacity-planning), X8 in [mvp-scope.md](../product/mvp-scope.md#2-beyond-mvp)
 
-Оператору и аудитору нужен поиск событий по объекту, зоне, устройству, типу и времени и связь событий с инцидентами (поиск за сутки по зоне ≤ 500 мс при полной нагрузке записи). Хранить все 50 000 событий/с длительно дорого: ≈ 4,3 млрд строк в сутки.
+## Context
 
-## Рассмотренные варианты
+Operators and auditors need event searches by resource, zone, device, type and time, plus event-to-incident links. A one-day search by zone must complete within 500 ms under full write load. Long-term storage of all 50,000 events/s is expensive: approximately 4.3 billion rows per day.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Все события в PostgreSQL | Простота запросов | Объём и нагрузка записи несоразмерны MVP |
-| **Значимые события в PostgreSQL с секционированием по суткам; все события - в Kafka в пределах retention** | Объём ×20 меньше (5% значимых); знакомое хранилище; быстрый поиск по индексам в пределах секции | Незначимые события доступны только в пределах retention Kafka |
-| Колоночное хранилище (ClickHouse) для всех событий | Аналитика по всему потоку | Новая подсистема в поставке и эксплуатации; аналитика вне MVP |
-| OpenSearch / Elasticsearch | Полнотекстовый поиск | Тяжёлая эксплуатация, лицензионная неоднородность; полнотекст не требуется |
+| All events in PostgreSQL | Simple queries | Volume and write load are disproportionate to the MVP |
+| **Significant events in PostgreSQL with daily partitions; all events in Kafka within retention** | 20x lower volume at 5% significant events; familiar storage; fast indexed search within a partition | Other events are available only within Kafka retention |
+| Columnar storage, such as ClickHouse, for all events | Analytics over the entire stream | Additional deployment and operational subsystem; analytics outside the MVP |
+| OpenSearch / Elasticsearch | Full-text search | Operational burden and differing licenses; full-text search is unnecessary |
 
-## Решение
+## Decision
 
-1. **Event History** записывает в PostgreSQL значимые события (`severity ≥` порога тенанта, по умолчанию `medium`) и все события, на которые ссылаются сигналы (через обработку `psim.signals.v1`).
-2. Таблица секционирована по суткам `occurred_at`; индексы `(tenant_id, zone_id, occurred_at)`, `(tenant_id, device_id, occurred_at)`, `(tenant_id, type, occurred_at)`; вставка пакетами через `COPY`; идемпотентность - `ON CONFLICT (event_id) DO NOTHING` в пределах секции.
-3. Retention истории - по умолчанию 30 суток, удаление отсоединением секций.
-4. Долговременный аналитический архив всех событий - вне MVP; кандидат - колоночное хранилище, потребляющее `psim.events.normalized.v1`. Точка расширения - новая группа потребителей без изменения конвейера.
+1. **Event History** writes significant events to PostgreSQL when `severity ≥` the tenant threshold, default `medium`, together with every event referenced by signals consumed from `psim.signals.v1`.
+2. Partition the table by `occurred_at` day, with indexes on `(tenant_id, zone_id, occurred_at)`, `(tenant_id, device_id, occurred_at)` and `(tenant_id, type, occurred_at)`. Insert batches through `COPY`; enforce per-partition idempotency with `ON CONFLICT (event_id) DO NOTHING`.
+3. Default history retention is 30 days, with deletion by detaching partitions.
+4. A long-term analytical archive of all events is outside the MVP. A candidate is a columnar store consuming `psim.events.normalized.v1`; add a consumer group without changing the pipeline.
 
-## Последствия
+## Consequences
 
-- Порог значимости определяет объём хранения (модель сайзинга шага 10.1).
-- Незначимые события старше retention Kafka (24 ч по умолчанию) не восстановимы; это документируется для заказчика.
+- The significance threshold determines storage volume; sizing follows load measurements.
+- Non-significant events older than Kafka retention, default 24 hours, cannot be recovered. Document this for customers.
 
-## Проверка
+## Verification
 
-Нагрузочный тест: поиск за сутки по зоне ≤ 500 мс при записи 2 500 строк/с (DoD шага 5.4).
+Load test: a one-day zone search completes within 500 ms while inserting 2500 rows/s.

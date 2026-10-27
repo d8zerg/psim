@@ -1,38 +1,42 @@
-# ADR-070. Ленивая загрузка модулей и бюджеты поставки
+# ADR-070. Lazy module loading and Delivery Budgets
 
-- **Статус:** Принято
-- **Связанные:** [ADR-065](0065-ui-loading-budgets.md), [ADR-069](0069-application-shell-and-session-recovery.md)
+<!-- language-links -->
+[English](0070-lazy-loading-and-delivery-budgets.md) | [Русский](../ru/adr/0070-lazy-loading-and-delivery-budgets.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-065](0065-ui-loading-budgets.md), [ADR-069](0069-application-shell-and-session-recovery.md)
 
-Бюджеты интерфейса должны ограничивать рост зависимостей. Перед очередным изменением лимита требуется сравнить способы уменьшения загрузки и состава поставки. Принятые решения сохраняют действие до принятия результатов сравнения.
+## Context
 
-В рабочей оболочке уже отложены загрузка ленты и protobuf до определения разрешённой сессии, загрузка страницы оператора и выбор словаря языка. Текущая конфигурация Vite собирает рабочую консоль и витрину вместе. Проверка полного графа учитывает статические и динамические зависимости; общий gzip-бюджет учитывает все поставляемые JS-файлы.
+Interface budgets must limit the growth of dependencies. Before making any changes to the limit, it’s necessary to compare methods to reduce loading and delivery components. The decisions made remain in effect until comparison results are received.
 
-По результатам проверки оболочки начальная загрузка составляет 117631 байт для EN и 118604 для RU при лимите 150000. Полный граф приложения - 188209 байт при лимите 200000, витрины - 179486 при лимите 260000. Общая сборка занимает около 270 КБ при лимите 294 КБ. Общие чанки входят в граф каждого использующего их входа, поэтому размеры графов нельзя складывать для определения уникального объёма поставки.
+In the application shell, loading of the feed and protobuf is delayed until a valid session is determined, as well as loading of the operator page and selection of language dictionaries. The current Vite configuration combines the work console and the showcase. The full graph checks for both static and dynamic dependencies; the total gzip budget accounts for all JS files delivered.
 
-## Варианты для сравнения
+Based on the check results, the initial loading is 117631 bytes for EN and 118604 for RU with a limit of 150000. The application’s full graph is 188209 bytes with a limit of 200000, and the showcase is 179486 bytes with a limit of 260000. The total build size is about 270 KB with a limit of 294 KB. The total chunks are included in each user’s input graph, so the sizes cannot be summed to determine the unique delivered size.
 
-| Вариант | Ожидаемый эффект | Что проверить |
+## Comparison Options
+
+| Option | Expected Effect | What to Check |
 |---|---|---|
-| Ленивая загрузка модулей по маршруту и разрешённым ролям | Меньше кода до открытия конкретного модуля | Прямые ссылки, первый переход, сохранение общей сессии, отсутствие преждевременного preload |
-| Ленивая загрузка тяжёлых виджетов, редакторов, графиков и экспортов по действию | Отложенная загрузка редко используемых функций | Задержка первого действия, индикатор загрузки, отказ чанка и повтор |
-| Загрузка только выбранного языка, затем переводов открытого модуля | Меньше словарей на входном маршруте | EN/RU, переключение языка, отсутствие текстов без перевода |
-| Отдельные сборки и артефакты рабочей консоли и витрины | Исключение файлов витрины из производственной поставки консоли | Состав образа, независимое использование витрины, общие зависимости и полнота проверки каждого артефакта |
-| Удаление неиспользуемого кода и лишних зависимостей, точечные imports | Уменьшение начального и полного объёма | Реальное содержимое чанков, дублирование библиотек, функциональная и визуальная регрессия |
+| Lazy module loading by route and allowed roles | Less code before opening a specific module | Direct links, first transition, maintaining the same session, no premature preload |
+| Lazy loading of heavy widgets, editors, charts, and exports based on actions | Delayed loading of rarely used functions | Delay of the first action, load indicator, failure of chunks and retries |
+| Loading only the selected language, then translations of open modules | Less dictionaries on the input route | EN/RU, language switching, absence of text without translation |
+| Separate builds and artifacts for the work console and showcase | Excluding view files from the production delivery of the console | Composition of the image, independent use of the showcase, common dependencies and thorough checking of each artifact |
+| Removing unused code and unnecessary dependencies, targeted imports | Reducing initial and total volume | Real content of chunks, duplication of libraries, functional and visual regression |
 
-Ленивая загрузка меняет момент получения кода. Если состав поставки сохраняется, одно разбиение на чанки не уменьшает суммарный объём. Для уменьшения производственного артефакта нужно исключить ненужные файлы из сборки и поставки, сохранив проверку всех обязательных функций.
+Lazy loading changes the moment code is obtained. If the delivery composition remains unchanged, dividing into chunks does not reduce the total volume. To reduce production artifacts, it’s necessary to exclude unnecessary files from the build and delivery, while maintaining checks on all required functions.
 
-## Порядок выбора
+## Selection Process
 
-1. Сохранить исходные измерения и состав зависимостей для обоих языков и всех модулей.
-2. Сравнить варианты по начальной загрузке, дополнительной загрузке первого перехода, полным графам модулей и уникальному объёму каждого поставляемого артефакта.
-3. Измерить задержки при холодном и прогретом кэше. Проверить ошибки чанков, обновление версии, прямой вход, смену роли и восстановление соединения.
-4. Выбрать вариант по результатам измерений, закрепить ограничения и проверки в CI. Динамические imports остаются частью полного графа; изменение момента загрузки не должно исключать код из измерений.
-5. Рассматривать изменение лимита после оптимизации и сравнения альтернатив. Обосновать остаточный рост необходимыми функциями, размерами и влиянием на задержки; оформить итоговое решение отдельным ADR.
+1. Save initial measurements and dependency composition for both languages and all modules.
+2. Compare options based on initial loading, additional loading of the first transition, full graphs of modules, and unique volume of each delivered artifact.
+3. Measure delays in cold and warm caches. Check chunk failures, version updates, direct navigation, role changes, and connection restoration.
+4. Select an option based on measurement results, and enforce restrictions and checks in CI. Dynamic imports remain part of the full graph; changing the loading moment should not exclude code from measurements.
+5. Consider changes to the limit after optimization and comparison of alternatives. Justify the remaining growth with necessary functions, sizes, and impact on delays; document the final decision as a separate ADR.
 
-## Проверка и принятие
+## Verification and Acceptance
 
-Сравнение выполнено: [размеры, задержки и выбор](../engineering/web-client-loading.md). Сохранена общая поставка с модулями по маршрутам и ролям. Задержка открытия устранена кэшированием определений компонентов с явным состоянием загрузки. Статические imports превышают начальный бюджет, дополнительные чанки и языковые ресурсы не дают устойчивого преимущества, отдельные артефакты дублируют зависимости. Пределы ADR-075 сохранены.
+The comparison is completed: [Size, delays, and selection](../engineering/web-client-loading.md). The overall delivery with modules by routes and roles is preserved. The opening delay is eliminated by caching component definitions with explicit loading status. Static imports exceed the initial budget, additional chunks and language resources do not provide a stable advantage, and individual artifacts duplicate dependencies. ADR-075 limits are maintained.
 
-Выбранная конфигурация и повторяемое сравнение закреплены в CI, квалификация описана в [ADR-076](0076-web-client-qualification.md). Новое увеличение бюджета требует нового сравнения, обоснования остаточного размера и отдельного решения.
+The selected configuration and repeated comparison are stored in CI. The qualification is described in [ADR-076](0076-web-client-qualification.md). New increases in budget require new comparisons, justification of the remaining size, and separate decisions.

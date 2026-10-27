@@ -1,54 +1,60 @@
-# ADR-038. Портал документации из репозитория
+# ADR-038. Documentation portal built from the repository
 
-- **Статус:** Принято
-- **Шаг плана:** 1.6
-- **Связанные:** ADR-026, ADR-030, ADR-034, метод FF-09 ([verification-matrix.md](../quality/verification-matrix.md))
+<!-- language-links -->
+[English](0038-documentation-portal.md) | [Русский](../ru/adr/0038-documentation-portal.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-026, ADR-030, ADR-034, method FF-09 ([verification-matrix.md](../quality/verification-matrix.md))
 
-Шаг 1.6: единый портал документации из репозитория - архитектура, ADR, модели C4, справочники OpenAPI, AsyncAPI и Protobuf, руководства; публикуется из CI. DoD: изменение контракта без обновления документации невозможно, так как справочники генерируются.
+## Context
 
-Исходные условия: документы - Markdown в `docs/` (русский текст, относительные ссылки и якоря в стиле GitHub, проверяемые `docs:links`), 29 диаграмм Mermaid, модель C4 в Structurizr DSL; контракты - OpenAPI и AsyncAPI, сгенерированные и проверяемые `task contracts:check`, справочник Protobuf в Markdown, реестры топиков и ошибок. Портал входит в поставку и должен открываться без интернета. Конвейер локальный, хостинг git - только хранилище кода (ADR-034).
+One repository-built portal contains architecture, ADRs, C4 models, OpenAPI, AsyncAPI and Protobuf references, and manuals, published through CI. Generated references prevent contract changes from leaving reference documentation stale.
 
-## Рассмотренные варианты
+Sources are Markdown under `docs/` with relative links and GitHub-style anchors checked by `docs:links`; UML and C4 use PlantUML. `task contracts:check` generates and verifies OpenAPI, AsyncAPI and the Markdown Protobuf reference, alongside topic and error registries. The portal is part of the distribution and must work without internet access. Pipelines are local; Git hosting stores code only (ADR-034).
 
-### Генератор
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Generator
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Docusaurus | React, MDX | MDX ломается на обычном Markdown с `<` и `{}`; тяжёлая сборка |
-| VitePress | Быстрый, Node уже есть | Markdown компилируется в шаблоны Vue: `{{ }}` в тексте (Task, Go-шаблоны) требует экранирования |
-| Zensical | Преемник Material, читает `mkdocs.yml` | Версия 0.0.x |
-| **MkDocs 1.6 + Material 9.7** | Обычный Markdown без сюрпризов; строгий режим проверяет ссылки и якоря; поиск по-русски; зрелость | MkDocs 1.x не развивается, Material - в режиме сопровождения; путь миграции - Zensical (тот же `mkdocs.yml`) |
+| Docusaurus | React and MDX | MDX breaks ordinary Markdown containing `<` and `{}`; heavy build |
+| VitePress | Fast; Node is already available | Markdown becomes Vue templates; Task and Go-template `{{ }}` require escaping |
+| Zensical | Material successor; reads `mkdocs.yml` | Version 0.0.x |
+| **MkDocs 1.6 + Material 9.7** | Ordinary Markdown; strict link and anchor checks; EN/RU search; mature | MkDocs 1.x is no longer developed; Material is maintained; Zensical offers a migration path using the same `mkdocs.yml` |
 
-### Справочники
+### References
 
-| Справочник | Источник | Как строится |
+| Reference | Source | Generation |
 |---|---|---|
-| REST | `contracts/openapi/psim-api-v1.yaml` | Redoc (`redocly build-docs`) в HTML; скрипт Redoc - из образа портала, а не с CDN |
-| Топики Kafka | `contracts/asyncapi/psim-topics.yaml` | Страница генерируется из документа AsyncAPI: топик, сообщение со ссылкой на Protobuf, ключ, партиции, retention, семантика, кто пишет и читает |
-| Protobuf | `contracts/docs/proto-reference.md` | Генерируется и проверяется `contracts:check` |
-| Коды ошибок | `contracts/errors/errors.yaml` | Страница генерируется из каталога |
-| C4 | `docs/architecture/c4/workspace.dsl` | Представления выгружаются Structurizr в Mermaid |
+| REST | `contracts/openapi/psim-api-v1.yaml` | Local OpenAPI JSON and Redoc HTML; the portal image bundles the Redoc script and logo |
+| Kafka topics | `contracts/asyncapi/psim-topics.yaml` | AsyncAPI generates topic, Protobuf-linked message, key, partitions, retention, semantics, producers and consumers |
+| Protobuf | `contracts/docs/proto-reference.md` | Generated and verified by `contracts:check` |
+| Error codes | `contracts/errors/errors.yaml` | Generated from the catalog |
+| C4 | `docs/architecture/c4/L2-Containers.puml` | Seven L1, L2, L3 and deployment views stored as PlantUML with the local C4 standard library |
 
-### Диаграммы
+### Diagrams
 
-Mermaid рендерится при сборке в SVG на белом фоне (mermaid-cli, закреплённый образ): портал не грузит рендерер, работает без сети, диаграммы читаются в тёмной и светлой теме. Изображение открывается в полном размере по щелчку.
+A digest-pinned, network-disabled image renders PlantUML to white-background SVG during the build. The portal loads no renderer, works offline and keeps diagrams readable in light and dark themes. Clicking an image opens it at full size.
 
-## Решение
+## Decision
 
-1. **`task docs:portal`** собирает `build/portal/site`: копирует `docs/` и README репозитория с сохранением раскладки (относительные ссылки работают), генерирует справочники, строит REST-справочник Redoc, рендерит Mermaid, выполняет `mkdocs build` в **строгом режиме** - битая ссылка или якорь останавливает сборку. Ссылки на файлы вне портала (proto, YAML, код) ведут в репозиторий на коммит сборки. Навигация строится из разделов `docs/README.md` плюс реестр ADR, справочники и раздел разработки - оглавление не ведётся вручную в двух местах.
-2. **Без внешних ресурсов:** шрифты не загружаются, плагин `offline` Material не используется (он подключает скрипт с CDN), Redoc - локальный файл; версия Redoc в образе сверяется с той, на которую ссылается закреплённый Redocly CLI.
-3. **Образ портала** `tools/docs/portal/` (Python 3.13, MkDocs 1.6.1, Material 9.7.7, pymdown-extensions; Redoc с проверкой SHA-256) собирается локально, тег - хэш Dockerfile и требований.
-4. **Публикация:** портал входит в каждый выпуск - `psim-platform-docs_<версия>.tar` с SBOM (тема Material и Redoc, лицензии MIT) в подписанном каталоге `dist/` (ADR-034); локально - `task docs:serve` (`http://localhost:8000`). Отдельного хостинга нет.
-5. **Барьер:** `docs:portal` входит в `docs:check` (FF-09); этап `docs` конвейера включается при изменении документов и контрактов.
+1. **`task docs:portal`** builds `build/portal/site`: copy `docs/` and repository READMEs while preserving layout and relative links, generate references, create Redoc REST documentation, render PlantUML and run **strict** `mkdocs build`. Broken links or anchors fail the build. Links to files outside the portal, such as proto, YAML and code, point to the repository at the build commit. Navigation derives from `docs/README.md` sections, ADR registry, references and maintained guides, avoiding a second manually maintained contents list.
+2. **No external resources:** no downloaded fonts or Material `offline` plugin, which would load a CDN script. Redoc's script and logo are local SHA-256-pinned files. The repository link does not fetch GitHub statistics. Redoc renders a local contract in the browser; it does not hydrate output from another React instance.
+3. **Portal image:** `tools/docs/portal/` contains Python 3.13, MkDocs 1.6.1, Material 9.7.7, pymdown-extensions and SHA-256-verified Redoc. It builds locally with a tag derived from the Dockerfile and requirements hash.
+4. **Publication:** every release includes `psim-platform-docs_<version>.tar` with an SBOM for MIT-licensed Material and Redoc in signed `dist/` (ADR-034). Locally, `task docs:serve` serves `http://localhost:8000`. No separate hosting is used.
+5. **Self-contained documentation:** a separate registry holds permanent quality goals; security requirements link to components rather than development sequence. Maintained documents contain release criteria and limitations. Development-only materials are excluded from the portal; `docs:release:check` verifies the repository copy and portal without them.
+6. **Gate:** `docs:portal` is part of `docs:check` (FF-09); documentation or contract changes activate the pipeline's `docs` stage.
 
-## Последствия
+7. **Languages:** English is the default; Russian has complete paired pages, diagrams, references and operational instructions. The registry `docs/localization.yaml` preserves page identities and reviewed source hashes. Terminology is shared through the [glossary](../domain/glossary.md). Language navigation retains the corresponding page and section; search stays within the selected language. The [contribution workflow](../../CONTRIBUTING.md) defines paired review and regeneration.
 
-- Изменение контракта отражается в портале при следующей сборке; несогласованность OpenAPI, AsyncAPI и справочника Protobuf с proto ловит `contracts:check`, а ссылки и якоря - строгий режим.
-- Сборка портала - около минуты (выгрузка C4, 29 диаграмм, Redoc, MkDocs).
-- Переход на Zensical - когда он выйдет из 0.x; конфигурация совместима.
+## Consequences
 
-## Проверка
+- Contract changes appear in the next portal build. `contracts:check` catches drift between proto and generated OpenAPI, AsyncAPI and Protobuf references; strict mode catches broken links and anchors.
+- Portal generation includes UML/C4 rendering, reference generation, Redoc and strict MkDocs validation. Duration depends on page and diagram counts.
+- Migrate to Zensical after it leaves 0.x; the configuration is compatible.
 
-`task docs:portal`, `task docs:check`; отрицательная проверка шага 1.6: битая ссылка в документе даёт отказ строгого режима. Выпуск: `task release:dist`, `task release:verify` - архив портала подписан и описан SBOM.
+## Verification
+
+Run `task docs:portal` and `task docs:check`; a negative broken-link test must fail strict mode. `task release:dist` and `task release:verify` verify the signed portal archive and its SBOM.

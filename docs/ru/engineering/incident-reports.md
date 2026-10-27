@@ -1,0 +1,73 @@
+# Отчёты по инцидентам
+
+<!-- language-links -->
+[English](../../engineering/incident-reports.md) | [Русский](incident-reports.md)
+<!-- /language-links -->
+
+Projection Service обслуживает `ReportService` и загружает факты инцидентов в ClickHouse. Семантика метрик и модель хранения определены в [ADR-057](../adr/0057-incident-reporting.md).
+
+## Запуск и доступ
+
+Каждый процесс задаёт непустой `service.instance`. Сервис `psim-projection-service` использует общий stream runtime: Kafka, Schema Registry, PostgreSQL для журнала пакетов и outbox аудита, TLS API, JWT/JWKS, readiness, метрики и трассировку. Сначала запускают Incident Service и Response Engine. Их PostgreSQL-схемы нужны для пересчёта; обычный загрузчик читает Kafka.
+
+| Настройка `settings` | Назначение |
+|---|---|
+| `clickhouse_host`, `clickhouse_port`, `clickhouse_cluster` | Узел, нативный порт, кластер DDL |
+| `clickhouse_user`, `clickhouse_password_file` | Роль загрузчика и защищённый файл пароля |
+| `clickhouse_ca_file`, `clickhouse_certificate_file`, `clickhouse_private_key_file` | TLS ClickHouse |
+| `reports_read_user`, `reports_read_password_file` | Выделенная роль API только с SELECT на представление и его зависимости |
+| `reports_batch_messages`, `reports_batch_wait_ms` | Размер пакета и задержка, по умолчанию 5000 и 100 мс |
+| `tls_certificate_file`, `tls_private_key_file`, `tls_ca_file` | TLS API, по умолчанию `reports-server.pem` и `reports-server.key` из `tls_directory` |
+| `issuer`, `jwks_url`, `jwks_ca_file` | Доверенная идентификация |
+
+Consumer group - `psim-projection-service`, начало чтения - earliest в доступном retention. Локальное незашифрованное подключение допускается только при явном `allow_plaintext`. Загрузчик создаёт таблицы и представления на кластере, поэтому при первичном запуске нужны DDL-права. Производственная поставка должна выделять права установки и рабочие права. API может использовать отдельную роль чтения. Пользователь API получает роль `manager`, `supervisor` или `auditor` и область площадок или зон. Тенант берётся из проверенного JWT.
+
+## API
+
+- `GET /v1/reports/incidents` - JSON по Protobuf JSON mapping.
+- `GET /v1/reports/incidents:export` - тот же отчёт в CSV с заголовком и строкой итогов.
+
+Обязательные параметры: `filter.from` и `filter.to` в RFC 3339, с точностью не мельче миллисекунды. Интервал `[from,to)` не длиннее 400 суток. Дополнительные повторяемые параметры: `filter.site_ids`, `filter.incident_type_ids`, `filter.priorities`. Имена `filter.siteIds` и `filter.incidentTypeIds` также принимаются. Для каждого фильтра допускается не более 100 значений. Приоритеты: `PRIORITY_P1`-`PRIORITY_P4`.
+
+`grouping` принимает `REPORT_GROUPING_NONE`, `REPORT_GROUPING_SITE`, `REPORT_GROUPING_INCIDENT_TYPE`, `REPORT_GROUPING_PRIORITY`, `REPORT_GROUPING_OPERATOR`, `REPORT_GROUPING_DAY`. По умолчанию возвращаются итоги. День определяется в UTC. Группа приоритета содержит число 1-4, группа оператора - идентификатор последнего ответственного; пустая группа обозначает отсутствие назначения. Предел - 10000 групп, превышение возвращает ошибку без усечения.
+
+`incidentsCreated` - число созданных за период, `incidentsResolved` - число решённых за период, включая созданные раньше. MTTA относится к принятию в периоде, MTTR и ложные тревоги - к решению в периоде. При группировке по дням используется время соответствующего наблюдения. SLA относится к первому из моментов завершения и дедлайна; незавершённое наблюдение учитывается после дедлайна. `mtta` и `mttr` - длительности, `falseAlarmRate`, `ackSlaCompliance` и `resolveSlaCompliance` - доли. `ackSlaEvaluated` и `resolveSlaEvaluated` позволяют отличить нулевую долю от отсутствия наблюдений. `escalated` считает созданные за период инциденты с ненулевым текущим уровнем эскалации. Нагрузка оператора представлена `incidentsCreated` при группировке по последнему ответственному. Итоги вычисляются по исходным наблюдениям. При отсутствии данных счётчики и доли равны нулю; нулевые поля могут отсутствовать в JSON согласно Protobuf mapping.
+
+CSV использует UTF-8, запятую, CRLF и двойные кавычки. Колонка `row_kind` различает итог и группы. Значения групп, начинающиеся со знаков формул, получают апостроф для безопасного открытия в табличном редакторе. Ответы имеют `Cache-Control: no-store`.
+
+## Пересчёт
+
+`psim-report-tool` входит в пакет и образ Projection Service:
+
+```sh
+psim-report-tool rebuild TENANT_UUID FROM_MS TO_MS
+```
+
+Границы пересчёта выбирают инциденты по времени создания и задаются Unix-временем в миллисекундах. Для восстановления отчётов нужны также инциденты, созданные до начала отчётного периода; при полном восстановлении выбирают весь доступный диапазон. PostgreSQL: `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. По умолчанию TLS проверяет имя узла и УЦ. Пароль передаётся защищённым окружением, а не аргументом команды. Роли достаточно SELECT на `incident.incidents` и `escalation.incidents`.
+
+ClickHouse: `PSIM_CH_HOST`, `PSIM_CH_PORT`, `PSIM_CH_USER`, `PSIM_CH_PASSWORD_FILE`, `PSIM_CH_CA_FILE`, `PSIM_CH_CERT_FILE`, `PSIM_CH_KEY_FILE`. Только для изолированного локального стенда допускается `PSIM_CH_ALLOW_PLAINTEXT=1`. Роль пересчёта получает INSERT на `incident_facts`; материализованное представление должно уже существовать.
+
+Утилита читает согласованный снимок порциями по 200 инцидентов. При ошибке часть фактов может быть вставлена, повтор безопасен. Живой загрузчик останавливать не требуется. Для проверки восстановления в пустое назначение сравнивают отчёты и `incident_report_current` до и после пересчёта на остановленных источниках. События до доступного retention Kafka восстанавливают из PostgreSQL.
+
+Не удаляйте только `incident_report_states`, оставляя журнал пакетов и дедупликационные токены загрузчика как единственный механизм восстановления. Выполните пересчёт PostgreSQL после восстановления схемы. Утилита дополняет проекцию, но не удаляет ошибочно внесённые строки или версии.
+
+## Эксплуатация и проверки
+
+`psim_clickhouse_*` показывает пакеты, ошибки и отставание загрузчика; `psim_report_query_seconds` - длительность обработки API, включая аудит. Незавершённые пакеты сохраняются в `psim_clickhouse.pending_batches`; ошибки повторяются с задержкой. Readiness ухудшается при ошибке загрузчика, остановке фоновой задачи или отказе публикации аудита. При росте задержки проверяют Kafka lag, доступность PostgreSQL и ClickHouse, размер порций и части таблиц. При отказе публикации аудита проверяют outbox `reports.psim_outbox` и доступ к `psim.audit.v1`.
+
+```sh
+task reports:test
+task reports:bench
+task reports:sanitizers
+task reports:coverage
+```
+
+Результаты сохраняются в `build/reports/<preset>/report.json`, журналы - рядом. Объём и результаты нагрузочного замера указываются в отчёте; ограничение три секунды проверяется для всех пяти запросов, включая первый.
+
+Локальный Prometheus загружает правила задержки отчётов и ошибок проекции. Grafana автоматически получает дашборд `PSIM incident reports`: p99 API, ошибки загрузки, скорость вставки и readiness. Для другой топологии настраивают обнаружение адресов административного порта сервиса.
+
+Проверен синтетический набор из миллиона инцидентов за 30 суток: пять запросов занимают 1,76-2,23 с. Это проверка отчёта на заданном объёме, без одновременной нагрузки потока событий. Полная нагрузка записи проверяется при системной квалификации. Интеграционные проверки пройдены в Debug, ASan/UBSan и TSan, включая инцидент, созданный до начала периода, повторы, переоткрытие, передачу, границы SLA, доступ руководителя и восстановление материализованного состояния. Покрытие сервиса - 89,37% строк при пороге 75%. DEB-пакет и контейнер содержат сервис и утилиту пересчёта.
+
+## Совместное размещение с моделями консоли
+
+Projection Service также владеет [моделями консоли](console-projections.md). Флаги `reports_enabled`, `console_enabled` и `console_writer` позволяют разделить загрузчик отчётности, единственного писателя консоли и читающие экземпляры. Для прежней отдельной конфигурации отчётности задайте `console_enabled: false`. Пакет и образ сервиса содержат обе утилиты: `psim-report-tool` и `psim-console-tool`.

@@ -1,30 +1,34 @@
-# ADR-069. Оболочка приложения и восстановление сессии
+# ADR-069. Application Shell and Session Recovery
 
-- **Статус:** Принято
-- **Связанные:** [ADR-037](0037-web-monorepo.md), [ADR-060](0060-realtime-delivery.md), [ADR-061](0061-live-access-validation.md), [ADR-065](0065-ui-loading-budgets.md)
+<!-- language-links -->
+[English](0069-application-shell-and-session-recovery.md) | [Русский](../ru/adr/0069-application-shell-and-session-recovery.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-037](0037-web-monorepo.md), [ADR-060](0060-realtime-delivery.md), [ADR-061](0061-live-access-validation.md), [ADR-065](0065-ui-loading-budgets.md)
 
-Одна оболочка владеет сессией и каналом ленты независимо от текущего маршрута. TanStack Router обрабатывает ссылки, прямой вход, историю браузера, неизвестный маршрут и ошибку рендера. Переход между доступными модулями не создаёт новую подписку и не сбрасывает строки. Ролевые признаки управляют навигацией; сервер самостоятельно проверяет права каждого запроса.
+## Solution
 
-OIDC использует Authorization Code + PKCE S256, одноразовый state и nonce, фиксированный issuer и ограниченную десятью минутами транзакцию входа. ID token проверяется по JWKS настроенного Keycloak: RS256, подпись, issuer, audience, azp, срок и nonce. Subject access token совпадает с проверенной идентичностью. В browser storage сохраняется только незавершённая транзакция PKCE; access и refresh token остаются в памяти. Refresh выполняется одним запросом на сессию; Keycloak ротирует refresh token без повторного использования. Выход немедленно очищает строки и сессию, сообщает другим вкладкам и завершает сессию в Keycloak.
+A shell owns the session and the feed channel independently of the current route. TanStack Router handles links, direct navigation, browser history, unknown routes, and rendering errors. The transition between available modules does not create a new subscription or discard rows. Role-based flags manage navigation; the server independently checks the permissions for each request.
 
-Канал заранее обновляет токен, повторно согласует возможности и возобновляет подписки с последнего применённого курсора. Сетевой отказ использует ограниченный экспоненциальный интервал с разбросом; событие online ускоряет повтор. Поздние ответы старого экземпляра, соединения и сессии не меняют текущее состояние. При разрыве сохранённые строки помечаются последними известными данными.
+OIDC uses Authorization Code + PKCE S256, a one-time state and nonce, a fixed issuer, and a sign-in transaction limited to ten minutes. The ID token is verified against the JWKS settings in Keycloak: RS256, signature, issuer, audience, azp, expiration, and nonce. The access token subject matches the verified identity. Only the unfinished PKCE transaction is stored in browser storage; access and refresh tokens remain in memory. Refresh is performed with a single session request; Keycloak rotates the refresh token without reusing it. Sign-out immediately clears the rows and session, notifies other tabs, and terminates the session in Keycloak.
 
-Курсоры снимков и дельт ленты инцидентов содержат `accessContext`: SHA-256 канонического subject, tenant, ролей и эффективных областей доступа. Срок JWT и время проверки в контекст не входят. Gateway сравнивает контекст перед возобновлением. Изменение области требует ResyncRequired; клиент очищает прежние строки до загрузки нового разрешённого снимка. Старые курсоры без контекста сохраняют совместимость; фильтрация сервером остаётся обязательной при любом курсоре.
+The channel updates the token in advance, reconfirms capabilities, and renews subscriptions from the last applied cursor. Network failures use a limited exponential backoff with jitter; the online event accelerates retry. Late responses from old instances, connections, and sessions do not change the current state. When disconnected, the saved rows are marked with the last known data.
 
-Успешная криптографическая проверка JWT кэшируется в снимке JWKS с пределом 1024 токена. Кэш учитывает точные байты токена, срок и движение часов назад; замена снимка ключей удаляет прежний кэш. Потоки синхронизируют доступ. Проверка актуальных прав через introspection выполняется отдельно с прежними пределами 500 мс кэша и 1 с свежести. Повторная проверка подписи для каждого соединения не задерживает сетевую проверку прав при массовом входе.
+Incident feed snapshot and delta cursors contains `accessContext`: SHA-256 canonical subject, tenant, roles, and effective access scopes. JWT expiry and verification time are excluded from the context. The gateway compares the context before renewal. Changing the scope requires ResyncRequired; the client clears previous rows before loading a new allowed snapshot. Old cursors without context maintain compatibility; filtering by the server remains mandatory for any cursor.
 
-Отпечаток контекста вычисляется при успешной аутентификации и переиспользуется для дельт. Массовая рассылка уступает выполнение после каждых 32 доставок, чтобы обновление прав и сетевые ответы обрабатывались вовремя. Кадры могут ожидать в ограниченной очереди во время проверки прав; цикл отправки проверяет актуальную идентичность перед передачей и очищает очередь при отказе или изменении области. Истечение прежней проверки при постановке кадра в очередь не прерывает уже выполняющееся обновление. Сроки проверки и ограничения очередей сохраняются.
+Successful JWT cryptographic verification is cached in a JWKS snapshot with a limit of 1024 tokens. The cache keeps the exact token bytes, expiry and backwards clock movement; replacing the snapshot removes the previous cache. Threads synchronize access. Verifying current permissions through introspection is performed separately with previous limits of 500 ms cache and 1 s freshness. Rechecking the signature for each connection does not delay network permission verification during mass login.
 
-Отказ авторизации передаётся отдельным fatal error frame; ошибка доступности оставляет возможность повтора. Ожидание отправки отказа ограничено. Ошибки 401/403 снимка завершают локальную сессию и очищают данные. Сетевые ошибки не подменяются отсутствием прав и не уничтожают восстановимый refresh token.
+The context fingerprint is calculated upon successful authentication and reused for deltas. Mass delivery yields execution after every 32 deliveries to ensure that permission and network responses are processed in time. Frames can wait in a limited queue during permission checking; the sending cycle checks the current identity before transferring and clears the queue if the scope fails or changes. Expiring the previous check when enqueueing a frame does not interrupt ongoing updates. The expiration times and queue limits are maintained.
 
-## Размер поставки
+Authorization failure is sent as a separate fatal error frame; availability errors allow for repetition. Waiting for an error to be sent is limited. Errors 401/403 in the snapshot terminate the local session and clear data. Network errors are not replaced by lack of permissions and do not destroy the recoverable refresh token.
 
-Начальный бюджет 150000 байт JS gzip сохраняется. Лента и protobuf загружаются после определения разрешённой сессии. Отдельный предел полного графа рабочей консоли, включая динамические imports и словари, - 200000 байт; граф витрины ограничен прежними 260000 байтами.
+## Delivery Size
 
-Общая сборка рабочей оболочки и витрины теперь включает TanStack Router, проверку OIDC и управление общей сессией. Она занимает около 270 КБ вместо 237,98 КБ прежнего объёма. Общий предел - 294 КБ, около 9% запаса над измеренным размером. Это отдельный суммарный предел; начальная загрузка, граф витрины, CSS и шрифты сохраняют свои ограничения. Размеры проверяются по манифесту и всем поставляемым файлам, а не исключением новых компонентов из измерения.
+The initial budget is 150,000 bytes of JS gzip. Feeds and protobuf are loaded after determining the allowed session. The total size of the work shell, including dynamic imports and dictionaries, is 200,000 bytes; the showcase dependency graph is limited to 260,000 bytes.
 
-## Проверка
+The overall build of the work shell and showcase now includes TanStack Router, OIDC verification, and management of the overall session. It occupies about 270 KB instead of 237.98 KB before. The total limit is 294 KB, about 9% above the measured size. This is a separate total limit; initial loading, showcase dependency graph, CSS, and fonts retain their limits. Sizes are checked against the manifest and all delivered files, not excluding new components from measurement.
 
-`task web:check` проверяет маршруты, ролевые границы, криптографическую проверку входа, конкуренцию refresh, поздние ответы, общий канал, доступность и бюджеты. `task shell:test` проверяет реальный PKCE с Keycloak, потерю сети на 300000 мс, обновление истёкшего access token, восстановление изменений и SIGKILL Gateway. Нативные проверки realtime покрывают несовпадение области курсора, отказ авторизации и чтение из Kafka.
+## Verification
+
+`task web:check` verifies routes, role boundaries, cryptographic input verification, refresh competition, late responses, the overall channel, accessibility and budgets. `task shell:test` verifies real PKCE with Keycloak, network loss for 300,000 ms, updating expired access tokens, restoring changes, and SIGKILL Gateway. Native realtime verifications cover inconsistencies in cursor scopes, authorization failures, and reading from Kafka.

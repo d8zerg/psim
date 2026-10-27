@@ -1,62 +1,66 @@
-# Сравнение загрузки веб-клиента
+# Web Client Loading Comparison
 
-Решения - [ADR-070](../adr/0070-lazy-loading-and-delivery-budgets.md) и [ADR-076](../adr/0076-web-client-qualification.md). Действуют пределы [ADR-075](../adr/0075-audit-and-reporting-delivery-budget.md).
+<!-- language-links -->
+[English](web-client-loading.md) | [Русский](../ru/engineering/web-client-loading.md)
+<!-- /language-links -->
 
-## Метод
+Decisions are [ADR-070](../adr/0070-lazy-loading-and-delivery-budgets.md) and [ADR-076](../adr/0076-web-client-qualification.md). Limits follow [ADR-075](../adr/0075-audit-and-reporting-delivery-budget.md).
 
-`task web:loading` собирает варианты одним закреплённым инструментарием и запускает Chromium против статического сервера с gzip и настоящим HTTP-кэшем. Исходная версия берётся через `git archive` по ревизии из `tools/web-quality/baseline.json`; это снимок перед квалификацией. Для исходной и текущей версии используются одинаковые зависимости и сгенерированные клиенты. Полная история репозитория должна содержать указанную ревизию.
+## Method
 
-Каждая пара маршрут/язык проверяется в трёх новых контекстах браузера. Холодный вход получает реальные файлы, повторный вход использует тот же HTTP-кэш. Отдельная серия измеряет первый переход из консоли в модуль и возврат в уже открытый модуль без перезагрузки документа. У прогретых хешированных ресурсов из `/assets/` `transferSize` равен нулю. Сетевая серия учитывает JS/JSON из этого каталога; HTML и корневой `config.js` передаются с `no-store`. Полные бюджеты дополнительно включают корневые JS-файлы. Сырые события содержат URL, переданный и сжатый размер. Предпросмотр редактора и построение отчёта измеряются отдельно от появления модуля.
+`task web:loading` builds variants using a single fixed tool and runs Chromium against a static server with gzip and real HTTP cache. The original version is taken from `tools/web-quality/baseline.json` via `git archive`; this is a snapshot before qualification. Both the original and current versions use the same dependencies and generated clients. The full repository history must include the specified revision.
 
-Маршруты: `/` - оператор, `/admin` - администратор, `/integrations` - интегратор, `/audit` - аудитор, `/reports` - руководитель; переходы выполняются с совокупностью разрешённых ролей. Для каждого проверяются EN и RU. Публикуются p50 и p95; при трёх повторах p95 совпадает с максимумом. Это локальные сравнительные измерения, без моделирования пропускной способности реального канала.
+Each route/language pair is tested in three new browser contexts. Cold entry uses real files, while re-entry uses the same HTTP cache. A separate series measures the first transition from the console to the module and returning to an already opened module without reloading the document. For cached hashed assets under `/assets/`, `transferSize` is zero. The network series includes JS/JSON from this directory; HTML and root `config.js` are served with `no-store`. Full budgets additionally include root JS files. Raw events contain the URL and compressed size. Previewing the editor and building a report are measured separately from when the module appears.
 
-Контролируемые ответы идентификации и API нужны только для одинаковых данных при измерении файлов. Бизнес-приёмка выполняется [отдельно с настоящими сервисами](web-client-quality.md). Самостоятельный артефакт витрины открывается без `index.html` приложения.
+Routes: `/` is the operator, `/admin` is the administrator, `/integrations` is the integrator, `/audit` is the auditor, `/reports` is the supervisor; transitions are performed with allowed roles. Each is tested for EN and RU. p50 and p95 are published; with three samples, nearest-rank p95 equals the maximum, it’s a local comparison without modeling real channel capacity.
 
-Начальный граф использует gzip уровня 6, как действующая проверка; полный граф и уникальная поставка используют gzip уровня 9 для каждого файла. Полный граф обходит статические и динамические imports и связанные JSON-ресурсы. В пределах артефакта файл считается один раз. JSON-словари включены в размеры наравне с JS, CSS и шрифты проверяются собственными бюджетами.
+Controlled authentication and API responses are only needed for identical data when measuring files. Business acceptance is performed [separately with real services](web-client-quality.md). The standalone artifact of the showcase opens without `index.html` of the application.
 
-## Варианты
+The initial graph uses gzip level 6 as a test; the full graph and unique delivery use gzip level 9 for each file. The full graph traverses static and dynamic imports and related JSON resources. Within the artifact, a file is counted once. JSON dictionaries are included in the size, along with JS, CSS, and fonts, which are tested with their own budgets.
 
-| Имя | Изменение |
+## Variants
+
+| Name | Change |
 |---|---|
-| `baseline` | Исходная версия с `React.lazy` и `Suspense` |
-| `inline` | Выбранная текущая конфигурация: модули по маршрутам после проверки роли, словари обоих языков внутри соответствующего модуля |
-| `eager` | Статические imports всех модулей |
-| `widgets` | Отдельный отложенный чанк полей административного редактора |
-| `selected` | JSON-словарь только выбранного языка при первом открытии модуля |
-| `bilingual` | Те же JSON-ресурсы, но оба языка загружаются сразу |
-| `application` | Только вход рабочей консоли |
-| `design` | Только вход витрины |
+| `baseline` | Original version with `React.lazy` and `Suspense` |
+| `inline` | Selected current configuration: modules by route after role check, dictionaries for both languages within the corresponding module |
+| `eager` | Static imports of all modules |
+| `widgets` | Separate delayed field container for the administrative editor |
+| `selected` | JSON dictionary only for the selected language when opening the module for the first time |
+| `bilingual` | Same JSON resources, but both languages are loaded immediately |
+| `application` | Only entry from the working console |
+| `design` | Only entry from the showcase |
 
-Преобразования альтернатив изолированы в Vite-плагине для сравнения. Рабочая конфигурация по умолчанию используется при сборке `inline` без принудительного выбора варианта. Канонические словари общие для вариантов, проверка совпадения ключей исключает потерю переводов.
+The transformations of alternatives are isolated in the Vite plugin for comparison. The default working configuration is used during build with `inline` without forced selection of a variant. The canonical dictionaries are common to all variants; key matching ensures translation loss is avoided.
 
-## Выбор
+## Choice
 
-Сохраняется общая поставка с отложенными модулями по маршрутам и проверкой роли до загрузки кода. Общий кэш TanStack Query хранит только определения компонентов. Серверные данные сохраняют отдельные клиенты и очистку по сессии и области. Ожидание `Suspense` при открытии маршрута заменено явным состоянием загрузки; измерения подтверждают устранение задержки отображения модуля.
+The overall delivery with delayed modules by route and role check before code loading is preserved. The overall TanStack Query cache only stores module definitions. Server data keeps separate clients and session and scope cleanup. Waiting for `Suspense` when opening a route is replaced with an explicit loading state; measurements confirm that the delay in module display is eliminated.
 
-Статическая загрузка превышает начальный бюджет. Дополнительный чанк редактора увеличивает суммарную поставку и задерживает первое действие. Отдельные словари выбранного языка уменьшают передачу переводов при открытии, но почти исчерпывают общий бюджет и не дают устойчивого выигрыша по времени. Текущий вариант оставляет больше места внутри действующего лимита. Смена языка в экспериментальном варианте ожидает все необходимые словари, сохраняет прежний язык и черновик при отказе и допускает повтор без перезагрузки.
+Static loading exceeds the initial budget. An additional editor container increases the total delivery and delays the first action. Separate dictionaries of the selected language reduce translation transmission when opening, but almost exhaust the overall budget and do not provide a stable time gain. The current variant leaves more space within the current limit. Changing language in the experimental variant waits for all required dictionaries, retains the previous language and draft in case of failure, and allows repetition without reloading.
 
-Отдельная сборка приложения уменьшает его собственный артефакт, однако требует отдельной витрины и дублирует общие зависимости. Поэтому стоимость фиксируется для каждого артефакта, как сумма двух физических поставок и как объединение содержимого по SHA-256. Возможное исключение витрины из производственного образа потребует отдельного решения о составе поставки; при текущем выборе оба входа остаются в общей сборке.
+Separate application build reduces its own artifact, but requires a separate showcase and duplicates common dependencies. Therefore, the cost is fixed for each artifact as the sum of two physical deliveries and as the combination of content by SHA-256. Excluding the showcase from the production image requires a separate solution for delivery composition; with the current choice, both entries remain in the overall build.
 
-Ни один предел не повышается. Чанки не исключаются из полного графа. Отказ первого импорта и старый документ после обновления проверены через явное обновление страницы и повторный вход. Закрытый маршрут не загружает код модуля. Четыре проверки восстановления и все измерения входят в CI.
+No limits are increased. Chunks are not excluded from the full graph. Failure of the first import and old document after updates are tested through explicit page updates and re-entry. A unauthorized route does not load module code. Four recovery checks and all measurements are included in CI.
 
-## Измерения
+## Measurements
 
-Все размеры ниже - байты gzip. Пределы: начальный граф 150000 на язык, приложение 250000, витрина 260000, уникальная поставка 300000.
+All sizes are below - bytes gzip. Limits: initial graph 150000 per language, application 250000, showcase 260000, unique delivery 300000.
 
-| Вариант | Начальный EN/RU | Полный граф приложения | Полный граф витрины | Уникальные JS/JSON | Бюджеты |
+| Variant | Initial EN/RU | Application full graph | Showcase full graph | Unique JS/JSON | Budgets |
 |---|---|---|---|---|---|
-| `baseline` | 118952/120336 | 239855 | 184316 | 297160 | проходят |
-| `inline` | 128466/129859 | 240519 | 183963 | 297812 | проходят |
-| `eager` | 191964/193357 | 235229 | 182321 | 292379 | начальный граф превышен |
-| `widgets` | 129261/130654 | 242075 | 184776 | 299400 | проходят |
-| `selected` | 128697/130090 | 242157 | 184181 | 299428 | проходят |
-| `bilingual` | 128713/130106 | 242169 | 184198 | 299441 | проходят |
-| `application` | 127101/128494 | 238687 | - | 238687 | проходят |
-| `design` | - | - | 180136 | 180136 | проходят |
+| `baseline` | 118952/120336 | 239855 | 184316 | 297160 | pass |
+| `inline` | 128466/129859 | 240519 | 183963 | 297812 | pass |
+| `eager` | 191964/193357 | 235229 | 182321 | 292379 | initial graph exceeded |
+| `widgets` | 129261/130654 | 242075 | 184776 | 299400 | pass |
+| `selected` | 128697/130090 | 242157 | 184181 | 299428 | pass |
+| `bilingual` | 128713/130106 | 242169 | 184198 | 299441 | pass |
+| `application` | 127101/128494 | 238687 | - | 238687 | pass |
+| `design` | - | - | 180136 | 180136 | pass |
 
-Полные графы модулей `operator`, `administration` и `insights` в выбранном варианте составляют по 240519 байт: обход включает общую оболочку и доступные из неё динамические переходы. Это достижимый полный граф, а не объём первого запроса модуля. Общие файлы внутри каждого графа считаются один раз.
+The full graphs for modules `operator`, `administration`, and `insights` in the selected variant are 240519 bytes each: the traversal includes the overall shell and available dynamic transitions. This is an reachable full graph, not the volume of the first module request. Common files within each graph are counted once.
 
-| Вариант | Максимальный p95 холодного входа, мс | Прогретого входа | Первого перехода | Повторного перехода | Первое открытие редактора, максимум |
+| Variant | Maximum p95 for cold entry, ms | Warmed entry | First transition | Re-entry | First editor opening, max |
 |---|---|---|---|---|---|
 | `baseline` | 899 | 851 | 829 | 66 | 43 |
 | `inline` | 193 | 89 | 81 | 69 | 48 |
@@ -66,10 +70,10 @@
 | `bilingual` | 216 | 75 | 80 | 71 | 42 |
 | `application` | 214 | 79 | 76 | 70 | 44 |
 
-Максимумы берутся по всем маршрутам и обоим языкам каждого варианта. Детализация выбранной конфигурации: значения в ячейке - p50/p95, мс.
+Maxima values are taken from all routes and both languages for each variant. Details of the selected configuration: values in the cell are p50/p95, ms.
 
-| Маршрут | Язык | Холодный вход | Прогретый вход | Первый переход | Повторный переход |
-|---|---|---|---|---|---|
+| Route | Language | Cold Entry | Warm Entry | First Transition | Repeat Transition |
+|---|---|---|---|---|---|---|
 | `/` | EN | 134/138 | 67/89 | - | - |
 | `/admin` | EN | 131/172 | 63/67 | 68/81 | 42/43 |
 | `/integrations` | EN | 114/137 | 61/67 | 74/81 | 43/44 |
@@ -81,9 +85,9 @@
 | `/audit` | RU | 121/133 | 63/64 | 75/75 | 69/69 |
 | `/reports` | RU | 116/130 | 64/65 | 73/76 | 66/68 |
 
-Дополнительная передача при первом переходе после открытия консоли по ResourceTiming (`transferSize`, включая оценку заголовков браузером):
+Additional data is provided during the first transition after opening the console, as measured by ResourceTiming (`transferSize`), including browser header evaluation:
 
-| Модуль | Язык | Текущий вариант, байты | Выбранный JSON-словарь, байты |
+| Module | Language | Current Variant, bytes | Selected JSON Dictionary, bytes |
 |---|---|---|---|
 | `/admin` | EN | 33360 | 30298 |
 | `/integrations` | EN | 33360 | 30298 |
@@ -94,8 +98,8 @@
 | `/audit` | RU | 10417 | 9613 |
 | `/reports` | RU | 10417 | 9613 |
 
-Отдельные физические поставки дают 418823 байт JS/JSON gzip суммарно; объединение одинакового содержимого по SHA-256 - 410187. Это больше 297812 байт общей сборки. В отдельном приложении 238687 байт, в отдельной витрине 180136; уменьшение приложения не означает уменьшение двух поставок вместе.
+Individual physical deliveries yield 418823 bytes of JS/JSON gzip in total; combining the same content using SHA-256 results in 410187 bytes. This is more than 297812 bytes of the total build. In a separate application, this amounts to 238687 bytes, and in a separate showcase, 180136 bytes; reducing the application does not mean reducing both deliveries together.
 
-У выбранного варианта остаётся 2188 байт до общего предела, у `selected` - 572 байт. Статическая загрузка уменьшает суммарный объём, но превышает предел начальной загрузки на обоих языках. Отложенный редактор добавляет задержку около 800 мс к первому действию; его чанк остаётся частью полного графа. JSON-варианты проверены на фактическую загрузку одного выбранного или обоих словарей; все четыре JSON-файла явно исключены из встраивания в JS.
+In the selected variant, there are 2188 bytes remaining before reaching the total limit, while for `selected`, it’s 572 bytes. Static loading reduces the total size, but still exceeds the initial loading limit for both languages. The delayed editor adds a delay of about 800 ms to the first action; its chunk remains part of the overall graph. The JSON variants have been tested for actual loading of one or both dictionaries; all four JSON files are explicitly excluded from inlining into JS.
 
-Сырые данные: `build/web-quality/loading.json`, `comparison.json`, `variants.json` и `.vite/manifest.json` каждого варианта. Артефакты находятся под `build/web-quality/variants/`.
+Raw data: `build/web-quality/loading.json`, `comparison.json`, `variants.json`, and `.vite/manifest.json` for each variant. The artifacts are under `build/web-quality/variants/`.

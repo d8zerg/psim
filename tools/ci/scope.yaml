@@ -25,7 +25,7 @@ stages:
   fuzz_rules: ['libs/domain/processing/*', 'services/correlation-engine/*', 'contracts/proto/psim/processing/v1/rules.proto', 'tools/rules/*', 'tools/taskfiles/fuzz.yml']
   contracts: ['contracts/*', 'tools/contracts/*']
   # The portal (docs:portal) is built from the documents and from the contracts.
-  docs: ['docs/*', '*.md', 'contracts/*', 'tools/docs/*', 'tools/quality/*', 'tools/security/*']
+  docs: ['docs/*', '*.md', 'contracts/*', 'tools/contracts/*', 'tools/docs/*', 'tools/quality/*', 'tools/security/*', 'deploy/observability/*']
   deps: ['conanfile.py', 'conan.lock', 'web/pnpm-lock.yaml', 'tools/release/licenses.yaml', 'tools/taskfiles/security.yml']
   release: ['tools/monitoring-agent/*', 'tools/psimctl/*', 'tools/pg-migrate/*', 'deploy/operations/*', 'deploy/images/*', 'tools/release/*', 'tools/taskfiles/release.yml', 'deploy/topologies/*', 'deploy/infrastructure/*', 'deploy/observability/*', 'deploy/helm/*', 'deploy/operators/*', 'deploy/vm/*', 'tools/deploy/*', 'tools/observability/*', 'tools/vm/*', 'tools/taskfiles/deploy.yml', 'tools/taskfiles/vm.yml']
   # The environment also hosts the component tests of adapters (TS-03) and the registry check (FF-04).

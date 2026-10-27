@@ -1,38 +1,41 @@
-# ADR-044. Детерминированный симуляционный стенд с ручным запуском
+# ADR-044. Deterministic Simulation Environment with Manual Execution
 
-- **Статус:** Принято
-- **Шаг плана:** 2.7
-- **Связанные:** ADR-006, ADR-008, ADR-016, ADR-031, ADR-040, [стратегия качества](../quality/strategy.md)
+<!-- language-links -->
+[English](0044-deterministic-simulation.md) | [Русский](../ru/adr/0044-deterministic-simulation.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-006, ADR-008, ADR-016, ADR-031, ADR-040, [Quality Strategy](../quality/strategy.md)
 
-Шаг 2.7 требует воспроизводимого стенда с управляемым временем, эмуляцией Kafka и хранилищ, внесением сбоев и воспроизведением по зерну. Доменного конвейера Ф4-Ф6 ещё нет. Принят ручной запуск стенда отдельными задачами Task без подключения к CI.
+## Context
 
-## Рассмотренные варианты
+Simulation requires a reproducible environment with controlled timing, Kafka emulation, and storage systems, as well as fault injection and seed-based reproduction. Manual execution of the environment as separate tasks without integration with CI is accepted.
 
-| Вариант | Преимущества | Ограничения |
+## Proposed Options
+
+| Option | Advantages | Limitations |
 |---|---|---|
-| Настоящие контейнеры и сетевые сбои | Проверяют реальные адаптеры | Не дают детерминированного расписания; уже покрываются компонентными тестами |
-| Отдельный событийный движок без Asio | Простой контроль времени | Не проверяет исполнение корутин через существующий порт Clock |
-| Один io_context + ManualClock, модели устойчивого состояния | Использует шаг 2.2; воспроизводит расписание, таймеры и границы транзакций | Не моделирует протоколы, репликацию и реальные процессы |
+| Real containers and network faults | Tests real adapters | Does not provide deterministic scheduling; already covered by component tests |
+| Separate event engine without Asio | Simple timing control | Does not exercise coroutine execution through the existing Clock port |
+| One io_context + ManualClock, durable state models | Uses ADR-040 asynchronous primitives; reproduces schedules, timers, and transaction boundaries | Does not model protocols, replication, and real processes |
 
-## Решение
+## Solution
 
-1. `libs/sim`, пространство имён `psim::sim`, цель `psim::sim`. Один `io_context`, существующий `ManualClock`, продвижение к ближайшему таймеру. Лимиты обработчиков и виртуального времени завершают зависшие сценарии ошибкой; системные часы и потоки не используются.
-2. SplitMix64 и собственный bounded sampler с rejection sampling. Порядок обхода состояния фиксирован; нет `random_device`, стандартных распределений или `std::hash`. Зерно воспроизводит прогон при одинаковых версии модели и параметрах.
-3. Модель Kafka: устойчивые партиционные журналы, read_committed, атомарная публикация выхода/changelog/смещений, fencing по эпохе продюсера, запрет повторного commit и отката смещений. Модель SQL: оптимистичная транзакция inbox + эффект + outbox; ключ `(tenant, id)`, версия состояния, отдельное подтверждение outbox.
-4. Эталонная цепочка: повторённые и перемешанные входы -> Kafka EOS-K с восстановлением состояния из changelog -> inbox/outbox -> повторяемая публикация -> inbox получателя. Падение теряет незавершённую транзакцию и локальный прогресс, сохраняя commit; потеря ответа не удаляет устойчивую запись. Задержки изменяют порядок работы партиций, сохраняя порядок журнала внутри партиции.
-5. Независимый оракул сравнивает входной набор с выходом, эффектами БД и получателя, включая содержимое, тенант и кратность транзакционного выхода; проверяет дренирование журналов и outbox. Повторы транспортных публикаций допускаются, повторные эффекты исключаются.
-6. `task sim:short` - 200 прогонов, `task sim:long` - 10 000, `task sim:replay SEED=<число>` - один прогон с трассой. Ошибка сохраняет версию модели, параметры, расписание и команду повторения в `.cache/sim/`. Для регрессий используются фиксированные зерна и явные скрипты сбоев вокруг commit/публикации/подтверждения.
-7. Только ручной запуск: подкаталог CMake имеет `EXCLUDE_FROM_ALL`; проверки стенда не регистрируются в CTest. Задачи `sim:*` не вызываются из `check`, `ci`, `ci:nightly` или `release`. Это уточняет только автоматический запуск симуляции в ADR-006 и стратегии качества; остальные барьеры сохраняются.
+1. `libs/sim`, namespace `psim::sim`, target `psim::sim`. One `io_context`, existing `ManualClock`, moves to the next timer. Limits on handlers and virtual time terminate stuck scenarios with an error; system clocks and threads are not used.
+2. SplitMix64 and a bounded sampler with rejection sampling. State iteration order is fixed; no `random_device`, standard distributions, or `std::hash`. The seed reproduces the same version of the model and parameters.
+3. Kafka model: durable partition logs, read_committed, atomic publication of output/changelog/offsets, fencing by producer epoch, prohibition of repeated commits and offset rollback. SQL model: optimistic transaction inbox + effect + outbox; key `(tenant, id)`, state version, separate acknowledgment for outbox.
+4. Reference chain: repeated and shuffled inputs -> Kafka EOS-K with state restoration from changelog -> inbox/outbox -> repeated publication -> receiver inbox. The failure loses unfinished transactions and local progress, while preserving commits; loss of response does not remove durable records. Delays change the interleaving of partitions while maintaining log order within the partition.
+5. Independent oracle compares input set with output, database effects, and receiver, including content, tenant, and transaction output multiplicity; checks that logs and outbox are drained. Repeated transport publications are allowed, but repeated effects are excluded.
+6. `task sim:short` - 200 iterations, `task sim:long` - 10,000, `task sim:replay SEED=<number>` - one iteration with trace. Errors save model version, parameters, schedule, and repetition command in `.cache/sim/`. For regression, fixed seeds and explicit fault scripts around commit/publishing/acknowledgment are used.
+7. Only manual execution: CMake subdir has `EXCLUDE_FROM_ALL`; environment checks are not registered in CTest. Tasks `sim:*` are not triggered from `check`, `ci`, `ci:nightly`, or `release`. This clarifies only automatic simulation in ADR-006 and quality strategy; other barriers remain.
 
-## Последствия
+## Consequences
 
-- Библиотеку моделей и планировщик можно использовать в тестах будущих доменных портов. `Transform` позволяет подключить детерминированный обработчик к эталонной цепочке; предметным сценариям понадобятся свои ожидаемые результаты.
-- Шаг 2.7 проверяет стенд и семантику эталонной доставки. Он не подтверждает готовность Normalizer, Correlation Engine, Incident Service, реальные адаптеры или устойчивость к отказу реплик. Подключение домена и его оракулов относится к шагу 5.2 и последующим шагам.
-- Повторение между изменёнными моделями требует сохранённой версии исходного кода; CLI отвергает неизвестную версию модели. Изменение алгоритма расписания, генератора или формата сценария требует повышения версии.
-- Результаты ручного запуска фиксируются в журнале прогресса; стенд не является автоматическим барьером выпуска.
+- Model libraries and schedulers can be used in future domain port tests. `Transform` allows connecting deterministic handlers to the standard chain; domain scenarios need their expected results.
+- Simulation checks confirm the semantics of the reference delivery. It does not verify the readiness of Normalizer, Correlation Engine, Incident Service, real adapters, or fault tolerance of replication. The live correlation oracle is described in [guide](../engineering/live-correlation.md).
+- Repetition between modified models requires a saved version of the source code; CLI rejects unknown model versions. Changing schedule algorithm, generator, or scenario format requires upgrading the version.
+- Manual execution results are preserved as test artifacts; the environment is not an automatic release barrier.
 
-## Проверка
+## Verification
 
-`task sim:test`, `task sim:short`, `task sim:long`, `task sim:sanitizers`, `task sim:coverage`. Отдельно проверяется отсутствие симуляционных тестов в CTest и вызовов `sim:*` в конвейерах. Повреждение данных и коллизия выходных идентификаторов должны обнаруживаться оракулом; повтор по зерну должен давать одинаковую полную трассу.
+`task sim:test`, `task sim:short`, `task sim:long`, `task sim:sanitizers`, `task sim:coverage`. Manually check for absence of simulation tests in CTest and `sim:*` calls in pipelines. Data corruption and conflicts between output identifiers must be detected by the oracle; seed repetition should produce the same complete trace.

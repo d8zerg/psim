@@ -1,67 +1,70 @@
-# ADR-028. ClickHouse для истории событий и аналитики
+# ADR-028. ClickHouse for event history and analytics
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (реализация - 1.4, 2.8, 4.5, 5.4, 6.5, 9.1)
-- **Заменяет:** [ADR-013](0013-event-history-storage.md)
-- **Связанные:** ADR-003, ADR-008, ADR-022, [scaling.md](../architecture/scaling.md#5-сайзинг)
+<!-- language-links -->
+[English](0028-clickhouse-analytical-storage.md) | [Русский](../ru/adr/0028-clickhouse-analytical-storage.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Supersedes:** [ADR-013](0013-event-history-storage.md)
+- **Related:** ADR-003, ADR-008, ADR-022, [scaling.md](../architecture/scaling.md#5-capacity-planning)
 
-Принято: использовать ClickHouse для подходящих задач и данных. ADR-013 хранил в PostgreSQL только значимые события (5% потока), а все события - лишь в Kafka в пределах retention (24 ч); долговременный архив был вне MVP. При этом нагрузка - 50 000 событий/с (≈ 4,3 млрд в сутки), а отчёты и разбор инцидентов требуют поиска по истории и агрегатов за 30 суток и больше.
+## Context
 
-Нужно определить, какие данные и задачи переходят в ClickHouse, а какие остаются в PostgreSQL, Redis и RocksDB.
+ClickHouse is selected for suitable data and workloads. ADR-013 stored only significant events, 5% of the stream, in PostgreSQL; the complete stream remained in Kafka only for its 24 h retention, with long-term archives outside MVP. At 50,000 events/s, approximately 4.3 billion per day, reports and incident investigation require historical search and aggregates covering 30 days or more.
 
-## Рассмотренные варианты
+The decision must assign data and workloads to ClickHouse, PostgreSQL, Redis and RocksDB.
 
-### Что хранить в ClickHouse
+## Options considered
 
-| Данные и задача | Подходит ли ClickHouse | Решение |
+### Data stored in ClickHouse
+
+| Data and workload | ClickHouse suitability | Decision |
 |---|---|---|
-| История событий: все нормализованные события, поиск по объекту, зоне, устройству, типу, времени | Да: вставка пакетами, сжатие столбцов в 10-15 раз, сортировка по ключу поиска, TTL | ClickHouse |
-| Связь событий с сигналами и инцидентами | Да: таблица связей, только добавление | ClickHouse |
-| Факты инцидентов для отчётов (MTTA, MTTR, ложные тревоги, SLA, нагрузка операторов) | Да: агрегаты за большие периоды за доли секунды | ClickHouse |
-| Статистика сигналов и правил (частота срабатываний для настройки правил) | Да | ClickHouse |
-| Агрегаты предметной области (инциденты, сценарии, команды, каталог), outbox, inbox | Нет: нужны транзакции, уникальность, точечные обновления | PostgreSQL |
-| Журнал аудита с цепочкой хэшей | Нет: нужна строгая последовательность и запрет изменений средствами БД (ADR-021) | PostgreSQL |
-| Горячие проекции консоли, сессии, лимиты | Нет: нужны точечные чтения и записи с малой задержкой | Redis-совместимое хранилище |
-| Состояние корреляции | Нет: локальное состояние партиции с exactly-once (ADR-009) | RocksDB |
-| Логи и трассировки платформы | Да (экспортёр ClickHouse в OpenTelemetry Collector) | Отклонено для поставки; отдельные Loki и Tempo по [ADR-080](0080-observability-package.md) |
+| All normalized events; search by site, zone, device, type and time | Suitable: batch inserts, 10-15× column compression, search-key ordering and TTL | ClickHouse |
+| Event relationships to signals and incidents | Suitable: append-only relationship tables | ClickHouse |
+| Incident facts for MTTA, MTTR, false-alarm, SLA and operator-load reports | Suitable: subsecond aggregates over long periods | ClickHouse |
+| Signal and rule statistics for rule tuning | Suitable | ClickHouse |
+| Domain aggregates: incidents, scenarios, commands, catalog, outbox and inbox | Unsuitable: transactions, uniqueness and point updates are required | PostgreSQL |
+| Hash-chain audit log | Unsuitable: strict sequencing and database-enforced mutation restrictions are required (ADR-021) | PostgreSQL |
+| Hot console projections, sessions and limits | Unsuitable: low-latency point reads and writes are required | Redis-compatible store |
+| Correlation state | Unsuitable: local partition state with exactly-once semantics (ADR-009) | RocksDB |
+| Platform logs and traces | Suitable through the OpenTelemetry Collector ClickHouse exporter | Rejected for the distribution; separate Loki and Tempo per [ADR-080](0080-observability-package.md) |
 
-### Способ загрузки
+### Ingestion
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Табличный движок Kafka в ClickHouse | Нет отдельного сервиса | Формат Confluent wire format для Protobuf не поддерживается напрямую; нет управления ошибками и DLQ по правилам платформы; метрики и трассировка вне платформы |
-| **Сервис-потребитель на C++ с пакетной вставкой по нативному протоколу** (библиотека clickhouse-cpp, Apache 2.0) | Единые правила потребления, DLQ, метрик и трассировки (ADR-006); управление размером пакета | Свой код загрузчика (небольшой) |
+| ClickHouse Kafka table engine | No separate service | No direct Confluent Protobuf wire-format support; error and DLQ handling do not follow platform rules; metrics and tracing are outside the platform |
+| **C++ consumer service with native-protocol batch inserts**, using Apache 2.0 clickhouse-cpp | Shared consumption, DLQ, metrics and tracing rules (ADR-006); controlled batch size | A small custom ingestion implementation |
 
-### Топология
+### Topology
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Replicated-движки + ClickHouse Keeper во всех топологиях** (одна машина: 1 узел ClickHouse и 1 Keeper; кластер: 1 шард × 2 реплики, Keeper ×3 на узлах инфраструктуры) | Одинаковые DDL во всех топологиях; отказоустойчивость в кластере | Keeper - ещё один компонент |
-| Нереплицированный MergeTree на одной машине, Replicated в кластере | Проще одна машина | Два варианта DDL и миграций |
+| **Replicated engines and ClickHouse Keeper in every topology**: one ClickHouse node and one Keeper on a single machine; one shard with two replicas and three Keepers on infrastructure nodes in a cluster | Identical DDL across topologies; cluster fault tolerance | Adds Keeper |
+| Nonreplicated MergeTree on one machine, Replicated in a cluster | Simpler single-machine deployment | Two DDL and migration variants |
 
-## Решение
+## Decision
 
-1. **ClickHouse** (Apache 2.0, LTS-версия, фиксируется в шаге 1.4) хранит:
-   - `events` - все нормализованные события;
-   - `event_signals` - связи событий с сигналами (из `psim.signals.v1`);
-   - `incident_facts` - факты жизненного цикла инцидентов (из `psim.incidents.events.v1` и `psim.response.events.v1`);
-   - `signal_facts` - сигналы для статистики правил.
-2. **Загрузка:** Event History (события, связи, сигналы) и Projection Service (факты инцидентов) - потребители Kafka на C++; пакетная вставка по нативному протоколу с TLS; смещение фиксируется после успешной вставки. Повтор после сбоя устраняется токеном дедупликации вставки (`insert_deduplication_token` = топик, партиция, диапазон смещений) и движком `ReplacingMergeTree` как страховкой.
-3. **Модель `events`** (уточняется в шаге 4.5): `ReplicatedReplacingMergeTree`, `PARTITION BY toYYYYMMDD(occurred_at)`, `ORDER BY (tenant_id, site_id, zone_id, occurred_at, event_id)`; индексы пропуска по `device_id`, `type`, `event_id`; `type` и `raw_code` - `LowCardinality`. Поиск по `event_id` сужается по времени, извлечённому из UUIDv7.
-4. **Retention** через TTL, по умолчанию: все события - 7 суток, значимые события и связи - 90 суток, факты инцидентов - 400 суток. Значения задаются в `RetentionSettings` (`psim.config.v1`).
-5. **Топология:** Replicated-движки и ClickHouse Keeper во всех топологиях; одна машина - 1 узел и 1 Keeper; кластер - 1 шард × 2 реплики, Keeper ×3 на узлах инфраструктуры.
-6. **Чтение:** EventHistoryService и ReportService читают из ClickHouse; запросы всегда ограничены `tenant_id` (ADR-022) и интервалом времени.
-7. ClickHouse - не источник истины для предметной области: любая таблица восстановима проигрыванием Kafka в пределах retention топиков или пересчётом из PostgreSQL (факты инцидентов).
+1. **ClickHouse**, Apache 2.0 with an LTS version pinned in the distribution, stores:
+   - `events`: all normalized events;
+   - `event_signals`: event-to-signal relationships from `psim.signals.v1`;
+   - `incident_facts`: lifecycle facts from `psim.incidents.events.v1` and `psim.response.events.v1`;
+   - `signal_facts`: signals for rule statistics.
+2. **Ingestion:** Event History handles events, relationships and signals; Projection Service handles incident facts. Both are C++ Kafka consumers using native-protocol batch inserts over TLS. Offsets commit after successful insertion. Recovery duplicates are handled by `insert_deduplication_token`, derived from topic, partition and offset range, with `ReplacingMergeTree` as a fallback.
+3. **`events` model**, refined by ADR-052: `ReplicatedReplacingMergeTree`, `PARTITION BY toYYYYMMDD(occurred_at)`, `ORDER BY (tenant_id, site_id, zone_id, occurred_at, event_id)`; skipping indexes on `device_id`, `type` and `event_id`; `type` and `raw_code` use `LowCardinality`. Lookup by `event_id` is bounded by the requested interval, defaulting to the latest 90 days.
+4. **Retention:** TTL defaults are 7 days for all events, 90 days for significant events and relationships, and 400 days for incident facts. Configure them through `RetentionSettings` in `psim.config.v1`.
+5. **Topology:** Replicated engines and ClickHouse Keeper everywhere; one node and one Keeper on a single machine; one shard, two replicas and three Keepers on cluster infrastructure nodes.
+6. **Reads:** EventHistoryService and ReportService query ClickHouse. Every query is bounded by `tenant_id` (ADR-022) and a time interval.
+7. ClickHouse is not the domain source of truth. Tables can be rebuilt by replaying Kafka within topic retention or recomputing incident facts from PostgreSQL.
 
-## Последствия
+## Consequences
 
-- Сценарий «все события доступны для разбора» становится частью MVP; пункт X8 «вне MVP» сужается до BI-инструментов и произвольной аналитики.
-- Объём хранения истории при 50 000 событий/с снижается по сравнению с ADR-013, несмотря на хранение всех событий ([scaling.md](../architecture/scaling.md#5-сайзинг)).
-- В поставку добавляются ClickHouse и ClickHouse Keeper: установка, мониторинг, резервное копирование (шаги 9.1, 9.3, 9.4).
-- Миграции схем ClickHouse подчиняются правилам expand/contract (ADR-024).
+- Complete event history for investigation becomes part of MVP. Out-of-scope item X8 is narrowed to BI tools and arbitrary analytics.
+- History storage at 50,000 events/s decreases compared with ADR-013 despite retaining all events ([scaling.md](../architecture/scaling.md#5-capacity-planning)).
+- Distribution installation, monitoring and backups now include ClickHouse and ClickHouse Keeper.
+- ClickHouse migrations follow expand/contract rules (ADR-024).
 
-## Проверка
+## Verification
 
-Нагрузочный тест: вставка 50 000 событий/с; поиск за сутки по зоне ≤ 500 мс при полной нагрузке записи (DoD шага 5.4); отчёт за 30 суток ≤ 3 с (DoD шага 6.5).
+Load test: insert 50,000 events/s, search one day by zone within 500 ms under full write load, and generate a 30-day report within 3 s.

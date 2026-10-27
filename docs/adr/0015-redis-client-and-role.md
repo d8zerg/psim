@@ -1,52 +1,55 @@
-# ADR-015. Redis-совместимое хранилище, клиент и его роль
+# ADR-015. Redis-compatible store, client and responsibilities
 
-- **Статус:** Принято
-- **Шаг плана:** 2.5
-- **Связанные:** ADR-016, ADR-018, [deployment.md](../architecture/deployment.md#3-топология-кластер-на-vm)
+<!-- language-links -->
+[English](0015-redis-client-and-role.md) | [Русский](../ru/adr/0015-redis-client-and-role.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-016, ADR-018, [deployment.md](../architecture/deployment.md#3-cluster-on-vms-topology)
 
-Redis используется для реестра сессий коннекторов, ограничения частоты запросов и горячих проекций (лента). Исходный план предусматривал Redis Cluster. Redis распространяется под RSALv2/SSPL, с версии 8 - также под AGPLv3; поставка в составе коммерческого продукта под такими лицензиями нежелательна (ограничение «только открытые лицензии, допускающие поставку»).
+## Context
 
-## Рассмотренные варианты
+Redis stores connector sessions, rate limits and hot projections such as the feed. Redis uses RSALv2/SSPL and, from version 8, also AGPLv3. These licenses are undesirable for distribution within a commercial product under the requirement to use open licenses that permit distribution.
 
-### Сервер
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Server
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Redis 7.4+ / 8 | Оригинал | RSALv2/SSPL/AGPL - ограничения при поставке |
-| **Valkey** (форк Redis 7.2, BSD-3, Linux Foundation) | Открытая лицензия, совместимость протокола, активное развитие | - |
-| KeyDB, Dragonfly | Производительность | Dragonfly - BSL; KeyDB развивается слабо |
+| Redis 7.4+ / 8 | Original implementation | RSALv2/SSPL/AGPL impose distribution constraints |
+| **Valkey** (Redis 7.2 fork, BSD-3, Linux Foundation) | Open license, protocol compatibility, active development | - |
+| KeyDB, Dragonfly | Performance | Dragonfly uses BSL; limited KeyDB development |
 
-### Топология
+### Topology
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Redis Cluster (шардирование, план) | Масштаб по объёму | Объём данных MVP - мегабайты; клиент должен поддерживать маршрутизацию по слотам и перенаправления; многоключевые операции ограничены |
-| **Primary + 2 реплики под Sentinel** | Достаточно для объёма MVP; простой клиент; автоматическое переключение | Нет горизонтального масштаба записи (не требуется) |
+| Redis Cluster (sharding) | Scales storage capacity | MVP data occupies megabytes; clients need slot routing and redirects; multi-key operations are restricted |
+| **Primary + 2 replicas managed by Sentinel** | Sufficient MVP capacity; simple client; automatic failover | No horizontal write scaling, which is not required |
 
-### Клиент
+### Client
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Boost.Redis 1.90** | Asio-нативный, корутины, RESP3, конвейеризация; Boost уже закреплён в проекте | Обнаружение primary через Sentinel реализуется в платформенном слое; маршрутизации Cluster нет |
-| redis-plus-plus (hiredis) | Cluster и Sentinel | Асинхронный режим на libuv - чужой цикл событий |
+| **Boost.Redis 1.90** | Native Asio, coroutines, RESP3, pipelining; Boost is already pinned | The platform layer implements primary discovery through Sentinel; no Cluster routing |
+| redis-plus-plus (hiredis) | Cluster and Sentinel | Its asynchronous libuv mode uses a different event loop |
 
-## Решение
+## Decision
 
-1. Сервер - **Valkey**; в кластере - primary + 2 реплики под управлением Sentinel (3 экземпляра Sentinel на узлах инфраструктуры); на одной машине - один экземпляр. Выбранная топология заменяет исходное требование Redis Cluster в плане и критериях приёмки. Шардирование и обработка MOVED/ASK выходят за границы MVP; переход на Cluster потребует отдельного решения и адаптера за теми же сервисными портами.
-2. Клиент - Boost.Redis 1.90 за портом [`libs/platform/redis`](../../libs/platform/redis/README.md). RESP3, асинхронный DNS, TLS с проверкой CA и имени узла, ограниченные запросы/ответы и конвейеризация. Обнаружение primary через `SENTINEL get-master-addr-by-name` и проверка `ROLE` реализованы в платформенном слое по [спецификации клиента Sentinel](https://valkey.io/topics/sentinel-clients/). Учётные данные и параметры TLS Sentinel и хранилища независимы.
-3. **Роль:** Redis - не источник истины. Всё, что в нём хранится, восстановимо: реестр сессий - переподключением коннекторов, проекции - из Kafka и PostgreSQL, счётчики лимитов - допускают сброс. Потеря Redis деградирует функции, но не теряет данные.
+1. Use **Valkey**: a primary and 2 replicas managed by Sentinel in the cluster, with 3 Sentinel instances on infrastructure nodes; a single instance on one machine. HA uses Sentinel; Redis Cluster is outside the supported configuration. Sharding and MOVED/ASK handling are outside MVP scope; adopting Cluster requires a separate decision and an adapter behind the same service ports.
+2. Use Boost.Redis 1.90 behind [`libs/platform/redis`](../../libs/platform/redis/README.md): RESP3, asynchronous DNS, TLS with CA and hostname validation, bounded requests and responses, and pipelining. The platform layer implements `SENTINEL get-master-addr-by-name` discovery and `ROLE` validation according to the [Sentinel client specification](https://valkey.io/topics/sentinel-clients/). Sentinel and data-store credentials and TLS settings are independent.
+3. **Responsibilities:** Redis is not a source of truth. All its data is recoverable: connector reconnection restores the session registry; Kafka and PostgreSQL restore projections; rate-limit counters may reset. Losing Redis degrades functionality without losing durable data.
 
-## Последствия
+## Consequences
 
-- План, [deployment.md](../architecture/deployment.md) и критерии приёмки согласованы с топологией Sentinel.
-- Сервисы проверяются на работу при недоступности Redis (деградация, а не отказ обработки событий).
-- Ограниченный ленивый пул принадлежит одному шарду. Перед выдачей сохранённого соединения проверяется `ROLE`; после потери связи выполняется новое обнаружение primary. Повтор отправленной команды с неизвестным результатом запрещён: таймаут, отмена или разрыв возвращают ошибку и закрывают транспорт. Политику восстановления операции определяет сервис.
-- Репликация Valkey асинхронна: переключение может потерять последние изменения горячих данных. Счётчики ограничений допускают сброс, кэши имеют обязательный TTL, реестр сессий восстанавливается переподключением. Compare-and-renew/delete с токеном поколения защищает новую запись от старого владельца на текущем primary; это не распределённая блокировка и не основание авторизации.
-- Уведомления `PUBLISH` используют версионированный конверт, но не имеют гарантии доставки и истории ([семантика Pub/Sub](https://valkey.io/topics/pubsub/)). Надёжные события публикуются через Kafka и outbox.
-- Тестовый профиль `valkey-ha` изолирован от обычного локального Valkey. Он содержит primary, две реплики, три Sentinel и отдельный endpoint mTLS; производственная настройка quorum, ACL, TLS и размещения узлов относится к шагам 2.6 и 9.1.
+- [deployment.md](../architecture/deployment.md) and acceptance criteria use the Sentinel topology.
+- Services are tested with Redis unavailable: functionality degrades while event processing continues.
+- A bounded lazy pool belongs to one shard. Before reusing a connection, it checks `ROLE`; after connection loss it discovers the primary again. A sent command with an unknown outcome must not be retried: timeout, cancellation or disconnection returns an error and closes the transport. The service determines operation recovery policy.
+- Valkey replication is asynchronous: failover may lose recent hot-data changes. Rate-limit counters may reset, caches require a TTL, and connector reconnection restores sessions. Compare-and-renew/delete with a generation token protects a new entry from an old owner on the current primary; it is neither a distributed lock nor an authorization mechanism.
+- `PUBLISH` notifications use a versioned envelope but provide neither delivery guarantees nor history ([Pub/Sub semantics](https://valkey.io/topics/pubsub/)). Reliable events use Kafka and the outbox.
+- The `valkey-ha` test profile is isolated from the regular local Valkey. It contains a primary, two replicas, three Sentinels and a separate mTLS endpoint. Production quorum, ACL, TLS and node placement are described in the [topology guide](../engineering/deployment-topologies.md).
 
-## Проверка
+## Verification
 
-`task test:redis` проверяет автоматическое переключение primary при остановке его ответов под нагрузкой, повторное обнаружение через Sentinel, сетевой разрыв через Toxiproxy, дедлайны, ограничение памяти, атомарные лимиты, TTL, изоляцию тенантов, защиту сессий и доставку уведомлений. `task test:redis:sanitizers` выполняет компонентные сценарии под ASan/UBSan и TSan; `task test:component` проверяет покрытие модуля не ниже 75%. Системный хаос-тест S11 и размещение реплик на разных VM - последующие фазы.
+`task test:redis` checks automatic failover when the primary stops responding under load, Sentinel rediscovery, Toxiproxy network interruption, deadlines, memory limits, atomic limits, TTL, tenant isolation, session protection and notification delivery. `task test:redis:sanitizers` runs component scenarios under ASan/UBSan and TSan; `task test:component` checks module coverage of at least 75%. System chaos test S11 and replica placement on separate VMs require subsequent qualification.

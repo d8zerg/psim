@@ -1,46 +1,50 @@
-# Оболочка приложения
+# Application Shell
 
-Решение: [ADR-069](../adr/0069-application-shell-and-session-recovery.md). Оболочка объединяет вход, навигацию, состояние сессии и восстановление ленты.
+<!-- language-links -->
+[English](application-shell.md) | [Русский](../ru/engineering/application-shell.md)
+<!-- /language-links -->
 
-## Маршруты
+Solution: [ADR-069](../adr/0069-application-shell-and-session-recovery.md). The shell combines login, navigation, session state, and realtime recovery.
 
-| Маршрут | Модуль | Роли навигации |
+## Routes
+
+| Route | Module | Navigation Roles |
 |---|---|---|
-| `/` | Рабочее место оператора | operator, supervisor |
-| `/admin` | Администрирование | admin |
-| `/integrations` | Интеграции | admin, integrator |
-| `/audit` | Аудит | auditor |
-| `/reports` | Отчёты | manager, supervisor |
+| `/` | Operator Workspace | operator, supervisor |
+| `/admin` | Administration | admin |
+| `/integrations` | Integrations | admin, integrator |
+| `/audit` | Audit | auditor |
+| `/reports` | Reports | manager, supervisor |
 
-После входа в `/` пользователь без операторского модуля переходит в первый доступный модуль. Прямой вход сохраняет выбранный путь; ручной переход к закрытому модулю показывает отказ. Неизвестный путь сохраняет доступную навигацию и показывает отсутствие страницы. Настройки ru/en, темы и плотности остаются общими. Навигация переводит фокус в содержимое; обновление ленты не переводит фокус.
+After entering `/`, a user without an operator module transitions to the first available module. Direct entry retains the selected route; manual navigation to a unavailable module results in an error. Unknown routes retain navigation but show no page. Settings for ru/en, themes, and density remain the same. Navigation focuses on content; stream updates do not shift focus.
 
-Предметные экраны администрирования, аудита и отчётности подключаются отдельно. Входные страницы обозначают назначение модулей и не предлагают имитируемых рабочих действий. Операторская лента использует существующие REST и realtime. Пользователь без операторского модуля не открывает её API и WSS-подписку. Переходы оператора между разделами сохраняют один канал.
+Administration, audit, and reporting panels are connected separately. Entry pages indicate module purposes and do not offer simulated functions. The operator stream uses existing REST and realtime protocols. Users without an operator module do not access its APIs or WSS subscriptions. Operator transitions between sections maintain a single channel.
 
-## Сессия
+## Session
 
-`window.psimConfig.issuer` задаёт точный issuer Keycloak без завершающего `/`. В рабочем размещении используется HTTPS; loopback и изолированное окружение разработки сохраняют локальную настройку. Public client - `psim-console`, аудитория API - `psim`, алгоритм подписи ID token - RS256. Callback допускается только для того же origin и пути, на котором начат вход. Keycloak должен разрешать соответствующие redirect URI и web origins.
+`window.psimConfig.issuer` sets the exact Keycloak issuer URL without ending with `/`. In production, HTTPS is used; loopback and isolated development environments retain local settings. Public client is `psim-console`, API audience is `psim`, and ID token signing algorithm is RS256. Callback is only allowed for the same origin and route where entry began. Keycloak must allow appropriate redirect URIs and web origins.
 
-Access и refresh token не сохраняются в localStorage или sessionStorage. Перезагрузка страницы требует нового входа через текущую сессию Keycloak. Только verifier, state, nonce и параметры незавершённого PKCE находятся в sessionStorage; callback удаляет их до обмена кода. Строки токенов, диагностические ответы провайдера и параметры callback не отображаются в сообщениях об ошибках.
+Access and refresh tokens are not stored in localStorage or sessionStorage. Reloading a page requires sign-in again through the current Keycloak session. Only verifier, state, nonce, and incomplete PKCE parameters are in sessionStorage; callback removes them before code exchange. Token strings, provider diagnostic responses, and callback parameters are not displayed in error messages.
 
-Refresh объединяет конкурентные обращения. Временная недоступность Keycloak сохраняет возможность повтора; invalid_grant и некорректный ответ завершают локальную сессию. Выход очищает данные до ответа Keycloak и уведомляет другие вкладки. При недоступности IdP локальные данные остаются очищенными; интерфейс сообщает ошибку завершения сессии.
+Refresh combines concurrent requests. Temporary unavailability of Keycloak retains the ability to retry; invalid_grant and incorrect responses end the local session. Exit clears data before Keycloak response and notifies other tabs. If IdP is unavailable, local data remains cleared; the interface reports session termination error.
 
-## Восстановление
+## Restoration
 
-Канал проверяет доступность ping/pong и обновляет токен до окончания его срока. Повторная аутентификация возобновляет подписки с последнего применённого курсора. Начальный интервал повтора - 500 мс, максимум - 30 секунд, с разбросом; online вызывает немедленный повтор. Количество попыток не ограничено временем разрыва.
+The channel checks ping/pong availability and updates tokens until they expire. Re-authentication resumes subscriptions from the last applied cursor. Initial retry interval is 500 ms, maximum is 30 seconds, with jitter; the online event triggers an immediate retry. There is no fixed retry count.
 
-Сетевой разрыв сохраняет строки и явно помечает их последними известными данными. Отказ начального снимка и ResyncRequired повторяют чтение автоматически; кнопка обновления ускоряет попытку. Строки старой сессии, поздние HTTP-ответы и сообщения отсоединённого сокета не применяются.
+Network interruption retains rows and explicitly marks them as last known data. Failure of initial snapshot and ResyncRequired automatically repeat reading; update button speeds up attempts. Rows from old sessions, late HTTP responses, and disconnected socket messages are not used.
 
-`accessContext` курсора связывает разрешённый снимок с текущей серверной областью. Если она изменилась, прежние строки очищаются до нового снимка. Истечение JWT само по себе не меняет этот контекст и не требует нового снимка. При превышении окна восстановления также загружается новый согласованный снимок. Серверная [семантика realtime](realtime.md) определяет retention и бюджеты replay.
+`accessContext` cursor links the authorized snapshot with the current server access scope. If it changes, previous rows are cleared until the new snapshot. JWT expiration alone does not change this context and does not require a new snapshot. When the restoration window expires, a new consistent snapshot is also loaded. The server’s [realtime semantics](realtime.md) determine retention and replay budgets.
 
-В debug-журнале Gateway событие `Realtime connection closed` содержит ограниченную причину закрытия. `authorization-refresh-failed` с кодом указывает отказ проверки, `authorization-scope-changed` - изменение области, `token-expired` - окончание срока, `write-timeout` - тайм-аут отправки. Bearer и содержимое кадров в это событие не входят. Отправка ожидает завершения проверки прав; неактуальные права не разрешают передачу очереди.
+In the Gateway debug log, event `Realtime connection closed` contains limited reasons for closure. `authorization-refresh-failed` with code indicates verification failure, `authorization-scope-changed` - access scope change, `token-expired` - expiration, `write-timeout` - timeout of sending. Bearer and frame content are not included in this event. Sending awaits verification of rights; outdated rights do not allow queue transmission.
 
-Импорт realm и подготовка стенда включают ротацию refresh token: `revokeRefreshToken=true`, `refreshTokenMaxReuse=0`. Подготовка обновляет эти параметры и в существующем локальном realm; повторный импорт всего realm не требуется.
+Importing realm and preparing the test environment include rotating refresh tokens: `revokeRefreshToken=true`, `refreshTokenMaxReuse=0`. Preparation updates these parameters in the existing local realm; re-importing the entire realm is not required.
 
-## Проверки и артефакты
+## Checks and Artifacts
 
-- `task web:check` - модульные проверки с покрытием, маршруты и доступность в браузере, прежняя визуальная регрессия, бюджеты загрузки.
-- `task shell:test` - реальная инфраструктура и браузер, PKCE, 300000 мс без сети, истёкший access token, доставка изменений за время разрыва и перезапуск Gateway. `SHELL_PROJECT` задаёт отдельный проект Docker Compose.
-- `task realtime:test` - два Gateway, проверка контекста курсора, отказов авторизации, WSS, повторов и чтения Kafka.
-- `task realtime:sanitizers` - нативные проверки и реальные процессы под ASan/UBSan и TSan.
+- `task web:check` - module-level checks with coverage, routes, and browser accessibility, previous visual regression, loading budgets.
+- `task shell:test` - real infrastructure and browser, PKCE, 300,000 ms without network, expired access token, delivery of changes during interruption, and restarting Gateway. `SHELL_PROJECT` sets up a separate Docker Compose project.
+- `task realtime:test` - two Gateways, checking cursor context, authentication failures, WSS, retries, and reading Kafka.
+- `task realtime:sanitizers` - native checks and real processes under ASan/UBSan and TSan.
 
-`build/event-flow-test/baseline.json` содержит длительность разрыва и сверку эффектов, `playwright.log` - браузерный результат. `build/shell-assets.json` содержит полные графы JS и ограничения; начальная загрузка каждого языка проверяется отдельно. Скриншоты и обычные тестовые трассы содержат только данные изолированного стенда.
+`build/event-flow-test/baseline.json` contains duration of interruption and effect comparison, `playwright.log` - browser results. `build/shell-assets.json` contains complete JS graphs and restrictions; initial loading of each language is checked separately. Screenshots and normal test traces contain only data from isolated tests.

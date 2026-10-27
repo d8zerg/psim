@@ -1,51 +1,55 @@
-# Слой Valkey/Redis
+# Valkey/Redis Layer
 
-Шаг 2.5, [ADR-015](../../../docs/adr/0015-redis-client-and-role.md). Цель CMake - `psim::platform_redis`, пространство имён - `psim::platform::redis`.
+<!-- language-links -->
+[English](README.md) | [Русский](../../../docs/ru/repository/libs/platform/redis/README.md)
+<!-- /language-links -->
 
-Boost.Redis 1.90 работает на Asio без второго цикла событий и блокирующего клиента. Используется уже закреплённый пакет Boost; реализация Boost.Redis компилируется один раз внутри библиотеки. Поддерживаются standalone Valkey и primary с репликами под Sentinel. Маршрутизация Redis Cluster, MOVED/ASK и шардирование не реализованы в MVP.
+[ADR-015](../../../docs/adr/0015-redis-client-and-role.md). The CMake target is `psim::platform_redis`, and the namespace is `psim::platform::redis`.
 
-## Интерфейсы
+Boost.Redis 1.90 operates with Asio without a second event loop and a blocking client. It uses an already compiled Boost package; the implementation of Boost.Redis is compiled once within the library. Standalone Valkey and primary replicas with Sentinel are supported. Routing of Redis Cluster, MOVED/ASK, and sharding are not implemented in MVP.
 
-| Заголовок | Назначение |
+## Interfaces
+
+| Title | Purpose |
 |---|---|
-| [connection.hpp](include/psim/platform/redis/connection.hpp) | RESP3, бинарные параметры, упорядоченный pipeline, TLS и обнаружение primary |
-| [pool.hpp](include/psim/platform/redis/pool.hpp) | Ленивый пул с ограничением соединений, FIFO-ожиданием и RAII-арендой |
-| [serde.hpp](include/psim/platform/redis/serde.hpp) | Версионированный конверт байтов/Protobuf и ключи с изоляцией тенантов |
-| [patterns.hpp](include/psim/platform/redis/patterns.hpp) | Кэш, атомарные лимиты, TTL-реестр сессий и публикация уведомлений |
+| [connection.hpp](include/psim/platform/redis/connection.hpp) | RESP3, binary parameters, ordered pipeline, TLS, and primary detection |
+| [pool.hpp](include/psim/platform/redis/pool.hpp) | Lazy pool with connection limits, FIFO waiting, and RAII leasing |
+| [serde.hpp](include/psim/platform/redis/serde.hpp) | Versioned byte/Protobuf container and tenant-isolated keys |
+| [patterns.hpp](include/psim/platform/redis/patterns.hpp) | Cache, atomic limits, TTL session registry, and notification publishing |
 
-Все ошибки возвращаются как `Result<T>` из каталога платформы. Диагностика сервера, ключи, значения, пароли и пути сертификатов не попадают в сообщения ошибок. Для серверных ошибок остаётся только известная категория, например `WRONGTYPE` или `READONLY`.
+All errors are returned as `Result<T>` from the platform error catalog. Server diagnosis, keys, values, passwords, and certificate paths are not included in error messages. For server errors, only known categories are used, such as `WRONGTYPE` or `READONLY`.
 
-## Соединения и Sentinel
+## Connections and Sentinel
 
-`ConnectionOptions` задаёт endpoint, учётные данные, параметры TLS, общий бюджет подключения и дедлайн команды. TLS включён по умолчанию: проверяются цепочка и имя сервера, разрешены TLS 1.2 и выше. Для разработки plaintext задаётся явно через `tls.enabled = false`. Можно задать CA, клиентский сертификат/ключ и имя сервера. У Sentinel отдельные credentials и TLS-настройки.
+`ConnectionOptions` specifies the endpoint, credentials, TLS parameters, overall connection budget, and command deadline. TLS is enabled by default: the server chain and name are checked, TLS 1.2 and above are allowed. For plaintext development, it is specified explicitly through `tls.enabled = false`. A CA, client certificate/key, and server name can be set. Sentinel has separate credentials and TLS settings.
 
-Непустой `sentinel.endpoints` включает обнаружение primary: клиент обращается к Sentinel по очереди, получает адрес через `get-master-addr-by-name`, подключается и проверяет `ROLE`. Устаревший адрес реплики отвергается; недоступный Sentinel не мешает попробовать следующий. Имена, которые возвращает Sentinel, должны разрешаться из сети сервиса и присутствовать в сертификатах узлов.
+A non-empty `sentinel.endpoints` includes primary detection: the client contacts Sentinel in turn, receives the address through `get-master-addr-by-name`, connects, and checks `ROLE`. An outdated replica address is rejected; an unavailable Sentinel does not prevent trying the next one. Names returned by Sentinel must be allowed in the service network and present in node certificates.
 
-Автоматическое переподключение Boost.Redis выключено. После отправки команды таймаут, отмена или сетевой разрыв могут означать неизвестный результат записи. Библиотека закрывает соединение и возвращает ошибку; команда не воспроизводится автоматически. Pipeline сохраняет порядок результатов, но не является транзакцией: серверная ошибка одной команды не отменяет остальные. Такие ошибки возвращаются отдельными `Reply::Kind::kError`.
+Automatic reconnection of Boost.Redis is disabled. A timeout, cancellation, or network failure after sending a command may indicate an unknown write outcome. The library closes the connection and returns an error; the command is not automatically repeated. The pipeline maintains the order of results but is not a transaction: a server error in one command does not cancel others. Such errors are returned separately as `Reply::Kind::kError`.
 
-Пул создаётся на каждый шард и используется только на его executor. По умолчанию доступны 8 соединений и 5 секунд на получение аренды, включая проверку сохранённого соединения и подключение нового. Перед выдачей соединения проверяется `ROLE`; после разрыва или смены роли оно отбрасывается, а primary снова обнаруживается через Sentinel. `close()` будит ожидающих; уже выданная аренда живёт до завершения операции.
+The pool is created for each shard and used only by its executor. By default, 8 connections are available, with a 5-second wait for leasing, including checking the saved connection and connecting to a new one. Before providing a connection, `ROLE` is checked; after a break or role change, it is discarded, and the primary is re-detected through Sentinel. `close()` wakes up waiting ones; an already leased lease lasts until the operation is completed.
 
-На одном соединении одновременно выполняется одна операция; параллельные операции получают отдельные аренды. Изменяющие состояние соединения команды AUTH/SELECT/MULTI/WATCH/SUBSCRIBE и команды блокирующего ожидания данных запрещены в этом API. Нужные приложению команды должны разрешаться ACL хранилища; серверное администрирование не является назначением пула.
+One operation is executed simultaneously on one connection; parallel operations get separate leases. Commands that change the state of connections such as AUTH/SELECT/MULTI/WATCH/SUBSCRIBE and blocking data wait commands are prohibited in this API. Applications must allow the ACL of the storage to execute commands; server administration is not the purpose of the pool.
 
-Ограничения: 1024 команды в pipeline, 4 МиБ на закодированный запрос, по умолчанию 4 МиБ на данные ответа, 8192 узла RESP3 и глубина 32. Адаптер проверяет пределы до копирования очередного узла; сетевой буфер также ограничен. Максимальный полезный payload конверта - 1 МиБ. Для выборок сервис дополнительно ограничивает число результатов.
+Limitations: 1024 commands in the pipeline, 4 MiB for encoded requests, 4 MiB by default for response data, 8192 RESP3 nodes, and depth 32. The adapter checks limits before copying the next node; the network buffer is also limited. The maximum useful serialized payload is 1 MiB. For samples, the service additionally limits the number of results.
 
-## Горячие данные
+## Hot Data
 
-`Keyspace(service, tenant)` требует непустые сегменты и строит ключи с длиной каждого сегмента. Двоичные данные и разделители внутри идентификаторов не создают коллизий. Разные tenant и назначения `cache`, `limit`, `session`, `notification` изолированы. Каждый сегмент ограничен 512 байтами.
+`Keyspace(service, tenant)` requires non-empty segments and builds keys with each segment’s length. Binary data and separators within identifiers do not cause collisions. Different tenants and purposes `cache`, `limit`, `session`, `notification` are isolated. Each segment is limited to 512 bytes.
 
-`Cache` возвращает промах как пустой `optional`, а недоступность хранилища - как ошибку. Запись имеет обязательный TTL от 1 мс до 30 дней. `put/get` работают с байтами, включая пустые и не-UTF-8 значения. `put_encoded/get_encoded` принимают конверт; `encode_protobuf` и `decode_protobuf<T>` проверяют версию, формат, размер и полное имя типа сообщения. Повреждение значения и несовпадение схемы не маскируются под промах.
+`Cache` returns a cache miss as an empty `optional`, and storage unavailability as an error. The record has a mandatory TTL from 1 ms to 30 days. `put/get` works with bytes, including empty and non-UTF-8 values. `put_encoded/get_encoded` accepts containers; `encode_protobuf` and `decode_protobuf<T>` check version, format, size, and full message name. Damage to the value and mismatch with the schema are not masked as cache misses.
 
-`RateLimiter::consume` атомарно выполняет Lua-скрипт: окно начинается с первого принятого запроса, TTL задаёт сервер, счётчик увеличивается только до лимита. Результат содержит решение, число принятых запросов и оставшееся время окна. Лимит - от 1 до 1 млрд; TTL имеет те же границы. Приложение явно выбирает поведение при недоступности: разрешать деградацию для некритичного лимита или отказывать для чувствительной операции.
+`RateLimiter::consume` atomically executes a Lua script: the window starts with the first received request, TTL is set by the server, and the counter only increases up to the limit. The result includes the decision, number of accepted requests, and remaining time of the window. The limit is from 1 to 1 billion; TTL has the same limits. The application explicitly chooses behavior when unavailable: allowing degradation for non-critical limits or refusing for sensitive operations.
 
-`TokenBucket::consume` сохраняет общий burst и непрерывно пополняет запас по времени Valkey. Ключи `bucket` отделены от фиксированных окон `limit`. Все клиенты одного ключа должны задавать одинаковые rate и burst; несовпадение возвращает ошибку. TTL соответствует времени полного пополнения, максимум 30 дней. После исчезновения клиента bucket удаляется; перезапуск клиента не создаёт новый запас. Обратный ход времени не добавляет токены. Потеря данных хранилища допускает сброс счётчика. API Gateway использует этот механизм для общей квоты пользователя внутри тенанта и возвращает 503 при ошибке хранилища.
+`TokenBucket::consume` maintains a shared burst capacity and continuously replenishes tokens at Valkey time. Keys `bucket` are separated from fixed windows `limit`. All clients of one key must set the same rate and burst; mismatch returns an error. TTL corresponds to the time of full replenishment, up to 30 days. After inactivity, the bucket expires; restarting a client does not create a new token balance. Backtracking time does not add tokens. Loss of data in the storage allows resetting the counter. API Gateway uses this mechanism for the user’s overall quota within the tenant and returns 503 when the storage fails.
 
-`SessionRegistry` хранит gateway и токен поколения подключения. `claim` использует NX + TTL, `renew` и `release` атомарно сравнивают запись перед изменением. Старое подключение не может продлить или удалить запись нового владельца. Для каждого подключения gateway создаёт свежий непредсказуемый токен; поля записи должны быть корректным UTF-8 и не превышать 512 байт. Запись служит подсказкой маршрутизации; проверка актуальной сессии и прав выполняется gateway.
+`SessionRegistry` stores the gateway and connection generation token. `claim` uses NX + TTL, `renew` and `release` atomically compare the record before changing it. An old connection cannot extend or delete the record of a new owner. For each connection, the gateway creates a fresh and unpredictable token; the record fields must be correct UTF-8 and not exceed 512 bytes. The record serves as a hint for routing; checking the active session and rights is done by the gateway.
 
-`Notifications::publish` отправляет версионированный конверт в канал текущего тенанта и возвращает число подписчиков. Число подписчиков не подтверждает обработку сообщения. Получатель использует RESP3 Pub/Sub и `decode`; подписка и её восстановление принадлежат транспортному адаптеру сервиса. Pub/Sub не хранит сообщения и не гарантирует доставку.
+`Notifications::publish` sends the versioned container to the current tenant’s channel and returns the number of subscribers. The number of subscribers does not confirm message processing. The recipient uses RESP3 Pub/Sub and `decode`; subscription and its restoration belong to the service transport adapter. Pub/Sub does not store messages and does not guarantee delivery.
 
-Valkey не является источником истины. Репликация асинхронна, последние изменения могут исчезнуть при переключении. Сервисы восстанавливают кэш из PostgreSQL/Kafka, сессии - переподключением, счётчики допускают сброс. Защита от старого владельца не превращает реестр в распределённую блокировку. Для надёжных событий используются Kafka и transactional outbox.
+Valkey is not the source of truth. Replication is asynchronous, and recent changes may disappear upon switching. Services restore cache from PostgreSQL/Kafka, sessions are reconnected, and counters can be reset. Protection against the previous owner does not convert the registry into a distributed lock. For reliable events, Kafka and transactional outbox are used.
 
-## Пример
+## Example
 
 ```cpp
 redis::ConnectionOptions options;
@@ -61,11 +65,11 @@ if (!saved) {
 auto cached = co_await cache.get(resource_id);
 ```
 
-Для отдельного соединения мониторинга `require_primary=false` разрешает чтение реплик и Sentinel без проверки доступности записи. Пулы рабочих клиентов сохраняют проверку primary.
+For separate monitoring connections, `require_primary=false` allows reading replicas and Sentinels without checking the writability. Work client pools retain the primary check.
 
-Для Sentinel заполняются `options.sentinel.endpoints`, `primary_name`, credentials и TLS. Статический endpoint используется только без Sentinel. Конфигурация и получение секретов остаются у сервисного адаптера.
+For Sentinels, `options.sentinel.endpoints`, `primary_name`, credentials, and TLS are filled in. The static endpoint is used only without Sentinels. Configuration and secret retrieval remain with the service adapter.
 
-## Проверка
+## Verification
 
 ```text
 task env:up
@@ -74,6 +78,6 @@ task test:redis:sanitizers
 task test:component
 ```
 
-Задачи запускают изолированный профиль `valkey-ha` с primary, двумя репликами, тремя Sentinel и отдельным mTLS-endpoint. Каждый запуск начинает с чистой тестовой топологии. Обычный локальный `valkey` и его данные остаются отдельными. В HA-сценарии текущий primary прекращает отвечать, Sentinel автоматически повышает реплику, а пул возобновляет записи под нагрузкой. Проверяются также Toxiproxy-разрыв, отсутствие автоматического повтора записи, лимиты памяти, TTL, атомарность лимитов, токены сессий, Protobuf и уведомления. Покрытие модуля проверяется совместно с модульными тестами, порог - 75%.
+Tasks run from an isolated profile `valkey-ha` with a primary, two replicas, three Sentinels, and a separate mTLS-endpoint. Each run starts with a clean test topology. The usual local `valkey` and its data remain separate. In HA scenario, the current primary stops responding, Sentinels automatically raises the replica, and the pool resumes writes under load. Also verified are Toxiproxy breaks, absence of automatic write retries, memory limits, TTL, atomicity of limits, session tokens, Protobuf, and notifications. Module coverage is checked together with module tests, with a threshold of 75%.
 
-Проверка TLS и доверия выполняется компонентными тестами; эксплуатационные ACL, ротация сертификатов, размещение на разных VM и системный сценарий S11 относятся к шагам 2.6 и 9.1.
+TLS and trust verification are performed with component tests; operational ACLs, certificate rotation, placement on different VMs, and system scenario S11 are covered by [trust procedures](../../../docs/security/platform-trust.md) and [deployment qualification](../../../docs/engineering/deployment-topologies.md).

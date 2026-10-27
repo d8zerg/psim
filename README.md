@@ -1,43 +1,47 @@
 # Open-Source PSIM Platform
 
-Открытая вендор-нейтральная платформа управления ситуациями в физической безопасности (PSIM, Physical Security Information Management). Объединяет события охранных и пожарных систем, СКУД, видеоаналитики и инженерной инфраструктуры в единый процесс: обнаружение ситуации, реагирование, закрытие инцидента и отчёт.
+<!-- language-links -->
+[English](README.md) | [Русский](docs/ru/repository/README.md)
+<!-- /language-links -->
 
-Платформа предназначена для служб безопасности, ситуационных центров и интеграторов. Рассчитана на самостоятельное развёртывание в локальной или облачной инфраструктуре. Серверная часть написана на C++, веб-консоль - на React и TypeScript. Лицензия - [MIT](LICENSE).
+An open-source vendor-neutral platform for managing physical security situations (PSIM, Physical Security Information Management). It integrates events from security and fire protection systems, SCADA, video analytics, and engineering infrastructure into a unified process: incident detection, response, closure, and reporting.
 
-[Быстрый старт](#быстрый-старт) · [Документация](docs/README.md) · [Архитектура](docs/architecture/README.md) · [План разработки](docs/psim-mvp-development-plan.md) · [Участие](CONTRIBUTING.md)
+The platform is designed for security services, incident centers, and integrators. It can be deployed independently on local or cloud infrastructure. The server side is written in C++, while the web console is built with React and TypeScript. License: [MIT](LICENSE).
 
-## Возможности
+[Quick Start](#quick-start) · [Documentation](docs/README.md) · [Architecture](docs/architecture/README.md) · [Release Status](docs/product/release-readiness.md) · [Participation](CONTRIBUTING.md)
 
-- **Интеграция оборудования.** Протокол коннекторов по gRPC, C++ SDK, дисковая буферизация и досылка событий. В репозитории доступны симулятор и эталонный Webhook/HTTP-коннектор.
-- **Обработка событий.** Нормализация, обогащение, дедупликация, история и поиск. Корреляция по условиям, временным окнам, последовательностям и отсутствию событий.
-- **Работа с инцидентами.** Общая лента, планы объектов и состояние устройств, назначение ответственных, подтверждённая передача ответственности и обновления через WebSocket.
-- **Реагирование.** Сценарии, чек-листы, команды на устройства, контроль SLA, эскалации и уведомления.
-- **Аудит и отчётность.** История действий с цепочкой хэшей и проверкой целостности, экспорт, показатели MTTA, MTTR и соблюдения SLA.
-- **Администрирование и эксплуатация.** Каталог объектов и устройств, ролевой доступ, обслуживание, диагностика, управление сертификатами, резервное копирование и восстановление.
-- **Ассистент и учения.** Сводки по разрешённым источникам, подключение локального провайдера модели и изолированные учебные сценарии.
+## Features
 
-Подробности: [назначение продукта](docs/product/product-brief.md), [роли и рабочие сценарии](docs/product/roles-and-journeys.md), [границы MVP](docs/product/mvp-scope.md).
+- **Device integration.** gRPC protocol for connectors, C++ SDK, disk buffering, and event delivery. The repository includes a simulator and standard Webhook/HTTP connectors.
+- **Event processing.** Normalization, enrichment, deduplication, history, and search. Correlation based on conditions, time windows, sequences, and absence of events.
+- **Incident handling.** Unified feed, floor plans, device status, assignment of responsible parties, confirmed transfer of responsibility, and updates via WebSocket.
+- **Response management.** Scenarios, checklists, commands to devices, SLA control, escalation, and notifications.
+- **Audit and reporting.** History of actions with hash chain and integrity checks, export, MTTA/MTTR metrics, and SLA compliance.
+- **Administration and operation.** Object and device catalog, role-based access, maintenance, diagnosis, certificate management, backup, and restoration.
+- **Assistants and exercises.** Summaries from authorized sources, connection to local model provider, and isolated training scenarios.
 
-## Состояние проекта
+Details: [Product description](docs/product/product-brief.md), [Roles and working scenarios](docs/product/roles-and-journeys.md), [MVP boundaries](docs/product/mvp-scope.md).
 
-Проект находится в разработке MVP. Реализованы основные серверные сервисы, операторская консоль, интерфейсы администрирования, аудита и отчётов. Доступен локальный сквозной стенд: событие от коннектора проходит через обработку и отображается как инцидент в браузере.
+## Project Status
 
-До выпуска остаются полная сквозная верификация и эксплуатационная приёмка. В частности, ещё не подтверждены обновление и откат под целевой нагрузкой 50 000 событий/с, а также полное восстановление обеих топологий с независимым целевым хранилищем и измерением RPO/RTO. Реализация инструментов и результаты локальных проверок отражены в [журнале прогресса](docs/progress.md); критерии готовности - в [плане разработки](docs/psim-mvp-development-plan.md) и [спецификации приёмки](docs/product/acceptance-spec.md).
+The project is in MVP development stage. Basic server services, operator console, administration, audit, and reporting interfaces are implemented. A local test environment is available: events from the connector are processed and displayed as incidents in the browser.
 
-## Быстрый старт
+Full cross-verification and operational testing remain to be completed. Specifically, upgrades and rollback under 50,000 events per second have not been confirmed, nor has full restoration of both topologies with independent target storage and RPO/RTO measurement. Implemented functions and unconfirmed conditions are listed in [Release Status](docs/product/release-readiness.md); ongoing criteria are in [Quality Registry](docs/quality/requirements.yaml) and [Acceptance Specifications](docs/product/acceptance-spec.md).
 
-Локальный стенд позволяет проверить путь события от симулятора до операторской ленты без подключения реального оборудования.
+## Quick Start
 
-### Требования
+The local test environment allows testing the path from the simulator to the operator feed without connecting to real devices.
 
-Разработка, сборка и тестирование выполняются на Linux с нативным Docker Engine и плагином Docker Compose. На хосте нужны:
+### Requirements
+
+Development, build, and testing are performed on Linux with native Docker Engine and Docker Compose. The host requires:
 
 - Git.
-- [Docker Engine и Docker Compose](https://docs.docker.com/engine/install/debian/).
-- Python 3 с PyYAML, доступным для `python3 -I`.
+- [Docker Engine and Docker Compose](https://docs.docker.com/engine/install/debian/).
+- Python 3 with PyYAML, available for `python3 -I`.
 - [Task 3.x](https://taskfile.dev/docs/installation).
 
-Проверка окружения:
+Environment check:
 
 ```bash
 docker info
@@ -46,7 +50,7 @@ task --version
 python3 -I -c "import yaml; print(yaml.__version__)"
 ```
 
-### Запуск стенда
+### Starting the test environment
 
 ```bash
 git clone https://github.com/d8zerg/psim.git
@@ -55,173 +59,155 @@ task flow:up
 task flow:emit COUNT=3
 ```
 
-`task flow:up` собирает необходимые компоненты и запускает инфраструктуру и прикладные процессы. `task flow:emit` отправляет синтетические тревоги через mTLS-коннектор.
+`task flow:up` builds the required components and runs infrastructure and application processes. `task flow:emit` sends synthetic alarms through mTLS connector.
 
-Откройте [http://localhost:4173](http://localhost:4173), нажмите **Sign in** и войдите с учётной записью разработки:
+Open [http://localhost:4173](http://localhost:4173), click **Sign in** and log in with the development account:
 
-| Поле | Значение |
+| Field | Value |
 |---|---|
-| Логин | `operator1` |
-| Пароль | `psim-dev-Passw0rd` |
+| Login | `operator1` |
+| Password | `psim-dev-Passw0rd` |
 
-В операторской ленте появятся инциденты, сформированные из отправленных событий. Адреса сервисов и учётные данные локального окружения выводит `task env:endpoints`.
+In the operator feed, incidents formed from sent events will appear. Service addresses and local environment credentials are provided by `task env:endpoints`.
 
-### Остановка стенда
+### Stopping the test environment
 
 ```bash
 task flow:down
 task env:down
 ```
 
-Первая команда останавливает прикладные процессы, вторая - инфраструктуру с сохранением данных. Состав стенда, тестовая конфигурация и сквозные проверки описаны в [руководстве сквозного потока](docs/engineering/event-flow.md).
+The first command stops application processes, the second stops infrastructure with data preserved. The composition of the test environment, test configuration, and cross-verification are described in [End-to-end event flow guide](docs/engineering/event-flow.md).
 
-## Архитектура и стек
+## Architecture and Stack
 
-Основные потоки: приём событий, формирование инцидентов, работа оператора и исполнение сценариев реагирования.
+Main flows: event reception, incident formation, operator operation, and response scenario execution.
 
-```mermaid
-flowchart TB
-    subgraph INPUT[1. Приём событий]
-        direction LR
-        SRC["Системы безопасности<br/>Охрана, пожар, СКУД, видеоаналитика"]
-        CON["Коннекторы<br/>Буферизация и досылка"]
-        GW["Connector Gateway<br/>Проверка и приём пакетов"]
-        SRC --> CON
-        CON -->|gRPC / mTLS| GW
-    end
-
-    subgraph PROCESS[2. Обработка событий через Kafka]
-        direction LR
-        NORM["Нормализация<br/>Обогащение и дедупликация"]
-        CORR["Корреляция<br/>Условия, окна, последовательности"]
-        INC["Инциденты<br/>Создание, назначение, закрытие"]
-        NORM -->|События| CORR
-        CORR -->|Сигналы| INC
-    end
-
-    subgraph RESPONSE[Реагирование]
-        direction TB
-        RESP["Сценарии<br/>Чек-листы, таймеры, SLA"]
-        CMD["Команды оборудованию<br/>Доставка через коннекторы<br/>и контроль результата"]
-        NOTIFY["Уведомления<br/>Получатели и эскалации"]
-        RESP --> CMD
-        RESP --> NOTIFY
-    end
-
-    subgraph OPERATOR[Работа оператора]
-        direction TB
-        READ["Проекции консоли<br/>Лента, планы, состояние устройств"]
-        API["API Gateway<br/>Авторизация и realtime"]
-        UI["Веб-консоль<br/>Инциденты и шаги реагирования"]
-        READ -->|Снимки| API
-        API <-->|REST / WebSocket| UI
-    end
-
-    subgraph RECORDS[История и контроль]
-        direction TB
-        HISTORY["История событий<br/>Поиск и связи с инцидентами"]
-        AUDIT["Аудит действий<br/>Цепочка хэшей и проверка"]
-        REPORTS["Отчёты по инцидентам<br/>MTTA, MTTR, соблюдение SLA"]
-    end
-
-    INPUT -->|Kafka: исходные события| PROCESS
-    PROCESS -->|Инциденты| RESPONSE
-    PROCESS -->|События и изменения| OPERATOR
-    PROCESS -->|События и действия| RECORDS
-
-    classDef integration fill:#f1f5f9,stroke:#64748b,color:#0f172a
-    classDef processing fill:#eff6ff,stroke:#2563eb,color:#1e3a8a
-    classDef operator fill:#f0fdfa,stroke:#0d9488,color:#134e4a
-    classDef response fill:#fff7ed,stroke:#ea580c,color:#7c2d12
-    classDef records fill:#faf5ff,stroke:#9333ea,color:#581c87
-    class SRC,CON,GW integration
-    class NORM,CORR,INC processing
-    class READ,API,UI operator
-    class RESP,CMD,NOTIFY response
-    class HISTORY,AUDIT,REPORTS records
-    style INPUT fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    style PROCESS fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    style RESPONSE fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    style OPERATOR fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
-    style RECORDS fill:#f8fafc,stroke:#cbd5e1,color:#0f172a
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam shadowing false
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 50
+top to bottom direction
+package "Event ingestion" as INPUT #F1F5F9 {
+ rectangle "Security Systems" as SRC
+ rectangle "Connectors\nBuffering and delivery" as CON
+ rectangle "Connector Gateway\nBatch validation" as GW
+ SRC --> CON
+ CON --> GW : gRPC / mTLS
+}
+package "Event Processing" as PROCESS #EFF6FF {
+ rectangle "Normalizer\nEnrichment and deduplication" as NORM
+ rectangle "Correlation Engine\nRules and windows" as CORR
+ rectangle "Incident Service\nLifecycle and Responsibilities" as INC
+ NORM --> CORR : Events
+ CORR --> INC : Signals
+}
+package "Operator’s Work" as OPERATOR #F0FDFA {
+ rectangle "Console projections\nFeed, floor plans, state" as READ
+ rectangle "API Gateway\nAuthorization and realtime" as API
+ rectangle "Web Console\nIncidents and Response" as UI
+ READ --> API : Snapshots
+ API <--> UI : REST / WebSocket
+}
+package "Response" as RESPONSE #FFF7ED {
+ rectangle "Response Engine\nScenarios, timers, SLA" as RESP
+ rectangle "Command Service\nCommands and Results Delivery" as CMD
+ rectangle "Notification Service\nRecipients and Escalations" as NOTIFY
+ RESP --> CMD
+ RESP --> NOTIFY
+}
+package "History and Control" as RECORDS #F8FAFC {
+ rectangle "Event History\nSearch and Relationships" as HISTORY
+ rectangle "Audit\nHash Chain" as AUDIT
+ rectangle "Reports\nMTTA, MTTR, SLA" as REPORTS
+}
+INPUT --> PROCESS : Kafka: raw
+PROCESS --> RESPONSE : Incidents
+PROCESS --> OPERATOR : Changes
+PROCESS --> RECORDS : Events and Actions
+@enduml
 ```
 
-Схема показывает логические этапы и основные потребители данных. Межсервисные события передаются через Apache Kafka; брокеры, отдельные топики и хранилища опущены. История, аудит и отчётность пополняются по мере обработки, включая действия оператора и результаты реагирования.
+The diagram shows logical steps and main data consumers. Inter-service events are sent via Apache Kafka; brokers, individual topologies, and storage are omitted. History, audit, and reporting are updated as processing progresses, including operator actions and response results.
 
-Оператор работает через API Gateway: назначает и подтверждает инциденты, выполняет шаги сценария и закрывает инцидент после обязательных действий. Gateway получает снимки от сервиса проекций, а realtime-изменения читает из Kafka и передаёт в консоль через WebSocket. Команды доставляются оборудованию через Connector Gateway и коннектор; результаты возвращаются в сервис команд и сценарий реагирования.
+The operator uses API Gateway to assign and acknowledge incidents, execute scenario steps and close incidents after completing required actions. The gateway receives snapshots from the projection service, and real-time changes are read from Kafka and sent to the console via WebSocket. Commands are delivered to devices through Connector Gateway and connector; results are returned to the command service and response scenario.
 
-Сервисы разделены по доменным контекстам; доменное ядро отделено от инфраструктурных адаптеров.
+Services are divided by domain contexts; the domain core is separated from infrastructure adapters.
 
-| Область | Технологии |
+| Domain | Technologies |
 |---|---|
-| Сервер и SDK | C++23, Boost.Asio и Beast, gRPC, Protobuf |
-| Событийные потоки | Apache Kafka в режиме KRaft, Schema Registry |
-| Хранение данных | PostgreSQL, ClickHouse, RocksDB, Valkey, S3-совместимый SeaweedFS |
-| Идентификация и доступ | Keycloak, OIDC, RBAC, области доступа, mTLS |
-| Веб-клиент | React, TypeScript, Vite, TanStack, Zustand, Tailwind CSS |
-| Наблюдаемость | OpenTelemetry, Prometheus, Grafana, Loki, Tempo |
-| Сборка и зависимости | Clang, CMake, Ninja, Conan 2, Task, Docker |
+| Server and SDK | C++23, Boost.Asio and Beast, gRPC, Protobuf |
+| Event flows | Apache Kafka in KRaft mode, Schema Registry |
+| Data storage | PostgreSQL, ClickHouse, RocksDB, Valkey, S3-compatible SeaweedFS |
+| Identity and access | Keycloak, OIDC, RBAC, access scopes, mTLS |
+| Web client | React, TypeScript, Vite, TanStack, Zustand, Tailwind CSS |
+| Observability | OpenTelemetry, Prometheus, Grafana, Loki, Tempo |
+| Build and dependencies | Clang, CMake, Ninja, Conan 2, Task, Docker |
 
-Схемы компонентов, потоки данных и семантика доставки описаны в [архитектурной документации](docs/architecture/README.md). Публичные интерфейсы - в [контрактах](contracts/README.md), основания технических решений - в [реестре ADR](docs/adr/README.md).
+Component diagrams, data flows, and delivery semantics are described in [Architecture Documentation](docs/architecture/README.md). Public interfaces are in [Contracts](contracts/README.md), and architecture decisions are in [ADR Registry](docs/adr/README.md).
 
-## Развёртывание и эксплуатация
+## Deployment and Operation
 
-Целевая ОС - Debian 13 x86_64. Предусмотрены топологии одной машины и кластера на виртуальных машинах, DEB-пакеты и контейнерные образы без root. Техническое название стенда, образов и поставки - `psim-platform`.
+Target OS: Debian 13 x86_64. Single-machine and cluster topologies on virtual machines are supported, along with DEB packages and container images without root access. The technical name of the test environment, images, and deliveries is `psim-platform`.
 
-Для административных операций используется C++ CLI `psimctl`, для сбора метрик узла и инфраструктуры - `psim-monitoring-agent`. Средства эксплуатации включают установку и обновление, диагностику, управление сертификатами, зашифрованные резервные копии во внешнем S3 и восстановление.
+For administrative operations, C++ CLI `psimctl` is used, while for collecting node and infrastructure metrics, `psim-monitoring-agent` is used. Operations include installation and updates, diagnosis, certificate management, encrypted backups in external S3, and restoration.
 
-Инструкции и ограничения проверенных конфигураций:
+Instructions and restrictions for verified configurations:
 
-- [Топологии и требования к развёртыванию](docs/engineering/deployment-topologies.md).
-- [Установка, обновление и откат](docs/engineering/installation-and-upgrades.md).
-- [Администрирование, резервное копирование и восстановление](docs/engineering/administration-and-recovery.md).
-- [Мониторинг, логи, трассы и оповещения](docs/engineering/observability.md).
+- [Topologies and deployment requirements](docs/engineering/deployment-topologies.md).
+- [Installation, updates, and rollbacks](docs/engineering/installation-and-upgrades.md).
+- [Administration, backup, and restoration](docs/engineering/administration-and-recovery.md).
+- [Monitoring, logs, traces, and notifications](docs/engineering/observability.md).
 
-## Разработка
+## Development
 
-Используйте окружение из [быстрого старта](#требования). Компилятор, зависимости C++ и инструменты веб-разработки запускаются в контейнерах с закреплёнными версиями. Доступен [dev container](.devcontainer/devcontainer.json), подключённый к Docker Engine Linux-хоста.
+Use the environment from [Quick Start](#requirements). The compiler, C++ dependencies, and web development tools are run in containers with fixed versions. The [dev container](.devcontainer/devcontainer.json) is available, connected to the Docker Engine on the Linux host.
 
-Сервисы, коннекторы, `psimctl` и продуктовая логика реализуются на C++. Python используется для вспомогательных задач сборки, генерации, развёртывания и тестирования. Подробности - в [правилах выбора языков](docs/engineering/product-runtime-languages.md).
+Services, connectors, `psimctl`, and product logic are implemented in C++. Python is used for auxiliary tasks such as building, generation, deployment, and testing. Details are in [Language selection rules](docs/engineering/product-runtime-languages.md).
 
-| Команда | Назначение |
+| Command | Purpose |
 |---|---|
-| `task cpp:test` | Сборка и тесты C++ |
-| `task web:check` | Проверки и сборка веб-клиента |
-| `task ci` | Локальный конвейер по области изменений |
-| `task ci FULL=true` | Полный локальный конвейер |
-| `task docs:check` | Проверка документации и сборка портала |
-| `task web:dev` | Витрина дизайн-системы на `http://localhost:5173/design-system.html` |
-| `task web:catalogue` | Каталог компонентов на `http://localhost:61000` |
-| `task docs:portal` | Сборка портала документации в `build/portal/site/` |
-| `task docs:serve` | Просмотр собранного портала на `http://localhost:8000` |
+| `task cpp:test` | C++ build and testing |
+| `task web:check` | Web client verification and build |
+| `task ci` | Local pipeline for affected components |
+| `task ci FULL=true` | Full local pipeline |
+| `task docs:check` | Documentation verification and portal build |
+| `task web:dev` | Design system dashboard on `http://localhost:5173/design-system.html` |
+| `task web:catalogue` | Component catalog on `http://localhost:61000` |
+| `task docs:portal` | Documentation portal build in `build/portal/site/` |
+| `task docs:serve` | View of the built portal on `http://localhost:8000` |
 
-Витрина дизайн-системы использует демонстрационные данные. Устройство веб-клиента и его команды описаны в [web/README.md](web/README.md).
+The design system dashboard uses demonstration data. The web client and its commands are described in [web/README.md](web/README.md).
 
-Для C++ доступны пресеты `debug`, `release`, `relwithdebinfo`, `asan`, `tsan`, `coverage`. Например, `task cpp:build PRESET=release JOBS=4` запускает release-сборку с четырьмя параллельными заданиями. Артефакты находятся в `build/debian13/<preset>/`, кэш - в `.cache/`.
+For C++, presets `debug`, `release`, `relwithdebinfo`, `asan`, `tsan`, and `coverage` are available. For example, `task cpp:build PRESET=release JOBS=4` runs a release build with four parallel tasks. Artifacts are located in `build/debian13/<preset>/`, and cache is in `.cache/`.
 
-Полный список команд: `task --list-all`. Рабочий процесс и проверки описаны в [CONTRIBUTING.md](CONTRIBUTING.md), управление локальной инфраструктурой - в [deploy/README.md](deploy/README.md).
+The full list of commands is `task --list-all`. The workflow and checks are described in [CONTRIBUTING.md](CONTRIBUTING.md), and local infrastructure management is described in [deploy/README.md](deploy/README.md).
 
-## Структура репозитория
+## Repository Structure
 
-| Каталог | Назначение |
+| Directory | Purpose |
 |---|---|
-| `contracts/` | Protobuf, OpenAPI, AsyncAPI, реестры топиков, таксономии и ошибок |
-| `libs/platform/` | Runtime, асинхронные примитивы и инфраструктурные библиотеки |
-| `libs/domain/` | Доменные модели событий, корреляции, инцидентов и реагирования |
-| `services/` | Сервисы по доменным контекстам |
-| `connectors/` | SDK, симулятор и интеграции с внешними системами |
-| `web/` | Веб-консоль, дизайн-система, REST- и realtime-клиенты |
-| `deploy/` | Локальное окружение, образы и профили развёртывания |
-| `tests/` | Системные, сквозные, нагрузочные и хаос-тесты |
-| `tools/` | `psimctl`, агент мониторинга, миграторы, инструменты сборки, генераторы и проверки |
-| `docs/` | Продукт, архитектура, ADR, инженерные руководства, безопасность и качество |
+| `contracts/` | Protobuf, OpenAPI, AsyncAPI, topic registries, taxonomies, and errors |
+| `libs/platform/` | Runtime, asynchronous primitives, and infrastructure libraries |
+| `libs/domain/` | Domain event models, correlations, incidents, and responses |
+| `services/` | Services for domain contexts |
+| `connectors/` | SDK, simulator, and integration with external systems |
+| `web/` | Web console, design system, REST and realtime clients |
+| `deploy/` | Local environment, images, and deployment profiles |
+| `tests/` | System, end-to-end, load and chaos tests |
+| `tools/` | `psimctl`, monitoring agents, migrators, build tools, generators, and checks |
+| `docs/` | Product, architecture, ADR, engineering guides, security, and quality |
 
-Модульные и компонентные тесты C++ находятся рядом с кодом. Репозиторий, код и пространства имён используют название `psim`.
+C++ module and component tests are located near the code. The repository, code, and namespace use the name `psim`.
 
-## Участие, безопасность и лицензия
+## Participation, Security, and License
 
-Предложения и ошибки принимаются через [GitHub Issues](https://github.com/d8zerg/psim/issues), изменения - через pull request. Порядок участия описан в [CONTRIBUTING.md](CONTRIBUTING.md).
+Suggestions and errors are accepted through [GitHub Issues](https://github.com/d8zerg/psim/issues), and changes are made through pull requests. Participation procedures are described in [CONTRIBUTING.md](CONTRIBUTING.md).
 
-О проблемах безопасности сообщайте по [SECURITY.md](SECURITY.md).
+For security issues, report via [SECURITY.md](SECURITY.md).
 
-Код распространяется под лицензией [MIT](LICENSE).
+The code is distributed under the [MIT](LICENSE) license.

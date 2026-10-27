@@ -1,34 +1,37 @@
-# ADR-018. Маршрутизация команд к сессиям коннекторов
+# ADR-018. Routing commands to connector sessions
 
-- **Статус:** Принято
-- **Шаг плана:** 4.2
-- **Связанные:** ADR-015, ADR-017, [data-flows.md](../architecture/data-flows.md#36-команды-psimcommandsv1-и-psimcommandsresultsv1)
+<!-- language-links -->
+[English](0018-command-routing.md) | [Русский](../ru/adr/0018-command-routing.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-015, ADR-017, [data-flows.md](../architecture/data-flows.md#36-commands-psimcommandsv1-and-psimcommandsresultsv1)
 
-Команда записывается Command Service в `psim.commands.v1` (ключ `connector_id`) и должна попасть в тот экземпляр Connector Gateway, у которого открыта сессия коннектора. Экземпляров шлюза несколько; сессия может переехать на другой экземпляр при переподключении. Объём команд - единицы в секунду; задержка запрос -> доставка ≤ 200 мс.
+## Context
 
-## Рассмотренные варианты
+Command Service writes a command to `psim.commands.v1` with `connector_id` as its key. The command must reach the Connector Gateway instance holding the connector session. Multiple gateway instances exist, and reconnection can move a session to another instance. Command volume is a few per second; request -> delivery latency must be ≤ 200 ms.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Группа потребителей + пересылка между экземплярами по реестру сессий в Redis | Каждая команда читается один раз | Межэкземплярный канал пересылки; зависимость критичного пути от Redis; сложная обработка переезда сессии |
-| Привязка коннектора к партиции и экземпляру (sticky routing на балансировщике) | Нет пересылки | Балансировщик L4 должен знать соответствие; ломается при отказе экземпляра |
-| **Широковещательное чтение: каждый экземпляр читает все партиции в своей группе и доставляет команду, если сессия у него** | Просто; нет межэкземплярного канала; Redis не на критичном пути доставки | Каждый экземпляр читает все команды (объём мал) |
+| Consumer group with forwarding between instances using the Redis session registry | Each command is read once | Requires an inter-instance forwarding channel; Redis enters the critical path; session movement is complex |
+| Pin each connector to a partition and instance using sticky load-balancer routing | No forwarding | The L4 load balancer must know the mapping; instance failure breaks it |
+| **Broadcast consumption: each instance reads all partitions in its own group and delivers commands for sessions it owns** | Simple; no inter-instance channel; Redis is outside the delivery critical path | Every instance reads all commands, whose volume is small |
 
-## Решение
+## Decision
 
-Широковещательное чтение: отдельная эфемерная группа на каждый запуск экземпляра, без сохранения смещений. До открытия gRPC-listener экземпляр получает назначение всех партиций с `auto.offset.reset=latest`. Группы не делят команды между экземплярами. Дополнительно:
+Use broadcast consumption: a separate ephemeral group for each instance start, without committed offsets. Before opening its gRPC listener, the instance receives all partition assignments with `auto.offset.reset=latest`. Groups do not distribute commands between instances. Additionally:
 
-1. Command Service перед отправкой проверяет реестр сессий: коннектор не в сети - немедленно `failed: COMMAND_CONNECTOR_OFFLINE`.
-2. Экземпляр шлюза начинает чтение с конца топика при старте (команды старше запуска экземпляра не доставляются: они либо уже доставлены, либо завершатся по дедлайну).
-3. Команда с истёкшим `deadline_at` не доставляется.
-4. Повторная доставка того же `command_id` безопасна (ADR-017, п. 4).
+1. Before sending, Command Service checks the session registry: an offline connector immediately produces `failed: COMMAND_CONNECTOR_OFFLINE`.
+2. At startup, the gateway starts at the topic end. Commands older than the instance start are not delivered: they were either delivered already or will expire at their deadlines.
+3. A command whose `deadline_at` has expired is not delivered.
+4. Redelivery of the same `command_id` is safe (ADR-017, rule 4).
 
-## Последствия
+## Consequences
 
-- При сотнях экземпляров шлюза или тысячах команд в секунду решение пересматривается в пользу пересылки по реестру.
+- Reconsider registry-based forwarding when reaching hundreds of gateway instances or thousands of commands per second.
 
-## Проверка
+## Verification
 
-Тест: переподключение коннектора к другому экземпляру между запросом и доставкой; замер задержки доставки p99.
+Test connector reconnection to another instance between request and delivery; measure p99 delivery latency.

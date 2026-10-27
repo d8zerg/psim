@@ -1,34 +1,37 @@
-# ADR-022. Мультитенантность в модели данных при одном тенанте в MVP
+# ADR-022. Multitenant data model with one tenant in MVP
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - все шаги)
-- **Связанные:** ADR-005, ADR-021, [crosscutting.md](../architecture/crosscutting.md#8-мультитенантность)
+<!-- language-links -->
+[English](0022-multitenancy.md) | [Русский](../ru/adr/0022-multitenancy.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-005, ADR-021, [crosscutting.md](../architecture/crosscutting.md#8-multitenancy)
 
-В MVP эксплуатируется один тенант, но продукт должен позже поддерживать федерацию ситуационных центров и мультитенантную эксплуатацию (X4) без переделки модели данных и контрактов.
+## Context
 
-## Рассмотренные варианты
+MVP operates with one tenant. Later, the product must support situation-center federation and multitenant operation (X4) without redesigning data models and contracts.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Не закладывать тенант в MVP | Меньше кода | Последующее добавление затрагивает все таблицы, ключи, контракты и данные заказчиков |
-| **Общие хранилища, `tenant_id` в каждой сущности, сообщении, ключе и индексе** | Минимальная стоимость сейчас; мультитенантность включается без миграции модели | Изоляция обеспечивается кодом, а не инфраструктурой |
-| Схема или база на тенанта | Сильная изоляция | Операционная сложность миграций и пулов; в MVP избыточно |
-| Установка на тенанта | Полная изоляция | Не требует поддержки в модели, но не решает федерацию |
+| Omit tenants from MVP | Less code | Adding them later affects every table, key, contract and customer dataset |
+| **Shared stores, with `tenant_id` in every entity, message, key and index** | Minimal current cost; enables multitenancy without a model migration | Code provides isolation rather than infrastructure |
+| Schema or database per tenant | Strong isolation | Complex migrations and pools; excessive for MVP |
+| Installation per tenant | Complete isolation | Needs no model support but does not solve federation |
 
-## Решение
+## Decision
 
-1. `tenant_id` (UUID) - в каждой таблице (первый столбец составных индексов и первичных ключей, где уместно), в конверте каждого сообщения, в ключах Redis (`t:<tenant>:...`), в токене пользователя (claim) и в регистрации коннектора.
-2. Тенант определяется только из аутентифицированного контекста (токен, сертификат коннектора, конверт), никогда из параметров запроса.
-3. В MVP установщик создаёт один тенант; API управления тенантами нет.
-4. Row-level security PostgreSQL не включается в MVP; изоляция на уровне репозиториев (каждый запрос фильтрует по `tenant_id`).
+1. Include `tenant_id` (UUID) in every table, as the leading column of composite indexes and primary keys where appropriate; every message envelope; Redis keys (`t:<tenant>:...`); user-token claims; and connector registrations.
+2. Derive the tenant only from authenticated context: token, connector certificate or envelope, never request parameters.
+3. The MVP installer creates one tenant; no tenant-management API is provided.
+4. MVP does not enable PostgreSQL row-level security. Repositories enforce isolation: every query filters by `tenant_id`.
 
-## Последствия
+## Consequences
 
-- Дополнительные 16-36 байт на сообщение и столбец в индексах - приемлемо.
-- Переход к нескольким тенантам потребует API управления тенантами, изоляционных тестов и, возможно, RLS - без изменения модели.
+- An extra 16-36 bytes per message and an index column are acceptable.
+- Multiple tenants will require a management API, isolation tests and possibly RLS, without changing the model.
 
-## Проверка
+## Verification
 
-Fitness function: статическая проверка SQL репозиториев на наличие условия по `tenant_id`; линтер контрактов - наличие конверта с `tenant_id`.
+Fitness function: statically check repository SQL for a `tenant_id` condition; contract linting checks for an envelope containing `tenant_id`.

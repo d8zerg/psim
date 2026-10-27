@@ -1,344 +1,341 @@
-# Спецификация приёмки MVP
+# Acceptance Specification
 
-Версия 0.2 · Шаг плана 0.1 · Эксплуатационные критерии приняты (ADR-042)
+<!-- language-links -->
+[English](acceptance-spec.md) | [Русский](../ru/product/acceptance-spec.md)
+<!-- /language-links -->
 
-Сценарии S1-S13 описаны в формате «дано - когда - тогда». Каждый критерий проверяем: у него есть измеримый порог и метод проверки. Методы и стенды детализируются в стратегии качества (шаг 0.7); финальный прогон - шаг 11.3.
+Scenarios S1-S13 are described in the format “given - when - then”. Each criterion is verified: it has a measurable threshold and a verification method. The methods and test environments are defined in the [Quality Strategy](../quality/strategy.md); a full run is required for qualification release.
 
-## Общие условия
+Qualification of the complete load, failure and recovery profile remains outstanding. Current evidence and limitations are recorded in [release readiness](release-readiness.md). HA qualification requires replicas in independent physical failure domains.
 
-**Стенды:**
+## General Conditions
 
-| Код | Стенд | Назначение |
+**Test Environments:**
+
+| Code | Test Environment | Purpose |
 |---|---|---|
-| `E-LOCAL` | Одна машина, Docker Compose, Kafka с одним брокером | Функциональные сценарии |
-| `E-CLUSTER` | Кластер на VM: 3+ узла, Kafka ×3, PostgreSQL с синхронной репликой, Valkey с primary, двумя репликами и Sentinel | Нагрузка, отказы, обновление |
+| `E-LOCAL` | One Linux host, native Docker Engine with Docker Compose, one Kafka broker | Functional scenarios |
+| `E-CLUSTER` | Cluster on VM: 3+ nodes, Kafka ×3, PostgreSQL with synchronous replication, Valkey with primary and two replicas, and Sentinel | Load, failures, updates |
 
-**Фоновая нагрузка `LOAD-50K`:** симулятор генерирует 50 000 событий/с устойчиво по 10 000 виртуальных устройств на 10 площадках с неравномерным профилем: 30% нагрузки приходится на одну площадку. Каждое событие несёт порядковый номер источника для сквозной сверки.
+**Background load `LOAD-50K`:** The simulator generates 50,000 events per second, with 10,000 virtual devices on 10 sites with uneven profiles: 30% of the load is allocated to one site. Each event has a sequence number of the source for cross-checking.
 
-**Задержки** измеряются по event time: от метки времени возникновения события у источника до момента наблюдения результата (сигнал в топике, отрисовка инцидента в браузере). Часы стенда синхронизированы, рассогласование ≤ 5 мс.
+**Latency is measured by event time:** from the time the event originates at the source to the time it is observed (signal in the topic, display of the incident in the browser). The clocks of the test environment is synchronized, with a deviation of ≤ 5 ms.
 
-**Методы проверки:** `E2E` - автоматический сквозной тест (Playwright или API-тест); `LOAD` - нагрузочный тест; `CHAOS` - тест с внесением отказа; `SIM` - детерминированная симуляция; `DOC` - проверка сторонним исполнителем по документации.
+**Verification methods:** `E2E` - automatic end-to-end testing (Playwright or API test); `LOAD` - load test; `CHAOS` - fault test; `SIM` - deterministic simulation; `DOC` - verification by a third-party executor according to documentation.
 
 ---
 
-## S1. Подключение нового коннектора
+## S1. Connecting a new connector
 
-**Метод:** E2E + DOC · **Стенд:** E-LOCAL
+**Method:** E2E + DOC · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   платформа развёрнута и в ядре нет кода для источника типа «X»
-  И    интегратор написал коннектор на Connector SDK по руководству, не читая код ядра
-Когда  коннектор проходит тестовый набор соответствия
-  И    администратор регистрирует коннектор в каталоге и выпускает учётные данные
-  И    администратор задаёт правила отображения событий типа «X» в таксономию
-  И    коннектор подключается и отправляет события
-Тогда  тестовый набор соответствия пройден без ошибок
-  И    коннектор отображается в администрировании со статусом «в сети» не позже 5 с после подключения
-  И    события коннектора появляются в psim.events.normalized.v1 нормализованными
-  И    ни один артефакт ядра (образы сервисов, их конфигурация, кроме правил отображения) не изменён
+Given the platform is deployed and its core has no source-type X implementation
+And an integrator implemented a connector with Connector SDK using the guide, without reading core code
+When the connector runs the conformance suite
+And an administrator registers it and its certificate fingerprint in Connector Gateway
+And the certificate is issued by the approved external PKI
+And an administrator defines normalization mappings for source type X
+And the connector connects and sends events
+Then the conformance suite passes without errors
+And administration shows the connector online within 5 seconds
+And normalized events appear in psim.events.normalized.v1
+And no core service images or configurations change, except the mapping rules
 ```
 
-**Негативные проверки:**
-- коннектор без регистрации или с недействительным сертификатом отклоняется при подключении, отказ фиксируется в аудите;
-- событие, не проходящее валидацию схемы, отклоняется с кодом ошибки из каталога и не попадает в Kafka;
-- событие без правила отображения попадает в `psim.dlq.normalizer.v1` с причиной.
+**Negative checks:**
+- A connector without registration or with invalid certificate is rejected during connection, and the failure is recorded in audit;
+- An event that does not pass schema validation is rejected with an error code from the catalog and does not enter Kafka;
+- An event without a mapping rule enters `psim.dlq.normalizer.v1` with a reason.
 
-**Жизненный цикл сертификата (F-PLT-08):**
-
-- продление с перекрытием двух сертификатов не теряет события; по окончании перекрытия старый сертификат не даёт доступ;
-- отзыв закрывает действующую сессию и блокирует повторное подключение; регистрация, продление и отзыв отражаются в аудите;
-- закрытый ключ коннектора не передаётся платформе и не попадает в диагностические материалы.
+**Certificate lifecycle (F-PLT-08):**
+- Renewal with an overlap of two certificates does not lose events; after the overlap ends, the old certificate loses access;
+- Revocation closes the current session and blocks reconnection; registration, renewal and revocation are reflected in audit;
+- The private connector key is not transferred to the platform and does not enter diagnostic materials.
 
 ---
 
-## S2. Описание объекта
+## S2. Catalog Setup
 
-**Метод:** E2E · **Стенд:** E-LOCAL
+**Method:** E2E · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   администратор вошёл в систему
-Когда  он создаёт площадку, здание, 3 этажа и 20 зон
-  И    загружает поэтажные планы
-  И    импортирует файл с 50 000 устройств с привязкой к зонам, источникам и коннекторам
-Тогда  импорт завершается не дольше 5 минут с отчётом: создано, обновлено, ошибки по строкам
-  И    устройства отображаются на плане этажа по своим координатам
-  И    изменение каталога доступно Normalizer не позже 2 с после фиксации
+Given an administrator is signed in
+When they create a site, a building, 3 floors and 20 zones
+And upload floor plans
+And import 50,000 devices with zone, source and connector bindings
+Then import completes within 5 minutes with created, updated and per-row error results
+And devices appear at their floor-plan coordinates
+And catalog changes reach Normalizer within 2 seconds of commit
 ```
 
-**Негативные проверки:**
-- строки с несуществующей зоной или дублирующимся идентификатором попадают в отчёт с ошибкой и не прерывают импорт остальных строк;
-- повторный импорт того же файла не создаёт дубликатов (идемпотентность по внешнему идентификатору).
+**Negative checks:**
+- Lines with a non-existent zone or duplicate identifier are reported with an error and do not interrupt the import of other lines;
+- Reimporting the same file does not create duplicates (idempotence by external identifier).
 
-**Файловое хранилище (F-PLT-07):**
-
-- PNG/JPEG до 20 МБ загружается и читается только пользователем своей области; поддельный формат, SVG, превышение размера и предела пикселей отклоняются;
-- замена плана создаёт версию; ошибка загрузки или фиксации метаданных сохраняет предыдущую доступную версию;
-- прямое публичное чтение bucket запрещено; метаданные и объекты восстановлены на чистом стенде с совпадающими SHA-256 и ссылками.
+**File storage (F-PLT-07):**
+- PNG/JPEG up to 20 MB are only loaded and read by the user within the authorized scope; fake formats, SVG, exceeding size and pixel limits are rejected;
+- Changing the plan creates a new version; errors in loading or metadata storage retain the previous available version;
+- Direct public reading of buckets is prohibited; metadata and objects are restored on a clean test environment with matching SHA-256 and links.
 
 ---
 
-## S3. Нормализация и обогащение события
+## S3. Normalizing and enriching events
 
-**Метод:** E2E + LOAD · **Стенд:** E-LOCAL, E-CLUSTER
+**Method:** E2E + LOAD · **Test Environment:** E-LOCAL, E-CLUSTER
 
 ```gherkin
-Дано   датчик привязан в каталоге к зоне «Z» площадки «P»
-Когда  коннектор отправляет сырое событие срабатывания датчика
-Тогда  в psim.events.normalized.v1 появляется событие с типом из таксономии v1,
-       критичностью, site_id = P, zone_id = Z, device_id и исходным порядковым номером
-  И    событие несёт контекст трассировки, связанный с трассировкой приёма
-  И    при нагрузке LOAD-50K p99 задержки этапа нормализации ≤ 30 мс
+Given a sensor is registered in zone Z at site P
+When its connector sends a raw activation event
+Then psim.events.normalized.v1 contains an event with a taxonomy v1 type,
+     severity, site_id = P, zone_id = Z, device_id and the original source sequence number
+And its trace context is linked to the ingestion trace
+And normalization-stage p99 latency is at most 30 ms under LOAD-50K
 ```
 
-**Негативные проверки:**
-- повторно отправленное событие с тем же порядковым номером источника не порождает второго нормализованного события;
-- событие от устройства, отсутствующего в каталоге, уходит в DLQ с причиной.
+**Negative checks:**
+- A repeated event with the same sequence number of origin does not create a second normalized event;
+- An event from a device not in the catalog is sent to DLQ with a reason.
 
 ---
 
-## S4. Корреляция событий нескольких источников
+## S4. Correlation of multiple source events
 
-**Метод:** E2E + LOAD + SIM · **Стенд:** E-LOCAL, E-CLUSTER
+**Method:** E2E + LOAD + SIM · **Test Environment:** E-LOCAL, E-CLUSTER
 
 ```gherkin
-Дано   активно правило «срабатывание датчика периметра и детекция человека
-       видеоаналитикой в той же зоне в пределах 30 с -> сигнал "проникновение", приоритет высокий»
-Когда  в зоне «Z» срабатывает датчик периметра
-  И    через 10 с видеоаналитика детектирует человека в зоне «Z»
-Тогда  в psim.signals.v1 появляется ровно один сигнал «проникновение» со ссылками на оба события
-  И    p99 задержки событие -> сигнал ≤ 300 мс при нагрузке LOAD-50K
+Given a rule matches perimeter activation and video person detection in the same zone within 30 seconds
+And its output is a high-priority intrusion signal
+When the perimeter activates in zone Z and video detects a person there within 10 seconds
+Then psim.signals.v1 contains exactly one intrusion signal referencing both events
+And event -> signal p99 latency is at most 300 ms under LOAD-50K
 ```
 
-**Дополнительные проверки:**
-- те же события с интервалом 40 с сигнала не порождают;
-- события из разных зон сигнала не порождают;
-- событие, пришедшее с опозданием в пределах допустимого, учитывается по event time;
-- правило с синтаксической ошибкой невозможно активировать;
-- пробный прогон правила на исторических данных показывает сигналы, которые правило породило бы, без публикации в `psim.signals.v1`.
+**Additional checks:**
+- The same events 40 seconds apart do not produce a signal;
+- Events from different zones do not produce a signal;
+- An event that arrives late within acceptable limits is considered by event time;
+- Rules with syntax errors cannot be activated;
+- A trial run of the rule on historical data shows signals that the rule would generate, without publication in `psim.signals.v1`.
 
-**Обслуживание (F-CAT-06):**
+**Maintenance (F-CAT-06):**
+- The administrator sets a one-time interval for a device or zone with a reason, responsible person, and explicit policy; only selected new signals are suppressed, events are retained;
+- Fire incidents and P1 are not suppressed; open incidents and their SLA do not change;
+- After the interval ends, suppression stops with an accuracy of ≤ 1 second, including restarting; rules consider policy versions and provide explanations for suppression;
+- If the status is unknown or stale, it is not considered a normal state of the device.
 
-- администратор задаёт устройству или зоне разовый интервал с причиной, ответственным и явной политикой; только выбранные новые сигналы подавляются, события сохраняются;
-- пожарные события и P1 не подавляются; открытые инциденты и их SLA не изменяются;
-- после окончания интервала подавление прекращается с точностью ≤ 1 с, включая перезапуск; правила учитывают версии политики и дают объяснение подавления;
-- при качестве состояния unknown или stale оно не считается нормальным состоянием устройства.
-
-**Диагностический прогон (F-PLT-09):** история, которая вызвала бы команды и уведомления, обрабатывается в изолированном запуске; рабочие сигналы и инциденты не изменяются, внешних вызовов 0. Инициатор, область, версии и диапазон отражаются в аудите.
+**Diagnostic replay (F-PLT-09):** The history that would trigger commands and notifications is processed in an isolated run; production signals and incidents do not change, external calls are 0. Initiator, scope, versions, and range are reflected in audit.
 
 ---
 
-## S5. Сигнал создаёт инцидент без дубликатов
+## S5. A signal creates an incident without duplicates
 
-**Метод:** E2E + SIM + CHAOS · **Стенд:** E-LOCAL, E-CLUSTER
+**Method:** E2E + SIM + CHAOS · **Test Environment:** E-LOCAL, E-CLUSTER
 
 ```gherkin
-Дано   открытого инцидента по ключу группировки K нет
-Когда  приходит сигнал с ключом K
-Тогда  создаётся ровно один инцидент со статусом «новый»
-Когда  в пределах окна группировки приходит ещё один сигнал с ключом K
-Тогда  сигнал присоединяется к открытому инциденту, приоритет пересчитывается,
-       хронология дополняется, новый инцидент не создаётся
+Given no open incident accepts signals for grouping key K
+When a signal with key K arrives
+Then exactly one incident in the new state is created
+When another signal with key K arrives within the grouping window
+Then it is attached to the existing open incident
+And priority and timeline are updated without creating another incident
 ```
 
-**Устойчивость:** в симуляции с внесением сбоев (повтор доставки, переупорядочивание, падение Incident Service и Correlation Engine в любой точке, ребалансировка) на 10 000 прогонах число инцидентов совпадает с эталонным, дубликатов 0.
+**Stability:** In simulations with errors (repeated delivery, reordering, failure of Incident Service and Correlation Engine at any point, rebalancing) on 10,000 runs, the number of incidents matches the reference, with 0 duplicates.
 
 ---
 
-## S6. Инцидент в консоли за секунду
+## S6. Incident in the Console Within One Second
 
-**Метод:** E2E + LOAD · **Стенд:** E-CLUSTER
+**Method:** E2E + LOAD · **Test Environment:** E-CLUSTER
 
 ```gherkin
-Дано   оператор с областью доступа «площадка P» открыл консоль
-  И    действует нагрузка LOAD-50K
-Когда  событие на площадке P приводит к новому инциденту
-Тогда  инцидент отображается в ленте оператора не позже 1 с от времени события (p99)
-  И    звучит звуковое оповещение, соответствующее приоритету, и инцидент визуально выделен
-  И    инцидент занимает позицию в ленте согласно приоритету
+Given an operator with site P access has opened the console
+And LOAD-50K is running
+When an event at site P creates an incident
+Then it appears in that operator's feed within 1 second of the event at p99
+And a priority-specific sound and visual indication are emitted
+And the feed positions the incident according to priority
 ```
 
-**Дополнительные проверки:**
-- оператор с областью «площадка Q» этот инцидент не видит ни в ленте, ни через REST API;
-- лента с 10 000 активных инцидентов прокручивается с частотой ≥ 50 кадров/с.
+**Additional checks:**
+- An operator scoped to “site Q” does not see this incident in the feed or through REST API;
+- A feed with 10,000 active incidents is scrolled at a frequency of ≥ 50 frames per second.
 
-**Состояние устройств и realtime (F-INT-08, F-API-02, F-API-03):**
-
-- на плане отдельно видны доступность, последнее наблюдаемое состояние, качество actual/stale/unknown и время подтверждения;
-- снимок и дельты устройств, зон и коннекторов фильтруются по области доступа; p99 доставки дельты после обновления проекции ≤ 200 мс;
-- после разрыва WebSocket состояние восстановлено без пропуска и отката версий; старый клиент получает только поддерживаемые потоки;
-- соединение коннектора само по себе не делает его устройства исправными или их данные актуальными.
+**Device and realtime status (F-INT-08, F-API-02, F-API-03):**
+- On the floor plan, availability, last observed state, quality actual/stale/unknown, and confirmation time are separately visible;
+- Snapshots and deltas of devices, zones, and connectors are filtered by access scope; p99 delivery deltas after projection update ≤ 200 ms;
+- After a break in WebSocket, the status is restored without skipped or duplicate versions; old clients receive only supported streams;
+- A connector connection itself does not prove that its device is healthy or its data up-to-date.
 
 ---
 
-## S7. Принятие инцидента и исполнение сценария
+## S7. Accepting an incident and executing a scenario
 
-**Метод:** E2E · **Стенд:** E-LOCAL
+**Method:** E2E · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   к типу инцидента «проникновение» привязан сценарий версии 3:
-       инструкция -> чек-лист -> решение «тревога подтверждена?» -> (да) команда + уведомление
-                                                                -> (нет) пометка «ложная»
-       шаг «доклад старшему смены» обязателен
-  И    новый инцидент этого типа в ленте оператора
-Когда  оператор принимает инцидент
-Тогда  инцидент назначен на оператора, статус «принят», запущен сценарий версии 3
-Когда  оператор отмечает чек-лист и выбирает ветку «да»
-Тогда  сценарий переходит к шагу команды, все действия видны в хронологии
-Когда  оператор пытается решить инцидент, не выполнив обязательный шаг
-Тогда  система отказывает с указанием невыполненного шага
+Given intrusion incidents use response plan version 3:
+     instruction -> checklist -> decision "Alarm confirmed?" -> yes: command + notification
+                                                         -> no: mark false alarm
+And the step "Report to shift supervisor" is mandatory
+When an operator acknowledges a new intrusion incident
+Then it is assigned to that operator, becomes acknowledged and uses response plan version 3
+When the operator completes the checklist and selects yes
+Then execution advances to the command step and records actions in the timeline
+When the operator tries to resolve the incident before completing the mandatory step
+Then the operation is rejected and identifies that incomplete step
 ```
 
-**Устойчивость:** после перезапуска Response Engine посреди сценария выполнение продолжается с того же шага; версия сценария остаётся 3, даже если администратор опубликовал версию 4.
+**Stability:** After restarting the Response Engine mid-script, execution continues from the same step; the script version remains 3, even if the administrator published version 4.
 
-**Передача ответственности (F-INC-07):**
-
-- оператор предлагает передачу незакрытого инцидента; получатель подтверждает её в своей области, до подтверждения ответственным остаётся прежний оператор;
-- повтор запроса не выполняет передачу повторно; устаревшая версия, неподходящая роль и чужая область отклоняются;
-- SLA, версия сценария, текущий шаг и уже выполненные действия сохранены; запрос, подтверждение и переназначение старшим смены видны в аудите;
-- пакетная передача показывает результат по каждому инциденту без скрытой частичной передачи.
+**Transfer of responsibility (F-INC-07):**
+- The operator proposes transferring an unclosed incident; the recipient confirms it within their scope, and until confirmed, the previous operator remains responsible;
+- Repeating a request does not transfer repeatedly; outdated versions, inappropriate roles, and foreign scopes are rejected.
+- SLA, scenario version, current step, and completed actions are preserved; the request, acknowledgment, and reassignment by the shift supervisor are visible in the audit.
+- Batch transfer shows the result for each incident without any hidden partial transfers.
 
 ---
 
-## S8. Команда на устройство
+## S8. Device Command
 
-**Метод:** E2E + CHAOS · **Стенд:** E-LOCAL
+**Method:** E2E + CHAOS · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   устройство «дверь D» поддерживает команду «заблокировать»
-  И    коннектор устройства в сети
-Когда  оператор отправляет команду «заблокировать» из шага сценария
-Тогда  статус команды проходит «запрошена» -> «отправлена» -> «подтверждена» -> «исполнена»
-  И    p99 от запроса до доставки коннектору ≤ 200 мс
-  И    результат отображается в карточке инцидента и в хронологии
+Given door D supports the lock command
+And its connector is online
+When an operator sends lock from a response step
+Then command state progresses requested -> sent -> acknowledged -> executed
+And request -> connector delivery p99 latency is at most 200 ms
+And the result appears in the incident card and timeline
 ```
 
-**Отказ и таймаут:**
-- коннектор отвечает отказом - команда получает статус «ошибка» с причиной;
-- коннектор не отвечает - по истечении таймаута команда получает статус «таймаут»;
-- каждая команда завершается финальным статусом.
+**Failure and timeout:**
+- The connector rejects the request - the command receives a failed status with a reason.
+- The connector is not responding - after the timeout period, the command receives the “timeout” status.
+- Each command ends with a final status.
 
-**Негативные проверки:**
-- повторная отправка с тем же command_id не приводит к двойному исполнению;
-- оператор без права на команду получает отказ, отказ фиксируется в аудите;
-- критичная команда не уходит на устройство без подтверждения старшим смены; инициатор не может подтвердить её сам.
+**Negative Tests:**
+- Re-sending with the same command_id does not result in double execution.
+- The operator without command rights encounters a failure, which is recorded in the audit.
+- The critical command cannot be executed on the device without confirmation from the shift supervisor; the initiator cannot confirm it themselves.
 
-**Изоляция диагностических команд (F-PLT-09):** запуск replay с историей критичных команд создаёт только результаты симуляции. Количество рабочих команд и внешних вызовов не увеличивается; попытка записи исполнителем в рабочий топик отклоняется ACL.
+Isolation of diagnostic commands (F-PLT-09): Running a replay with critical command history only produces simulation results. The number of production commands and external calls does not increase; attempts by the executor to record in the production topic are rejected by the ACL.
 
 ---
 
-## S9. Эскалация при нарушении SLA
+## S9. Escalation in Case of SLA Violation
 
-**Метод:** E2E + SIM · **Стенд:** E-LOCAL
+**Method:** E2E + SIM · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   политика SLA: принятие за 60 с; уровень 1 - старший смены; уровень 2 - руководитель, через 120 с
-Когда  инцидент не принят в течение 60 с
-Тогда  не позже 61 с от создания инцидент помечен «эскалирован»
-  И    старший смены получает уведомление в приложении и по email
-  И    доставка уведомлений зафиксирована в аудите
-Когда  реакции нет ещё 120 с
-Тогда  срабатывает уровень 2
+Given an acknowledgement SLA of 60 seconds
+And escalation level 1 targets the shift supervisor and level 2 the manager after a further 120 seconds
+When an incident remains unacknowledged for 60 seconds
+Then it is marked escalated no later than 61 seconds after creation
+And the supervisor receives in-app and email notifications
+And notification delivery is audited
+When there is no response for a further 120 seconds
+Then escalation level 2 is triggered
 ```
 
-**Дополнительные проверки:**
-- инцидент, принятый до истечения SLA, не эскалируется;
-- при массовом событии (≥ 100 инцидентов за минуту) уведомления группируются, а не отправляются по одному;
-- перезапуск сервиса таймеров не отменяет и не дублирует эскалацию.
+**Additional checks:**
+- An incident acknowledged before its SLA expires is not escalated.
+- During a mass event (≥ 100 incidents per minute), notifications are grouped together instead of being sent individually.
+- Restarting the timer service does not cancel or duplicate the escalation.
 
-**Дежурный площадки (F-RSP-08):**
+**Site Duty Assignee (F-RSP-08):**
 
-- старший смены явно назначает текущего дежурного своей области; новая эскалация разрешает актуального получателя;
-- смена дежурного не сбрасывает срок SLA и не отменяет уже отправленные уведомления;
-- при отсутствии дежурного используется заданный резервный получатель и появляется эксплуатационный алерт.
+- The shift supervisor explicitly assigns the current duty holder to their area; each new escalation resolves the current recipient.
+- The shift of a duty holder does not cancel the SLA period or the already sent notifications.
+- When no one is on duty, the specified backup recipient is used, and an operational alert is generated.
 
 ---
 
-## S10. Неизменяемый аудит
+## S10. Audit Integrity
 
-**Метод:** E2E · **Стенд:** E-LOCAL
+**Method:** E2E · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   выполнены сценарии S1-S9
-Когда  аудитор открывает журнал аудита
-Тогда  в журнале есть записи обо всех действиях пользователей и системы из S1-S9,
-       включая вход, отказы в доступе, изменения конфигурации, команды, эскалации
-Когда  запись аудита изменена или удалена напрямую в базе данных
-  И    аудитор запускает проверку целостности
-Тогда  проверка указывает нарушение с точностью до записи
+Given scenarios S1-S9 have been executed
+When an auditor opens the audit log
+Then it includes user and system actions from S1-S9,
+     including login, access denials, configuration changes, commands and escalation
+When a record is modified or deleted directly in the database
+And the auditor runs integrity verification against independently trusted checkpoints
+Then verification identifies the affected record or sequence gap
 ```
 
-**Дополнительные проверки:**
-- у аудитора нет операций изменения ни в UI, ни в API;
-- экспорт выборки содержит данные для независимой проверки цепочки хэшей.
+**Additional checks:**
+- The auditor has no mutating operations in either the UI or API.
+- The exported sample contains data for independent verification of the hash chain.
 
-**Эксплуатационные действия:** журнал содержит регистрацию, продление и отзыв сертификатов, включение и автоматическое завершение обслуживания, назначение дежурного, передачу ответственности, операции с планами и параметры replay. Неавторизованные операции отклоняются и также фиксируются; секреты и содержимое файлов не пишутся в аудит.
+**Operational Actions:** The log records certificate registration, renewal, and revocation, as well as the automatic termination of maintenance, assignment of duty holders, and responsibility handover operations and replay parameters. Unauthorized actions are rejected and recorded; secrets and file contents are not logged.
 
 ---
 
-## S11. Отказ без потерь
+## S11. Failure Recovery Without Loss
 
-**Метод:** CHAOS · **Стенд:** E-CLUSTER
+Method: CHAOS · **Test Environment:** E-CLUSTER
 
 ```gherkin
-Дано   действует нагрузка LOAD-50K
-Когда  поочерёдно отключаются: брокер Kafka, экземпляр каждого сервиса, узел PostgreSQL, узел Redis
-Тогда  сквозная сверка порядковых номеров показывает 0 потерянных событий
-  И    число инцидентов совпадает с эталонным, дубликатов 0
-  И    обработка восстанавливается не позже 60 с (RTO), потеря зафиксированных инцидентов 0 (RPO)
-  И    консоль оператора восстанавливает связь без потери изменений
-  И    отказ виден на дашборде и порождает алерт со ссылкой на runbook
+Given LOAD-50K is running
+When a Kafka broker, each service instance, a PostgreSQL node and a Valkey node fail in turn
+Then source-sequence reconciliation finds 0 lost events
+And incident counts match the reference with 0 duplicates
+And processing resumes within 60 seconds (RTO), with 0 lost committed incidents (RPO)
+And the console reconnects without losing changes
+And each failure appears on a dashboard with an alert linked to its runbook
 ```
 
-**Дополнительно:** обрыв связи коннектора с платформой на 10 минут - события досылаются из буфера SDK без потерь.
+**Additional:** A connection to the platform is interrupted for 10 minutes - buffered events are replayed after reconnection without loss.
 
-**Достоверность и восстановление (F-INT-08, F-PLT-07, F-PLT-08):**
+Reliability and Recovery (F-INT-08, F-PLT-07, F-PLT-08):
 
-- после пропуска трёх heartbeat-интервалов коннектор offline; связанные данные не имеют качества actual;
-- досылка десятиминутной истории не возвращает actual; актуальный снимок или новое подтверждённое наблюдение восстанавливает качество, старый снимок не перезаписывает новое событие;
-- источник без возможности получить снимок остаётся unknown до актуального наблюдения; перестроение проекции по старой истории не даёт ложной свежести;
-- учения на чистом стенде восстанавливают файловые объекты, ссылки, Keycloak и доверие; отозванный сертификат после восстановления не получает доступ.
+- After three heartbeat intervals have passed, the connector becomes offline; the associated data loses its “actual” quality.
+- Replaying ten-minute-old history does not restore freshness; only the latest snapshot or newly confirmed observation restores quality. An old snapshot does not overwrite new events.
+- A source without an available snapshot remains unknown until an actual observation is made; rebuilding the projection based on old history does not provide false freshness.
+- The exercises on the clean test environment restore file objects, links, Keycloak, and trust; a revoked certificate no longer has access after restoration.
 
 ---
 
-## S12. Обновление без остановки
+## S12. Rolling Upgrade
 
-**Метод:** CHAOS + E2E · **Стенд:** E-CLUSTER
+**Method:** CHAOS + E2E · **Test Environment:** E-CLUSTER
 
-**Статус:** Отложено до [шага 10.1](../psim-mvp-development-plan.md#шаг-101-производительность). Успешный прогон остаётся обязательным перед выпуском. Шаг 9.2 принят с этим ограничением; критерии ниже не ослаблены и пока не подтверждены.
+**Status:** The load qualification has not been completed. A successful execution is required before release; the following criteria have not been relaxed and have not yet been confirmed. Known limitations are listed in [release readiness](release-readiness.md).
 
 ```gherkin
-Дано   кластер работает на версии N под нагрузкой LOAD-50K
-Когда  выполняется последовательное обновление всех сервисов до версии N+1
-       с миграциями схемы базы данных
-Тогда  обработка событий не прерывается: нет интервала дольше 5 с без новых сигналов
-  И    сквозная сверка: 0 потерь, 0 дубликатов
-  И    SLO задержки p99 событие -> инцидент ≤ 1 с соблюдается на всём протяжении обновления
-Когда  выполняется откат с N+1 на N
-Тогда  те же критерии выполняются
+Given the cluster runs version N under LOAD-50K
+When services are upgraded sequentially to N+1 with database schema migrations
+Then event processing continues without a gap longer than 5 seconds between new signals
+And reconciliation reports 0 losses and 0 duplicates
+And event -> incident p99 latency remains at most 1 second throughout the upgrade
+When N+1 is rolled back to N
+Then the same criteria hold
 ```
 
 ---
 
-## S13. Отчёт руководителя
+## S13. Manager’s Report
 
-**Метод:** E2E · **Стенд:** E-LOCAL
+**Method:** E2E · **Test Environment:** E-LOCAL
 
 ```gherkin
-Дано   в системе есть история инцидентов за 30 дней с известными эталонными значениями
-Когда  руководитель строит отчёт за 30 дней по всем площадкам
-Тогда  отчёт строится не дольше 3 с
-  И    количество инцидентов, MTTA, MTTR, доля ложных тревог, соблюдение SLA
-       совпадают с эталонными значениями
-  И    отчёт экспортируется в CSV с теми же значениями
+Given 30 days of history with known reference values
+When a manager requests a report across all sites for those 30 days
+Then it is generated within 3 seconds
+And incident counts, MTTA, MTTR, false-alarm ratio and SLA compliance match the reference
+And CSV export contains the same values
 ```
 
-**Определения метрик:** MTTA - среднее время от создания инцидента до принятия; MTTR - среднее время от создания до решения; доля ложных тревог - доля инцидентов, решённых с результатом «ложная», среди решённых за период.
+**Definitions of metrics:** MTTA - Mean Time To Acknowledge; MTTR - Mean Time To Resolution; False Alarms Ratio - The proportion of incidents resolved with the result “false” among all resolved incidents during a period.
 
 ---
 
-## Матрица трассировки
+## Traceability Matrix
 
-| Сценарий | Роли | Пути | Функции | Метод |
+| Scenario | Roles | Paths | Functions | Method |
 |---|---|---|---|---|
 | S1 | integrator, admin | J1 | F-INT-01..04, 06, 07; F-EVP-02; F-IAM-03; F-PLT-08 | E2E, DOC |
 | S2 | admin | J2 | F-CAT-01..05; F-PLT-07 | E2E |

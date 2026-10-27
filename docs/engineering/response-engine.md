@@ -1,36 +1,40 @@
-# Исполнение сценариев реагирования
+# Execution of Response Scenarios
 
-Response Engine исполняет версии сценариев, хранит состояние запусков в PostgreSQL и публикует переходы в Kafka. Чистый интерпретатор находится в `libs/domain/response`, сервис - в `services/response-engine`, сохраняемые таймеры - в `libs/platform/timers`. Решение: [ADR-012](../adr/0012-response-execution-and-timers.md).
+<!-- language-links -->
+[English](response-engine.md) | [Русский](../ru/engineering/response-engine.md)
+<!-- /language-links -->
 
-## Планы и привязки
+The Response Engine executes scenario versions, stores execution states in PostgreSQL, and publishes transitions to Kafka. The pure interpreter is located in `libs/domain/response`, the service is in `services/response-engine`, and the saved timers are in `libs/platform/timers`. Solution: [ADR-012](../adr/0012-response-execution-and-timers.md).
 
-HTTPS API предоставляет `GET /v1/plans`, `GET /v1/plans/{id}`, `POST /v1/plans`, `POST /v1/plans:validate`, `POST /v1/plans/{id}:publish` и `POST /v1/plans/{id}:archive`. Тело сохранения и проверки - объект ResponsePlan. Публикация принимает номер версии. Сохранение создаёт следующую черновую версию; опубликованная версия не редактируется. Архивирование закрывает все версии плана для новых запусков и сохраняет ранее начатые запуски.
+## Plans and Bindings
 
-Список поддерживает `incidentTypeId`, `includeArchived`, `pageSize` до 1000 и `pageToken`. Чтение отдельного плана принимает `version`, ноль означает последнюю версию. Изменение планов доступно admin с областью `*`. Глобальный список планов также требует область `*`; оператор получает нужную версию вместе с доступным запуском.
+The HTTPS API provides `GET /v1/plans`, `GET /v1/plans/{id}`, `POST /v1/plans`, `POST /v1/plans:validate`, `POST /v1/plans/{id}:publish`, and `POST /v1/plans/{id}:archive`. The body of saving and checking is the ResponsePlan object. Publishing takes a version number. Saving creates the next draft version; the published version is not editable. Archiving closes all versions of the plan for new runs and saves previously started runs.
 
-Граф содержит до 200 достижимых шагов без циклов и один начальный шаг. Decision содержит минимум два варианта с непустыми ссылками; завершение ветки задаётся конечным шагом. Типы: instruction, checklist, decision, command, notify, wait, escalate, automated. Поддерживаются инструкции до 8000 байт, до 200 пунктов чек-листа, ожидание до 30 суток и обработчик с дедлайном 1-30 секунд. Весь план ограничен 512 КиБ.
+The list supports filters `incidentTypeId`, `includeArchived`, `pageSize` up to 1000, and `pageToken`. Reading a single plan requires `version`; zero means the last version. Changing plans is available to admins with the scope `*`. The global list of plans also requires the scope `*`; the operator gets the desired version along with the available run.
 
-Привязка выбирается по типу инцидента, площадке, зоне и приоритету. Специфичность: зона +4, площадка +2, ограничение приоритетов +1; затем сравнивается bindingPriority. Для разных планов публикация отклоняет пересечение с равной специфичностью и равным приоритетом. В каждом плане используется последняя опубликованная версия. Отсутствие совпадения сохраняет запись `response.plan.missing` в аудите и событие PlanUnavailable. Для типа с responseRequired=true Incident Service добавляет предупреждение в хронологию; запуск не создаётся. Счётчик psim_response_plans_missing_total учитывает инциденты без совпадения.
+The graph contains up to 200 reachable steps without loops and one initial step. The Decision contains at least two options with non-empty links; ending a branch is determined by the final step. Types: instruction, checklist, decision, command, notify, wait, escalate, automated. Instructions can be up to 8000 bytes, checklists up to 200 items, waiting up to 30 days, and handlers with deadlines of 1-30 seconds. The entire plan is limited to 512 KiB.
 
-## Запуски и действия
+Binding is selected based on the incident type, site, zone, and priority. Specificity: zone +4, site +2, priority limit +1; then compare bindingPriority. For different plans, publishing rejects intersections with the same specificity and priority. In each plan, the last published version is used. No match keeps the record `response.plan.missing` in audit and the event PlanUnavailable. For the type with responseRequired=true, the Incident Service adds a warning to the timeline; no run is created. The psim_response_plans_missing_total counter counts incidents without a match.
 
-`GET /v1/incidents/{id}/run` возвращает запуск и зафиксированную версию плана. Чтение доступно operator, supervisor и auditor в области инцидента. Изменения выполняются через `POST /v1/runs/{runId}/steps/{stepId}:complete`, `:skip`, `:retry`, `:override`. Нужны UUID в `Idempotency-Key` и версия запуска в `If-Match`. Повтор того же запроса возвращает сохранённый ответ; другое содержимое с тем же ключом отклоняется. Доступ повторно проверяется.
+## Runs and Actions
 
-Complete для инструкции подтверждает чтение; для чек-листа требует все обязательные пункты; для решения принимает result.decisionOptionId. Complete командного шага подтверждает отправку, но не завершает его. Клиент не может подставлять commandIds или overridden. Обязательный шаг пропустить нельзя. Skip требует reason, Retry допустим после ошибки, Override доступен supervisor с причиной. Необязательный Decision не пропускается: нужно явно выбрать ветку.
+`GET /v1/incidents/{id}/run` returns the run and the saved plan version. Reading is available to operator, supervisor, and auditor in the incident access scope. Changes are made through `POST /v1/runs/{runId}/steps/{stepId}:complete`, `:skip`, `:retry`, `:override`. A UUID is required in `Idempotency-Key` and the run version in `If-Match`. Repeating the same request returns the saved response; other content with the same key is rejected. Access is rechecked.
 
-Каждый переход и изменение обязательных шагов сохраняются вместе с аудитом и outbox. Невыбранные ветви остаются непройденными; их обязательные шаги не блокируют инцидент. Закрытие инцидента отменяет незавершённые шаги и таймеры. Уже доставленные устройству действия не отзываются.
+Complete confirms reading for instructions; for checklists, all required items are needed; for decisions, it takes result.decisionOptionId. Complete of the command step confirms sending but does not complete it. The client cannot substitute commandIds or overridden. Skipping a mandatory step is not allowed. Skip requires a reason, Retry is allowed after an error, Override is available to supervisor with a reason. Non-mandatory Decision is not skipped: the branch must be explicitly selected.
 
-## Команды и внешние действия
+Each transition and change of mandatory steps are saved along with audit and outbox. Unselected branches remain uncompleted; their mandatory steps do not block incidents. Closing an incident cancels unfinished steps and timers. Actions already delivered to devices are not revoked.
 
-Командный шаг использует Command Service через долговечный CommandRequested. Поддерживаются явный UUID устройства и `zone.devices`, ограниченный площадкой и зоной инцидента, с пределом 128 устройств. Возможность должна присутствовать в активном типе устройств при публикации; перед отправкой Command Service проверяет фактическое устройство и параметры. Автоматический шаг инициирует запрос сразу; ручной ждёт Complete. Критичность всегда определяется каталогом и требует отдельного подтверждения supervisor. Ручной шаг сохраняет проверенного пользователя инициатором команды; собственное подтверждение запрещено и для supervisor. Автоматический шаг указывает сервисного инициатора. После EXECUTED всех команд шаг завершается. Любой конечный отказ, таймаут или UNKNOWN даёт ошибку шага. Retry создаёт новую попытку; оператор должен учитывать уже выполненные действия.
+## Commands and External Actions
 
-Notify сохраняет NotificationRequested и продолжает граф; успех шага означает сохранение намерения, доставка каналами выполняется [Notification Service](notifications.md). Escalate публикует EscalationLevelTriggered. Automated вызывает только HTTPS-адрес из handler_urls. Перенаправления запрещены, ответ ограничен 64 КиБ, timeout - 1-30 секунд. Сервис фиксирует отправку до HTTP-вызова и не повторяет её автоматически после неизвестного результата. Запрос содержит effectId, runId, incidentId, stepId и tenantId. Обработчик может использовать effectId для своей идемпотентности.
+The command step uses the Command Service through the durable CommandRequested. Explicit UUID of the device and `zone.devices` are supported, limited by site and incident zone, with a limit of 128 devices. The capability must be present in the active type of devices during publishing; before sending, the Command Service checks the actual device and parameters. Automatic steps initiate requests immediately; manual ones wait for Complete. Criticality is always determined by the catalog and requires separate confirmation from supervisor. Manual steps keep the verified user as the initiator of the command; self-confirmation is prohibited for supervisor. Automatic steps identify the service initiator. The step completes only after every command reaches EXECUTED. Any final failure, timeout, or UNKNOWN causes an error in the step. Retry creates a new attempt; the operator must consider already performed actions.
 
-## Конфигурация и проверка
+Notify persists the NotificationRequested and continues the graph; success of the step means persisting the intent, delivery through channels is done by [Notification Service](notifications.md). Escalate publishes EscalationLevelTriggered. Automated only calls the HTTPS address from handler_urls. Redirection is prohibited, response is limited to 64 KiB, timeout is 1-30 seconds. The service records the dispatch before the HTTP call and does not repeat it automatically after an unknown result. The request contains effectId, runId, incidentId, stepId, and tenantId. The handler can use effectId for its own idempotency.
 
-Используются общие параметры Kafka, Schema Registry, PostgreSQL и JWT/JWKS. HTTPS использует tls_certificate_file и tls_private_key_file либо response-server.pem и response-server.key в tls_directory. handler_urls задаёт точный список разрешённых HTTPS-адресов, handler_ca_file - доверенные CA обработчиков. По умолчанию список пуст. Опрос таймеров - 200 мс; исходный срок и срабатывание хранятся в response.timers. Метрики psim_response_transaction_seconds и psim_response_inputs_total показывают обработку снимков инцидентов.
+## Configuration and Verification
 
-Проверки выполняются через нативный Docker Engine на Linux:
+Common parameters of Kafka, Schema Registry, PostgreSQL, and JWT/JWKS are used. HTTPS uses tls_certificate_file and tls_private_key_file or response-server.pem and response-server.key in tls_directory. handler_urls provides the exact list of allowed HTTPS addresses, handler_ca_file is the trusted CA for handlers. By default, the list is empty. The timer polling interval is 200 ms; the initial time and triggering are stored in response.timers. Metrics psim_response_transaction_seconds and psim_response_inputs_total show the processing of incident snapshots.
+
+Verifications are performed through the native Docker Engine on Linux:
 
 ```
 task response:test
@@ -39,6 +43,6 @@ task response:coverage
 task response:replay INPUT=path/to/replay.json
 ```
 
-Артефакты: `build/response/<preset>/`, включая отчёт, журналы двух процессов и вызовы HTTPS-приёмника. Проверка использует отдельный Compose-проект; имя задаётся в [задачах проверки](../../tools/taskfiles/response.yml). Все процессы запускаются с ограниченными правами. Проверка replay монтирует только исполняемый файл, передаёт план и историю через stdin и отключает сеть. Replay возвращает состояние, имитированные действия и externalCalls=0; не получает credentials и не изменяет рабочие данные.
+Artifacts: `build/response/<preset>/`, including reports, logs of two processes, and HTTPS receiver calls. The verification uses a separate Compose project; the name is set in [verification tasks](../../tools/taskfiles/response.yml). All processes are run with limited permissions. Replay verification mounts only the executable, sends the plan and history through stdin, and shuts down the network. Replay returns state, simulated actions, and externalCalls=0; it does not get credentials or change production data.
 
-Файл INPUT содержит объекты `plan` и `history`. `plan` - полный ResponsePlan; `history` - последовательность подтверждений instruction, checklist и decision с полями `stepId`, `checkedItemIds` и `decisionOptionId`. Асинхронные шаги проходят через имитирующие адаптеры с успешным результатом. Неподходящий порядок подтверждений отклоняется.
+The INPUT file contains objects `plan` and `history`. `plan` is the complete ResponsePlan; `history` is a sequence of acknowledgments for instruction, checklist, and decision with fields `stepId`, `checkedItemIds`, and `decisionOptionId`. Asynchronous steps are performed through simulated adapters with successful results. Inappropriate order of acknowledgments is rejected.

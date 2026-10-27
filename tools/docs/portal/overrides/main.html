@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block content %}
+  {% set alternate = config.extra.page_alternates.get(page.file.src_uri) %}
+  {% if alternate %}
+  <nav aria-label="{{ 'Language' if config.extra.document_language == 'en' else 'Язык' }}" style="text-align:right;font-size:.8rem;margin-bottom:1rem">
+    <strong>{{ 'English' if config.extra.document_language == 'en' else 'Русский' }}</strong> |
+    <a data-language-switch href="{{ alternate.url }}" hreflang="{{ alternate.language }}" lang="{{ alternate.language }}">{{ alternate.label }}</a>
+    <script type="application/json" id="document-language-anchors">{{ alternate.anchors | tojson }}</script>
+  </nav>
+  {% endif %}
+  {{ super() }}
+{% endblock %}

@@ -1,29 +1,33 @@
-# ADR-061. Проверка актуальности токенов и наборов областей
+# ADR-061. Checking current token validity and scope sets
 
-- **Статус:** Принято
-- **Связанные:** [ADR-020](0020-authorization-model.md), [ADR-043](0043-platform-security.md), [ADR-060](0060-realtime-delivery.md)
+<!-- language-links -->
+[English](0061-live-access-validation.md) | [Русский](../ru/adr/0061-live-access-validation.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-020](0020-authorization-model.md), [ADR-043](0043-platform-security.md), [ADR-060](0060-realtime-delivery.md)
 
-Проверка подписи JWT сохраняет доступ до истечения токена после отключения пользователя. Передача тысяч зон в JWT превышает ограничения HTTP-заголовков. Все владельцы операций должны одинаково проверять актуальность идентичности, роли и область.
+## Context
 
-## Решение
+JWT signature verification alone preserves access until token expiry after a user is disabled. Transferring thousands of zones in a JWT exceeds HTTP header limits. All operation owners must equally check the validity of identity, role, and scope.
 
-Сервисы используют общую конфигурацию `platform::stream::authentication_options` и `platform::security::JwksCache`: сначала локальная проверка подписи и обязательных утверждений, затем introspection через конфиденциальный клиент Keycloak. Адрес задаётся конфигурацией. Сетевой запрос не выбирается по непроверенным данным токена. Результаты ограничены 500 мс, 1024 токенами на шард и дедлайном 1 с; ошибка запрещает использовать прежний положительный результат.
+## Solution
 
-Консоль передаёт в JWT ссылку `psim_scope_set` на стабильный user ID. Keycloak выдаёт tenant, роли и полный набор областей в introspection. Сервер связывает ответ с подписью JWT через subject, issuer, клиент, tenant, срок и идентификатор набора. Изменившиеся inline-утверждения требуют обновления токена; области по ссылке обновляются без его перевыпуска. Протокол не добавляет отдельную службу хранения областей и Keycloak SPI.
+Services use the common configurations `platform::stream::authentication_options` and `platform::security::JwksCache`: first, local signature and required claims are checked, then introspection is performed through the confidential Keycloak client. The address is set in the configuration. A network request is not made based on unverified token data. Results are cached for up to 500 ms, with 1024 tokens per shard and a 1 s request deadline; an error prevents using previous positive results.
 
-Проверка роли и области выполняется только в `platform::authz`, включая нормализацию фильтров для SQL и ClickHouse. Ограничения выборок передаются параметрами. Connector Gateway требует tenant-wide область при административных изменениях; восстановление выделено отдельным действием.
+The console sends `psim_scope_set` link to the stable user ID in JWT. Keycloak returns tenant, roles, and full scope in introspection. The server links the response with the JWT signature through subject, issuer, client, tenant, expiry and scope-set identifier. Changed inline claims require token updates; scopes by link are updated without reissue. The protocol does not add a separate storage service for scopes or Keycloak SPI.
 
-WebSocket периодически проверяет актуальность независимо от наличия Kafka-событий. Просроченное доверие запрещает передачу следующего сообщения. Изменившиеся права закрывают соединение; клиент получает новый снимок и подписывается повторно. Явная переаутентификация сохраняется.
+Checking role and scope is only done in `platform::authz`, including SQL and ClickHouse filter normalization. Query restrictions are set with parameters. Connector Gateway requires tenant-wide scope for administrative changes; recovery is a separate action.
 
-## Последствия
+WebSocket periodically checks validity regardless of Kafka events. Expired trust prevents sending the next message. Changed rights close the connection; the client receives a new snapshot and subscribes again. Explicit reauthentication is preserved.
 
-Недоступность Keycloak прекращает доступ после короткого кэша. Это сознательный выбор для управляемого отзыва до истечения JWT. Нагрузка introspection зависит от числа различных активных токенов на шард; совместные запросы одного токена объединяются. Локальная подпись и ограниченные кэши защищают IdP от запросов с произвольными неподписанными токенами.
+## Consequences
 
-Инструкция настройки, границы отзыва и проверки описаны в [руководстве авторизации](../security/authorization.md).
+Keycloak’s unavailability ends access after the short cache expires. This is a deliberate choice for controlled revocation before JWT expiry. Introspection load depends on the number of active tokens per shard; requests from one token are combined. Local signature verification and limited caching protect IdP from queries with unverified tokens.
 
-## Источники
+Settings, revocation limits, and checks are described in the [Authorization Guide](../security/authorization.md).
+
+## Sources
 
 - [Keycloak OIDC endpoints](https://www.keycloak.org/securing-apps/oidc-layers).
 - [Keycloak protocol mappers](https://www.keycloak.org/admin-api/protocol-mappers).

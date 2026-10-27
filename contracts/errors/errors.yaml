@@ -6,7 +6,7 @@
 # Fields: http - REST status (null if not used in REST); grpc - gRPC status;
 # retryable - the client may retry the same request; used_in - where the code appears;
 # used_in values: rest, connector, dlq, command_result, notification, realtime.
-# title - English, returned in Problem.title; ru - description for documentation.
+# title - English, returned in Problem.title; en and ru - detailed descriptions.
 
 version: 1
 domains: [COMMON, AUTH, CATALOG, INGEST, PROCESSING, INCIDENT, RESPONSE, COMMAND, NOTIFICATION, AUDIT, REALTIME]
@@ -18,6 +18,7 @@ codes:
     retryable: false
     used_in: [rest, connector]
     title: Invalid argument
+    en: Request validation failed; details are provided in errors[]
     ru: Запрос не прошёл валидацию; подробности в errors[]
   - code: COMMON_PAYLOAD_TOO_LARGE
     http: 413
@@ -25,6 +26,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Payload too large
+    en: The request body exceeds the permitted size
     ru: Размер тела запроса превышает допустимый предел
   - code: COMMON_NOT_FOUND
     http: 404
@@ -32,6 +34,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Resource not found
+    en: The resource does not exist or is outside the access scope
     ru: Ресурс не найден или недоступен в области доступа
   - code: COMMON_CONCURRENT_MODIFICATION
     http: 412
@@ -39,6 +42,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Resource was modified
+    en: The If-Match version differs from the current resource version
     ru: Версия в If-Match не совпадает с текущей версией ресурса
   - code: COMMON_PRECONDITION_REQUIRED
     http: 428
@@ -46,6 +50,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: If-Match header required
+    en: A versioned resource was modified without the If-Match header
     ru: Изменение версионированного ресурса без заголовка If-Match
   - code: COMMON_IDEMPOTENCY_KEY_REUSED
     http: 422
@@ -53,6 +58,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Idempotency key reused with a different request
+    en: The idempotency key was already used for a different request
     ru: Ключ идемпотентности уже использован для другого запроса
   - code: COMMON_RATE_LIMITED
     http: 429
@@ -60,6 +66,7 @@ codes:
     retryable: true
     used_in: [rest]
     title: Too many requests
+    en: The request rate limit was exceeded
     ru: Превышен лимит частоты запросов
   - code: COMMON_INTERNAL
     http: 500
@@ -67,6 +74,7 @@ codes:
     retryable: true
     used_in: [rest, connector, dlq, realtime]
     title: Internal error
+    en: An unexpected error occurred; use trace_id to find details in the logs
     ru: Непредвиденная ошибка; подробности в журнале по trace_id
   - code: COMMON_UNAVAILABLE
     http: 503
@@ -74,6 +82,7 @@ codes:
     retryable: true
     used_in: [rest, connector, realtime]
     title: Service unavailable
+    en: The service or a dependency is temporarily unavailable
     ru: Сервис или его зависимость временно недоступны
   - code: COMMON_DEADLINE_EXCEEDED
     http: 504
@@ -81,6 +90,7 @@ codes:
     retryable: true
     used_in: [rest]
     title: Deadline exceeded
+    en: The request did not finish within its time limit
     ru: Запрос не выполнен за отведённое время
 
   # --- AUTH -----------------------------------------------------------------
@@ -90,6 +100,7 @@ codes:
     retryable: false
     used_in: [rest, connector, realtime]
     title: Authentication required
+    en: The access token or certificate is missing or invalid
     ru: Нет или недействителен токен доступа либо сертификат
   - code: AUTH_TOKEN_EXPIRED
     http: 401
@@ -97,6 +108,7 @@ codes:
     retryable: false
     used_in: [rest, realtime]
     title: Access token expired
+    en: The access token has expired; obtain a new token
     ru: Срок действия токена истёк; нужен новый токен
   - code: AUTH_FORBIDDEN
     http: 403
@@ -104,6 +116,7 @@ codes:
     retryable: false
     used_in: [rest, realtime]
     title: Action not allowed for the role
+    en: The user role does not permit the action (RBAC)
     ru: Роль пользователя не разрешает действие (RBAC)
   - code: AUTH_SCOPE_DENIED
     http: 403
@@ -111,6 +124,7 @@ codes:
     retryable: false
     used_in: [rest, realtime]
     title: Object outside the access scope
+    en: The object is outside the user's access scope (ABAC)
     ru: Объект вне области доступа пользователя (ABAC)
 
   # --- CATALOG --------------------------------------------------------------
@@ -120,27 +134,31 @@ codes:
     retryable: false
     used_in: [rest]
     title: Invalid parent location
-    ru: Недопустимый родитель локации (L1)
+    en: The location parent is invalid
+    ru: Недопустимый родитель локации
   - code: CATALOG_LOCATION_NOT_EMPTY
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Location has children or devices
-    ru: Нельзя архивировать локацию с дочерними локациями или устройствами (L3)
+    en: A location with child locations or devices cannot be archived
+    ru: Нельзя архивировать локацию с дочерними локациями или устройствами
   - code: CATALOG_SITE_CHANGE_FORBIDDEN
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Location cannot move to another site
-    ru: Перенос локации в другую площадку запрещён (L4)
+    en: Moving a location to another site is prohibited
+    ru: Перенос локации в другую площадку запрещён
   - code: CATALOG_DUPLICATE_CODE
     http: 409
     grpc: ALREADY_EXISTS
     retryable: false
     used_in: [rest]
     title: Duplicate code
+    en: The location or device type code is already in use
     ru: Код локации или типа устройства уже занят
   - code: CATALOG_DUPLICATE_EXTERNAL_ID
     http: 409
@@ -148,41 +166,47 @@ codes:
     retryable: false
     used_in: [rest]
     title: Duplicate external device id
-    ru: external_id устройства уже используется в пределах коннектора (D1)
+    en: The device external_id is already in use within the connector
+    ru: external_id устройства уже используется в пределах коннектора
   - code: CATALOG_DUPLICATE_SOURCE_REF
     http: 409
     grpc: ALREADY_EXISTS
     retryable: false
     used_in: [rest]
     title: Duplicate source reference
-    ru: external_ref источника уже используется в пределах коннектора (D2)
+    en: The source external_ref is already in use within the connector
+    ru: external_ref источника уже используется в пределах коннектора
   - code: CATALOG_POSITION_INVALID
     http: 400
     grpc: INVALID_ARGUMENT
     retryable: false
     used_in: [rest]
     title: Invalid device position
-    ru: Позиция устройства вне плана этажа или зона не на этаже с планом (D3)
+    en: The device position is outside the floor plan or the zone is not on the floor associated with the plan
+    ru: Позиция устройства вне плана этажа или зона не на этаже с планом
   - code: CATALOG_DEVICE_TYPE_IN_USE
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Device type is in use
-    ru: Тип устройства нельзя удалить, пока есть устройства этого типа (DT2)
+    en: A device type cannot be deleted while devices use it
+    ru: Тип устройства нельзя удалить, пока есть устройства этого типа
   - code: CATALOG_CERTIFICATE_LIMIT
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Too many active certificates
-    ru: У коннектора уже два сертификата; дождитесь окончания ротации (C1)
+    en: The connector already has two certificates; wait for rotation to finish
+    ru: У коннектора уже два сертификата; дождитесь окончания ротации
   - code: CATALOG_IMPORT_ROW_INVALID
     http: null
     grpc: INVALID_ARGUMENT
     retryable: false
     used_in: [rest]
     title: Import row is invalid
+    en: An import row is invalid; details are returned in the import report
     ru: Ошибка строки импорта, возвращается в отчёте импорта
 
   # --- INGEST ---------------------------------------------------------------
@@ -192,6 +216,7 @@ codes:
     retryable: false
     used_in: [connector]
     title: Connector is not registered
+    en: The certificate is not associated with a connector
     ru: Сертификат не привязан ни к одному коннектору
   - code: INGEST_CONNECTOR_REVOKED
     http: null
@@ -199,13 +224,15 @@ codes:
     retryable: false
     used_in: [connector]
     title: Connector revoked
-    ru: Коннектор отозван (C2)
+    en: The connector has been revoked
+    ru: Коннектор отозван
   - code: INGEST_PROTOCOL_VERSION_UNSUPPORTED
     http: null
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [connector]
     title: Protocol version not supported
+    en: There is no mutually supported connector protocol version
     ru: Нет общей версии протокола коннекторов
   - code: INGEST_PROTOCOL_VIOLATION
     http: null
@@ -213,6 +240,7 @@ codes:
     retryable: false
     used_in: [connector]
     title: Protocol violation
+    en: The protocol message order was violated, for example EventBatch before Register
     ru: Нарушен порядок сообщений протокола (например, EventBatch до Register)
   - code: INGEST_INVALID_EVENT
     http: null
@@ -220,6 +248,7 @@ codes:
     retryable: false
     used_in: [connector]
     title: Invalid event
+    en: The event failed schema validation and was permanently rejected
     ru: Событие не прошло валидацию схемы и отклонено навсегда
   - code: INGEST_CREDITS_EXCEEDED
     http: null
@@ -227,13 +256,15 @@ codes:
     retryable: true
     used_in: [connector]
     title: Credits exceeded
-    ru: Коннектор отправил больше событий, чем выдано кредитов (CS4)
+    en: The connector sent more events than its granted credits allow
+    ru: Коннектор отправил больше событий, чем выдано кредитов
   - code: INGEST_RATE_LIMITED
     http: null
     grpc: RESOURCE_EXHAUSTED
     retryable: true
     used_in: [connector]
     title: Connector rate limit exceeded
+    en: The connector's event rate limit was exceeded
     ru: Превышен лимит событий в секунду коннектора
   - code: INGEST_BATCH_TOO_LARGE
     http: null
@@ -241,6 +272,7 @@ codes:
     retryable: false
     used_in: [connector]
     title: Batch too large
+    en: The batch exceeds max_batch_events or max_batch_bytes
     ru: Пакет больше max_batch_events или max_batch_bytes
 
   # --- PROCESSING -----------------------------------------------------------
@@ -250,34 +282,39 @@ codes:
     retryable: false
     used_in: [dlq]
     title: Device not found for source
-    ru: Источник события не привязан к устройству в каталоге (E2)
+    en: The event source is not associated with a device in the catalog
+    ru: Источник события не привязан к устройству в каталоге
   - code: PROCESSING_DEVICE_DISABLED
     http: null
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [dlq]
     title: Device disabled
-    ru: Событие отключённого устройства (D5)
+    en: The event belongs to a disabled device
+    ru: Событие отключённого устройства
   - code: PROCESSING_NO_MAPPING
     http: null
     grpc: NOT_FOUND
     retryable: false
     used_in: [dlq]
     title: No mapping rule
-    ru: Нет правила отображения для кода события (E2)
+    en: There is no mapping rule for the event code
+    ru: Нет правила отображения для кода события
   - code: PROCESSING_UNKNOWN_TAXONOMY_TYPE
     http: 400
     grpc: INVALID_ARGUMENT
     retryable: false
     used_in: [rest, dlq]
     title: Unknown taxonomy type
-    ru: Тип таксономии не существует в действующей версии (M1)
+    en: The taxonomy type does not exist in the active version
+    ru: Тип таксономии не существует в действующей версии
   - code: PROCESSING_PAYLOAD_INVALID
     http: null
     grpc: INVALID_ARGUMENT
     retryable: false
     used_in: [dlq]
     title: Message payload invalid
+    en: The topic message cannot be decoded or violates its schema
     ru: Сообщение топика не декодируется или нарушает схему
   - code: PROCESSING_RULE_INVALID
     http: 400
@@ -285,13 +322,15 @@ codes:
     retryable: false
     used_in: [rest]
     title: Rule is invalid
-    ru: Правило не прошло валидацию (R1, R3, R4)
+    en: The rule failed validation
+    ru: Правило не прошло валидацию
   - code: PROCESSING_RULE_STATE_INVALID
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Rule state does not allow the operation
+    en: The operation is not allowed in the current rule version state
     ru: Операция недопустима в текущем состоянии версии правила
   - code: PROCESSING_RULE_EVALUATION_FAILED
     http: null
@@ -299,6 +338,7 @@ codes:
     retryable: false
     used_in: [dlq]
     title: Rule evaluation failed
+    en: Rule evaluation failed for the event
     ru: Ошибка вычисления правила для события
   - code: PROCESSING_RULESET_CONFLICT
     http: 409
@@ -306,6 +346,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Rule set was changed concurrently
+    en: The active rule set changed after the client read it
     ru: Активный набор правил изменился после чтения клиентом
   - code: PROCESSING_DRY_RUN_RANGE_INVALID
     http: 400
@@ -313,6 +354,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Dry run range outside retention
+    en: The dry-run range is outside the normalized event retention window
     ru: Интервал пробного прогона вне retention нормализованных событий
 
   # --- INCIDENT -------------------------------------------------------------
@@ -322,6 +364,7 @@ codes:
     retryable: false
     used_in: [rest]
     title: Incident type already exists
+    en: An incident type with this identifier already exists
     ru: Тип инцидента с таким идентификатором уже существует
   - code: INCIDENT_INVALID_STATE_TRANSITION
     http: 409
@@ -329,20 +372,23 @@ codes:
     retryable: false
     used_in: [rest]
     title: Invalid incident state transition
-    ru: Переход не разрешён моделью состояний инцидента (I1)
+    en: The transition is not allowed by the incident state model
+    ru: Переход не разрешён моделью состояний инцидента
   - code: INCIDENT_MANDATORY_STEPS_PENDING
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Mandatory steps are pending
-    ru: Инцидент нельзя решить, пока не выполнены обязательные шаги (I7)
+    en: The incident cannot be resolved until mandatory steps are completed
+    ru: Инцидент нельзя решить, пока не выполнены обязательные шаги
   - code: INCIDENT_RUN_VERSION_STALE
     http: 409
     grpc: ABORTED
     retryable: true
     used_in: [rest]
     title: Response run changed
+    en: The client has not seen the latest response run changes; refresh the incident view
     ru: Клиент не видел последних изменений сценария; обновите карточку
   - code: INCIDENT_ASSIGNEE_INVALID
     http: 400
@@ -350,13 +396,15 @@ codes:
     retryable: false
     used_in: [rest]
     title: Invalid assignee
-    ru: Ответственный без нужной роли или области доступа (I5)
+    en: The assignee lacks the required role or access scope
+    ru: Ответственный без нужной роли или области доступа
   - code: INCIDENT_RESOLUTION_FORBIDDEN
     http: 403
     grpc: PERMISSION_DENIED
     retryable: false
     used_in: [rest]
     title: Resolution not allowed
+    en: Resolution is not allowed for the role or state, for example from new without supervisor
     ru: Решение недопустимо для роли или состояния (например, из new без supervisor)
 
   # --- RESPONSE -------------------------------------------------------------
@@ -366,41 +414,47 @@ codes:
     retryable: false
     used_in: [rest]
     title: Response plan is invalid
-    ru: Сценарий нарушает P1-P5
+    en: The response plan failed structural or content validation
+    ru: Сценарий не прошёл проверку структуры или содержимого
   - code: RESPONSE_PLAN_IMMUTABLE
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Published plan version is immutable
-    ru: Опубликованная версия сценария неизменяема (P4)
+    en: A published response plan version is immutable
+    ru: Опубликованная версия сценария неизменяема
   - code: RESPONSE_STEP_NOT_ACTIVE
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Step is not active
-    ru: Шаг не входит в active_steps (RR2)
+    en: The step is not included in active_steps
+    ru: Шаг не входит в active_steps
   - code: RESPONSE_STEP_MANDATORY
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Mandatory step cannot be skipped
-    ru: Обязательный шаг нельзя пропустить (RR3)
+    en: A mandatory step cannot be skipped
+    ru: Обязательный шаг нельзя пропустить
   - code: RESPONSE_POLICY_INVALID
     http: 400
     grpc: INVALID_ARGUMENT
     retryable: false
     used_in: [rest]
     title: Escalation policy is invalid
-    ru: Политика эскалации нарушает EP1-EP2
+    en: The escalation policy failed validation
+    ru: Политика эскалации не прошла валидацию
   - code: RESPONSE_AUTOMATED_STEP_FAILED
     http: null
     grpc: UNAVAILABLE
     retryable: true
     used_in: [dlq]
     title: Automated step handler failed
+    en: The external automated step handler returned an error or did not respond
     ru: Внешний обработчик автоматического шага вернул ошибку или не ответил
 
   # --- COMMAND --------------------------------------------------------------
@@ -410,20 +464,23 @@ codes:
     retryable: false
     used_in: [rest]
     title: Capability not supported by device
-    ru: Возможности нет у типа устройства (CM1)
+    en: The device type does not support the capability
+    ru: Возможности нет у типа устройства
   - code: COMMAND_APPROVAL_SELF
     http: 403
     grpc: PERMISSION_DENIED
     retryable: false
     used_in: [rest]
     title: Requester cannot approve own command
-    ru: Подтверждающий совпадает с инициатором (CM3)
+    en: The approver is the initiator
+    ru: Подтверждающий совпадает с инициатором
   - code: COMMAND_INVALID_STATE
     http: 409
     grpc: FAILED_PRECONDITION
     retryable: false
     used_in: [rest]
     title: Command state does not allow the operation
+    en: The operation is not allowed in the current command state
     ru: Операция недопустима в текущем состоянии команды
   - code: COMMAND_CONNECTOR_OFFLINE
     http: null
@@ -431,6 +488,7 @@ codes:
     retryable: false
     used_in: [command_result]
     title: Connector offline
+    en: The device connector was offline at dispatch time
     ru: Коннектор устройства не в сети в момент отправки
   - code: COMMAND_DEVICE_REJECTED
     http: null
@@ -438,6 +496,7 @@ codes:
     retryable: false
     used_in: [command_result, connector]
     title: Device rejected the command
+    en: The connector or device refused execution
     ru: Коннектор или устройство отказали в исполнении
   - code: COMMAND_TIMED_OUT
     http: null
@@ -445,6 +504,7 @@ codes:
     retryable: false
     used_in: [command_result]
     title: Command timed out
+    en: No final result arrived before deadline_at
     ru: Нет финального результата до deadline_at
   - code: COMMAND_APPROVAL_TIMED_OUT
     http: null
@@ -452,6 +512,7 @@ codes:
     retryable: false
     used_in: [command_result]
     title: Approval timed out
+    en: The critical command was not approved in time
     ru: Критичная команда не подтверждена в срок
   - code: COMMAND_EXPIRED
     http: null
@@ -459,6 +520,7 @@ codes:
     retryable: false
     used_in: [connector]
     title: Command expired before delivery
+    en: The gateway did not deliver the command because deadline_at had expired
     ru: Шлюз не доставил команду с истёкшим deadline_at
 
   - code: COMMAND_OUTCOME_UNKNOWN
@@ -467,6 +529,7 @@ codes:
     retryable: false
     used_in: [command_result]
     title: Command outcome unknown
+    en: The connector session ended without a result; automatic retry is prohibited
     ru: Сессия коннектора завершилась без результата; автоматический повтор запрещён
 
   # --- NOTIFICATION ---------------------------------------------------------
@@ -476,7 +539,8 @@ codes:
     retryable: false
     used_in: [notification]
     title: Notification delivery failed
-    ru: Попытки доставки уведомления исчерпаны (N2)
+    en: Notification delivery attempts have been exhausted
+    ru: Попытки доставки уведомления исчерпаны
 
 
   # --- REALTIME -------------------------------------------------------------
@@ -486,6 +550,7 @@ codes:
     retryable: false
     used_in: [realtime]
     title: Resync required
+    en: The resume token is stale; the client must obtain a new snapshot
     ru: Токен возобновления устарел; клиент должен взять новый снимок
   - code: REALTIME_SLOW_CONSUMER
     http: null
@@ -493,6 +558,7 @@ codes:
     retryable: true
     used_in: [realtime]
     title: Slow consumer
+    en: The client send queue is full; the connection is being closed
     ru: Очередь отправки клиента переполнена; соединение закрывается
   - code: REALTIME_SUBSCRIPTION_INVALID
     http: null
@@ -500,6 +566,7 @@ codes:
     retryable: false
     used_in: [realtime]
     title: Invalid subscription
+    en: The subscription or filter is invalid
     ru: Неверная подписка или фильтр
 
   # --- AUDIT ----------------------------------------------------------------
@@ -509,4 +576,5 @@ codes:
     retryable: false
     used_in: [rest]
     title: Audit integrity violation
+    en: The audit chain or checkpoint failed integrity verification
     ru: Цепочка аудита или контрольная точка не прошла проверку целостности

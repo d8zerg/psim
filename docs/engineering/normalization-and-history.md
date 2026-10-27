@@ -1,8 +1,12 @@
-# Normalizer и Event History
+# Normalizer and Event History
 
-`psim-normalizer` принимает `psim.ingest.raw.v1`, применяет таксономию и собственную версионную копию каталога, публикует `psim.events.normalized.v1` и транзакционный журнал курсоров. `psim-event-history` загружает нормализованный поток в ClickHouse. Границы восстановления и ограничения закреплены в [ADR-052](../adr/0052-normalization-and-event-history.md).
+<!-- language-links -->
+[English](normalization-and-history.md) | [Русский](../ru/engineering/normalization-and-history.md)
+<!-- /language-links -->
 
-## Локальная проверка
+`psim-normalizer` accepts `psim.ingest.raw.v1`, applies a taxonomy and its local catalog replica, publishes `psim.events.normalized.v1` and the transactional cursor changelog. `psim-event-history` loads the normalized stream into ClickHouse. Recovery boundaries and constraints are defined in [ADR-052](../adr/0052-normalization-and-event-history.md).
+
+## Local Verification
 
 ```sh
 task processing:test
@@ -11,13 +15,13 @@ task processing:coverage
 task processing:bench
 ```
 
-Все процессы выполняются через нативный Docker Engine на Linux. Проверка создаёт Compose-проект `psim-processing-test`; `PROJECT` задаёт другое имя. Собственный проект удаляется вместе с тестовыми томами. Если сеть уже существовала, проверка останавливает только свои сервисы. Логи и отчёт записываются в `build/processing/<preset>/`.
+All processes are executed through the native Docker Engine on Linux. The verification creates a Compose project `psim-processing-test`; `PROJECT` sets another name. The custom project is deleted along with test volumes. If the network already exists, the verification only stops its services. Logs and reports are recorded in `build/processing/<preset>/`.
 
-Примеры настроек: [Normalizer](../../deploy/local/config/event-flow/normalizer.yaml), [Event History](../../deploy/local/config/processing/event-history.yaml). Пароль ClickHouse - защищённый файл режима 0400, принадлежащий пользователю процесса. Для реальной поставки задаются TLS/mTLS Kafka, Schema Registry, PostgreSQL и ClickHouse. Открытые соединения разрешаются только явной настройкой локального окружения.
+Examples of configurations: [Normalizer](../../deploy/local/config/event-flow/normalizer.yaml), [Event History](../../deploy/local/config/processing/event-history.yaml). ClickHouse password is a protected 0400 mode file belonging to the process user. For real delivery, TLS/mTLS is used for Kafka, Schema Registry, PostgreSQL, and ClickHouse. Plaintext connections are only allowed with explicit configuration in the local environment.
 
-## Управление нормализацией
+## Management of Normalization
 
-Каталог поступает из `psim.catalog.v1`. `ConfigRecord.mapping_rule_set` публикуется в `psim.config.v1` под ключом `mapping/<tenant_id>/<connector_type>`. Набор содержит версию, версию таксономии `1` и упорядоченные правила. Пример правила:
+The catalog comes from `psim.catalog.v1`. `ConfigRecord.mapping_rule_set` is published in `psim.config.v1` under the key `mapping/<tenant_id>/<connector_type>`. The set includes the version, taxonomy version `1`, and ordered rules. Example rule:
 
 ```json
 {
@@ -28,24 +32,24 @@ task processing:bench
 }
 ```
 
-Первое совпадение определяет тип, класс и критичность. Пустое условие всегда истинно. Поддерживаемое подмножество CEL описано в ADR-052; неподдерживаемое выражение останавливает загрузку копии с ошибкой, предыдущая корректная конфигурация не заменяется. REST-редактор отображений в этой реализации отсутствует: версии публикует доверенный административный инструмент.
+The first match determines the type, class, and severity. An empty condition is always true. The supported subset of CEL is described in ADR-052; an unsupported expression stops the loading of a corrupted copy, and the previous correct configuration is not replaced. Resource Catalog publishes versions through `PUT /v1/mappings/{connectorType}` via API Gateway, with `If-Match` version checks. The [administration interface](administration.md) provides the mapping editor; concurrent publication by a separate administrative writer is not allowed.
 
-`ProcessingSettings` задаёт порог значимости. `taxonomy_file` указывает на читаемый YAML: пакет устанавливает его в `/usr/share/psim/taxonomy.yaml`, локальный стенд читает файл репозитория. Число ресурсов и курсоров ограничено `max_replica_entries`. Курсоры не удаляются автоматически. Старые номера вне окна 4096 отправляются в DLQ с причиной. Пакет чтения ограничен 16 сообщениями, целевой интервал фиксации - 5 мс, минимальный интервал между транзакциями - 5 мс (`transaction_gap_ms`). Курсоры одного источника объединяются до последнего снимка внутри транзакции.
+`ProcessingSettings` sets the significance threshold. `taxonomy_file` specifies the readable YAML: the package installs it in `/usr/share/psim/taxonomy.yaml`, and the local test environment reads the repository file. The number of resources and cursors is limited by `max_replica_entries`. Cursors are not automatically deleted. Old numbers outside the range 4096 are sent to DLQ with a reason. The read batch has a limit of 16 messages, with a target confirmation interval of 5 ms and a minimum interval between transactions of 5 ms (`transaction_gap_ms`). Cursors from the same source are coalesced into the latest snapshot within a transaction.
 
-## Состояние и история
+## Status and History
 
-Наличие события в истории не доказывает актуальность оборудования. Только недавнее подтверждённое наблюдение текущей принимающей сессии получает `live_observation` и `state_observed_at`; остальные события сохраняют свои времена без повышения свежести. При чтении проекция учитывает текущую сессию Gateway и монотонность времени подтверждения.
+The presence of an event in history does not prove device state freshness. Only recently confirmed observations by the current receiving session receive `live_observation` and `state_observed_at`; other events retain their time without increasing freshness. When reading, the projection takes into account the current Gateway session and the monotonicity of confirmation time.
 
-Event History использует таблицу `events`, журнал `psim_clickhouse.pending_batches` и отдельную транзакционную публикацию ошибок. Подготовленный блок ограничен 8 МиБ с учётом сериализации. Если преобразование увеличило пакет сверх лимита, загрузчик уменьшает префикс записей и перечитывает остаток после фиксации. Лимит ответа PostgreSQL по умолчанию - 32 МиБ: чтение бинарного журнала в hex требует удвоенного размера. Отказ ClickHouse оставляет подготовленный блок для повтора. Временные ошибки не переводятся в DLQ. Некорректный нормализованный Protobuf отбраковывается с исходным содержимым. Чтение истории использует `FINAL`, обязательный тенант и ограниченный интервал времени.
+Event History uses table `events`, log `psim_clickhouse.pending_batches`, and a separate transaction error publication. The prepared block is limited to 8 MiB, including serialization. If the conversion exceeds the limit, the loader reduces the prefix of the records and rereads the remaining part after recording. The default response limit for PostgreSQL is 32 MiB: reading the binary log in hex requires double the size. A failure in ClickHouse leaves the prepared block for repetition. Transient errors are not transferred to DLQ. Invalid normalized Protobuf is sent to DLQ with the original payload. Reading history uses `FINAL`, a required tenant, and a limited time interval.
 
-Срок удаления хранится в каждой строке. `RetentionSettings` изменяет сроки новых подготовленных блоков; ранее сохранённые строки сохраняют прежний срок. Повтор после сбоя использует исходные байты блока. TTL выполняется фоновыми слияниями ClickHouse и не является точным таймером удаления.
+The expiration time is stored in each row. `RetentionSettings` changes the expiration times of newly prepared blocks; previously saved rows retain their original expiration time. After a failure, repetition uses the original bytes of the block. TTL is executed through ClickHouse background merging and is not an exact timer for deletion.
 
-## Поставка
+## Delivery
 
-Оба сервиса имеют отдельные Debian-пакеты и контейнерные образы без root. Normalizer требует Kafka, Schema Registry и файл таксономии. Event History дополнительно требует PostgreSQL для журнала, ClickHouse и Keeper. Миграция создаёт одну Replicated-таблицу на настроенном кластере; для запуска нужны права развёртывания на DDL и создание журнала. Рабочая роль должна получать только необходимые права после применения миграций.
+Both services have separate Debian packages and container images running as a non-root user. Normalizer requires Kafka, Schema Registry, and taxonomy file. Event History additionally requires PostgreSQL for logs, ClickHouse, and Keeper. Migration creates one Replicated table on the configured cluster; to run, DDL rights and log creation are required. The runtime role should only receive necessary rights after migration.
 
-## Замер этапа
+## Stage Measurement
 
-`p99_stage_ms` измеряется от начала чтения очередного входного пакета Normalizer до получения нормализованной записи потребителем `read_committed`. Включены чтение, обработка пакета, фиксация и видимость транзакции. Отдельный `p99_visible_ms` измеряет время от приёма шлюзом и включает доставку сырого события через Kafka. Для бюджета Normalizer 30 мс используется первая величина; полная задержка сохраняется в отчёте. Нагрузочная проверка использует открытое расписание 50 000 событий/с, отдельный прогрев 50 000 событий, 100 источников в 100 зонах и полную сверку идентификаторов. Сравнение насыщенного потока на одном и трёх экземплярах требует ускорения не менее 2,4 раза. Генератор использует отдельный синтетический код `BENCHMARK`, отображаемый в `generic.alarm`, чтобы нагрузка не создавала инциденты минимального стенда.
+`p99_stage_ms` is measured from the start of reading the next input batch of Normalizer until the consumer receives the normalized record `read_committed`. Reading, batch processing, recording, and transaction visibility are included. A separate `p99_visible_ms` measures the time from receiving by the gateway and includes the delivery of raw events through Kafka. For Normalizer budget, 30 ms is used for the first value; the total delay is reported. Load testing uses an open-loop schedule of 50,000 events per second, a separate warm-up of 50,000 events, 100 sources in 100 zones, and full comparison of identifiers. Comparing a saturated flow on one and three instances requires at least a 2.4-fold increase in speed. The generator uses a separate synthetic code `BENCHMARK`, mapped to `generic.alarm`, to prevent incidents from the baseline test environment.
 
-Проверенный технический профиль: 100 000 измеряемых событий после 50 000 прогревочных, три Normalizer и два Event History на одном Linux-хосте с одним Kafka. p99 этапа - 27,20 мс, верхняя оценка отставания истории - 4,32 с, ускорение насыщенного потока на трёх экземплярах - 3,92 раза. Основной замер использует точное отображение кода без условия CEL и события без дополнительных атрибутов; крупные атрибуты проверяются отдельным функциональным сценарием. Это короткий замер этапа; длительная нагрузка и кластерные SLO проверяются отдельно.
+Verified technical profile: 100,000 measured events after 50,000 warm-up, three Normalizers, and two Event History on one Linux host with one Kafka. p99 of the stage is 27.20 ms, the upper estimate of history delay is 4.32 s, and the increase in saturated flow on three instances is 3.92 times. The main measurement uses exact-code mapping without CEL conditions and events without additional attributes; large attributes are tested with a separate functional scenario. This is a short stage measurement; long-term load and cluster SLOs are tested separately.

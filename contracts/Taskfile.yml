@@ -152,7 +152,7 @@ tasks:
       - rm -rf {{.OUT}}/docs
       - task: _buf
         vars: {ARGS: generate --template buf.gen.docs.yaml}
-      - sed -i 's/[[:blank:]]*$//' {{.OUT}}/docs/proto-reference.md
+      - '{{.PYTHON}} {{.TOOLS}}/reference.py {{.OUT}}/docs/proto-reference.md'
       - task: :_publish
         vars: {SRC: '{{.OUT}}/docs/proto-reference.md', DST: '{{.TASKFILE_DIR}}/docs/proto-reference.md', UPDATE: '{{.UPDATE}}'}
 

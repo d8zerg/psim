@@ -1,36 +1,40 @@
-# ADR-071. Рабочая консоль оператора
+# ADR-071. Operator’s Work Console
 
-- **Статус:** Принято
-- **Связанные:** [ADR-062](0062-design-system-and-stable-updates.md), [ADR-064](0064-alarm-philosophy.md), [ADR-068](0068-operational-interface-backend.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-070](0070-lazy-loading-and-delivery-budgets.md)
+<!-- language-links -->
+[English](0071-operator-console.md) | [Русский](../ru/adr/0071-operator-console.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-062](0062-design-system-and-stable-updates.md), [ADR-064](0064-alarm-philosophy.md), [ADR-068](0068-operational-interface-backend.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-070](0070-lazy-loading-and-delivery-budgets.md)
 
-Рабочий маршрут консоли использует существующую OIDC-сессию, REST-клиент и один realtime-канал оболочки. Виртуализированная лента сохраняет идентификаторы строк, фокус и положение прокрутки при обновлениях. В начале списка новые записи видны сразу. Отбор по тексту, приоритету, состоянию, площадке и ответственному независим. Выбор записи не меняется из-за нового события или изменения порядка.
+## Solution
 
-TanStack Query хранит детали инцидента, сценарий, команды, каталог, состояние объекта и уведомления. Изменения инцидентов, реагирования и выбранного объекта инвалидируют чтение; периодическая сверка восстанавливает данные между уведомлениями. Повторяются только чтения. Изменения используют отдельный Idempotency-Key и версию соответствующего агрегата. Разрешение инцидента также передаёт известную версию сценария реагирования. Конфликт требует проверки перечитанного состояния. Смена идентичности или области удаляет прежние данные; отказ актуальной авторизации скрывает ранее полученные детали.
+The console’s working path uses an existing OIDC session, a REST client, and one realtime channel for the interface. The virtual feed stores row identifiers, focus, and scrolling position during updates. New entries are displayed immediately at the beginning of the list. Filters for text, priority, state, site and assignee are independent. Selection is unaffected by new events or reordering.
 
-Нет связи или нет актуального успешного чтения - нет изменяющих действий. Учения и видеостена в рабочем маршруте доступны для чтения. Условие тревоги, её подтверждение и жизненный цикл инцидента независимы. Откладывание и подавление требуют основания и ограниченного срока. Звук включается явно; P1 повторяется не чаще одного раза за десять секунд, P2 звучит один раз, P3/P4 не звучат. Наплыв ограничивает частоту звуков и сообщений live-региона, сохраняя исходные записи и счётчик.
+TanStack Query stores details of incidents, scenarios, commands, catalogs, object states, and notifications. Changes to incidents, responses, and selected objects invalidate reads; periodic checks restore data between notifications. Only reads are repeated. Changes use a separate Idempotency-Key and the version of the corresponding aggregate. Incident resolution also passes the known version of the response scenario. Conflicts require checking the read state. Changing identity or access scope deletes previous data; failure of current authorization hides previously obtained details.
 
-Чтение доступного устройства возвращает также его тип с capabilities. Каталог сначала проверяет tenant и область устройства, затем загружает связанный тип в той же транзакции. Доступ к общему каталогу типов не расширяется.
+Mutating actions are unavailable without connectivity or a current successful read. Exercises and video walls in the working path are read-only. Alarm conditions, acknowledgment, and incident lifecycle are independent. Shelving and suppression require a reason and limited time. Sounds are activated explicitly; P1 repeats no more than once every ten seconds, P2 sounds once, P3/P4 don’t sound. Overload limits sound and message frequency in the live region, preserving original records and counters.
 
-Команда создаётся после предпросмотра конкретного устройства, capability, параметров, шага и последствий. Изменение предложения снимает возможность отправки до нового предпросмотра. Отправка использует commandId как Idempotency-Key и fingerprint предпросмотра. После начала запроса повторная отправка заблокирована; неизвестный результат проверяется чтением того же commandId. Критичное подтверждение требует другого старшего смены, свежего предпросмотра и текущей версии команды.
+Reading an authorized device also returns its type with capabilities. The catalog first checks the tenant and device access scope, then loads the corresponding type in the same transaction. Access to the general type catalog isn’t expanded.
 
-Передача сохраняет текущего ответственного до подтверждения получателя. Получатель явно отмечает просмотр текущей версии инцидента и сценария. Изменение версии снимает отметку просмотра. Исходные сроки SLA остаются серверными. Старший смены назначает дежурного с отдельной версией записи и обязательным резервным контактом.
+A command is created after previewing a specific device, capability, parameters, step, and consequences. Changing the proposal disables sending until a new preview. Sending uses commandId as an Idempotency-Key and the fingerprint of the preview. After starting the request, re-sending is blocked; unknown results are checked by reading the same commandId. Critical acknowledgment requires another shift supervisor, a fresh preview, and the current version of the command.
 
-План загружается через авторизованный файловый API в Blob URL; URL освобождается после замены и закрытия объекта. Маркеры используют координаты каталога и отдельное состояние проекции. Отсутствие наблюдения, неизвестная доступность, устаревшие данные, потеря соединения и обслуживание не отображаются как исправность. Табличное текстовое представление сохраняет качество, связь и время подтверждения.
+Transfer keeps the current responsible person until the recipient acknowledges. The recipient explicitly marks the current version as reviewed of the incident and scenario. Changing the version removes the mark. Original SLA deadlines remain server-side. Shift supervisors assign duty with a separately versioned record and mandatory backup contact.
 
-## Состав браузерного кода
+The floor plan is loaded through an authorized file API in Blob URL; the URL is freed after replacement and object closure. Markers use catalog coordinates and separate projection state. Lack of observation, unknown availability, outdated data, connection loss, and maintenance aren’t shown as normal. Tabular text representation preserves quality, connection, and confirmation time.
 
-Действующие пределы сохраняются: начальная загрузка до 150000 байт JS gzip, полный граф приложения до 200000, граф витрины до 260000, суммарный JS до 294 КБ и CSS до 15 КБ.
+## Composition of Browser Code
 
-Сравнение исходной реализации выявило три лишние зависимости: серверные protobuf-аннотации и HTTP-дескрипторы, таблица при импорте дерева, словари макетов в графе рабочего входа. Браузерная генерация сохраняет сообщения, достижимые из realtime-протокола, и определения перечислений; исключает серверные custom options и сервисы. Стандартные параметры полей, oneof, map-entry, имена JSON, числа и временные типы сохраняются. Оптимизация не изменяет исходные контракты и серверную валидацию. Дерево получает отдельный совместимый экспорт; прежний экспорт сохраняется. Словари макетов регистрируются только входом витрины.
+Current limits are preserved: initial loading up to 150,000 bytes of JS gzip, application graph up to 200,000, showcase dependency graph up to 260,000, total JS up to 294 KB, and CSS up to 15 KB.
 
-Измеренный полный граф до оптимизаций - 238260 байт, после удаления аннотаций - 224869, после отдельного импорта дерева - 209825, после отбора сообщений протокола - 205379, после отделения словарей - 197867. Итоговый граф консоли - 197935 байт. Отдельная экспериментальная сборка консоли сама по себе оставалась выше лимита. Полное исследование вариантов поставки ADR-070 остаётся в шаге 8.6; локальные оптимизации не повышают лимиты и не объявляют исследование завершённым.
+Comparison with the original implementation revealed three extra dependencies: server-side protobuf annotations and HTTP descriptors, table during tree import, and showcase dictionaries in the working input graph. Browser generation preserves messages from realtime protocols and enumeration definitions; it excludes server-side custom options and services. Standard field parameters, oneof, map-entry, JSON names, numbers, and time types are preserved. Optimization doesn’t change original contracts or server validation. The tree gets a separate compatible export; the previous export is preserved. Showcase dictionaries are registered only when entering the showcase.
 
-## Проверка
+Measured total graph before optimization was 238,260 bytes, after removing annotations it became 224,869 bytes, after separate tree import it became 209,825 bytes, after filtering protocol messages it became 205,379 bytes, after separating dictionaries it became 197,867 bytes. The final console graph was 197,935 bytes. The experimental console build itself remained above the limit. Detailed variations in delivery are described in ADR-070 and ADR-076; local optimizations don’t increase limits or declare research complete.
 
-- `task web:check`: версии, права, поздние ответы, локализация, клавиатура, доступность, визуальная регрессия и бюджеты.
-- `task operator:benchmark`: отдельный браузерный worker, 10000 записей, частота прокрутки и задержка realtime -> DOM. Это не замер полного входного конвейера.
-- `task operator:test`: реальный PKCE, HTTPS-сервисы, Kafka, PostgreSQL, каталог и частные планы, Response Engine, Command Service, Connector Gateway и SDK, SLA и уведомления.
-- `task catalog:test` и прогоны каталога под ASan/UBSan и TSan: чтение capabilities через доступное устройство, запрет общего каталога типов, чужой площадки и tenant.
-- `task flow:test`: исходное событие через коннектор, нормализацию, корреляцию и Kafka до браузера; отдельная сверка устойчивых эффектов и трассировки.
+## Verification
+
+- `task web:check`: Versions, rights, late responses, localization, keyboard, accessibility, visual regression, and budgets.
+- `task operator:benchmark`: Separate browser worker, 10,000 records, scrolling frequency and realtime -> DOM delay. This isn’t a measurement of the total input pipeline.
+- `task operator:test`: Real PKCE, HTTPS services, Kafka, PostgreSQL, catalog and private plans, Response Engine, Command Service, Connector Gateway and SDK, SLA and notifications.
+- `task catalog:test` and catalog runs under ASan/UBSan and TSan: Reading capabilities through an authorized device, prohibiting general type catalog, another site or tenant.
+- `task flow:test`: Original event through connector, normalization, correlation and Kafka to browser; separate check of stable effects and tracing.

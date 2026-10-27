@@ -1,53 +1,56 @@
-# ADR-004. Формат сериализации и правила эволюции схем
+# ADR-004. Serialization format and schema evolution rules
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 0.5, 1.3, 2.3)
-- **Связанные:** ADR-003, ADR-005, ADR-026, [crosscutting.md](../architecture/crosscutting.md#10-эволюция-контрактов)
+<!-- language-links -->
+[English](0004-serialization-and-schema-evolution.md) | [Русский](../ru/adr/0004-serialization-and-schema-evolution.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-003, ADR-005, ADR-026, [crosscutting.md](../architecture/crosscutting.md#10-contract-evolution)
 
-Сообщения в Kafka, протокол коннекторов и REST должны иметь строгие типизированные схемы, компактный формат для 50 000 событий/с и правила эволюции, позволяющие обновление без простоя (версии N и N+1 работают одновременно).
+## Context
 
-## Рассмотренные варианты
+Kafka messages, the connector protocol and REST require strict typed schemas, a compact format for 50,000 events/s, and evolution rules supporting zero-downtime upgrades while versions N and N+1 coexist.
 
-### Формат
+## Considered options
 
-| Вариант | Плюсы | Минусы |
+### Format
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Protobuf (proto3)** | Компактный и быстрый; один IDL для Kafka, gRPC и REST; зрелый C++ и TS; `buf` для линтинга и проверки совместимости | Нет встроенной схемы в сообщении (решается реестром) |
-| Avro | Стандарт для Kafka-экосистемы | Слабее C++-инструменты; второй IDL рядом с gRPC |
-| JSON + JSON Schema | Читаемость | Объём и стоимость разбора при 50 000 событий/с |
-| FlatBuffers / Cap'n Proto | Нулевое копирование | Слабая поддержка реестрами и инструментами |
+| **Protobuf (proto3)** | Compact and fast; one IDL for Kafka, gRPC and REST; mature C++ and TS tooling; `buf` linting and compatibility checks | No embedded message schema; addressed by the registry |
+| Avro | Standard in the Kafka ecosystem | Weaker C++ tooling; a second IDL alongside gRPC |
+| JSON + JSON Schema | Readability | Size and parsing cost at 50,000 events/s |
+| FlatBuffers / Cap'n Proto | Zero-copy access | Limited registry and tooling support |
 
-### Структура сообщения в топике
+### Topic-message structure
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| A. Конверт с полезной нагрузкой `bytes` и именем типа | Гибкость | Реестр видит только конверт; совместимость нагрузок не проверяется реестром |
-| B. Конверт в заголовках Kafka, тело - полезная нагрузка | Тело проверяется реестром | Конверт не типизирован и не проверяется; заголовки легко потерять при переносе |
-| **C. Одна запись на топик: `<Topic>Record { Envelope envelope = 1; oneof payload {...} }`** | Конверт и все типы событий топика типизированы и проверяются реестром как одна схема; новый тип события - новая ветвь `oneof` | Все типы событий топика в одном файле записи |
+| A. Envelope with a `bytes` payload and type name | Flexibility | The registry sees only the envelope and cannot check payload compatibility |
+| B. Envelope in Kafka headers, payload in the body | The registry checks the body | The envelope is untyped and unchecked; headers can be lost during transfer |
+| **C. One record per topic: `<Topic>Record { Envelope envelope = 1; oneof payload {...} }`** | The envelope and every topic event type are typed and checked as one schema; a new event type adds a `oneof` branch | Every event type for a topic belongs to one record file |
 
-## Решение
+## Decision
 
-1. **Protobuf proto3** - единственный IDL контрактов. Поля с явным присутствием - `optional`.
-2. **Структура C:** значение сообщения в топике - запись топика, например `psim.incident.v1.IncidentEventRecord`, с полем конверта и `oneof payload`. Стратегия имени subject - `TopicNameStrategy` (`<topic>-value`).
-3. **Формат на проводе** - Confluent wire format: магический байт `0`, 4 байта идентификатора схемы, индексы сообщения Protobuf, тело. Ключ сообщения - строка UTF-8 без схемы.
-4. **Совместимость:** `BACKWARD_TRANSITIVE` для записей топиков, `FULL_TRANSITIVE` для конверта и общих типов. Компиляционная проверка - `buf breaking` с набором правил `WIRE_JSON` против последнего выпуска.
-5. **Правила эволюции:**
-   - добавлять только необязательные поля с новыми номерами;
-   - удалённые поля и номера переносить в `reserved`;
-   - не менять тип и смысл поля; для нового смысла - новое поле;
-   - новый тип события - новая ветвь `oneof`; потребитель обязан игнорировать неизвестную ветвь (логировать и считать в метрике, не отправлять в DLQ);
-   - перечисления: значение `0` - `*_UNSPECIFIED`; неизвестные значения обрабатываются как неизвестные;
-   - несовместимое изменение - новая версия пакета (`v2`) и новый топик (`.v2`) с периодом двойной записи.
-6. **Именование пакетов:** `psim.<context>.v<N>`; файлы - `contracts/proto/psim/<context>/v<N>/*.proto`.
+1. **Protobuf proto3** is the sole contract IDL. Fields requiring explicit presence use `optional`.
+2. **Structure C:** a topic message value is a topic record, such as `psim.incident.v1.IncidentEventRecord`, with an envelope field and `oneof payload`. Use `TopicNameStrategy` for subjects (`<topic>-value`).
+3. **Wire format:** Confluent framing with magic byte `0`, four schema-ID bytes, Protobuf message indexes and the body. The message key is a UTF-8 string without a schema.
+4. **Compatibility:** `BACKWARD_TRANSITIVE` for topic records and `FULL_TRANSITIVE` for the envelope and shared types. Compile-time verification uses `buf breaking` with `WIRE_JSON` rules against the latest release.
+5. **Evolution rules:**
+   - Add only optional fields with new numbers.
+   - Mark removed field names and numbers as `reserved`.
+   - Never change a field's type or meaning; introduce a new field for new meaning.
+   - Add a new event type as a new `oneof` branch. Consumers must ignore unknown branches, logging and counting them without sending them to DLQ.
+   - Enum value `0` is `*_UNSPECIFIED`; unknown values are handled as unknown.
+   - An incompatible change requires a new package version (`v2`) and topic (`.v2`), with a dual-write period.
+6. **Package naming:** `psim.<context>.v<N>`; files are `contracts/proto/psim/<context>/v<N>/*.proto`.
 
-## Последствия
+## Consequences
 
-- Один генератор кода для C++ (protoc + gRPC) и TypeScript (ADR-026).
-- Слой Kafka (шаг 2.3) реализует кодек Confluent wire format с индексами сообщений Protobuf.
-- Потребители устойчивы к будущим типам событий без перевыпуска.
+- One code-generation approach for C++ with protoc + gRPC and TypeScript under ADR-026.
+- The Kafka layer implements the Confluent wire codec, including Protobuf message indexes.
+- Consumers tolerate future event types without a new release.
 
-## Проверка
+## Verification
 
-`buf lint` и `buf breaking` в CI (шаг 1.3); контрактный тест реестра (ADR-003); тест «старый потребитель - новый производитель» в наборе обновления (шаг 9.2).
+Run `buf lint` and `buf breaking` in CI, the registry contract test from ADR-003, and an old-consumer/new-producer test in the upgrade suite.

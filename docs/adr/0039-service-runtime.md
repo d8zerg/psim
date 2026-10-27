@@ -1,62 +1,65 @@
-# ADR-039. Runtime сервиса
+# ADR-039. Service Runtime
 
-- **Статус:** Принято
-- **Шаг плана:** 2.1
-- **Связанные:** ADR-001, ADR-005, ADR-016 (модель потоков, шаг 2.2), [ADR-040](0040-async-primitives.md) (шарды и пул в `Context`), ADR-033, [crosscutting.md](../architecture/crosscutting.md#5-конфигурация) разделы 5 и 6, требование SR-09, метод FF-06
+<!-- language-links -->
+[English](0039-service-runtime.md) | [Русский](../ru/adr/0039-service-runtime.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-001, ADR-005, ADR-016 (threading model), [ADR-040](0040-async-primitives.md) (shards and pools in `Context`), ADR-033, sections 5 and 6 of [crosscutting.md](../architecture/crosscutting.md#5-configuration), requirement SR-09, method FF-06
 
-Шаг 2.1: единый каркас всех сервисов - жизненный цикл с корректной остановкой и дренированием, конфигурация из файла и переменных окружения с валидацией по схеме и частичной горячей перезагрузкой, `/health/live` и `/health/ready`, структурированные логи, метрики и трассировка через OpenTelemetry с эндпоинтом Prometheus, сигналы ОС, единая модель ошибок с кодами из каталога; результат - библиотека runtime и шаблон сервиса. DoD: сервис из шаблона сразу экспортирует метрики, трассировку и health; остановка не теряет обрабатываемые сообщения.
+## Context
 
-Требования: crosscutting.md - сервис не стартует при невалидной конфигурации и сообщает все ошибки сразу; JSON-логи в stdout с `trace_id`; `/metrics` на каждом сервисе. SR-09 - секреты только из файлов с правами 0400, не из окружения, не в логах. Модель потоков и корутины (ADR-016) принимается на шаге 2.2: runtime шага 2.1 не должен её предрешать сверх того, что ADR-016 уже предлагает (Asio и корутины).
+The unified framework for all services is a lifecycle with proper termination and draining, configuration from files and environment variables with validation according to the schema and partial hot reloading, `/health/live` and `/health/ready`, structured logs, metrics, and tracing through OpenTelemetry with Prometheus endpoint, OS signals, a unified error model with codes from the catalog; the result is the runtime library and service template. DoD: The service exports metrics, tracing, and health immediately from the template; termination does not lose processed messages.
 
-## Рассмотренные варианты
+Requirements: crosscutting.md - the service does not start if the configuration is invalid and reports all errors immediately; JSON logs in stdout with `trace_id`; `/metrics` on each service. SR-09 - secrets only from files with permission 0400, not from the environment or logs. The threading model and coroutines are defined in ADR-016 and ADR-040: Asio, shards, and a limited pool of blocking operations.
 
-### Формат и схема конфигурации
+## Proposed Options
 
-| Вариант | Плюсы | Минусы |
+### Format and Configuration Schema
+
+| Option | Pros | Cons |
 |---|---|---|
-| Сообщения Protobuf как схема, разбор JSON | Типы из одного источника с контрактами | Разбор останавливается на первой ошибке; нет аннотаций секретов и перезагрузки |
-| TOML + ручная проверка | Простой формат | Схема в коде, «все ошибки сразу» реализуется вручную |
-| **YAML + JSON Schema (draft 7) с аннотациями `x-psim-secret`, `x-psim-reload`** | Схема декларативна и документирует настройки; валидатор (json-schema-validator) собирает все ошибки; аннотации описывают секреты и перезагрузку там же | Две библиотеки (yaml-cpp, nlohmann) |
+| Protobuf messages as schema, JSON parsing | Types from one source with contracts | Parsing stops at the first error; no annotations for secrets and reloading |
+| TOML + manual verification | Simple format | Schema in code, “all errors immediately” implemented manually |
+| **YAML + JSON Schema (draft 7) with annotations `x-psim-secret`, `x-psim-reload`** | Declarative schema and documentation of settings; the validator (json-schema-validator) collects all errors; annotations describe secrets and reloading there too | Two libraries (yaml-cpp, nlohmann) |
 
-### Метрики
+### Metrics
 
-| Вариант | Плюсы | Минусы |
+| Option | Pros | Cons |
 |---|---|---|
-| Метрики OpenTelemetry SDK + Prometheus-экспортёр OTel | Один API для метрик и трасс | Экспортёр тянет civetweb и открывает свой порт; лишний слой на горячем пути |
-| **prometheus-cpp (только ядро) + свой `/metrics`** | Тот же порт, что health; быстрые счётчики; формат Prometheus без преобразований | Метрики не идут через OTLP (Collector при необходимости забирает их у Prometheus) |
+| OpenTelemetry SDK + Prometheus-export OTel | One API for metrics and tracing | The exporter pulls civetweb and opens its port; extra layer on the hot path |
+| **prometheus-cpp (only core) + your `/metrics`** | Same port as health; fast counters; Prometheus format without conversions | Metrics do not go through OTLP (Collector takes them from Prometheus if needed) |
 
-### Трассировка и логи
+### Tracing and Logs
 
-Трассировка - **OpenTelemetry C++ SDK** с экспортом OTLP gRPC (gRPC уже в зависимостях; HTTP-экспорт и Zipkin выключены, чтобы не тянуть libcurl), семплирование «родитель или доля новых трасс». Логи - **собственный структурированный логгер** (JSON-строка на запись в stdout): поля из crosscutting.md 6.3 и контекст активного спана; spdlog не даёт структурных полей без форматирования строк, логи OTel SDK - лишний путь, когда Collector и так читает stdout контейнеров.
+Tracing - **OpenTelemetry C++ SDK** with OTLP gRPC export (gRPC is already a dependency; HTTP-export and Zipkin are disabled to avoid using libcurl), sampling “parent or fraction of new traces”. Logs - **custom structured logger** (JSON strings on stdout): fields from crosscutting.md 6.3 and context of the active span; spdlog does not provide structured fields without string formatting, OTel SDK logs - extra path when Collector already reads stdout containers.
 
-### Служебный HTTP
+### Service HTTP
 
-**Boost.Beast на корутинах Asio**, один поток - тот же цикл событий, что и сигналы. Liveness обслуживается этим же циклом: если цикл завис, проба не отвечает.
+**Boost.Beast with Asio coroutines**, one thread - the same event loop as signals. Liveness is served by this same loop: if the loop hangs, the probe does not respond.
 
-## Решение
+## Solution
 
-1. **Библиотеки `libs/platform`:**
-   - `errors` - `ErrorCode` и метаданные (HTTP, gRPC, повтор, заголовок) генерируются при сборке из `contracts/errors/errors.yaml`; `Error` (код + сообщение без секретов), `Result<T>` = `std::expected<T, Error>`;
-   - `log` - JSON-строки `ts, level, service, instance, trace_id, span_id, msg` + поля; уровень меняется на лету;
-   - `config` - YAML-файл, переопределения `PSIM__<SECTION>__<KEY>` (тип - из схемы, неизвестный ключ - ошибка), значения по умолчанию, все ошибки сразу; секреты - пути к файлам, читаются отдельно и не попадают в документ конфигурации, файл должен принадлежать пользователю сервиса и быть недоступен группе и остальным, переопределение секрета из окружения запрещено (SR-09); план перезагрузки делит изменения на применяемые и требующие перезапуска;
-   - `observability` - `Metrics` (реестр prometheus-cpp, текстовый формат 0.0.4), `Tracing` (OTLP gRPC, ресурс `service.name`, `service.version`, `service.instance.id`), `current_trace_ids()` для логов;
-   - `runtime` - `Component` (`start`, `ready`, `drain`, `reconfigure` - корутины Asio), `Runtime`, `run(argc, argv, ServiceDefinition)`.
-2. **Конфигурация сервиса:** секции runtime `service.instance` (по умолчанию - имя хоста), `admin.listen` (по умолчанию `0.0.0.0:9100`), `log.level` (перезагружаемая), `telemetry.otlp_endpoint`, `telemetry.sampling_ratio` (по умолчанию 0,01), `shutdown.drain_timeout_ms` (по умолчанию 30 000) и секция `settings` со схемой сервиса. Опции процесса: `--config <файл>`, `--check-config`, `--version`.
-3. **Эндпоинты:** `/health/live`, `/health/ready` (все компоненты готовы, запуск завершён, остановка не начата; иначе 503 с состоянием компонентов), `/metrics`, `/info` (сборка и экземпляр); только GET и HEAD. Метрики runtime: `psim_runtime_info`, `psim_runtime_ready`, `psim_runtime_start_time_seconds`, `psim_runtime_config_reloads_total{result}`, `psim_runtime_drain_timeouts_total`.
-4. **Жизненный цикл:** компоненты создаются фабрикой сервиса и стартуют по порядку; ошибка старта - код выхода 1. SIGTERM или SIGINT: готовность снимается, компоненты дренируются в обратном порядке до общего дедлайна; превышение дедлайна - код 3 и метрика (работа могла быть потеряна), иначе 0. SIGHUP: конфигурация перечитывается; невалидная отклоняется целиком, изменения неперезагружаемых настроек сообщаются предупреждением, остальные применяются (`reconfigure`).
-5. **Шаблон и генератор:** `tools/service-template` - компилируемый сервис с компонентом-примером (приём и обработка сообщений со спаном и метриками, дренирование всех начатых сообщений); `task service:new NAME=<имя> CONTEXTS=<контексты>` создаёт `services/<имя>` (исполняемый `psim-<имя>`, пакет, образ) и регистрирует сервис в `tools/arch/architecture.yaml`, `services/CMakeLists.txt` и `IMAGES`. CMake-функция `psim_add_service`.
-6. **FF-06** - `task test:observability`: каждый исполняемый файл сервиса запускается в локальном окружении (образ Debian 13 x86_64); проверяются `/health/live`, `/health/ready`, `/metrics`, JSON-формат всех строк лога, трассы в Tempo через Collector, чистая остановка по SIGTERM. Входит в `env:ci-test`; этап `env` конвейера включается и при изменении runtime или сервисов.
-7. **Профиль clang-tidy** (дополнение к ADR-033): include-cleaner не проверяет заголовки Boost, OpenTelemetry, prometheus-cpp, nlohmann и yaml-cpp (сопоставляет символы с их внутренними заголовками); выключены `modernize-use-designated-initializers` (частичную инициализацию ловит `-Wmissing-designated-field-initializers`) и правила с ложными срабатываниями в чужом коде: `portability-template-virtual-member-function`, `clang-analyzer-core.CallAndMessage` (кадры корутин Asio; вызовы по нулевому указателю ловят `-Wnull-dereference`, ASan и UBSan). После перехода на системную libstdc++ проверка `cert-err58-cpp` включена.
+1. **Libraries `libs/platform`:**
+   - `errors` - `ErrorCode` and metadata (HTTP, gRPC, retry, header) are generated during build from `contracts/errors/errors.yaml`; `Error` (code + message without secrets), `Result<T>` = `std::expected<T, Error>`;
+   - `log` - JSON strings `ts, level, service, instance, trace_id, span_id, msg` + fields; level changes on the fly;
+   - `config` - YAML file, overrides `PSIM__<SECTION>__<KEY>` (type - from schema, unknown key - error), default values, all errors immediately; secrets - paths to files, read separately and not included in the configuration document, the file must belong to the service user and be inaccessible to groups and others, overriding secrets from the environment is prohibited (SR-09); the reload plan divides changes into those that apply and require restarting;
+   - `observability` - `Metrics` (prometheus-cpp registry, text format 0.0.4), `Tracing` (OTLP gRPC, resource `service.name`, `service.version`, `service.instance.id`), `current_trace_ids()` for logs;
+   - `runtime` - `Component` (`start`, `ready`, `drain`, `reconfigure` - Asio coroutines), `Runtime`, `run(argc, argv, ServiceDefinition)`.
+2. **Service configuration:** runtime sections `service.instance` (default - host name), `admin.listen` (default `0.0.0.0:9100`), `log.level` (reloadable), `telemetry.otlp_endpoint`, `telemetry.sampling_ratio` (default 0.01), `shutdown.drain_timeout_ms` (default 30,000) and section `settings` with the service schema. Process options: `--config <file>`, `--check-config`, `--version`.
+3. **Endpoints:** `/health/live`, `/health/ready` (all components are ready, startup completed, termination not started; otherwise 503 with component status), `/metrics`, `/info` (build and instance); only GET and HEAD. Runtime metrics: `psim_runtime_info`, `psim_runtime_ready`, `psim_runtime_start_time_seconds`, `psim_runtime_config_reloads_total{result}`, `psim_runtime_drain_timeouts_total`.
+4. **Lifecycle:** Components are created by the service factory and start in order; startup error - exit code 1. SIGTERM or SIGINT: readiness is removed, components are drained in reverse order until the overall deadline; exceeding the deadline - code 3 and metric (work may have been lost), otherwise 0. SIGHUP: configuration is reread; invalid ones are completely rejected, changes to non-reloadable settings are reported with a warning, others are applied (`reconfigure`).
+5. **Template and Generator:** `tools/service-template` - compilable service with a component example (receiving and processing messages with span and metrics, draining all started messages); `task service:new NAME=<name> CONTEXTS=<contexts>` creates `services/<name>` (executable `psim-<name>`, package, image) and registers the service in `tools/arch/architecture.yaml`, `services/CMakeLists.txt` and `IMAGES`. CMake function `psim_add_service`.
+6. **FF-06** - `task test:observability`: Each executable service file is run in the local environment (Debian 13 x86_64); `/health/live`, `/health/ready`, `/metrics` are checked, JSON format of all log strings, tracing in Tempo through Collector, clean termination on SIGTERM. It is included in `env:ci-test`; the `env` stage of the pipeline is activated when runtime or services change.
+7. **Clang-tidy Profile** (addendum to ADR-033): include-cleaner does not check headers for Boost, OpenTelemetry, prometheus-cpp, nlohmann, and yaml-cpp (it matches symbols with their internal headers); `modernize-use-designated-initializers` is disabled (partial initialization is caught by `-Wmissing-designated-field-initializers`), and rules with false positives in other code are disabled: `portability-template-virtual-member-function`, `clang-analyzer-core.CallAndMessage` (Asio coroutines; calls to null pointers are caught by `-Wnull-dereference`, ASan, and UBSan). After switching to the system libstdc++, the check for `cert-err58-cpp` is enabled.
 
-## Последствия
+## Consequences
 
-- Новый сервис получает конфигурацию, логи, метрики, трассы, health и корректную остановку без своего кода; его компоненты реализуют только `start`, `drain` и, при необходимости, `ready` и `reconfigure`.
-- Один поток исполнения на шаге 2.1; шарды по ядрам, пулы блокирующих операций и примитивы противодавления добавит шаг 2.2 (ADR-016), не меняя интерфейс `Component`.
-- TLS к Collector и служебному HTTP - шаг 2.6 (SR-08); проверка JWT для служебных эндпоинтов не нужна - порт не публикуется вне сети узла (SR-19).
-- Контекст трассировки хранится в потоке; при переключениях корутин между `co_await` его передаёт явно компонент (шаг 2.2 добавит распространение через исполнитель).
+- The new service receives configuration, logs, metrics, traces, health, and proper termination without its own code; its components only implement `start`, `drain`, and, if necessary, `ready` and `reconfigure`.
+- Shards by CPU cores, blocking operations pools, and backpressure primitives are defined in ADR-016 and ADR-040, maintaining the interface `Component`.
+- TLS for Collector and service HTTP is defined in SR-08 and ADR-043; JWT checks for service endpoints are not required; the port is not published outside the node’s network (SR-19).
+- The tracing context is stored in a thread; when coroutines switch between `co_await`, it is explicitly passed by the component (propagation through the executor is defined in ADR-040).
 
-## Проверка
+## Verification
 
-Модульные тесты библиотек и шаблона (в том числе остановка по SIGTERM с кодом 0, превышение дедлайна дренирования с кодом 3, отказ старта, отклонение невалидной перезагрузки, секреты с открытыми правами); `task test:observability` (FF-06) на локальном окружении.
+Unit tests for libraries and the template (including SIGTERM termination with code 0, exceeding the drain deadline with code 3, startup failure, rejection of invalid reloads, rejection of secret files with excessive permissions); `task test:observability` (FF-06) on local environment.

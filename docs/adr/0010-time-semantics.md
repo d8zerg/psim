@@ -1,43 +1,46 @@
-# ADR-010. Семантика времени: event time, водяные знаки, рассогласование часов
+# ADR-010. Time semantics: event time, watermarks and clock skew
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 4.5, 5.2)
-- **Связанные:** ADR-009, ADR-011, [data-flows.md](../architecture/data-flows.md#33-корреляция-psimeventsnormalizedv1---psimsignalsv1)
+<!-- language-links -->
+[English](0010-time-semantics.md) | [Русский](../ru/adr/0010-time-semantics.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-009, ADR-011, [data-flows.md](../architecture/data-flows.md#33-correlation-psimeventsnormalizedv1---psimsignalsv1)
 
-События приходят с задержками и не по порядку: буферизация в SDK при обрыве связи (до 10 мин и больше), разные коннекторы, перенос устройства между зонами. Правила корреляции используют время события для проверки временных окон. Немедленный сигнал должен сохранять состав и идентификатор при повторной обработке того же журнала Kafka. Часы источников могут расходиться с часами платформы.
+## Context
 
-## Рассмотренные варианты
+Events arrive late and out of order because of SDK buffering during outages of ten minutes or longer, different connectors, and devices moving between zones. Correlation rules use event time for windows. An immediate signal must retain its composition and identifier when the same Kafka log is reprocessed. Source clocks can differ from platform clocks.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Processing time (время обработки) | Просто, нет ожидания | Результат зависит от задержек доставки; проигрывание истории даёт другой результат; досылка буфера после обрыва порождает ложные корреляции |
-| Ingestion time (время приёма шлюзом) | Не зависит от часов источника | Те же проблемы при досылке буфера |
-| **Event time (время источника) + водяные знаки + допустимое опоздание** | Временные окна учитывают время события; закрытие окна ограничивает ожидание | Немедленные совпадения зависят от порядка доставки; зависимость от часов источника |
+| Processing time | Simple; no waiting | Results depend on delivery delays; history replay differs; buffered retransmission after an outage can produce false correlations |
+| Ingestion time at the gateway | Independent of source clocks | The same buffered-retransmission problems |
+| **Source event time, watermarks and allowed lateness** | Windows follow event timestamps; window closure bounds waiting | Immediate matches depend on delivery order; relies on source clocks |
 
-## Решение
+## Decision
 
-1. Правила работают по **event time** = `occurred_at` события.
-2. **Водяной знак партиции** = минимум по активным источникам партиции из `max(occurred_at источника)` минус `allowed_lateness`. Источник без событий дольше `idle_timeout` (по умолчанию 30 с) исключается из минимума, чтобы молчащий датчик не останавливал время.
-3. **Срабатывание:**
-   - `single`, `conjunction`, `sequence` - немедленно при приходе завершающего события, без ожидания водяного знака;
-   - `threshold`, `absence` - при закрытии окна по водяному знаку.
+1. Rules use **event time**, the event's `occurred_at`.
+2. **Partition watermark:** the minimum, across active sources in the partition, of `max(source.occurred_at)` minus `allowed_lateness`. Exclude sources with no events for longer than `idle_timeout`, default 30 seconds, so a silent sensor does not stop time progression.
+3. **Activation:**
+   - `single`, `conjunction` and `sequence` activate immediately when the completing event arrives, without waiting for the watermark.
+   - `threshold` and `absence` activate when the watermark closes the window.
 
-   Для немедленных правил состав совпадения определяется порядком обработки Kafka. Если подходят несколько событий, позднее событие не изменяет уже выданный сигнал. Повторная обработка того же журнала и восстановление сохраняют состав и ID. Исторический прогон с сортировкой по времени события может выбрать другие свидетельства при неоднозначном совпадении.
+   For immediate rules, Kafka processing order determines match composition. If several events qualify, a late event does not modify an already emitted signal. Reprocessing the same log and recovery preserve composition and ID. A historical run sorted by event time may select different evidence for an ambiguous match.
 
-4. **Опоздавшие события** (event time раньше водяного знака минус допустимое опоздание): не учитываются в закрытых окнах, учитываются в открытых; считаются в метрике `psim_correlation_late_events_total`. Допустимое опоздание задаётся в правиле; по умолчанию 10 с, максимум ограничен конфигурацией.
-5. **Рассогласование часов:** если `occurred_at` позже `received_at` больше чем на `max_clock_skew` (по умолчанию 5 с), шлюз заменяет event time на `received_at`, сохраняет исходное значение в атрибуте и порождает `system.source.clock_skew` (с ограничением частоты на источник). Это не даёт событию «из будущего» сдвинуть водяной знак.
-6. **Досылка буфера после обрыва:** события старше `max_buffer_replay_age` (по умолчанию 1 ч) нормализуются и сохраняются в истории, но в корреляции помечаются как опоздавшие; это предотвращает массовые ложные сигналы по давно прошедшим событиям.
-7. Абсолютное время для правил `absence` на границе окна вычисляется по водяному знаку. Исторический прогон использует те же абсолютные границы; он не моделирует доставку и исключение опоздавших событий из уже закрытых окон.
-8. Время в доменном ядре - только через порт `Clock`; системные часы - в адаптерах.
+4. **Late events**, whose event time precedes the watermark minus allowed lateness, do not affect closed windows but may affect open windows. Count them in `psim_correlation_late_events_total`. Lateness is configured per rule, defaulting to 10 seconds, with a configuration-defined maximum.
+5. **Clock skew:** when `occurred_at` exceeds `received_at` by more than `max_clock_skew`, default 5 seconds, the gateway replaces event time with `received_at`, preserves the original value in an attribute, and emits `system.source.clock_skew` with per-source rate limiting. Future-dated events cannot advance the watermark.
+6. **Buffered retransmission after an outage:** events older than `max_buffer_replay_age`, default one hour, are normalized and retained in history but marked late for correlation, preventing large numbers of false signals from old events.
+7. Absolute time for `absence` at the window boundary is computed from the watermark. Historical runs use the same absolute boundaries but do not model delivery or exclusion of late events from already closed windows.
+8. Domain-core time is accessed only through `Clock`; system clocks remain in adapters.
 
-## Последствия
+## Consequences
 
-- Конфигурация допускает компромисс «полнота против задержки» на уровне правила.
-- Правила `absence` и `threshold` имеют задержку, равную окну плюс допустимое опоздание; бюджет задержек считает их от закрытия окна.
-- Узлы платформы синхронизируются chrony; рассогласование узлов контролируется метрикой.
+- Rules can trade completeness against latency.
+- `absence` and `threshold` latency equals the window plus allowed lateness. Latency budgets measure them from window closure.
+- Platform nodes synchronize through chrony; clock-skew metrics monitor nodes.
 
-## Проверка
+## Verification
 
-Детерминированные тесты доменного ядра проверяют временные границы и перестановки с однозначным совпадением. Для немедленных правил проверяется зависимость неоднозначного состава от порядка доставки. Повтор того же журнала, падение и восстановление сохраняют набор сигналов и их ID. Исторический прогон сравнивается с рабочим потоком на однозначных данных в пределах открытых окон.
+Deterministic domain-core tests cover time boundaries and permutations with unambiguous matches. Immediate-rule tests cover delivery-order dependence of ambiguous match composition. Replaying the same log, failure and recovery preserve the signal set and IDs. Historical runs are compared with live processing on unambiguous data within open windows.

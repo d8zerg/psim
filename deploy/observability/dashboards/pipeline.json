@@ -1,7 +1,7 @@
 {
   "uid": "psim-pipeline",
-  "title": "Конвейер событий",
-  "description": "Open-Source PSIM Platform. Конвейер событий. Пропуски данных требуют проверки сбора.",
+  "title": "Event Pipeline",
+  "description": "Open-Source PSIM Platform. Event pipeline. Check data collection when data is missing.",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -33,50 +33,57 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "Обзор платформы",
+      "title": "Platform overview",
       "url": "/monitoring/d/psim-overview",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Конвейер событий",
+      "title": "Event Pipeline",
       "url": "/monitoring/d/psim-pipeline",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Сервисы и API",
+      "title": "Services and APIs",
       "url": "/monitoring/d/psim-services",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инфраструктура и репликация",
+      "title": "Infrastructure and Replication",
       "url": "/monitoring/d/psim-infrastructure",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Хранилища и ёмкость",
+      "title": "Storage and Capacity",
       "url": "/monitoring/d/psim-storage",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инциденты и подключения",
+      "title": "Incidents and Connections",
       "url": "/monitoring/d/psim-business",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Эксплуатационные проверки",
+      "title": "Operational checks",
       "url": "/monitoring/d/psim-operations",
+      "type": "link",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "RU",
+      "url": "/monitoring/d/psim-pipeline-ru",
       "type": "link",
       "keepTime": true,
       "includeVars": true
@@ -85,7 +92,7 @@
   "annotations": {
     "list": [
       {
-        "name": "Алерты",
+        "name": "Alerts",
         "enable": true,
         "datasource": {
           "type": "prometheus",
@@ -103,7 +110,7 @@
     "list": [
       {
         "name": "deployment",
-        "label": "Поставка",
+        "label": "Deployment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -120,14 +127,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "node",
-        "label": "Узел",
+        "label": "Node",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -144,14 +151,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "service",
-        "label": "Сервис",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -168,14 +175,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "topic",
-        "label": "Топик",
+        "label": "Topic",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -192,14 +199,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "group",
-        "label": "Группа",
+        "label": "Group",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -216,7 +223,7 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
@@ -227,8 +234,8 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Пропускная способность",
-      "description": "Вход, сигналы и фиксация данных. Разные счётчики не используются для доказательства отсутствия потерь.",
+      "title": "Throughput",
+      "description": "Input, signals, and data recording. Different counters are not used to prove the absence of losses.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -240,8 +247,8 @@
     },
     {
       "id": 2,
-      "title": "Вход Kafka",
-      "description": "Подтверждённые Kafka публикации.",
+      "title": "Input from Kafka",
+      "description": "Acknowledged Kafka publications.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -265,7 +272,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -295,7 +302,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -332,8 +339,8 @@
     },
     {
       "id": 3,
-      "title": "Обработка Kafka",
-      "description": "Чтение потребителями.",
+      "title": "Processing Kafka",
+      "description": "Reading by consumers.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -357,7 +364,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -387,7 +394,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -424,8 +431,8 @@
     },
     {
       "id": 4,
-      "title": "Фиксация сигналов",
-      "description": "Уникальные сигналы, зафиксированные в инцидентах, включая таймерные. Повторная доставка и ошибки не учитываются.",
+      "title": "Signal commits",
+      "description": "Unique signals recorded in incidents, including timer-related ones. Re-delivery and errors are not considered.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -449,7 +456,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -479,7 +486,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -517,8 +524,8 @@
     {
       "id": 5,
       "type": "row",
-      "title": "Задержки",
-      "description": "p99 вычисляется из bucket по всем экземплярам; перцентили отдельных этапов не складываются.",
+      "title": "Latencies",
+      "description": "p99 uses histogram buckets across all instances; stage percentiles are not added together.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -530,8 +537,8 @@
     },
     {
       "id": 6,
-      "title": "Событие -> фиксация инцидента p99",
-      "description": "Граница измерения указана в HELP метрики. Пусто при отсутствии наблюдений.",
+      "title": "Event -> incident commit p99",
+      "description": "The measurement boundary is indicated in the HELP metric. It remains empty when there are no observations.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -555,7 +562,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -585,7 +592,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -622,8 +629,8 @@
     },
     {
       "id": 7,
-      "title": "Обновление проекции консоли p99",
-      "description": "Граница измерения указана в HELP метрики. Сравнивать одинаковые интервалы.",
+      "title": "Console projection update p99",
+      "description": "The measurement boundary is indicated in the HELP metric. Compare within the same intervals.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -647,7 +654,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -677,7 +684,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -714,8 +721,8 @@
     },
     {
       "id": 8,
-      "title": "Обработка Normalizer p99",
-      "description": "Граница измерения указана в HELP метрики. Пусто при отсутствии наблюдений.",
+      "title": "Processing by Normalizer p99",
+      "description": "The measurement boundary is indicated in the HELP metric. It remains empty when there are no observations.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -739,7 +746,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -769,7 +776,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -806,8 +813,8 @@
     },
     {
       "id": 9,
-      "title": "Обработка Correlation Engine p99",
-      "description": "Граница измерения указана в HELP метрики. Сравнивать одинаковые интервалы.",
+      "title": "Processing of Correlation Engine p99",
+      "description": "The measurement boundary is indicated in the HELP metric. Compare within the same intervals.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -831,7 +838,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -861,7 +868,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -898,8 +905,8 @@
     },
     {
       "id": 10,
-      "title": "Транзакция инцидента p99",
-      "description": "Граница измерения указана в HELP метрики. Пусто при отсутствии наблюдений.",
+      "title": "Incident transaction p99",
+      "description": "The measurement boundary is indicated in the HELP metric. It remains empty when there are no observations.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -923,7 +930,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -953,7 +960,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -990,8 +997,8 @@
     },
     {
       "id": 11,
-      "title": "Доставка realtime p99",
-      "description": "Граница измерения указана в HELP метрики. Сравнивать одинаковые интервалы.",
+      "title": "Real-time p99 delivery",
+      "description": "The measurement boundary is indicated in the HELP metric. Compare within the same intervals.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1015,7 +1022,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1045,7 +1052,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1083,8 +1090,8 @@
     {
       "id": 12,
       "type": "row",
-      "title": "Очереди, DLQ и восстановление",
-      "description": "Фильтры topic и group сужают диагностику конкретного потребителя.",
+      "title": "Queues, DLQ, and Recovery",
+      "description": "Filters for topics and groups narrow down the diagnosis of specific consumers.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1096,8 +1103,8 @@
     },
     {
       "id": 13,
-      "title": "Lag Kafka по группам и топикам",
-      "description": "Committed offset -> end offset. Отрицательные или неизвестные offsets не подменяются нулём.",
+      "title": "Kafka lag by groups and topics",
+      "description": "Committed offset -> end offset. Negative or unknown offsets are not replaced with zero.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1121,7 +1128,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1151,7 +1158,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1188,8 +1195,8 @@
     },
     {
       "id": 14,
-      "title": "Новые записи DLQ",
-      "description": "Рост суммарного end offset, независимо от перезапуска производителя.",
+      "title": "New DLQ entries",
+      "description": "Growth in total end offset, independent of producer restarts.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1213,7 +1220,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1243,7 +1250,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1280,8 +1287,8 @@
     },
     {
       "id": 15,
-      "title": "Остановленные партиции",
-      "description": "Противодавление после повторяемой ошибки.",
+      "title": "Stopped partitions",
+      "description": "Backpressure after a repeated error.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1305,7 +1312,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1339,7 +1346,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1376,8 +1383,8 @@
     },
     {
       "id": 16,
-      "title": "Восстановление корреляции p99",
-      "description": "Время восстановления состояния.",
+      "title": "Correlation recovery p99",
+      "description": "Time to restore the state.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1401,7 +1408,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1435,7 +1442,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1473,8 +1480,8 @@
     {
       "id": 17,
       "type": "row",
-      "title": "Активные алерты и действия",
-      "description": "Алерты относятся к выбранной поставке; предупреждения и критические отказы имеют прямые ссылки на инструкции.",
+      "title": "Active Alerts and Actions",
+      "description": "Alerts apply to the selected deployment; warnings and critical failures link directly to instructions.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1487,8 +1494,8 @@
     {
       "id": 18,
       "type": "table",
-      "title": "Активные алерты",
-      "description": "Pending ещё ожидают выдержки. Firing требуют проверки. Watchdog подтверждает работу конвейера уведомлений.",
+      "title": "Active Alerts",
+      "description": "Pending alerts await the configured duration. Firing alerts require investigation. Watchdog confirms the notification pipeline is running.",
       "gridPos": {
         "x": 0,
         "y": 52,
@@ -1527,7 +1534,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Инструкция устранения",
+                    "title": "Remediation instructions",
                     "url": "../operations/runbooks/${__value.raw}",
                     "targetBlank": true
                   }
@@ -1535,7 +1542,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Алерт"
+                "value": "Alert"
               },
               {
                 "id": "custom.width",
@@ -1551,7 +1558,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Уровень"
+                "value": "Severity"
               },
               {
                 "id": "custom.width",
@@ -1567,7 +1574,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Состояние"
+                "value": "State"
               },
               {
                 "id": "custom.width",
@@ -1583,7 +1590,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Узел"
+                "value": "Node"
               },
               {
                 "id": "custom.width",
@@ -1599,7 +1606,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Контекст"
+                "value": "Context"
               },
               {
                 "id": "custom.width",
@@ -1613,7 +1620,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Уровень",
+            "displayName": "Severity",
             "desc": false
           }
         ]

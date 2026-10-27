@@ -1,39 +1,42 @@
-# ADR-042. Эксплуатационные функции в границах MVP
+# ADR-042. Operational capabilities within MVP scope
 
-- **Статус:** Принято
-- **Шаг плана:** 0.1 (реализация - 2.6, 4.1-4.5, 5.1-5.3, 6.1, 6.3, 7.1-7.3, 8.3-8.4, 9.1, 9.3, 9.5)
-- **Связанные:** ADR-017, ADR-019, ADR-020, ADR-023, [эксплуатационные функции](../architecture/operational-capabilities.md)
+<!-- language-links -->
+[English](0042-operational-capabilities.md) | [Русский](../ru/adr/0042-operational-capabilities.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-017, ADR-019, ADR-020, ADR-023, [operational capabilities](../architecture/operational-capabilities.md)
 
-План покрывает обработку событий и инцидентов, но не определяет хранение загруженных планов, достоверность текущего состояния после обрыва связи, режим обслуживания и передачу смены. Требования к сертификатам и replay есть, но процедуры эксплуатации и изоляция диагностических запусков нуждаются в уточнении. Дополнения приняты.
+## Context
 
-## Рассмотренные варианты
+Event and incident processing also requires floor plan storage, reliable current state after connection loss, maintenance mode and shift handover. Certificate and replay requirements need explicit operating procedures and isolation of diagnostic runs. These capabilities are part of the platform's operational scope.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Отложить все дополнения | Прежний объём разработки | Нет проверяемого поведения при обслуживании и передаче ответственности; не определено восстановление файлов |
-| Полные подсистемы медиа, графиков смен, PKI и управления оборудованием | Широкий набор возможностей | Существенное расширение MVP для одного инженера |
-| **Минимальные функции в существующих контекстах** | Закрываются конкретные эксплуатационные сценарии; можно проверять до выпуска | Дополнительный объём реализации; нужно совместимо расширить контракты |
+| Defer all additions | Retains the previous development scope | No testable maintenance or responsibility handover behavior; file recovery remains undefined |
+| Full media, shift scheduling, PKI and equipment management subsystems | Broad capabilities | Substantially expands the MVP for one engineer |
+| **Minimum capabilities in existing contexts** | Covers concrete operational scenarios that can be verified before release | Additional implementation work and compatible contract extensions |
 
-## Решение
+## Decision
 
-1. Принять минимальный объём из [operational-capabilities.md](../architecture/operational-capabilities.md) и включить его в DoD соответствующих шагов.
-2. Хранить планы через порт `FileStore` и S3-совместимый адаптер; выбор SDK и конкретного хранилища, общую библиотеку S3 и локальное тестовое окружение реализовать на шаге 2.9; интеграцию с Resource Catalog - на шаге 4.4. Собственные вложения инцидентов остаются после MVP.
-3. Отдельно моделировать жизненный цикл ресурса, связь, наблюдаемое состояние и свежесть. Восстановление связи требует актуального подтверждения состояния. Добавить снимки и realtime-дельты устройств, зон и коннекторов по модели ADR-019.
-4. Добавить разовые интервалы обслуживания с обязательным окончанием и явной политикой подавления. Все события сохраняются; пожарные события и P1 не подавляются.
-5. В MVP явно назначать дежурного и передавать незакрытые инциденты с подтверждением получателя, сохранением SLA и состояния сценария. Календарные графики и автоматические замещения отложить.
-6. Использовать внешнюю PKI и документированные процедуры первоначальной настройки, продления, отзыва и восстановления; собственного УЦ в составе платформы не создавать.
-7. Диагностический replay изолировать правами, топиками и хранилищами от рабочих команд, уведомлений и инцидентов. Восстановление проекций и рабочий DLQ оставить отдельными авторизованными операциями.
-8. Подготовить правила участия, сообщения об уязвимостях, совместимости и поддержки выпусков; демонстрационный набор содержит только синтетические данные.
+1. Adopt the minimum scope in [operational-capabilities.md](../architecture/operational-capabilities.md) as permanent acceptance requirements.
+2. Store floor plans through the `FileStore` port and an S3-compatible adapter. ADR-046 defines the SDK and storage choice, ADR-077 the topology, and ADR-051 integration with Resource Catalog. Platform-hosted incident attachments remain outside the MVP.
+3. Model resource lifecycle, connectivity, observed state and freshness separately. Reconnection requires fresh state confirmation. Provide device, zone and connector snapshots and realtime deltas using ADR-019.
+4. Provide one-time maintenance intervals with a mandatory end and an explicit suppression policy. Retain all events; never suppress fire events or P1.
+5. Assign duty explicitly and transfer unclosed incidents with recipient confirmation, preserving SLA and scenario state. Calendar scheduling and automatic substitutions remain outside the MVP.
+6. Use external PKI and documented initial setup, renewal, revocation and recovery procedures. Do not embed a proprietary CA in the platform.
+7. Isolate diagnostic replay from production commands, notifications and incidents using permissions, topics and storage. Projection recovery and production DLQ processing remain separate authorized operations.
+8. Maintain contribution, vulnerability reporting, compatibility and release support policies. Demonstration data is synthetic only.
 
-## Последствия
+## Consequences
 
-- Новые микросервисы для этих функций не требуются; файлы добавляют внешний компонент хранения.
-- Сценарии S1-S13 дополняются проверками эксплуатационного поведения, модель угроз и матрица верификации уточняются.
-- Дополнения включены в работы и DoD соответствующих шагов; завершённые шаги не получают статус реализации новых функций.
-- API расширяется перед реализацией каждой функции. Наличие принятого ADR не означает наличия работающего API или теста.
+- These capabilities require no new microservices; file handling adds an external storage component.
+- Scenarios S1-S13 include operational behavior checks, reflected in the threat model and verification matrix.
+- Acceptance requires evidence for each capability. Completion of an earlier subsystem does not establish that an added capability is implemented.
+- Extend the API before implementing each capability. An accepted ADR alone does not establish a working API or test.
 
-## Проверка
+## Verification
 
-Проверки восстановления файлов, свежести после досылки, возобновления realtime, автоматического окончания обслуживания, передачи ответственности, ротации и отзыва сертификатов, отсутствия рабочих побочных эффектов replay. Методы и шаги отражены в реестре верификации; документация проходит `task docs:check`.
+Verify file recovery, freshness after buffered delivery, realtime resumption, automatic maintenance completion, responsibility handover, certificate rotation and revocation, and absence of production side effects during replay. The verification registry records the methods; documentation passes `task docs:check`.

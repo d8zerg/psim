@@ -1,20 +1,24 @@
-# Установка и обновление
+# Installation and upgrades
 
-Механизм продолжает [поставку топологий](deployment-topologies.md). Решения - [ADR-024](../adr/0024-zero-downtime-upgrades.md) и [ADR-079](../adr/0079-release-version-identification.md). Инфраструктура сохраняет закреплённые версии; её обновление выполняется отдельной операцией.
+<!-- language-links -->
+[English](installation-and-upgrades.md) | [Русский](../ru/engineering/installation-and-upgrades.md)
+<!-- /language-links -->
 
-## Версия и артефакты
+This mechanism extends [topology delivery](deployment-topologies.md). Decisions are recorded in [ADR-024](../adr/0024-zero-downtime-upgrades.md) and [ADR-079](../adr/0079-release-version-identification.md). Infrastructure versions remain pinned; upgrading infrastructure is a separate operation.
 
-`python3 -I tools/version.py` выводит версию продукта, ревизию, представления для Debian и Docker. Официальная сборка требует чистого аннотированного SemVer-тега; `--release` проверяет это условие. Между тегами используются версии разработки. Веб-сборка публикует ту же версию в `build-info.json`; приватные workspace-пакеты не выпускаются независимо.
+## Version and artifacts
 
-Базовая версия определяется ближайшим достижимым SemVer-тегом Git. Файла версии и неявной исходной версии нет. Начальный тег - `v0.9.2-alpha.1`; он ставится на зафиксированные исходники. Пока тега нет, обычная сборка выдаёт ошибку. Для воспроизводимого стендового артефакта доступен явный `PSIM_BUILD_VERSION`; он не допускает официальный выпуск.
+`python3 -I tools/version.py` prints the product version, revision, and Debian and Docker representations. An official build requires a clean annotated SemVer tag; `--release` checks this condition. Development versions are used between tags. The web build publishes the same version in `build-info.json`; private workspace packages are not released independently.
 
-`task release:dist` формирует DEB, OCI-архивы, CycloneDX SBOM, архив установщика, документацию, снимок REST/protobuf и `release.json`. `SHA256SUMS` подписывается Ed25519-ключом. Для квалификации изменённого дерева используется `ALLOW_DIRTY=true`; это не официальный выпуск. Проверка - `task release:verify` с отдельно полученным `PSIM_TRUSTED_KEY`.
+The base version comes from the nearest reachable Git SemVer tag. There is no version file or implicit initial version. The initial tag is `v0.9.2-alpha.1`, applied to committed sources. A normal build fails until a tag exists. An explicit `PSIM_BUILD_VERSION` can produce a reproducible laboratory artifact, but cannot authorize an official release.
 
-Нельзя заменять содержимое опубликованной версии. Временные квалификационные сборки сохраняются отдельно. Установленная идентичность вычисляется по подписанному инвентарю, а не только по `release.json` или тегу контейнера.
+`task release:dist` produces DEB packages, OCI archives, a CycloneDX SBOM, an installer archive, documentation, a REST/protobuf snapshot and `release.json`. `SHA256SUMS` is signed with an Ed25519 key. `ALLOW_DIRTY=true` permits qualification of a modified tree; this is not an official release. Verify using `task release:verify` with a separately obtained `PSIM_TRUSTED_KEY`.
 
-## Первоначальная установка
+Never replace the contents of a published version. Store temporary qualification builds separately. Installed identity is computed from the signed inventory, not only from `release.json` or a container tag.
 
-Подготовить публичный профиль и внешние удостоверения по [регламенту PKI](deployment-pki.md). Подпись выпуска проверяется до изменения установки. `node_install.py` принимает публичный выпуск и отдельно доверенный ключ вместе с закрытым payload узла:
+## Initial installation
+
+Prepare the public profile and external credentials according to the [PKI procedure](deployment-pki.md). Verify the release signature before changing the installation. `node_install.py` accepts a public release and a separately trusted key together with the node's private payload:
 
 ```sh
 python3 -I tools/deploy/node_install.py \
@@ -22,13 +26,13 @@ python3 -I tools/deploy/node_install.py \
   --release /srv/releases/N --trusted-key /secure/psim-release.pub.pem
 ```
 
-Закрытый payload не входит в публичный выпуск. Он передаётся по доверенному каналу и проверяется по внешнему SHA-256. PKI, пароли и ключи не извлекаются из демонстрационных файлов. Повторная установка того же payload сохраняет данные; другой payload не заменяет существующий каталог.
+The private payload is not part of the public release. Transfer it through a trusted channel and verify it against an externally supplied SHA-256. Do not obtain PKI material, passwords or keys from demonstration files. Reinstalling the same payload preserves data; a different payload cannot replace the existing directory.
 
-Флаг `--lab` явно разрешает локальную установку лабораторного payload без подписи выпуска. Он не включается автоматически на основании содержимого входного архива. Обновление лабораторного стенда проверяет подписи обеих версий.
+`--lab` explicitly permits local installation of a laboratory payload without a release signature. It is never enabled automatically from archive contents. Laboratory upgrades still verify the signatures of both versions.
 
-## Подготовка обновления
+## Preparing an upgrade
 
-Сохранить подписанные N и N+1 и доверенный ключ. Проверить резервную копию по принятому регламенту. Для кластера нужны две здоровые прикладные реплики каждого сервиса. На одной машине допускается остановка при замене единственного экземпляра; режим без простоя требует кластера.
+Retain signed versions N and N+1 and the trusted key. Verify a backup according to the established procedure. A cluster requires two healthy application replicas of every service. A single-machine deployment may stop while its sole instance is replaced; zero-downtime operation requires a cluster.
 
 ```sh
 task deploy:upgrade:preflight BUNDLE=build/deployment/lab-cluster \
@@ -37,59 +41,59 @@ task deploy:upgrade:prepare BUNDLE=build/deployment/lab-cluster \
   BASELINE=/srv/releases/N RELEASE=/srv/releases/N+1 TRUSTED_KEY=/secure/psim-release.pub.pem
 ```
 
-Предпроверка проверяет подпись, полный инвентарь файлов, SHA-256, SBOM, платформу, порядок SemVer, состав компонентов, контрактные снимки, формат конфигурации и неизменность инфраструктуры. Узел повторяет проверку и сохраняет обе версии в закрытом хранилище установки. Проверенные переданные файлы используются повторно; незавершённый перенос проверяется заново.
+Preflight checks verify the signature, complete file inventory, SHA-256, SBOM, platform, SemVer ordering, component set, contract snapshots, configuration format and unchanged infrastructure. Each node repeats verification and stores both versions in its private installation repository. Verified transferred files are reused; incomplete transfers are checked again.
 
-Изменение поля protobuf, удаление сообщения, RPC-метода, REST-операции или свойства, добавление обязательного поля и несовместимая смена протокола запрещают автоматическое обновление. Консервативная проверка существующих REST-операций может потребовать отдельного решения даже для изменения без нарушения wire-совместимости.
+Changes to protobuf fields, removal of messages, RPC methods, REST operations or properties, addition of required fields, and incompatible protocol changes prevent automatic upgrades. Conservative checking of existing REST operations may require a separate decision even for a wire-compatible change.
 
-## Замена экземпляров и откат
+## Replacing instances and rolling back
 
-`task deploy:upgrade:apply` использует те же переменные. Сначала применяются expand-миграции, затем заменяются потребители и только после них производители. Перед заменой проверяется здоровая реплика, HTTP-экземпляр выводится из новых назначений HAProxy. Новая версия допускается после готовности и проверки `/info`. Одновременно заменяется один экземпляр.
+`task deploy:upgrade:apply` uses the same variables. Expand migrations run first, followed by consumer replacements and then producer replacements. Before replacing an instance, the coordinator checks for a healthy replica and removes the HTTP instance from new HAProxy assignments. The new version is admitted only after readiness and `/info` checks. One instance is replaced at a time.
 
-Контейнеры Normalizer и Correlation Engine заменяются с временной дополнительной репликой: новая версия загружает метаданные, получает назначения всех своих групп Kafka и проходит проверку готовности; после этого старая получает `SIGTERM`. Разные идентификаторы экземпляров разделяют Kafka producer identity. Административные адреса сохраняются через локальный HAProxy; журнал установки хранит точный контейнер и конфигурацию. Такое же правило действует при откате.
+Normalizer and Correlation Engine containers use a temporary additional replica: the new version loads metadata, receives assignments for all its Kafka groups and passes readiness checks before the old version receives `SIGTERM`. Different instance identifiers keep Kafka producer identities separate. Administrative addresses remain available through local HAProxy; the installation journal records the exact container and configuration. The same rule applies during rollback.
 
-Неудачная замена восстанавливает предыдущие образ и конфигурацию этого экземпляра. Остальные завершённые замены записаны в журнале и могут быть продолжены или откачены. Диагностика неудачного запуска сохраняется в каталоге `lifecycle` узла. Неподтверждённые команды не повторяются; ограниченный повтор чтения GET/HEAD на публичном прокси допустим при временном 503 или закрытии соединения.
+A failed replacement restores that instance's previous image and configuration. Other completed replacements remain journaled and can be continued or rolled back. Failed-start diagnostics are retained in the node's `lifecycle` directory. Unacknowledged commands are not retried. The public proxy may perform bounded GET/HEAD read retries after a temporary 503 or a closed connection.
 
-`task deploy:upgrade:rollback` восстанавливает сохранённую N последовательно, включая её конфигурацию. Обратные SQL-миграции expand не выполняются. После contract-барьера такой откат запрещён.
+`task deploy:upgrade:rollback` sequentially restores the saved N version, including its configuration. It does not reverse expand SQL migrations. This rollback is prohibited after the contract barrier.
 
-Изменённые настройки не заменяются новым шаблоном. Миграции конфигурации допускают добавление отсутствующего значения, контролируемое переименование и значения из инвентаря. Конфликт переименования завершает проверку конфигурации экземпляра до его остановки. Старый файл сохраняется для отката.
+Modified settings are not overwritten by a new template. Configuration migrations may add missing values, perform controlled renames and use inventory values. A rename conflict fails instance configuration validation before shutdown. The old file is retained for rollback.
 
-Для DEB сценарии сопровождающего проверяют платформу и обновляют systemd, сохраняя данные и удостоверения. Conffiles в `/etc/psim-platform/defaults` сохраняют изменения через `--force-confold`. Пакеты не запускают все сервисы одновременно: порядок перезапуска задаёт координатор. Системные процессы используют те же сохранённые версии конфигурации, что и контейнеры.
+For DEB packages, maintainer scripts check the platform and update systemd while preserving data and credentials. Conffiles in `/etc/psim-platform/defaults` retain modifications through `--force-confold`. Packages do not start all services simultaneously: the coordinator controls restart order. System processes use the same persisted configuration versions as containers.
 
-## Миграции схем
+## Schema migrations
 
-PostgreSQL и ClickHouse сохраняют версии, фазы, SHA-256 SQL и минимальную версию читающего плана `minimum_reader`. Неизвестное расширение допустимо только с явным совместимым reader floor. Изменение выполненной миграции, несовместимое расширение и неизвестная contract-фаза запрещены.
+PostgreSQL and ClickHouse store versions, phases, SQL SHA-256 and the minimum reader-plan version `minimum_reader`. An unknown expansion is accepted only with an explicit compatible reader floor. Modification of an already executed migration, incompatible expansion and an unknown contract phase are prohibited.
 
-Автоматический выпуск содержит только ограниченный набор expand DDL. Невозобновляемые изменения данных и разрушающие команды в expand запрещены. PostgreSQL-планы сериализуются session advisory lock и записывают прогресс после каждого идемпотентного оператора; отдельные операторы поддерживают `CREATE INDEX CONCURRENTLY`. ClickHouse использует нативный `psim-ch-migrate` и журнал PostgreSQL; DDL должен допускать повтор после неизвестного результата.
+An automatic release contains only a restricted set of expand DDL. Non-resumable data changes and destructive commands are prohibited in expand. PostgreSQL plans are serialized by a session advisory lock and record progress after each idempotent statement; individual statements support `CREATE INDEX CONCURRENTLY`. ClickHouse uses native `psim-ch-migrate` and a PostgreSQL journal; DDL must tolerate retries after an unknown outcome.
 
-Contract расширения N+1 выполняется только в следующей эпохе после замены всех старых читателей. `task deploy:upgrade:contract` сначала сохраняет запрет отката на всех узлах и затем выполняет разрушающую фазу. Ошибка не снимает запрет автоматически.
+The contract phase for an N+1 expansion runs only in the next epoch, after all old readers have been replaced. `task deploy:upgrade:contract` first persists the rollback prohibition on every node, then runs the destructive phase. An error does not automatically remove that prohibition.
 
-## Версии инфраструктуры
+## Infrastructure versions
 
-Поддерживаемые версии и границы переходов находятся в `deploy/infrastructure/compatibility.json`; точные образы закреплены в `deploy/topologies/images.json`. Неперечисленные целевые версии требуют отдельной квалификации. Автоматической смены major нет.
+Supported versions and transition boundaries are listed in `deploy/infrastructure/compatibility.json`; exact images are pinned in `deploy/topologies/images.json`. Unlisted target versions require separate qualification. There are no automatic major-version upgrades.
 
-| Компонент | Порядок и барьеры |
+| Component | Order and gates |
 |---|---|
-| Kafka | Один broker/controller; восстановить ISR и quorum до следующего. `metadata.version` финализируется после окна отката |
-| PostgreSQL 18 | Реплики, проверка синхронного подтверждения, управляемое переключение, прежний primary. Major - отдельная процедура |
-| ClickHouse | Одна реплика, завершение репликации, вторая реплика. Keeper обновляется отдельно от серверов |
-| Valkey | Реплики, контролируемое переключение Sentinel, прежний primary; затем Sentinel по одному с quorum |
-| Keycloak | Только проверенный совместимый rolling-переход; несовместимая миграция БД требует обслуживания и проверенного восстановления |
-| SeaweedFS | Master по одному с quorum -> volume по одному с репликацией -> filer -> S3 gateway. Чтение существующих планов и новая загрузка обязательны |
+| Kafka | One broker/controller at a time; restore ISR and quorum before the next. Finalize `metadata.version` after the rollback window |
+| PostgreSQL 18 | Replicas, synchronous acknowledgment check, controlled switchover, former primary. Major upgrades require a separate procedure |
+| ClickHouse | One replica, replication completion, second replica. Upgrade Keeper separately from the servers |
+| Valkey | Replicas, controlled Sentinel switchover, former primary; then Sentinel instances individually while maintaining quorum |
+| Keycloak | Only a qualified compatible rolling transition; incompatible database migration requires maintenance and verified recovery |
+| SeaweedFS | Masters individually with quorum -> volumes individually with replication -> filer -> S3 gateway. Verify reads of existing floor plans and new uploads |
 
-Основания: [Kafka](https://kafka.apache.org/43/getting-started/upgrade/), [PostgreSQL](https://www.postgresql.org/docs/18/upgrading.html), [ClickHouse](https://clickhouse.com/docs/guides/oss/update), [Valkey Sentinel](https://valkey.io/topics/sentinel/), [Keycloak](https://www.keycloak.org/docs/latest/upgrading/index.html), [SeaweedFS](https://github.com/seaweedfs/seaweedfs/wiki/Production-Setup).
+References: [Kafka](https://kafka.apache.org/43/getting-started/upgrade/), [PostgreSQL](https://www.postgresql.org/docs/18/upgrading.html), [ClickHouse](https://clickhouse.com/docs/guides/oss/update), [Valkey Sentinel](https://valkey.io/topics/sentinel/), [Keycloak](https://www.keycloak.org/docs/latest/upgrading/index.html), [SeaweedFS](https://github.com/seaweedfs/seaweedfs/wiki/Production-Setup).
 
-## Квалификация
+## Qualification
 
-Статус шага 9.2: Принято с ограничением. S12/C-12 отложен до шага 10.1; успешное обновление и откат под полным LOAD-50K остаются обязательными перед выпуском. Механизм временной дополнительной реплики имеет целевые проверки порядка запуска; его полная нагрузочная квалификация не завершена.
+S12/C-12 qualification is incomplete. Successful upgrade and rollback under full LOAD-50K remain mandatory before release. The temporary-additional-replica mechanism has targeted startup-order checks; its full load qualification is incomplete.
 
-В выполненном кластерном прогоне заменены все 26 экземпляров и выполнен полный откат. Все 1433 чтения плана успешны. Найдены все 171708 подтверждённых SDK идентификаторов raw; это не означает успешную сквозную сверку. Пауза сигналов около 19 с и отставание инцидентов нарушили критерии S12. Отдельная попытка LOAD-50K остановилась на ошибке локального буфера SDK до обновления сервисов. Эти результаты сохраняются как ограничения, а не как успешный S12.
+The completed cluster run replaced all 26 instances and performed a full rollback. All 1433 floor-plan reads succeeded. All 171708 SDK-acknowledged raw identifiers were found; this does not establish successful end-to-end reconciliation. A signal pause of approximately 19 seconds and incident lag violated S12 criteria. A separate LOAD-50K attempt stopped on a local SDK buffer error before services were upgraded. These results remain limitations, not a successful S12 result.
 
-`task deploy:lifecycle:test` проверяет подписи, контрактные барьеры, сохранение настроек, отказ неподписанной установки и реальное поведение dpkg. Компонентные проверки PostgreSQL и ClickHouse проверяют совместную работу версий схемы и запрет несовместимого отката.
+`task deploy:lifecycle:test` checks signatures, contract barriers, preservation of settings, rejection of unsigned installation and actual dpkg behavior. PostgreSQL and ClickHouse component tests check schema-version coexistence and rejection of incompatible rollback.
 
-`task deploy:upgrade:qualify` принимает `BASELINE`, `RELEASE`, `TRUSTED_KEY`, `RUNTIME` и `RATE`. Он выполняет обновление и откат при непрерывной публикации SDK, сверяет все подтверждённые идентификаторы в raw и normalized Kafka, проверяет предметный сквозной сценарий и чтение плана через публичный API. Полный профиль содержит 10 000 устройств на 10 площадках; одна площадка создаёт 30% фоновых событий. Контрольная тревога добавляется раз в секунду. SDK использует пакетную публикацию; перед обновлением проверяется фактическая скорость подтверждений. Генератор сохраняет отдельный журнал идентификаторов.
+`task deploy:upgrade:qualify` accepts `BASELINE`, `RELEASE`, `TRUSTED_KEY`, `RUNTIME` and `RATE`. It upgrades and rolls back while the SDK continuously publishes, reconciles every acknowledged identifier in raw and normalized Kafka, checks a domain end-to-end scenario, and reads a floor plan through the public API. The full profile contains 10,000 devices across 10 sites; one site generates 30% of background events. A control alarm is added once per second. The SDK uses batch publication; actual acknowledgment rate is checked before upgrading. The generator maintains a separate identifier journal.
 
-Генератор задаёт 51 000 событий/с с небольшим запасом относительно обязательных 50 000 фоновых событий/с. Отчёт содержит измеренные скорости, распределение по площадкам, максимальный интервал сигналов, общий p99 и p99 каждого десятисекундного интервала. Пределы S12 сохраняются: пауза не более 5 с, p99 событие -> инцидент не более 1 с, ноль логических потерь и дубликатов. Повторы транспорта raw и одной публикации outbox учитываются отдельно; нормализованный поток и логические эффекты проверяются по ADR-006. Функциональный прогон меньшей нагрузки не подтверждает LOAD-50K.
+The generator requests 51,000 events/s to provide a small margin over the required 50,000 background events/s. The report includes measured rates, distribution by site, maximum signal interval, overall p99 and p99 for every ten-second interval. S12 limits remain unchanged: a pause of at most 5 seconds, event -> incident p99 of at most 1 second, and zero logical losses or duplicates. Raw transport retries and repeats of one outbox publication are counted separately; the normalized stream and logical effects are checked according to ADR-006. A functional run at a lower load does not qualify LOAD-50K.
 
-`PSIM_LAB_ID=s12` выбирает отдельный VM-стенд, каталог конфигурации и заводскую запись. Имя VM-контейнера - `psim-platform-vm-s12`, каталоги - `.cache/deployment/s12` и `build/deployment/s12`. Обычный стенд сохраняет прежние пути и идентичности. Это позволяет хранить результаты неудачного прогона и выполнять S12 на чистом наборе данных. Контейнерный профиль используется для проверки передачи Kafka-партиций между версиями.
+`PSIM_LAB_ID=s12` selects a separate VM laboratory, configuration directory and factory record. The VM container is named `psim-platform-vm-s12`; directories are `.cache/deployment/s12` and `build/deployment/s12`. The ordinary laboratory retains its existing paths and identities. This preserves failed-run results and allows S12 to run against a clean dataset. The container profile checks Kafka partition handover between versions.
 
-`python3 -I tools/deploy/seaweed_upgrade.py qualify` выполняет точный переход 4.47 -> 4.48 в изолированном Docker-окружении с тремя master, двумя volume, двумя filer, PostgreSQL и двумя S3 gateway. Проверяются непрерывное чтение, загрузка нового объекта и запрет анонимного доступа. Этот прогон проверяет переход версий и не подтверждает независимость физических доменов отказа VM.
+`python3 -I tools/deploy/seaweed_upgrade.py qualify` performs the exact 4.47 -> 4.48 transition in an isolated Docker environment with three masters, two volumes, two filers, PostgreSQL and two S3 gateways. It checks continuous reads, new-object uploads and rejection of anonymous access. This verifies the version transition, not independent physical VM failure domains.

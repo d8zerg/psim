@@ -1,54 +1,60 @@
-# Пакет наблюдаемости
+# Observability Package
 
-Статус: Принято. Решение о хранении - [ADR-080](../adr/0080-observability-package.md).
+<!-- language-links -->
+[English](observability.md) | [Русский](../ru/engineering/observability.md)
+<!-- /language-links -->
 
-Узловой агент - отдельная программа `psim-monitoring-agent` в `tools/monitoring-agent`, пакет `psim-monitoring-agent` и образ `psim-platform/monitoring`. Он запускается с `--config /etc/psim-platform/monitoring/agent.json`, использует UID мониторинга и собственный жизненный цикл. `psimctl diagnose` остаётся разовой административной диагностикой. Общий файловый ввод-вывод находится в `psim::platform_files`; протокольные клиенты также берутся из платформенных библиотек.
+Status: Accepted. The decision on storage is [ADR-080](../adr/0080-observability-package.md).
 
-## Состав и доступ
+The node agent is a separate program `psim-monitoring-agent` within `tools/monitoring-agent`, along with the package `psim-monitoring-agent` and the image `psim-platform/monitoring`. It runs from `--config /etc/psim-platform/monitoring/agent.json`, uses the monitoring UID, and has its own lifecycle. `psimctl diagnose` serves as a one-time administrative diagnostic. The general file input/output is located in `psim::platform_files`; protocol clients also come from the platform libraries.
 
-Пакет находится в `deploy/observability/` и входит в конфигурацию узлов при `task deploy:render`. Нужны образы инфраструктуры из `deploy/topologies/images.json` и образ `psim-platform/monitoring:<version>`, собираемый `task deploy:images`. Дашборды, конфигурации и инструкции поставляются готовыми файлами; отдельная генерация не требуется.
+## Composition and Access
 
-Grafana открывается по `https://<public_name>/monitoring/`. Keycloak допускает отдельные realm-роли `psim-observability-admin` и `psim-observability-viewer`: первая получает Admin, вторая Viewer; обе требуют MFA. Первоначальная административная учётная запись получает первую роль при `task deploy:account`; дальнейшие назначения выполняются отдельно в Keycloak. Предметные роли `admin`, `auditor` и `operator` сами по себе доступа не дают: телеметрия содержит агрегаты всей поставки. Для аварийного входа существует `recovery-admin`; пароль хранится в материале владельца `grafana`, файл `admin.secret`.
+The package is located in `deploy/observability/` and is part of the node configuration at `task deploy:render`. Images of the infrastructure from `deploy/topologies/images.json` and the image `psim-platform/monitoring:<version>` are required, along with the build done by `task deploy:images`. Dashboards, configurations, and instructions are provided as ready-made files; no separate generation is needed.
 
-Для существующей установки нужны явное обновление инвентаря, материала, учётных записей мониторинга и клиента Keycloak. Обычное последовательное обновление прикладных сервисов не добавляет инфраструктуру наблюдаемости автоматически. Первоначальная установка импортирует нужные роли и клиент вместе с realm.
+Grafana is accessed via `https://<public_name>/monitoring/`. Keycloak allows for separate realm roles `psim-observability-admin` and `psim-observability-viewer`: the first role gets Admin privileges, and the second gets Viewer privileges; both require MFA. The initial administrative account gets the first role at `task deploy:account`; further assignments are done separately in Keycloak. Product roles `admin`, `auditor`, and `operator` do not provide access on their own; telemetry contains aggregates from all provided resources. For emergency access, there’s `recovery-admin`; passwords are stored in the owner’s material at `grafana`, along with the file `admin.secret`.
 
-Инструкции доступны по `/operations/runbooks/` через тот же HTTPS-вход. Отдельная страница каждого алерта содержит диагностику, восстановление, подтверждение результата и переход к соответствующему дашборду. Секретов и личных данных на страницах нет.
+For existing installations, explicit updates are required for inventory, material, monitoring accounts, and Keycloak clients. Regular sequential updates do not automatically add observability infrastructure. The initial installation imports the necessary roles and clients along with the realm.
 
-## Организация дашбордов
+Instructions are available via `/operations/runbooks/` through the same HTTPS entry. Each alert has a separate page containing diagnostics, recovery, confirmation of results, and access to the corresponding dashboard. There are no secrets or personal data on the pages.
 
-| Экран | Основная работа |
+English is the default language. Dashboard navigation switches between English and Russian while preserving the selected time range and filters. Alert links open instructions in the selected language; switching the instruction language preserves the current section. Both versions are included in the delivery.
+
+## Dashboard Organization
+
+| Screen | Main Function |
 |---|---|
-| Обзор платформы | Критические алерты, недоступные экземпляры, сквозная задержка, поток, очереди и ёмкость |
-| Конвейер событий | Скорость этапов, p99 отдельных границ, lag по группе и топику, новые записи DLQ, остановленные партиции и восстановление корреляции |
-| Сервисы и API | Readiness, трафик, длительность, ошибки upstream и общей квоты, насыщение, realtime и связанные логи |
-| Инфраструктура и репликация | Доступность каждого процесса, время ответа, роли PostgreSQL и Valkey, репликация, Keeper, etcd, HAProxy и Keycloak |
-| Хранилища и ёмкость | Доступные байты и inode, прогноз роста, загрузка ClickHouse, parts, replication queue и read-only реплики |
-| Инциденты и подключения | Агрегаты состояний инцидентов, живые и отключённые коннекторы, площадки без текущего дежурного, сценарии, команды и уведомления |
-| Эксплуатационные проверки | Копии, сертификаты, часы узлов, свежесть диагностики, ошибки доставки телеметрии и уведомлений |
+| Platform Overview | Critical alerts, unavailable instances, pipeline latency, flow, queues, and capacity |
+| Event Pipeline | Stage throughput, p99 values for individual boundaries, lag by group and topic, new DLQ records, stopped partitions, and correlation restoration |
+| Services and APIs | Readiness, traffic, duration, upstream errors, shared quotas, saturation, realtime, and related logs |
+| Infrastructure and Replication | Availability of each process, response time, PostgreSQL and Valkey roles, replication, Keeper, etcd, HAProxy, and Keycloak |
+| Storage and Capacity | Available bytes and inodes, growth forecast, ClickHouse load, parts, replication queue, and read-only replicas |
+| Incidents and Connectors | Aggregates of incident states, active and disconnected connectors, sites without current duty, scenarios, commands, and notifications |
+| Operational Checks | Backups, certificates, node clocks, diagnostic freshness, errors in telemetry and notification delivery |
 
-Все экраны имеют общий интервал, часовой пояс браузера, фильтры поставки и узла и переходы с сохранением фильтров и времени. Фильтр сервиса появляется на экранах с прикладными метриками; инфраструктурные метрики остаются привязаны к узлу. Дополнительные фильтры группы, топика, компонента и тенанта появляются на соответствующих экранах. Панели объединены по задачам, графики имеют единицы, описания границ измерения, легенду и общую подсказку. Подробные серии доступны через Grafana Explore. Отсутствующие измерения отображаются как `Нет данных`, пропуски графиков не соединяются.
+All screens share the same time zone, browser settings, deployment filters, and transitions with saved filters and time. Service filters appear on screens with application metrics; infrastructure metrics remain tied to the node. Additional filters for groups, topics, components, and tenants appear on corresponding screens. Panels are grouped by tasks, charts have units, measurement boundaries descriptions, legend, and general hints. Detailed series are available through Grafana Explore. Missing measurements are displayed as `No data` (`Нет данных` in Russian); missing chart lines are not connected.
 
-Цвета не заменяют числовые значения. Дисковые пороги - 15% и 5% свободного места; сертификаты требуют продления менее чем за 30 суток. Начальное окно - один час, обновление - 30 секунд. При работе с отказом следует зафиксировать интервал, выбрать узел и перейти из алерта к инструкции.
+Colors do not replace numerical values. Disk thresholds are 15% and 5% of free space; certificates require renewal within less than 30 days. The initial window is one hour, updates are every 30 seconds. When working with failures, it’s necessary to record the interval, select a node, and transition from an alert to an instruction.
 
-## Сбор и хранение
+## Collection and Storage
 
-Агент на каждом узле проверяет инфраструктуру, собирает ресурсы Linux, состояние локальных экземпляров PostgreSQL, Valkey, Sentinel, Keeper, ClickHouse и метрики административных HTTP-интерфейсов. Каждый узел отдельно проверяет достижимость Kafka и PostgreSQL, что позволяет видеть сетевое разделение. Детальное чтение lag Kafka и end offset DLQ выполняется центральным агентом через Kafka Admin API.
+The agent on each node checks the infrastructure, collects Linux resources, status of local PostgreSQL instances, Valkey, Sentinel, Keeper, ClickHouse, and metrics from administrative HTTP interfaces. Each node individually checks Kafka and PostgreSQL availability, allowing visibility into network segmentation. Detailed reading of Kafka lag and end offset of DLQ is performed by the central agent through Kafka Admin API.
 
-Агент слушает порт 19443, проверяет клиентский сертификат и разрешает чтение метрик только Prometheus и административной идентичности. HAProxy может читать HTML-инструкции, Alertmanager - передавать уведомления. Прокси метрик допускает только известные сервисы из инвентаря, без произвольных URL. Неуспешная загрузка возвращает ошибку scrape. Устаревший снимок агента также делает scrape неуспешным.
+The agent listens on port 19443, checks client certificates, and allows reading of metrics only for Prometheus and administrative identity. HAProxy can read HTML instructions, Alertmanager sends notifications. Proxy metrics only allow known services from the inventory, without arbitrary URLs. Failed downloads return an error. An outdated agent snapshot also makes scraping unsuccessful.
 
-Учётная запись PostgreSQL имеет `pg_monitor` и доступ только к функции фиксированных агрегатов `monitoring.business_metrics()`. Она не получает чтение таблиц предметной области. Функция не принимает SQL или параметры поиска, использует фиксированный `search_path` и ограничение длительности. Экспортируются количества и технические идентификаторы тенантов; тексты инцидентов, имена пользователей и адресаты не экспортируются. Отсутствующий текущий дежурный считается по полному каталогу площадок, включая площадки без строки назначения и назначения только резервного получателя.
+The PostgreSQL account has `pg_monitor` and only has access to fixed aggregate functions `monitoring.business_metrics()`. It does not have access to reading tables in the subject area. The function does not accept SQL or search parameters, uses a fixed `search_path` and time limit. Counts and technical identifiers of tenants are exported; incident texts, user names, and recipients are not exported. Missing current duty is considered based on the full catalog of sites, including sites without an assigned duty operator and those with only a backup recipient.
 
-Агент получает копии публичных сертификатов и доверенных CA своего узла. Для PEM-цепочки учитывается ближайший срок истечения. При продлении сертификата или замене доверия нужно обновить и публичную копию в материале `monitoring`; это часть регламента ротации. Закрытые ключи сервисов остаются у их владельцев. Том данных, смонтированный агенту только для чтения ёмкости, сохраняет исходного владельца при формировании узлового архива.
+The agent receives copies of public certificates and trusted CA’s from its node. For PEM chains, the nearest expiration date is taken into account. When renewing certificates or changing trust, the public copy must be updated in the material at `monitoring`; this is part of the rotation rules. Private service keys remain with their owners. Data files collected by the agent only for reading capacity are retained by the original owner when creating node archives.
 
-Приложение отправляет трассы на локальный Collector по TLS. Docker передаёт JSON-логи через локальный Fluent Forward с ограниченным асинхронным буфером. Нативные сервисы пишут JSONL в `data/<node>/service-logs`; Collector читает файлы с сохранением позиции. Нативная установка устанавливает logrotate и конфигурацию ротации: проверка размера 20 МиБ, пять сжатых копий, copytruncate. Частоту штатного запуска logrotate выбирают по интенсивности логов. Необходимо контролировать фактическую ёмкость тома.
+The application sends traces to the local Collector via TLS. Docker sends JSON logs through the local Fluent Forward with a limited asynchronous buffer. Native services write JSONL in `data/<node>/service-logs`; Collector reads files with position preservation. The native installation sets up logrotate and rotation configuration: size check is 20 MB, five compressed copies, copytruncate. The frequency of logrotate is chosen based on log intensity. It’s necessary to control the actual capacity of the data file.
 
-Между узлами Collector использует mTLS. Дисковая очередь переживает перезапуск Collector и повторяет отправку при недоступности хранилища; она имеет конечный размер. Сбор логов и трасс не является каналом долговечной доставки предметных событий. Логи содержат `trace_id`, источник Loki связан с Tempo. Внутренние HTTP/gRPC-порты хранилищ доступны только через loopback.
+Between the nodes of Collector, mTLS is used. The disk queue survives Collector restarts and repeats the sending if the storage is unavailable; it has a finite size. Logging and trace collection are not a persistent channel for event delivery. Logs contain `trace_id`, and the Loki source is connected to Tempo. Internal HTTP/gRPC ports of the storage are accessible only through loopback.
 
-Сквозная метрика `psim_event_to_incident_seconds` измеряет последнее исходное событие сигнала -> успешное завершение фиксации инцидента. Она исключает повторную доставку, таймерные сигналы с дедлайном отсутствия и будущие timestamps. Отдельный счётчик `psim_incident_signals_persisted_total` учитывает уникальные зафиксированные сигналы, включая таймерные; ошибки транзакций и повторы не увеличивают его. Это измерение включает ожидание правила и зависит от часов источника; оно не охватывает доставку в браузер. Проекция консоли и realtime измеряются отдельно. Складывать p99 этих границ нельзя. Нагрузочное SLO сохраняет отдельную проверку.
+The end-to-end metric `psim_event_to_incident_seconds` measures the last originating event of a signal -> successful completion of incident recording. It excludes duplicate deliveries, timer signals with deadlines, and future timestamps. A separate counter `psim_incident_signals_persisted_total` counts unique recorded signals, including timers; transaction errors and repetitions do not increase its value. This metric includes rule waiting time and depends on the source time; it does not cover browser delivery. Console projection and realtime are measured separately. Per-stage p99 values must not be added to derive end-to-end p99. The load SLO retains separate verification.
 
-## Резервные копии
+## Backups
 
-Центральный агент читает `data/<node>/monitoring/backups.json`. Задания копирования атомарно заменяют этот файл после проверки результата; нельзя обновлять успешный timestamp при старте задания. Формат:
+The central agent reads `data/<node>/monitoring/backups.json`. Backup tasks atomically replace this file after checking the result; it is not possible to update the successful timestamp at startup. Format:
 
 ```json
 {
@@ -64,22 +70,22 @@ Grafana открывается по `https://<public_name>/monitoring/`. Keycloa
 }
 ```
 
-Числа в примере показывают структуру, а не готовое состояние стенда. Timestamp задаётся в Unix seconds, размер - в байтах. Нет файла, ключа или корректного значения - состояние неизвестно и успешный timestamp равен нулю. Возраст копии более 24 часов и возраст состояния более десяти минут имеют отдельные алерты. Интервалы согласуют с политикой резервирования. Само резервирование и квалификация восстановления относятся к [шагу 9.3](../psim-mvp-development-plan.md#шаг-93-резервное-копирование-и-восстановление) и этим пакетом не подтверждаются.
+The numbers in the example show the structure, not the final state of the test environment. The timestamp is set in Unix seconds, and the size in bytes. If there is no file, key, or valid value, the state is unknown, and the successful timestamp is zero. Backups older than 24 hours and states older than ten minutes have separate alerts. Intervals comply with backup policies. Backup and recovery qualifications are described in [the schedule](administration-and-recovery.md) and are not confirmed by this package.
 
-## Уведомления и инструкции
+## Notifications and Instructions
 
-Prometheus передаёт алерты Alertmanager. Начальная конфигурация группирует их по поставке, имени и узлу; critical получает первую доставку через десять секунд, warning - через тридцать. При критическом заполнении диска подавляется менее срочное предупреждение того же тома. Все алерты имеют публичные URL инструкции и дашборда.
+Prometheus sends alerts to Alertmanager. The initial configuration groups them by deployment, name, and node; critical receives the first delivery after ten seconds, warning after thirty seconds. When the disk is critically full, less urgent warnings for the same volume are suppressed. All alerts have public URL instructions and dashboards.
 
-Штатный получатель сохраняет уведомления в `data/<node>/monitoring/alerts.jsonl`, подтверждая запись через fsync. При достижении 16 МиБ сохраняется одна предыдущая часть. Это локальный журнал доставки. Для дежурного следует настроить внешний получатель в `alertmanager.yaml`: webhook, почту или другой поддерживаемый канал, с секретами в закрытых файлах. Смена файла конфигурации сопровождается проверкой `amtool check-config` и контролируемой перезагрузкой Alertmanager. Нужно проверить доставку firing и resolved реальному получателю.
+The regular recipient saves notifications in `data/<node>/monitoring/alerts.jsonl`, confirming the record with fsync. When 16 MiB is reached, one previous part is saved. This is a local delivery log. For the duty officer, an external recipient should be set in `alertmanager.yaml`: webhook, email, or other supported channel, with secrets in protected files. Changing the configuration file is accompanied by `amtool check-config` verification and controlled restart of Alertmanager. It is necessary to verify delivery to the real recipient.
 
-`PsimWatchdog` отправляется каждую минуту. Его отсутствие должна обнаруживать внешняя система, независимая от узла наблюдаемости. Локальный журнал не обнаружит собственную недоступность.
+`PsimWatchdog` is sent every minute. Its absence should be detected by an external system, independent of the observability node. The local log will not detect its own unavailability.
 
-`PsimSignalInterrupted` сравнивает фактическую публикацию сигналов в Kafka с их обработкой Incident Service. Обычный поток событий без срабатываний правил не вызывает этот алерт. Двухминутное окно алерта не заменяет квалификацию пятисекундного ограничения паузы при обновлении.
+`PsimSignalInterrupted` compares actual Kafka publishing with Incident Service processing. A normal event flow without rule violations does not trigger this alert. A two-minute alert window does not replace the five-second pause limit during updates.
 
-## Проверки и границы
+## Tests and Limits
 
-- `task deploy:observability:check` проверяет навигацию, единицы, отсутствие перекрытий панелей, все PromQL, переходы алертов на тестовых рядах, ссылки C-01-C-15, конфигурации хранилищ и ограничение доступа к бизнес-агрегатам в PostgreSQL.
-- `task deploy:observability:test` дополнительно запускает изолированный Compose, проверяет provisioned Grafana и её источники, mTLS, реальные протоколы Kafka, PostgreSQL, Valkey, Keeper и ClickHouse, lag в две записи и DLQ, запись и чтение OTLP-лога и трассы, JSON-логи контейнера и нативного процесса, доставку алерта Prometheus -> Alertmanager -> журнал и HTML-инструкции. Chromium открывает семь дашбордов, прокручивает все панели, проверяет запросы и горизонтальное переполнение, сохраняет снимки.
-- `task deploy:check` проверяет профили одной машины и кластера, изоляцию процессов и рендеринг Helm. Kubernetes не получает отдельной квалификации наблюдаемости.
+- `task deploy:observability:check` checks navigation, units, no overlapping panels, all PromQL, alerts transitions on test series, C-01-C-15 links, storage configurations, and access limits to business aggregates in PostgreSQL.
+- `task deploy:observability:test` additionally runs isolated Compose, checks provisioned Grafana and its sources, mTLS, real Kafka protocols, PostgreSQL, Valkey, Keeper, and ClickHouse, lag in two records and DLQ, writing and reading OTLP logs and traces, container and native process JSON logs, and Prometheus -> Alertmanager -> log delivery. Chromium opens fourteen EN/RU dashboards, scrolls all panels, checks queries and horizontal overflow, saves snapshots.
+- `task deploy:check` checks profiles of one machine and cluster, process isolation, and Helm rendering. Kubernetes does not receive separate observability qualification.
 
-Артефакты - `build/observability/smoke-result.json`, `smoke-containers.log` и `screenshots/`. Тестовые ключи и контейнеры удаляются после прогона. Матрица `deploy/observability/chaos-coverage.json` подтверждает наличие диагностического маршрута для каждого отказа; значения RPO/RTO и работа под LOAD-50K подтверждаются отдельной кластерной квалификацией. Живая проверка всех инфраструктурных протоколов и входа Grafana через Keycloak на E-CLUSTER остаётся частью эксплуатационной приёмки.
+Artifacts - `build/observability/smoke-result.json`, `smoke-containers.log`, and `screenshots/`. Test keys and containers are removed after running. The matrix `deploy/observability/chaos-coverage.json` confirms the existence of a diagnostic path for each failure; RPO/RTO values and LOAD-50K performance are confirmed by separate cluster qualifications. Live testing of all infrastructure protocols and Grafana access through Keycloak on E-CLUSTER remains part of operational acceptance.

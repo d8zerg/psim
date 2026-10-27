@@ -10,7 +10,7 @@ import "google/protobuf/timestamp.proto";
 import "psim/common/v1/types.proto";
 
 // ReportService builds incident reports (ADR-028: analytics in ClickHouse).
-// Owner: Projection Service. Scenario S13.
+// Owner: Projection Service.
 service ReportService {
   // GetIncidentReport returns incident metrics for a period.
   rpc GetIncidentReport(GetIncidentReportRequest) returns (GetIncidentReportResponse) {

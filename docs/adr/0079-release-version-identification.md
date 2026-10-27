@@ -1,37 +1,40 @@
-# ADR-079. Определение версии и идентичности поставки
+# ADR-079. Defining Version and Identity of a Delivery
 
-- **Статус:** Принято
-- **Шаг плана:** 9.2
-- **Связанные:** ADR-024, ADR-034
+<!-- language-links -->
+[English](0079-release-version-identification.md) | [Русский](../ru/adr/0079-release-version-identification.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** ADR-024, ADR-034
 
-Постоянная версия `0.1.0` не различает сборки и допускает замену содержимого одного тега образа. Для обновления и отката нужны версия продукта, идентичность исходников и проверяемые идентичности всех артефактов. CMake, Debian и Docker используют разные допустимые представления версии.
+## Context
 
-## Решение
+The constant version `0.1.0` does not distinguish between builds and allows replacement of content within a single image tag. Updates and rollback require product versions, source identity, and verified identities for all artifacts. CMake, Debian, and Docker use different acceptable version representations.
 
-Использовать SemVer 2.0.0 и Git-теги `vMAJOR.MINOR.PATCH`. Базовая версия берётся из ближайшего достижимого SemVer-тега Git; файлы версии и неявная базовая версия не используются. Для базы допустимы аннотированные и лёгкие теги, с префиксом `v` или без него. Официальный выпуск требует аннотированного тега. Скрипт `tools/version.py` определяет версию один раз для CMake, пакетов, образов и метаданных веб-клиента.
+## Solution
 
-Чистый тег задаёт точную версию. Сборка после стабильного тега получает следующий patch с суффиксом `-dev.<distance>+g<revision>`. После prerelease-тега к prerelease добавляется `.dev.<distance>`. Изменённое рабочее дерево отмечается `.dirty`; такая сборка предназначена для разработки и квалификации. Официальный выпуск проверяется `tools/version.py --release` и требует чистого аннотированного тега. Если достижимых тегов нет, обычная сборка завершается с понятной ошибкой; для отдельного стендового артефакта допускается явный `PSIM_BUILD_VERSION`, который не подтверждает официальный выпуск. Создание тегов и публикация не выполняются инструментом определения версии.
+Use SemVer 2.0.0 and Git tags `vMAJOR.MINOR.PATCH`. The base version is taken from the nearest reachable SemVer tag in Git; version files and implicit base versions are not used. For the base, annotated and lightweight tags are allowed, with the prefix `v` or without it. Official releases require an annotated tag. The script `tools/version.py` defines the version once for CMake, packages, images, and web client metadata.
 
-Полная SemVer сохраняется в бинарных файлах и `build-info.json` веб-клиента. Числовая часть используется в `project(VERSION)` CMake. Для Debian разделитель prerelease заменяется на `~`, для тега Docker символ `+` заменяется на `_`. Инвентарь хранит версию продукта; преобразования выполняет модель поставки.
+A clean tag sets the exact version. After a stable tag, the next patch is added with the suffix `-dev.<distance>+g<revision>`. After a prerelease tag, `.dev.<distance>` is added. Modified working trees are marked with `.dirty`; such builds are intended for development and qualification. Official releases are verified with `tools/version.py --release` and require a clean annotated tag. If no reachable tags exist, the normal build ends with an understandable error; for individual test artifacts, an explicit `PSIM_BUILD_VERSION` is allowed, which does not confirm an official release. Tag creation and publication are not performed by the versioning tool.
 
-Версия не заменяет идентичность содержимого. Идентификатор установленной поставки - SHA-256 подписанного `SHA256SUMS`. Он связывает образы, DEB, SBOM, контрактные снимки и SQL-планы. Отдельный доверенный Ed25519-ключ проверяет подпись; ключ внутри архива служит справочной информацией и не становится источником доверия.
+The complete SemVer is stored in binary files and `build-info.json` of the web client. The numerical part is used in `project(VERSION)` CMake. For Debian, the prerelease separator is replaced with `~`; for Docker tags, `+` is replaced with `_`. The inventory stores the product version; the transformation is performed by the delivery model.
 
-Для образа сохраняется цепочка OCI-дескрипторов Linux amd64 и конфигурации. Docker Engine может показывать в `Image.Id` digest манифеста или конфигурации; допустим только digest из подписанной цепочки. Изменяемый тег не используется как доказательство идентичности.
+The version does not replace the content’s identity. The identifier of the installed delivery is the SHA-256 digest of signed `SHA256SUMS`. It links images, DEBs, SBOMs, contract snapshots, and SQL plans. A separate trusted Ed25519 key verifies the signature; the key within the archive serves as reference information and does not become a source of trust.
 
-Инфраструктура закреплена отдельно в `images.json` и политике совместимости. Обновление прикладного выпуска не меняет её версии автоматически.
+For an image, the OCI descriptors of Linux amd64 and configuration are preserved. Docker Engine can show the manifest or configuration in `Image.Id` digest; only a digest from the signed chain is allowed. The mutable tag is not used as proof of identity.
 
-## Альтернативы
+The infrastructure is separately defined in `images.json` and compatibility policies. Updating the application release does not automatically change its version.
 
-| Вариант | Оценка |
+## Alternatives
+
+| Option | Rating |
 |---|---|
-| Ручная версия в CMake и package.json | Несколько источников, сборки между выпусками неразличимы |
-| Только Git SHA | Идентифицирует исходники, но не задаёт порядок совместимых выпусков |
-| SemVer из Git и подписанные идентичности артефактов | Выбрано; разделяет совместимость, происхождение и содержимое |
+| Manual version in CMake and package.json | Multiple sources, builds are indistinguishable between releases |
+| Only Git SHA | Identifies the source, but does not set the order of compatible releases |
+| SemVer from Git and signed artifact identities | Chosen; separates compatibility, origin, and content |
 
-## Проверка
+## Verification
 
-Проверяются чистый тег, изменённое дерево, допустимость SemVer, порядок Debian prerelease, отдельный доверенный ключ, изменение артефакта и контрактного снимка, полнота подписанного инвентаря и сохранение старой конфигурации.
+The clean tag, modified tree, SemVer compliance, Debian prerelease order, separate trusted key, changes to artifacts and contract snapshots, completeness of signed inventory, and preservation of old configuration are verified.
 
-Основания: [SemVer](https://semver.org/), [git describe](https://git-scm.com/docs/git-describe), [версии пакетов Debian](https://www.debian.org/doc/debian-policy/ch-controlfields.html#version), [CPack DEB](https://cmake.org/cmake/help/latest/cpack_gen/deb.html).
+References: [SemVer](https://semver.org/), [git describe](https://git-scm.com/docs/git-describe), [Debian package versions](https://www.debian.org/doc/debian-policy/ch-controlfields.html#version), [CPack DEB](https://cmake.org/cmake/help/latest/cpack_gen/deb.html).

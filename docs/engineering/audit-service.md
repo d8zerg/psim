@@ -1,97 +1,101 @@
 # Audit Service
 
-Audit Service загружает действия из `psim.audit.v1`, строит отдельную цепочку SHA-256 на тенант и сохраняет подписанные Ed25519 контрольные точки вне PostgreSQL. Решение и границы доверия определены в [ADR-021](../adr/0021-audit-hash-chain.md).
+<!-- language-links -->
+[English](audit-service.md) | [Русский](../ru/engineering/audit-service.md)
+<!-- /language-links -->
 
-## Хранение и запуск
+The Audit Service loads actions from `psim.audit.v1`, builds a separate SHA-256 chain on the tenant, and stores Ed25519-signed checkpoints outside PostgreSQL. The solution and trust boundaries are defined in [ADR-021](../adr/0021-audit-hash-chain.md).
 
-`services/audit-service` собирает `psim-audit-service` и `psim-audit-tool`. Рабочий процесс не выполняет миграции и не получает пароль владельца схемы. Установщик создаёт роль приложения без SUPERUSER, CREATEDB, CREATEROLE и членства в роли владельца, выдаёт CONNECT на целевую БД и запускает от имени владельца:
+## Storage and Execution
+
+`services/audit-service` builds `psim-audit-service` and `psim-audit-tool`. The runtime process does not perform migrations or receive the schema owner’s password. The installer creates an application role without SUPERUSER, CREATEDB, CREATEROLE, and ownership membership, grants CONNECT to the target database, and executes it as the owner:
 
 ```sh
 psim-audit-tool migrate psim_audit
 ```
 
-Подключение утилиты задаётся `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT` и `PSIM_PG_SSLKEY`. По умолчанию TLS проверяет имя узла и УЦ. Пароль берётся из защищённого окружения процесса установщика; он не является аргументом команды.
+The utility connection is set via `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, and `PSIM_PG_SSLKEY`. By default, TLS checks the hostname and CA. The password is taken from the installer’s secure environment; it is not an argument to the command.
 
-Миграции создают `audit.entries`, `audit.checkpoints`, inbox/outbox и курсоры журнала идентификации. Роль `psim_audit` получает только SELECT и INSERT на записи и контрольные точки. Триггеры блокируют UPDATE, DELETE и TRUNCATE даже при ошибочной выдаче прав. Приложение проверяет отсутствие привилегий перед запуском. Обычная роль не может отключить триггеры. Суперпользователь может, поэтому внешняя контрольная точка обязательна.
+Migrations create `audit.entries`, `audit.checkpoints`, inbox/outbox, and identification log cursor. Role `psim_audit` only has SELECT and INSERT on entries and checkpoints. Triggers block UPDATE, DELETE, and TRUNCATE even if the rights are incorrectly granted. The application checks for no privileges before execution. A regular role cannot disable triggers. Superuser can do this, so an external checkpoint is required.
 
-Основные настройки:
+**Main Settings:**
 
-| Поле `settings` | Назначение |
+| Field `settings` | Purpose |
 |---|---|
-| `pg_user`, `pg_password_file` | Рабочая роль и файл её секрета |
-| `signing_key_file` | Закрытый ключ Ed25519 в PEM, поле секрета |
-| `trusted_keys_file` | JSON-объект `key_id -> PEM открытого ключа` |
-| `checkpoint_directory` | Отдельный существующий каталог для внешних контрольных точек |
-| `checkpoint_interval_ms` | Интервал до 300000 мс, по умолчанию 300000 |
-| `checkpoint_records` | Предел до 10000 новых записей, по умолчанию 10000 |
+| `pg_user`, `pg_password_file` | Runtime role and its secret file |
+| `signing_key_file` | Private Ed25519 key in PEM format, secret field |
+| `trusted_keys_file` | JSON object `key_id -> public key PEM` |
+| `checkpoint_directory` | Separate existing directory for external checkpoints |
+| `checkpoint_interval_ms` | Interval up to 300,000 ms, default 300,000 |
+| `checkpoint_records` | Limit up to 10,000 new records, default 10,000 |
 | `tls_certificate_file`, `tls_private_key_file`, `tls_ca_file` | TLS API |
-| `issuer`, `jwks_url`, `jwks_ca_file` | Доверенный источник JWT |
+| `issuer`, `jwks_url`, `jwks_ca_file` | Trusted JWT source |
 
-Kafka, Schema Registry и PostgreSQL используют общие настройки stream runtime. `allow_plaintext` допускается только в изолированном локальном окружении. Consumer group - `psim-audit-service`, начальная позиция - earliest в доступном retention. Ключ Kafka равен UUID тенанта. Повтор источника с другим действием или временем отклоняется в DLQ. Тело входной записи ограничено 1 MiB, как существующий outbox производителей. Чтение ограничено 8 MiB на порцию БД; страница API может содержать меньше запрошенного количества записей и продолжаться курсором. Для этого бюджета сохраняют стандартный `pg_max_result_bytes` 16 MiB или больше.
+Kafka, Schema Registry, and PostgreSQL use common stream runtime settings. `allow_plaintext` is only allowed in an isolated local environment. Consumer group - `psim-audit-service`, starting position - earliest in the available retention. Kafka key equals the tenant’s UUID. Repeating sources with different actions or times are rejected in DLQ. The body of an input record is limited to 1 MiB, as per existing producer outboxes. Reading is limited to 8 MiB per database page; the API page can contain fewer records than requested and continue with the cursor. For this budget, the standard `pg_max_result_bytes` of 16 MiB or more is maintained.
 
-Получить идентификатор открытого ключа можно как SHA-256 его последних 32 байтов DER SubjectPublicKeyInfo Ed25519. Доверенные ключи устанавливаются независимо от БД и экспорта. При ротации добавляют новый открытый ключ, переключают закрытый ключ и сохраняют прежние открытые ключи для проверки истории.
+The public key identifier is SHA-256 of the 32-byte public key, which is the last 32 bytes of its Ed25519 DER SubjectPublicKeyInfo encoding. Trusted keys are set independently of the database and export. During rotation, a new public key is added, the private key is switched, and previous public keys are saved for history verification.
 
-## Внешние контрольные точки
+## External Checkpoints
 
-Файлы имеют вид `<checkpoint_directory>/<tenant_uuid>/<audit_seq>.json`. Процесс не перезаписывает существующий файл: допускается только повтор абсолютно той же контрольной точки. Сначала fsync файла и каталогов, затем копия и Kafka outbox в транзакции PostgreSQL. При отказе COMMIT оставшийся внешний файл восстанавливает копию и публикацию. Два экземпляра используют один независимо сохраняемый архив и общий keyring.
+Files have the format `<checkpoint_directory>/<tenant_uuid>/<audit_seq>.json`. The process does not overwrite existing files: only an identical checkpoint can be repeated. First, fsync the file and directories, then store its copy and the Kafka outbox record in a PostgreSQL transaction. If a COMMIT fails, the remaining external file restores the copy and publication. Two instances use one independently stored archive and shared keyring.
 
-Архив размещается на отдельном носителе или томе, доступ к которому не получает администратор PostgreSQL. Сам закрытый ключ также недоступен ему. Резервное копирование должно сохранять архив, keyring и БД, а восстановление обязательно проверяет их согласованность. Удаление всех строк или контрольных точек из БД не удаляет доказательства из архива.
+The archive is stored on a separate storage or volume, inaccessible to PostgreSQL administrators. The private key itself is also inaccessible to them. Backup should save the archive, keyring, and database, and verification must check their consistency. Deleting all records or checkpoints from the database does not remove evidence from the archive.
 
-Периодическая проверка пересчитывает цепочку, сверяет внешние подписи и вершины, затем фиксирует новые записи. Ошибка не создаёт новую контрольную точку повреждённой цепочки. Недоступность архива и нарушение целостности ухудшают readiness; операторы должны реагировать на нездоровый компонент `audit` и сообщения `audit background operation deferred`. Обычная загрузка событий не удаляет повреждённые данные и не пытается автоматически переписать цепочку.
+Periodic checks recalculate the chain, verify external signatures and chain heads, then record new entries. An error does not create a new checkpoint for a broken chain. The absence of the archive and integrity violations worsen readiness; operators must respond to unhealthy `audit` components and messages `audit background operation deferred`. Normal event processing does not delete damaged data or attempt to automatically rewrite the chain.
 
-Защита от согласованной перезаписи действует до последней внешней контрольной точки. Проверка ещё не зафиксированного суффикса не доказывает отсутствие его полной замены. При доступном архиве окно ограничено настроенным интервалом; экспорт создаёт точку для своей вершины немедленно.
+Protection against consistent overwriting applies until the last external checkpoint. Checking for uncheckpointed suffixes does not prove absence of full replacement. With an available archive, the window is limited by the configured interval; export creates a checkpoint for its chain head immediately.
 
-## Поиск, проверка и экспорт
+## Searching, Verifying, and Exporting
 
-API использует HTTPS и JWT с ролью `auditor`. Действия администратора продукта не дают ему права аудитора автоматически.
+The API uses HTTPS and JWT with role `auditor`. Product administrator actions do not grant it automatic auditor rights.
 
-- `GET /v1/audit/records` - поиск по времени исходного действия, пользователю, префиксу действия, типу и идентификатору объекта, площадке и исходу. Параметры фильтра имеют префикс `query.`, например `query.action=incident.`. Порядок - убывание `audit_seq`; страница до 1000 записей. Курсор связан с тенантом и запросом. Аудитор площадки передаёт её явно; глобальные действия доступны аудитору с областью `*`.
-- `POST /v1/audit:verify` - тело с `fromSeq` и `toSeq`, ноль обозначает границу цепочки. Ответ содержит `intact`, `recordsChecked`, `firstBrokenSeq`, `detail` и последнюю контрольную точку. Даже для ограниченного диапазона доказательства проверяются от начала. Операция требует область `*`, поскольку целостность относится ко всей цепочке.
-- `GET /v1/audit/records:export` - JSONL со всеми записями снимка и признаком `selected` для результата фильтра. Полная цепочка нужна для проверки полноты и соседних хэшей. Поэтому экспорт требует область `*`. Ограничение - 64 MiB, превышение возвращает ошибку без усечения. Повреждённая цепочка возвращает `AUDIT_INTEGRITY_VIOLATION`.
+- `GET /v1/audit/records` - Search by time of the original action, user, action prefix, object type and identifier, site, and outcome. Filter parameters have prefix `query.`, e.g., `query.action=incident.`. Order - descending `audit_seq`; up to 1,000 records. The cursor is linked to the tenant and query. Site auditor explicitly provides it; global actions are available to the auditor with scope `*`.
+- `POST /v1/audit:verify` - Body with `fromSeq` and `toSeq`; zero in fromSeq means the beginning, and zero in toSeq means the end of the chain. The response contains `intact`, `recordsChecked`, `firstBrokenSeq`, `detail`, and the latest checkpoint. Even for a limited range, proof is checked from the beginning. The operation requires scope `*`, as integrity relates to the entire chain.
+- `GET /v1/audit/records:export` - JSONL with all snapshot records and criterion `selected` for filtering results. The full chain is needed for completeness and adjacent hashes. Therefore, export requires scope `*`. Limit - 64 MiB; exceeding returns an error without truncation. A broken chain returns `AUDIT_INTEGRITY_VIOLATION`.
 
-Каждая разрешённая операция и отказ по проверенной личности фиксируются через outbox. Непроверенный JWT не используется как источник тенанта или пользователя для записи: такие попытки остаются в журнале безопасности границы аутентификации.
+Each allowed operation and failure due to verified identity are recorded through the outbox. Unverified JWT is not used as a source for tenants or users for recording; such attempts remain in the security log of the authentication boundary.
 
-Для независимой проверки передают экспорт, доверенный keyring и независимо полученную копию архива на момент снимка:
+For independent verification, export, trusted keyring, and independently obtained archive copy at the time of snapshot are provided:
 
 ```sh
 psim-audit-tool verify psim-audit.jsonl trusted-keys.json checkpoints
 ```
 
-Утилита не использует сеть или PostgreSQL. Она пересчитывает хэши, проверяет подписи, признак выборки и вершину снимка. Последняя внешняя точка должна совпадать с вершиной экспорта. Более новый архив требует нового экспорта; для хранения исторического доказательства сохраняют независимый снимок архива вместе с ним. Ключи из самого экспорта не принимаются. Код завершения 0 означает успешную проверку, 1 - нарушение или непригодное доказательство, 2 - неправильный вызов.
+The utility does not use a network or PostgreSQL. It calculates hashes, verifies signatures, and checks the top of the snapshot. The last external checkpoint must match the top of the export. A newer archive requires a new export; for storing historical evidence, an independent snapshot of the archive is kept along with it. Keys from the export itself are not accepted. A completion code of 0 indicates a successful check, 1 indicates a violation or invalid evidence, 2 indicates an incorrect call.
 
-## Журнал идентификации
+## Identity Log
 
-Audit Service может импортировать журнал Keycloak через read-only Admin REST API. Настройки `identity_base`, `identity_client`, `identity_secret_file` задают выделенного клиента с `view-events`, `view-realm`, `view-users`. В realm `psim` должны быть включены пользовательские и административные события; представления ресурсов не требуются. Секрет клиента кодируется как поле формы и никогда не попадает в аудит.
+The Audit Service can import the Keycloak log through the read-only Admin REST API. Settings `identity_base`, `identity_client`, `identity_secret_file` define a dedicated client with `view-events`, `view-realm`, `view-users`. In the realm `psim`, user and administrative events must be enabled; resource representations are not required. The client’s secrets are encoded as form fields and never enter the audit.
 
-Используется [Keycloak Admin REST API](https://www.keycloak.org/docs-api/26.8.0/rest-api/index.html). Загружаются LOGIN, LOGIN_ERROR, LOGOUT, REFRESH_TOKEN_ERROR и административные события. В аудит попадают только тип операции, идентификаторы события, пользователя и клиента, код ошибки, тип и путь ресурса и адрес клиента. Пароли, токены, credentials и полные представления ресурсов не копируются.
+The [Keycloak Admin REST API](https://www.keycloak.org/docs-api/26.8.0/rest-api/index.html) is used. LOGIN, LOGIN_ERROR, LOGOUT, REFRESH_TOKEN_ERROR, and administrative events are loaded. Only the operation type, event identifiers, user and client, error code, resource type and path, and client address are included in the audit. Passwords, tokens, credentials, and complete resource representations are not copied.
 
-Тенант известного пользователя берётся из единственного атрибута `psim_tenant` при импорте. Этот атрибут должен оставаться неизменным для жизни идентификатора; перенос учётной записи между тенантами требует новой личности. События неизвестного или удалённого пользователя и администраторов другого realm направляются в явно настроенный `identity_security_tenant`. Это тенант централизованного аудита безопасности, доступ к которому выдаётся отдельно.
+A tenant of a known user is determined from the single attribute `psim_tenant` during import. This attribute must remain unchanged throughout the lifetime of the identifier; transferring accounts between tenants requires a new identity. Events of unknown or deleted users and administrators from another realm are directed to the explicitly configured `identity_security_tenant`. This is a centralized audit tenant with access provided separately.
 
-Курсор и outbox фиксируются атомарно. Используются фиксированная верхняя граница окна, задержка две секунды и повтор последней минуты; повторы дедуплицируются по идентификатору события. Порции по 100 событий ограничивают работу одного прохода. Retention Keycloak должен превышать допустимый простой импортёра; удалённые до импорта события восстановить невозможно. Отключение журнала или отказ чтения ухудшают readiness.
+The cursor and outbox are tracked atomically. A fixed upper limit for the window, a delay of two seconds, and replay of the previous minute are used; repetitions are deduplicated by event identifier. Batches of 100 events limit the performance of one process. Retention in Keycloak must exceed the maximum permitted importer lag; deleted events before import cannot be restored. Disabling the log or failing to read worsens readiness.
 
-## Производители и сценарии
+## Producers and Scenarios
 
-Это сверка ответственности за аудит действий, а не утверждение о завершении будущих функций консоли и поставки.
+This table identifies audit producers; complete scenario qualification is tracked separately.
 
-| Сценарий | Действия и производитель |
+| Scenario | Actions and Producers |
 |---|---|
-| S1 | Connector Gateway: `connector.REGISTRATION_ACTION_*` для регистрации, продления, отзыва и отключения, `access.denied` для отклонённой регистрации и сессии; Resource Catalog: конфигурация отображений; Keycloak: административные операции |
-| S2 | Resource Catalog: `catalog.*` для объектов, планов, импорта и конфигурации, `access.denied` |
-| S3 | Resource Catalog: изменения нормализации. Обработка обычного события сохраняется в Event History и не создаёт отдельную запись аудита на каждое измерение |
-| S4 | Correlation Engine: `rule.draft_saved`, `rule.validated`, публикация и архивирование правил, пробный прогон; автоматическое подавление обслуживания |
-| S5 | Incident Service: создание и переходы инцидента, связь сигналов |
-| S6 | Incident Service и Event History: отказы доступа к данным; Keycloak: входы. Отображение и доставка кадров консоли проверяются в её собственном журнале соединения |
-| S7 | Incident Service: принятие, комментарии, передача, изменение приоритета, решение и закрытие; Response Engine: версии планов, переходы шагов, Override и диагностика replay |
-| S8 | Command Service: запрос, подтверждение, отмена, состояния и результат; Connector Gateway: регистрация и жизненный цикл сессии |
-| S9 | Response Engine: политики, дежурные, нарушение SLA, эскалации и отсутствие дежурного; Notification Service: состояния, квитанции и сверка неизвестного результата |
-| S10 | Audit Service: поиск, проверка, экспорт и отказы доступа; Keycloak: управление ролями и учётными записями |
-| S11 | Сервисы: итоговые состояния восстановленных действий без повторной записи. Технический перезапуск процесса, состояние брокера и отказ узла отражаются в журналах и метриках инфраструктуры |
-| S12 | Управление выпуском и обновлением относится к установщику и эксплуатационным процедурам. Его действия должны публиковаться в `psim.audit.v1` с устойчивым идентификатором операции при реализации кластерной поставки |
-| S13 | Projection Service: `report.read`, `report.export` и `access.denied` через outbox; Audit Service принимает общий контракт |
+| S1 | Connector Gateway: `connector.REGISTRATION_ACTION_*` for registration, renewal, revocation, and shutdown; `access.denied` for rejected registrations and sessions; Resource Catalog: mapping configuration; Keycloak: administrative operations |
+| S2 | Resource Catalog: `catalog.*` for objects, plans, imports, and configurations; `access.denied` |
+| S3 | Resource Catalog: changes to normalization. Normalization of regular events is stored in Event History and does not create separate audit records for each measurement |
+| S4 | Correlation Engine: `rule.draft_saved`, `rule.validated`, publishing and archiving rules, trial runs; automatic maintenance suppression |
+| S5 | Incident Service: creation and transitions of incidents, signal attachment |
+| S6 | Incident Service and Event History: data access failures; Keycloak: sign-ins. Displaying and delivering console frames is checked in its own connection log |
+| S7 | Incident Service: acceptance, comments, transfer, priority change, resolution, and closure; Response Engine: plan versions, step transitions, Override, and replay diagnosis |
+| S8 | Command Service: requests, approvals, cancellations, states, and results; Connector Gateway: registration and session lifecycle |
+| S9 | Response Engine: policies, duties, SLA violations, escalation, and absence of duty; Notification Service: states, receipts, and verification of unknown results |
+| S10 | Audit Service: search, verification, export, and access failures; Keycloak: role management and account management |
+| S11 | Services: final states of restored actions without re-logging. Technical restart of processes, broker status, and node failure are reflected in logs and infrastructure metrics |
+| S12 | Management of release and updates relates to the installer and operational procedures. Its actions must be published in `psim.audit.v1` with a stable operation identifier during cluster delivery |
+| S13 | Projection Service: `report.read`, `report.export`, and `access.denied` through outbox; Audit Service accepts a common contract |
 
-Изменение паролей, ролей и клиентов фиксируется импортёром административных событий Keycloak. Изменения БД операторами обнаруживает целостность цепочки; они не считаются нормальными API-действиями приложения. Финальная сквозная приёмка S1-S13 остаётся в фазе системной квалификации.
+Changes to passwords, roles, and clients are recorded by the Keycloak administrative event importer. Changes to the database are detected by chain integrity checks; they are not considered normal API actions of the application. The final cross-verification of S1-S13 remains in the system qualification phase.
 
-## Проверки
+## Tests
 
 ```sh
 task audit:test
@@ -100,4 +104,4 @@ task audit:sanitizers
 task audit:coverage
 ```
 
-Проверки используют нативные процессы в контейнерах Debian 13 на сети Compose с настоящими Kafka, PostgreSQL и Keycloak. История до запуска, повторы, две копии сервиса, отказы доступа, реальные входы, операции Incident Service, SIGKILL и SQL-вмешательство проверяются отдельно от чистой модели хэшей.
+Tests use native processes in Debian 13 containers on the Compose network with real Kafka, PostgreSQL, and Keycloak. Pre-launch history, repetitions, two copies of the service, access failures, actual sign-ins, Incident Service operations, SIGKILL, and SQL interference are tested separately from the clean hash model.

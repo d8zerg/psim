@@ -27,18 +27,19 @@ vars:
   # Contract tooling image built locally from tools/contracts/image (buf + protoc plugins);
   # the tag follows the Dockerfile content, so a changed Dockerfile gives a new image.
   # Redoc bundled into the portal image (tools/docs/portal/Dockerfile) for the offline REST reference;
-  # must equal the version the pinned Redocly CLI references (checked by docs:portal).
+  # Keep the contract renderer version aligned with the pinned portal bundle.
   REDOC_VERSION: 2.5.4
   # Documentation portal image built locally from tools/docs/portal (MkDocs + Material, ADR-038).
   PORTAL_IMAGE:
     sh: echo "{{.IMAGE_NAMESPACE}}/docs-portal:$(cat {{.ROOT_DIR}}/tools/docs/portal/Dockerfile {{.ROOT_DIR}}/tools/docs/portal/requirements.txt | sha256sum | cut -c1-12)"
+  DOCS_BROWSER_IMAGE:
+    sh: echo "{{.IMAGE_NAMESPACE}}/docs-browser:$(cat {{.ROOT_DIR}}/tools/docs/browser/Dockerfile {{.ROOT_DIR}}/tools/docs/browser/package.json {{.ROOT_DIR}}/tools/docs/browser/package-lock.json | sha256sum | cut -c1-12)"
   CONTRACTS_TOOLS_IMAGE:
     sh: echo "{{.IMAGE_NAMESPACE}}/contracts-tools:$(sha256sum {{.ROOT_DIR}}/tools/contracts/image/Dockerfile | cut -c1-12)"
   # Pinned tool and base images: tag for readability, digest for integrity (SR-23). Change here only.
   REDOCLY_IMAGE: redocly/cli:2.58.2@sha256:02511945b4d6dbc1e51138f1c8fcc532ba269bb61aea30d3dcbc9978af61af42
   ASYNCAPI_IMAGE: asyncapi/cli:6.1.0@sha256:2240534054590b3d41d691fdf88e1f7a1e581b9cc4fb1d4af65ca93434aa681b
-  MERMAID_IMAGE: minlag/mermaid-cli:12.0.0@sha256:fa995339034aae7e5cd4f61482248b7f5c51be355b1a6f6eda11a2bbf8401f5f
-  STRUCTURIZR_IMAGE: structurizr/structurizr:2026.09.19@sha256:721136283c2f9cf1ba69037bc9de136c579d66fdcb2d771cb60546ec68def1a5
+  PLANTUML_IMAGE: plantuml/plantuml:1.2026.8@sha256:d08610df482510844382caa4e016ba2bf7e3231f630f02ee12f250f3416c62b1
   TRIVY_IMAGE: aquasec/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
   # Base of the container images (ADR-034): Debian 13 with the system C++ runtime,
   # no shell, non-root user.
@@ -405,6 +406,6 @@ tasks:
           fi
 
   clean:
-    desc: Remove generated caches (.cache/contracts, .cache/mermaid)
+    desc: Remove generated contract and diagram caches
     cmds:
-      - rm -rf {{.CACHE}}/contracts {{.CACHE}}/mermaid
+      - rm -rf {{.CACHE}}/contracts {{.CACHE}}/plantuml

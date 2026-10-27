@@ -6,7 +6,7 @@ import "buf/validate/validate.proto";
 import "google/api/annotations.proto";
 import "psim/response/v1/notification.proto";
 
-// NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.
+// NotificationService serves in-app notifications of the caller. Owner: Notification Service.
 service NotificationService {
   // ListMyNotifications lists in-app notifications of the caller; newest first.
   rpc ListMyNotifications(ListMyNotificationsRequest) returns (ListMyNotificationsResponse) {

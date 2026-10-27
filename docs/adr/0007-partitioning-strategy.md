@@ -1,44 +1,47 @@
-# ADR-007. Стратегия партиционирования и обработка «горячих» ключей
+# ADR-007. Partitioning strategy and high-load keys
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 2.3, 4.5, 5.2, 5.3)
-- **Связанные:** ADR-006, ADR-009, [scaling.md](../architecture/scaling.md), [data-flows.md](../architecture/data-flows.md)
+<!-- language-links -->
+[English](0007-partitioning-strategy.md) | [Русский](../ru/adr/0007-partitioning-strategy.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-006, ADR-009, [scaling.md](../architecture/scaling.md), [data-flows.md](../architecture/data-flows.md)
 
-Партиция - единица параллелизма и порядка. Ключи должны: сохранять порядок там, где он важен (источник, зона, инцидент); давать равномерную нагрузку при неравномерном профиле (30% нагрузки на одну площадку в `LOAD-50K`); позволять корреляции держать состояние локально; исключать гонки создания инцидентов. Увеличение числа партиций у существующего топика ломает распределение ключей.
+## Context
 
-## Рассмотренные варианты
+A partition is the unit of parallelism and ordering. Keys must preserve necessary source, zone and incident ordering; distribute uneven load, with one site producing 30% in `LOAD-50K`; keep correlation state local; and prevent incident-creation races. Increasing an existing topic's partition count changes key placement.
 
-### Ключ нормализованных событий
+## Considered options
 
-| Вариант | Плюсы | Минусы |
+### Normalized-event key
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| `site_id` | Правила уровня площадки локальны | Горячая площадка перегружает одну партицию |
-| **`site_id:zone_id` (план)** | Нагрузка площадки распределена по зонам; правила уровня зоны, устройства, источника локальны | Правила шире зоны требуют перераспределения |
-| `source_id` | Идеальная равномерность | Почти все правила корреляции требуют перераспределения |
+| `site_id` | Site-level rules remain local | A high-load site overloads one partition |
+| **`site_id:zone_id`** | Site load is spread across zones; zone-, device- and source-level rules remain local | Rules with a broader scope require repartitioning |
+| `source_id` | Ideal distribution | Almost every correlation rule requires repartitioning |
 
-### Ключ сигналов
+### Signal key
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| `correlation_key` (план) | Совпадает с ключом состояния правила | Сигналы разных правил с одним ключом группировки попадают в разные партиции, и два экземпляра Incident Service могут одновременно создавать инцидент по одному `grouping_key`; гонку пришлось бы разрешать ошибкой уникальности и повтором |
-| **`grouping_key`** | Все сигналы будущего инцидента - в одной партиции и по порядку; гонки нет | - |
+| `correlation_key` | Matches the rule-state key | Signals from different rules with the same grouping key can enter different partitions. Two Incident Service instances could create an incident for one `grouping_key` simultaneously, requiring a uniqueness error and retry to resolve the race |
+| **`grouping_key`** | Every signal for the future incident is ordered within one partition, preventing the race | - |
 
-## Решение
+## Decision
 
-1. Ключи топиков - по [сводной таблице data-flows.md](../architecture/data-flows.md#4-сводная-таблица); в частности: `psim.ingest.raw.v1` - `source_id`; `psim.events.normalized.v1` - `site_id:zone_id`; `psim.signals.v1` - `grouping_key` (отличие от плана); каталог - `resource_type:resource_id`.
-2. Правила, чей ключ корреляции выводится из зоны (зона, устройство, источник), исполняются локально. Правила с ключом шире зоны публикуют отфильтрованные события во внутренний топик `psim.correlation.repartition.v1` по `correlation_key` в той же транзакции. Валидатор правил запрещает такие правила без фильтра по типу события.
-3. Число партиций задаётся установщиком по профилю; значения по умолчанию - [scaling.md](../architecture/scaling.md#2-число-партиций) (48 для потоков событий в кластере). Изменение - только через новую версию топика.
-4. Разделитель составных ключей - `:`; компоненты - канонические UUID.
-5. Горячие ключи: метрика перекоса нагрузки по партициям и алерт; лимиты на коннектор; рекомендация администратору делить перегруженную зону.
+1. Use keys from the [data-flows.md summary](../architecture/data-flows.md#4-summary-table): in particular, `psim.ingest.raw.v1` uses `source_id`, `psim.events.normalized.v1` uses `site_id:zone_id`, `psim.signals.v1` uses `grouping_key`, and the catalog uses `resource_type:resource_id`.
+2. Rules whose correlation key is derived from a zone, including zone, device and source rules, execute locally. Rules with a broader key publish filtered events to internal topic `psim.correlation.repartition.v1`, keyed by `correlation_key`, in the same transaction. Rule validation rejects such rules without an event-type filter.
+3. The installer sets partition counts from the profile. Defaults are in [scaling.md](../architecture/scaling.md#2-number-of-partitions), including 48 partitions for cluster event streams. Change counts only through a new topic version.
+4. Composite keys use `:` as the separator and canonical UUID components.
+5. Detect high-load keys through partition-skew metrics and alerts, apply per-connector limits, and recommend splitting an overloaded zone.
 
-## Последствия
+## Consequences
 
-- `psim.correlation.changelog.v1` и `psim.normalizer.state.v1` имеют то же число партиций, что и их входные топики (копартиционирование).
-- Перенос устройства в другую зону меняет партицию его событий; порядок до и после переноса не гарантируется - корреляция работает по event time (ADR-010).
-- Для роста свыше ×10 потребуется топик `v2` с миграцией ([scaling.md](../architecture/scaling.md#6-масштабирование-сверх-mvp)).
+- `psim.correlation.changelog.v1` and `psim.normalizer.state.v1` have the same partition counts as their input topics: co-partitioning.
+- Moving a device to another zone changes its event partition. Ordering across the move is not guaranteed; correlation uses event time under ADR-010.
+- Growth beyond 10x requires a `v2` topic and migration; see [scaling.md](../architecture/scaling.md#6-scaling-beyond-mvp).
 
-## Проверка
+## Verification
 
-Нагрузочный тест с неравномерным профилем (`LOAD-50K`); метрика перекоса в дашборде; тест валидатора правил.
+Run an uneven-profile load test with `LOAD-50K`, display partition-skew metrics on the dashboard, and test the rule validator.

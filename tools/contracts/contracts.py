@@ -197,6 +197,19 @@ def index_messages(image):
 
 # ---------------------------------------------------------------- checks
 
+def topic_summary(markdown):
+    marker = "<!-- kafka-topic-summary -->"
+    if markdown.count(marker) != 1:
+        raise ValueError("exactly one topic summary marker is required")
+    table = markdown.split(marker, 1)[1].split("\n## ", 1)[0]
+    result = {}
+    for name, key in re.findall(r"^\| `(psim\.[a-z.]+\.v1)` \| `([^`]+)` \|", table, re.M):
+        if name in result:
+            raise ValueError(f"duplicate topic in summary: {name}")
+        result[name] = key
+    return result
+
+
 def check_topics(reg, msgs, root, problems):
     names = set()
     for t in reg["topics"]:
@@ -231,8 +244,11 @@ def check_topics(reg, msgs, root, problems):
 
     # data-flows.md summary table must list the same topics and keys.
     md = open(os.path.join(root, "docs/architecture/data-flows.md"), encoding="utf-8").read()
-    table = md[md.index("## 4. Сводная таблица"):]
-    doc = dict(re.findall(r"^\| `(psim\.[a-z.]+\.v1)` \| `([^`]+)` \|", table, re.M))
+    try:
+        doc = topic_summary(md)
+    except ValueError as error:
+        problems.append(f"data-flows.md: {error}")
+        doc = {}
     for t in reg["topics"]:
         if t["name"] not in doc:
             problems.append(f"data-flows.md: topic {t['name']} missing in summary table")
@@ -291,8 +307,8 @@ def check_errors(errs, enum_values, root, problems):
             problems.append(f"errors: {c}: bad used_in {e['used_in']}")
         if "rest" in e["used_in"] and e["http"] is None and c != "CATALOG_IMPORT_ROW_INVALID":
             problems.append(f"errors: {c}: used in rest without http status")
-        if not e.get("title") or not e.get("ru"):
-            problems.append(f"errors: {c}: missing title or ru")
+        if not e.get("title") or not e.get("en") or not e.get("ru"):
+            problems.append(f"errors: {c}: missing title, en or ru")
     # Every error-like code mentioned in docs and proto comments must exist in the catalog.
     files = glob.glob(os.path.join(root, "docs/**/*.md"), recursive=True)
     files += glob.glob(os.path.join(root, "contracts/proto/**/*.proto"), recursive=True)

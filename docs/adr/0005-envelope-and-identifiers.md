@@ -1,61 +1,64 @@
-# ADR-005. Конверт сообщения, UUIDv7 и именные UUID
+# ADR-005. Message envelope, UUIDv7 and named UUIDs
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 0.5, 2.1)
-- **Связанные:** ADR-004, ADR-006, [aggregates.md](../domain/aggregates.md#01-идентификаторы), [crosscutting.md](../architecture/crosscutting.md#1-конверт-сообщения)
+<!-- language-links -->
+[English](0005-envelope-and-identifiers.md) | [Русский](../ru/adr/0005-envelope-and-identifiers.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, ADR-006, ADR-029, [aggregates.md](../domain/aggregates.md#01-identifiers), [crosscutting.md](../architecture/crosscutting.md#1-message-envelope)
 
-Каждое сообщение должно нести единый набор метаданных для дедупликации, трассировки, мультитенантности и замера задержек. Идентификаторы должны быть сортируемыми по времени (индексы PostgreSQL, отладка) и, для ряда сущностей, детерминированными - чтобы повторная обработка давала тот же идентификатор и дубликаты отсекались.
+## Context
 
-## Рассмотренные варианты
+Every message needs common metadata for deduplication, tracing, multitenancy and latency measurement. Identifiers must sort by time for PostgreSQL indexes and debugging. Some entities also need deterministic identifiers so that reprocessing produces the same ID and duplicates are rejected.
 
-### Идентификаторы
+## Considered options
 
-| Вариант | Плюсы | Минусы |
+### Identifiers
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| UUIDv4 | Повсеместная поддержка | Случайный порядок: фрагментация B-tree индексов |
-| **UUIDv7 (RFC 9562)** | Монотонный по времени, хорошая локальность индексов, 128 бит | Раскрывает время создания (допустимо) |
-| ULID / Snowflake | Сортируемые | Нестандартный формат или требуется координация идентификаторов узлов |
-| Последовательности БД | Компактные | Требуют БД при создании; не годятся для SDK и Kafka |
+| UUIDv4 | Universal support | Random ordering fragments B-tree indexes |
+| **UUIDv7 (RFC 9562)** | Time-monotonic, good index locality, 128 bits | Reveals creation time, which is acceptable |
+| ULID / Snowflake | Sortable | Nonstandard format or coordinated node identifiers |
+| Database sequences | Compact | Require a database during creation; unsuitable for SDK and Kafka |
 
-### Детерминированные идентификаторы
+### Deterministic identifiers
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **UUIDv5 (SHA-1, RFC 9562)** | Стандарт, есть в Boost.Uuid; стойкость SHA-1 к коллизиям достаточна для неатакуемых внутренних ключей | SHA-1 не годится для безопасности (здесь не требуется) |
-| UUIDv8 с SHA-256 | Современный хэш | Нестандартное содержимое; своя реализация на всех языках |
-| Составной естественный ключ | Нет хэширования | Разная длина и форма; неудобно для внешних систем |
+| **UUIDv5 (SHA-1, RFC 9562)** | Standard and available in Boost.Uuid; SHA-1 collision resistance is sufficient for internal keys not exposed to adversarial construction | SHA-1 is unsuitable for security, which is not required here |
+| UUIDv8 with SHA-256 | Modern hash | Nonstandard contents and custom implementations in every language |
+| Composite natural key | No hashing | Variable length and shape; inconvenient for external systems |
 
-## Решение
+## Decision
 
-1. **UUIDv7** для всех создаваемых сущностей и событий, кроме перечисленных в п. 2. Генерация - через порт `IdGenerator`; монотонность в пределах процесса обеспечивается счётчиком в младших битах (метод 1 RFC 9562).
-2. **UUIDv5** для `signal_id`, `run_id`, `command_id` команд сценария, `notification_id`. Пространство имён - отдельный фиксированный UUID на вид идентификатора, хранится в `contracts/`. Имя - каноническая сериализация компонентов: каждый компонент кодируется как длина (varint) + байты, что исключает неоднозначность конкатенации.
-3. **Конверт** `psim.common.v1.Envelope`:
+1. **UUIDv7** for newly created entities and events except those in item 2. Generate through the `IdGenerator` port; a counter in lower bits provides process-local monotonicity using RFC 9562 method 1.
+2. **UUIDv5** for `source_id` under ADR-029, `signal_id`, `run_id`, response-plan `command_id` and `notification_id`. Each identifier kind has a separate fixed UUID namespace stored in `contracts/`. The name is a canonical component serialization: every component is encoded as a varint length followed by bytes, preventing ambiguous concatenation.
+3. **Envelope** `psim.common.v1.Envelope`:
 
-| Поле | Тип | Обязательно |
+| Field | Type | Required |
 |---|---|---|
-| `message_id` | string (UUID) | да |
-| `tenant_id` | string (UUID) | да |
-| `occurred_at` | `google.protobuf.Timestamp` | да |
-| `produced_at` | `google.protobuf.Timestamp` | да |
-| `received_at` | `google.protobuf.Timestamp` | для событий ввода |
-| `sequence` | uint64 | порядковый номер источника или версия агрегата |
-| `causation_id` | string (UUID) | для производных сообщений |
-| `correlation_id` | string (UUID) | да; у исходного события равен `message_id` |
-| `actor` | `Actor { kind: USER/SERVICE/CONNECTOR/SYSTEM; id }` | да |
-| `schema_version` | string | версия контрактов, выпустившая сообщение (для диагностики) |
+| `message_id` | string (UUID) | yes |
+| `tenant_id` | string (UUID) | yes |
+| `occurred_at` | `google.protobuf.Timestamp` | yes |
+| `produced_at` | `google.protobuf.Timestamp` | yes |
+| `received_at` | `google.protobuf.Timestamp` | for ingested events |
+| `sequence` | uint64 | source sequence number or aggregate version |
+| `causation_id` | string (UUID) | for derived messages |
+| `correlation_id` | string (UUID) | yes; equals `message_id` for an original event |
+| `actor` | `Actor { kind: USER/SERVICE/CONNECTOR/SYSTEM; id }` | yes |
+| `schema_version` | string | contract version that produced the message, for diagnostics |
 
-Тип полезной нагрузки определяется ветвью `oneof` записи топика (ADR-004), поэтому отдельного поля типа нет. Контекст трассировки передаётся в заголовках Kafka `traceparent`/`tracestate` (W3C), а не в конверте: так его сохраняют стандартные инструменты.
+The topic record's `oneof` branch determines payload type under ADR-004, so no separate type field is needed. W3C trace context travels in Kafka `traceparent`/`tracestate` headers rather than the envelope, allowing standard tools to preserve it.
 
-4. UUID в Protobuf передаются строкой канонического вида (36 символов) в REST и коннекторах и строкой в топиках - ради единообразия JSON-отображения и читаемости в инструментах. Оптимизация до `bytes` (16 байт) рассматривается отдельно по результатам замеров шага 10.1.
+4. UUIDs are canonical 36-character strings in Protobuf for REST and connectors, and strings in topics, ensuring consistent JSON mapping and tool readability. Optimization to `bytes`, or 16 bytes, requires a separate decision based on load measurements.
 
-## Последствия
+## Consequences
 
-- Слой платформы предоставляет генераторы v7 и v5 и проверку формата.
-- Дедупликация по всему конвейеру опирается на `message_id` и детерминированные идентификаторы.
-- Строковые UUID увеличивают размер сообщения (~20 байт на идентификатор); учтено в сайзинге, сжатие zstd снижает влияние.
+- The platform layer provides v7 and v5 generators and format validation.
+- Pipeline-wide deduplication relies on `message_id` and deterministic identifiers.
+- String UUIDs add approximately 20 bytes per identifier. Sizing accounts for this, and zstd compression reduces the impact.
 
-## Проверка
+## Verification
 
-Unit-тесты генераторов на векторы RFC 9562; тест свойства «одинаковые входы - одинаковый идентификатор»; линтер контрактов проверяет наличие конверта в каждой записи топика.
+Generator unit tests use RFC 9562 vectors. Property tests establish identical inputs -> identical identifiers. The contract linter checks for an envelope in every topic record.

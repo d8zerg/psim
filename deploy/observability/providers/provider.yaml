@@ -9,3 +9,12 @@ providers:
     updateIntervalSeconds: 30
     options:
       path: /etc/psim-platform/observability/dashboards
+  - name: psim-operations-ru
+    folder: Open-Source PSIM Platform RU
+    folderUid: psim-operations-ru
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/psim-platform/observability/ru/dashboards

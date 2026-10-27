@@ -1,207 +1,199 @@
-# Сквозные концепции
+# Cross-cutting Concepts
 
-Версия 0.1 · Шаг плана 0.3 · Статус: черновик
+<!-- language-links -->
+[English](crosscutting.md) | [Русский](../ru/architecture/crosscutting.md)
+<!-- /language-links -->
 
-Раздел 8 arc42. Концепции реализуются в библиотеках платформы (Ф2) и одинаковы во всех сервисах.
+Section 8 arc42. Concepts are implemented in the platform libraries and are the same across all services.
 
 ---
 
-## 1. Конверт сообщения
+## 1. Message Envelope
 
-Значение каждого сообщения Kafka - запись топика `<Topic>Record { Envelope envelope = 1; oneof payload {...} }` ([ADR-004](../adr/0004-serialization-and-schema-evolution.md)). Тип полезной нагрузки определяется ветвью `oneof`. Конверт `psim.common.v1.Envelope` ([ADR-005](../adr/0005-envelope-and-identifiers.md)):
+The value of each Kafka message is a record from the `<Topic>Record { Envelope envelope = 1; oneof payload {...} }` topic ([ADR-004](../adr/0004-serialization-and-schema-evolution.md)). The payload type is determined by the `oneof` branch. The `psim.common.v1.Envelope` envelope ([ADR-005](../adr/0005-envelope-and-identifiers.md)):
 
-| Поле | Тип | Назначение |
+| Field | Type | Purpose |
 |---|---|---|
-| `message_id` | UUID | Идентификатор сообщения: `event_id`, `signal_id`, идентификатор доменного события |
-| `tenant_id` | UUID | Тенант |
-| `occurred_at` | timestamp (мкс) | Время возникновения в предметной области |
-| `produced_at` | timestamp (мкс) | Время записи в Kafka |
-| `received_at` | timestamp (мкс) | Время приёма шлюзом (для событий ввода) |
-| `sequence` | целое | Порядковый номер у источника (для событий) или версия агрегата (для доменных событий) |
-| `causation_id`, `correlation_id` | UUID | Причина сообщения и сквозная цепочка от исходного события |
-| `actor` | структура | Субъект: пользователь, сервис, коннектор или система |
-| `schema_version` | строка | Версия контрактов, выпустившая сообщение |
+| `message_id` | UUID | Message identifier: `event_id`, `signal_id`, domain event identifier |
+| `tenant_id` | UUID | Tenant |
+| `occurred_at` | timestamp (μs) | Time of occurrence in the subject domain |
+| `produced_at` | timestamp (μs) | Time of recording in Kafka |
+| `received_at` | timestamp (μs) | Time of receipt by the gateway (for input events) |
+| `sequence` | integer | Source sequence number (for events) or version of the aggregate (for domain events) |
+| `causation_id`, `correlation_id` | UUID | Cause of the message and end-to-end chain from the original event |
+| `actor` | structure | Subject: user, service, connector, or system |
+| `schema_version` | string | Contract version used to produce the message |
 
-Заголовки Kafka: `traceparent`, `tracestate` (W3C Trace Context), `psim-ts-<stage>`, заголовки DLQ. Формат на проводе - Confluent wire format: магический байт, идентификатор схемы, индексы сообщения Protobuf, тело.
+Kafka headers: `traceparent`, `tracestate` (W3C Trace Context), `psim-ts-<stage>`, DLQ headers. The wire format is Confluent wire format: magic byte, schema identifier, Protobuf message indices, message body.
 
-## 2. Идентификаторы и время
+## 2. Identifiers and Time
 
-- Идентификаторы - по правилам [aggregates.md](../domain/aggregates.md#01-идентификаторы).
-- Доменное ядро получает время только через порт `Clock`, идентификаторы - через `IdGenerator`, случайность - через `Random`. В симуляции эти порты детерминированы.
-- Все времена хранятся и передаются в UTC с точностью до микросекунд. Часовой пояс применяется только при отображении и в отчётах (по `Site.timezone`).
-- Рассогласование часов источника выявляется сравнением `occurred_at` и `received_at` (RE2) и отражается в метрике и событии `system.source.clock_skew`. Узлы платформы синхронизируются chrony; рассогласование узлов контролируется метрикой.
+- Identifiers follow the [aggregates.md](../domain/aggregates.md#01-identifiers) rules.
+- The domain core receives time only through port `Clock`, identifiers through `IdGenerator`, randomness through `Random`. In simulation, these ports are deterministic.
+- All times are stored and transmitted in UTC with precision to the microsecond. The time zone is only applied when displaying and reporting (according to `Site.timezone`).
+- Time mismatch of sources is detected by comparing `occurred_at` and `received_at` (RE2) and reflected in the metric and event `system.source.clock_skew`. Platform nodes are synchronized with chrony; node mismatches are controlled by the metric.
 
-## 3. Транзакционные шаблоны
+## 3. Transaction Patterns
 
 ### 3.1 Outbox
 
 ```
 BEGIN;
-  UPDATE/INSERT агрегата ... WHERE version = :expected;
+  UPDATE/INSERT aggregate ... WHERE version = :expected;
   INSERT INTO outbox(outbox_id, aggregate_id, topic, key, envelope, created_at);
 COMMIT;
-NOTIFY outbox_<service>;
 ```
 
-Реле outbox:
+Outbox relay:
 
-- просыпается по `LISTEN/NOTIFY` и по таймеру (страховка 100 мс);
-- выбирает пакет `SELECT ... FOR UPDATE SKIP LOCKED` в порядке `outbox_id` для своих сегментов (`hash(aggregate_id) mod N`);
-- публикует идемпотентным продюсером, дожидается подтверждения, удаляет или помечает записи;
-- при нескольких экземплярах сегменты распределяются через advisory locks, чтобы события одного агрегата публиковал один экземпляр и в порядке.
+- Polls through the clock abstraction, waiting 100 ms by default when idle or after a retryable error;
+- Selects pending rows with `SELECT ... FOR UPDATE` in `sequence` order;
+- Publishes through an idempotent producer, waits for acknowledgement, and marks rows as published;
+- Uses a transaction advisory lock per schema so that concurrent instances elect one publisher and preserve publication order.
 
 ### 3.2 Inbox
 
 ```
 BEGIN;
   INSERT INTO inbox(message_id, received_at) ON CONFLICT DO NOTHING;
-  -- если вставка не произошла: повтор, пропустить
-  изменения агрегата + outbox;
+  -- If no row was inserted: duplicate, skip
+  aggregate changes + outbox;
 COMMIT;
--- после коммита пакета: фиксация смещения Kafka
+-- After the batch commits: commit the Kafka offset
 ```
 
-Записи inbox удаляются после retention входного топика, увеличенного вдвое.
+Inbox records are deleted after retention of the input topic has been doubled.
 
-### 3.3 Транзакции Kafka (EOS-K)
+### 3.3 Kafka Transactions (EOS-K)
 
-Один транзакционный продюсер на шард (`transactional.id = <service>-<instance>-<shard>`): смещения входа фиксируются в транзакции с метаданными группы потребителя (KIP-447), поэтому «зомби»-экземпляры после ребалансировки отсекаются поколением группы. Интервал коммита - по времени (≤ 50 мс) или по размеру пакета. Подробности - ADR-006 и [ADR-041](../adr/0041-kafka-layer.md), уточнивший механизм (вместо продюсера на партицию входа).
+One transaction producer per shard (`transactional.id = <service>-<instance>-<shard>`): input offsets are committed in the transaction with consumer group metadata (KIP-447), so zombie instances are eliminated by the group generation after rebalancing. The commit interval is time-based (≤ 50 ms) or batch size. Details - ADR-006 and [ADR-041](../adr/0041-kafka-layer.md), which clarifies the mechanism (instead of producer per input partition).
 
-## 4. Модель ошибок
+## 4. Error Model
 
-- Каталог кодов ошибок - единый для REST, gRPC и DLQ: `<ДОМЕН>_<СУТЬ>`, например `INCIDENT_INVALID_STATE_TRANSITION`, `CATALOG_DUPLICATE_EXTERNAL_ID`, `AUTH_SCOPE_DENIED`. Каталог - часть контрактов (шаг 0.5).
-- REST возвращает `application/problem+json` по RFC 9457: `type` (URI кода), `title`, `status`, `detail`, `instance`, `code`, `trace_id`, `errors[]` для ошибок валидации.
-- gRPC протокола коннекторов использует стандартные статусы и `google.rpc.ErrorInfo` с тем же кодом.
-- Доменное ядро возвращает ошибки как значения (`std::expected<T, DomainError>`); исключения допустимы только на границе инфраструктуры для непредвиденных ситуаций и преобразуются в код `COMMON_INTERNAL`.
+- The error code catalog is unified for REST, gRPC, and DLQ: `<DOMAIN>_<REASON>`, for example `INCIDENT_INVALID_STATE_TRANSITION`, `CATALOG_DUPLICATE_EXTERNAL_ID`, `AUTH_SCOPE_DENIED`. The catalog is part of the contracts.
+- REST returns `application/problem+json` according to RFC 9457: `type` (URI code), `title`, `status`, `detail`, `instance`, `code`, `trace_id`, `errors[]` for validation errors.
+- The connector gRPC protocol uses standard statuses and `google.rpc.ErrorInfo` with the same code.
+- The domain core returns errors as values (`std::expected<T, DomainError>`); exceptions are allowed only at the infrastructure boundary for unexpected situations and are converted to code `COMMON_INTERNAL`.
 
-Классы ошибок обработки сообщений:
+Error handling class for message processing:
 
-| Класс | Пример | Поведение |
+| Class | Example | Behavior |
 |---|---|---|
-| Временная | Недоступна PostgreSQL, таймаут Kafka | Пауза партиции, повтор с экспоненциальной задержкой; порядок сохраняется |
-| Постоянная для сообщения | Неизвестное устройство, невалидная полезная нагрузка | DLQ, продолжение |
-| Ошибка программы | Нарушение инварианта, необработанное исключение | Сообщение в DLQ, метрика и алерт; при повторении на нескольких сообщениях подряд - останов партиции (circuit breaker), чтобы не отправить в DLQ весь поток |
+| Transient | PostgreSQL unavailable, Kafka timeout | Partition pause, retry with exponential backoff; order is preserved |
+| Permanent for the message | Unknown device, invalid payload | DLQ, continuation |
+| Program error | Violation of invariants, unhandled exception | Message in DLQ, metric and alert; if repeated in multiple messages - circuit breaker stops the partition to avoid sending the entire stream to DLQ |
 
-## 5. Конфигурация
+## 5. Configuration
 
-| Уровень | Источник | Изменение |
+| Level | Source | Change |
 |---|---|---|
-| Статическая сервиса | YAML-файл + переменные окружения `PSIM_*` (перекрывают файл); проверка по JSON Schema при старте | Перезапуск; часть параметров (уровень логов, лимиты) - горячая перезагрузка по сигналу `SIGHUP` |
-| Секреты | Обычные файлы пользователя сервиса с правами `0400`; агент секретов материализует такие файлы; в конфигурации - только ссылки | Перезапуск или горячая перезагрузка сертификатов |
-| Предметная (правила, отображения, retention) | `psim.config.v1` | Без перезапуска, атомарно |
-| Справочная (каталог) | `psim.catalog.v1` | Без перезапуска |
+| Static service | YAML file + environment variables `PSIM_*` (override the file); check against JSON Schema at startup | Restart; some parameters (log level, limits) - hot reloading on `SIGHUP` signal |
+| Secrets | Regular files owned by the service user with permissions `0400`; secret agents materialize these files; in configuration - only file references | Restart or hot reloading of certificates |
+| Domain (rules, mappings, retention) | `psim.config.v1` | No restart, atomic |
+| Reference (catalog) | `psim.catalog.v1` | No restart |
 
-Сервис не стартует при невалидной конфигурации и сообщает все ошибки сразу.
+The service does not start if the configuration is invalid and reports all errors immediately.
 
-## 6. Наблюдаемость
+## 6. Observability
 
-### 6.1 Трассировка
+### 6.1 Tracing
 
-- OpenTelemetry SDK для C++, экспорт OTLP в OpenTelemetry Collector.
-- Контекст передаётся через заголовки Kafka (`traceparent`), gRPC-метаданные и HTTP-заголовки. Коннектор начинает трассировку; если не начал - её начинает шлюз.
-- Пакетная обработка: спан пакета со ссылками (span links) на контексты входящих сообщений; спан выходного сообщения - дочерний к спану входного. Так одна трассировка проходит от датчика до действия оператора.
-- Выборка: на горячем пути - по голове с вероятностью, задаваемой конфигурацией (по умолчанию 1%), плюс всегда для сообщений, ставших сигналом или инцидентом (решение по хвосту в Collector).
+- OpenTelemetry SDK for C++, export OTLP to OpenTelemetry Collector.
+- Context is transmitted through Kafka headers (`traceparent`), gRPC metadata, and HTTP headers. The connector starts tracing; if it hasn't started, the gateway does.
+- Batch processing: a batch span with links to contexts of incoming messages; span of the outgoing message - child of the incoming span. Thus, one trace goes from the sensor to the operator action.
+- Head sampling on the hot path is configured by probability (default 1%). Tail sampling cannot recover traces already excluded by head sampling; retaining every signal or incident trace requires an appropriate collection policy and separate validation.
 
-### 6.2 Метрики
+### 6.2 Metrics
 
-- Эндпоинт Prometheus `/metrics` на каждом сервисе; имена `psim_<подсистема>_<метрика>_<единица>`.
-- Золотые сигналы: задержка, пропускная способность, ошибки, насыщение (лаг потребителей, заполнение очередей, пул соединений).
-- Бизнес-метрики: события по типам таксономии, доля `generic.*`, сигналы по правилам, инциденты по типам и приоритетам, MTTA и MTTR в скользящем окне, нарушения SLA, команды по финальным статусам.
-- Метрики конвейера: гистограммы этапов и сквозной задержки ([quality.md](quality.md#44-как-измеряется)).
+- Prometheus endpoint `/metrics` on each service; names `psim_<subsystem>_<metric>_<unit>`.
+- Service metrics: latency, throughput, errors, saturation (consumer lag, queue filling, connection pool).
+- Business metrics: events by taxonomy, percentage `generic.*`, signals by rules, incidents by type and priority, MTTA and MTTR in a sliding window, SLA violations, commands by terminal status.
+- Pipeline metrics: histograms of stages and end-to-end latency ([quality.md](quality.md#44-how-it-is-measured)).
 
-### 6.3 Логи
+### 6.3 Logs
 
-- Структурированные JSON-строки в stdout: `ts`, `level`, `service`, `instance`, `trace_id`, `span_id`, `tenant_id`, `msg`, поля события. Сбор - Collector.
-- На горячем пути - без логирования отдельных событий на уровне выше `debug`; ошибки агрегируются с ограничением частоты.
-- Персональные данные (идентификаторы карт СКУД) не логируются.
+- Structured JSON lines in stdout: `ts`, `level`, `service`, `instance`, `trace_id`, `span_id`, `tenant_id`, `msg`, event fields. Collected by the Collector.
+- During the hot path, individual events are not logged at a level above `debug`; errors are aggregated with frequency limits.
+- Personal data (access-control card identifiers) is not logged.
 
-### 6.4 Здоровье
+### 6.4 Health
+- `/health/live` - The process is alive and the event loop responds.
+- `/health/ready` - Dependencies are available, local catalog replicas and configuration have been fully read, assigned partitions have been restored.
+- Stop: `ready = false` -> Stopping reception -> Draining: completing current batches and transactions, committing offsets, closing the producer -> Exit. The drain timeout can be adjusted.
 
-- `/health/live` - процесс жив и цикл событий отвечает.
-- `/health/ready` - зависимости доступны, локальные копии каталога и конфигурации прочитаны до конца, назначенные партиции восстановлены.
-- Остановка: `ready = false` -> прекращение приёма -> дренирование: завершение текущих пакетов и транзакций, фиксация смещений, закрытие продюсера -> выход. Таймаут дренирования настраивается.
-
-## 7. Безопасность
-
-Обзор. Модель угроз - [threat-model.md](../security/threat-model.md); угрозы, требования безопасности `SR-NN` и их шаги плана - [threat-register.md](../security/threat-register.md).
-
-| Граница | Механизм |
+## 7. Security
+Overview. Threat model - [threat-model.md](../security/threat-model.md); threats, security requirements `SR-NN` and responsible components - [threat-register.md](../security/threat-register.md).
+| Boundary | Mechanism |
 |---|---|
-| Коннектор -> шлюз | TLS 1.3, mTLS; сертификат коннектора привязан к регистрации в каталоге (C1, C2); лимиты на коннектор |
-| Браузер -> API Gateway | HTTPS; OIDC Authorization Code + PKCE; JWT доступа с коротким сроком; WebSocket аутентифицируется токеном при подключении и переаутентифицируется при обновлении токена |
-| Сервис -> сервис | mTLS с внутренним УЦ; синхронные вызовы несут JWT пользователя (делегирование) или сервисный токен client credentials; каждый сервис проверяет токен и права сам |
-| Сервис -> Kafka, PostgreSQL, Redis | TLS; отдельная учётная запись на сервис; ACL Kafka по топикам; права PostgreSQL - только своя схема |
-| Решения о доступе | Общая библиотека политик `decide()` (раздел 6 [aggregates.md](../domain/aggregates.md#6-identity--access)); запрет по умолчанию |
-| Аудит | Каждое изменяющее действие и каждый отказ в доступе |
+| Connector -> Gateway | TLS 1.3, mTLS; connector certificate is linked to registration in the catalog (C1, C2); limits on connectors |
+| Browser -> API Gateway | HTTPS; OIDC Authorization Code + PKCE; JWT access with short duration; WebSocket authentication with token upon connection and reauthentication when the token is updated |
+| Service -> Service | mTLS with internal CA; synchronous calls carry the user’s JWT (delegation) or service token client credentials; each service verifies the token and permissions itself |
+| Service -> Kafka, PostgreSQL, Redis | TLS; separate account for services; ACL in Kafka by topic; PostgreSQL permissions - only its own schema |
+| Access decisions | Common policy library `decide()` (section 6 [aggregates.md](../domain/aggregates.md#6-identity--access)); deny by default |
+| Audit | Every mutation and every access denial |
 
-## 8. Мультитенантность
+## 8. Multitenancy
+- `tenant_id` exists in each entity, each message, each cache key and index in PostgreSQL (the first column of composite indexes).
+- A tenant is determined from the token (user), connector registration (events) or envelope (messages), never from request parameters.
+- The MVP operates one tenant. Authorization tests must still reject access across tenant boundaries, and the invariant “no queries without `tenant_id`” is checked by a fitness function. ADR-022.
 
-- `tenant_id` присутствует в каждой сущности, каждом сообщении, каждом ключе кэша и индексе PostgreSQL (первым столбцом составных индексов).
-- Тенант определяется из токена (пользователь), регистрации коннектора (события) или конверта (сообщения) и никогда - из параметров запроса.
-- В MVP эксплуатируется один тенант; изоляция между тенантами не проверяется приёмкой, но инвариант «нет запросов без `tenant_id`» проверяется fitness function. ADR-022.
+## 9. Realtime: Snapshot and Deltas
+1. The client requests a snapshot of the feed: `GET /v1/feed/incidents`. The Projection Service returns incidents within the access scope and offset vectors `psim.incidents.events.v1` and `psim.response.events.v1`, on which the snapshot is aligned.
+2. The client opens a WebSocket and subscribes to this vector as a resume token.
+3. API Gateway reads topics with the specified offsets, filters by access scope and subscription, and sends deltas. The client applies the delta only if `version` is greater than the known version.
+4. After a break, the client reconnects with the last received offset vector and receives the missed data. If the offsets exceed the retention period or the break is too long, the server responds with `REALTIME_RESYNC_REQUIRED`, and the client gets a new snapshot.
+5. Slow clients: The sending queue is limited; when it’s full, the connection closes with code `REALTIME_SLOW_CONSUMER`, and the client recovers as described in step 4.
 
-## 9. Realtime: снимок и дельты
+Each instance of API Gateway reads topics completely (without consumer groups) and maintains a common stream for all connections; the volume of incident events is orders of magnitude lower than that of sensor events. ADR-019.
 
-1. Клиент запрашивает снимок ленты: `GET /v1/feed/incidents`. Projection Service возвращает инциденты области доступа и вектор смещений `psim.incidents.events.v1` и `psim.response.events.v1`, на которых снимок согласован.
-2. Клиент открывает WebSocket и подписывается с этим вектором как токеном возобновления.
-3. API Gateway читает топики с указанных смещений, фильтрует по области доступа и подписке, отправляет дельты. Клиент применяет дельту, только если `version` больше известной.
-4. После разрыва клиент переподключается с последним полученным вектором смещений и получает пропущенное. Если смещения вышли за retention или разрыв слишком долгий, сервер отвечает `REALTIME_RESYNC_REQUIRED`, и клиент берёт новый снимок.
-5. Медленный клиент: очередь отправки ограничена; при переполнении соединение закрывается с кодом `REALTIME_SLOW_CONSUMER`, клиент восстанавливается по п. 4.
+Clarification of realtime: [ADR-060](../adr/0060-realtime-delivery.md) defines node-independent resumption, type negotiation and the complete current state of the equipment in the Projection Service. Private delivery events are not sent to common subscriptions.
 
-Каждый экземпляр API Gateway читает топики целиком (без группы потребителей) и держит общий поток для всех своих соединений; объём событий инцидентов на порядки меньше потока событий датчиков. ADR-019.
-
-Уточнение realtime: [ADR-060](../adr/0060-realtime-delivery.md) определяет независимое от узла возобновление, согласование типов и полный актуальный образ оборудования из Projection Service. Приватные события доставки не передаются общим подпискам.
-
-## 10. Эволюция контрактов
-
-| Контракт | Версионирование | Правило совместимости |
+## 10. Contract Evolution
+| Contract | Versioning | Compatibility rule |
 |---|---|---|
-| Схемы Protobuf в топиках | Schema Registry, режим `BACKWARD_TRANSITIVE` для событий и `FULL_TRANSITIVE` для конверта | Только добавление необязательных полей; удаление - через `reserved`; смена смысла поля - новый тип |
-| Топики | Суффикс `.vN` | Несовместимое изменение - новый топик и период двойной записи |
-| REST | Префикс `/v1` | Добавление полей и эндпоинтов без смены версии; клиенты игнорируют неизвестные поля |
-| Протокол коннекторов | Версия пакета gRPC (`psim.connector.v1`) и согласование версии при регистрации | Шлюз поддерживает текущую и предыдущую мажорную версию |
-| Таксономия | Версия в событии | Только добавление типов; вывод через `deprecated` |
+| Protobuf schemas in topics | Schema Registry, mode `BACKWARD_TRANSITIVE` for events and `FULL_TRANSITIVE` for the envelope | Only adding optional fields; removing - through `reserved`; changing the meaning of a field - new type |
+| Topics | Suffix `.vN` | Incompatible changes - new topic and double-write period |
+| REST | Prefix `/v1` | Adding fields and endpoints without changing version; clients ignore unknown fields |
+| Connector protocol | Version of the gRPC package (`psim.connector.v1`) and versioning during registration | The gateway supports the current and previous major versions |
+| Taxonomy | Version in an event | Only adding types; retirement through `deprecated` |
 
-Совместимость проверяется в CI (`buf breaking` и проверка в Schema Registry). ADR-004.
+Compatibility is checked in CI (`buf breaking` and verification in Schema Registry). ADR-004.
 
-## 11. Противодавление и защита от перегрузки
+## 11. Backpressure and Overload Protection
+- Input: Credits in the connector protocol; the gateway gives credits only when the Kafka write queue is below the threshold.
+- Kafka consumers: Limited queues between reading and processing; when full - pause partitions (`pause`/`resume`), not unlimited memory growth.
+- PostgreSQL: Limited connection pool; when exhausted - waiting with deadlines, then temporary error and pause of the partition.
+- REST: Overall user quota within a tenant for all replicas of API Gateway in Valkey (ADR-078), local limits on incoming connections, request size limits, deadlines for each request.
+- Mass events: Suppression by rules, notification aggregation (N3), grouping signals into incidents.
 
-- Вход: кредиты в протоколе коннекторов; шлюз выдаёт кредиты, только пока очередь записи в Kafka ниже порога.
-- Потребители Kafka: ограниченные очереди между чтением и обработкой; при заполнении - пауза партиций (`pause`/`resume`), а не неограниченный рост памяти.
-- PostgreSQL: ограниченный пул соединений; при исчерпании - ожидание с дедлайном, затем временная ошибка и пауза партиции.
-- REST: общая квота пользователя внутри тенанта для всех реплик API Gateway в Valkey (ADR-078), локальные ограничения входящих соединений, ограничение размера запроса, дедлайны на каждый запрос.
-- Массовые события: подавление в правилах, агрегирование уведомлений (N3), группировка сигналов в инцидент.
+## 12. Testability and Module Structure
+- For each context: `domain` (pure library) -> `application` (use cases, dependent on ports) -> `adapters` (Kafka, PostgreSQL, Redis, gRPC, HTTP) -> `service` (build and execution).
+- Dependency directions are checked by the fitness function: `domain` depends on nothing except the standard library and common domain types.
+- Platform ports: `Clock`, `TimerService`, `IdGenerator`, `Random`, `EventPublisher`, `Outbox`, `Inbox`, `StateStore`, `CatalogView`, `ConfigView`, aggregate repositories.
+- The simulation environment (ADR-044) substitutes deterministic implementations for ports and emulates Kafka with injected failures.
 
-## 12. Тестируемость и структура модулей
+## 13. Storage in PostgreSQL
+- Each service owns its own schema (`catalog`, `incident`, `response`, `command`, `notification`, `audit`, `projection`); access to other schemas is prohibited by rights.
+- Migrations - versioned SQL files used by the platform’s migration tool; only expand/contract approach: new fields are added, code is transferred, old ones are removed in the next release. ADR-024.
+- Large tables with time (timeline, audit, inbox) are partitioned by time; deleting old data involves detaching partitions.
 
-- Для каждого контекста: `domain` (чистая библиотека) -> `application` (сценарии использования, зависят от портов) -> `adapters` (Kafka, PostgreSQL, Redis, gRPC, HTTP) -> `service` (сборка и запуск).
-- Направления зависимостей проверяются fitness function: `domain` не зависит ни от чего, кроме стандартной библиотеки и общих доменных типов.
-- Порты платформы: `Clock`, `TimerService`, `IdGenerator`, `Random`, `EventPublisher`, `Outbox`, `Inbox`, `StateStore`, `CatalogView`, `ConfigView`, репозитории агрегатов.
-- Симуляционный стенд (шаг 2.7) подставляет детерминированные реализации портов и эмулятор Kafka с внесением сбоев.
+### 13.1 Storage in ClickHouse
 
-## 13. Хранение в PostgreSQL
+- ClickHouse stores event history, event-signal relationships, incident facts, and signal statistics ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)); it is not a definitive source of truth in the domain but serves as a recoverable storage from Kafka and PostgreSQL for search and analytics. Rebuild is limited by retained source history; recovery beyond that history requires backups.
+- Only Event History and Projection Service write in batches, with a deduplication token for insertion; EventHistoryService and ReportService read it.
+- Tables are replicated in all topologies; partitioning follows each table schema; event retention uses TTL from `RetentionSettings`; each request is limited to `tenant_id` and time interval.
+- Schema migrations are versioned DDLs according to expand/contract rules (ADR-024), implemented using the platform’s migration tools.
 
-- Каждый сервис владеет своей схемой (`catalog`, `incident`, `response`, `command`, `notification`, `audit`, `projection`); доступ к чужой схеме запрещён правами.
-- Миграции - версионированные SQL-файлы, применяемые инструментом миграций платформы; только подход expand/contract: новое поле добавляется, код переходит, старое удаляется в следующем выпуске. ADR-024.
-- Большие таблицы с временем (хронология, аудит, inbox) секционируются по времени; удаление старых данных - отсоединение секций.
+## 14. Synchronous API between Web Client and Services
 
-### 13.1 Хранение в ClickHouse
+API Gateway acts as a reverse proxy with authentication, authorization, rate limiting, and routing based on the service owner’s path prefix. Services implement their own REST v1 themselves. DTOs are defined in Protobuf; OpenAPI, C++ DTOs and JSON mappings are generated from these contracts as specified in ADR-026.
 
-- ClickHouse хранит историю событий, связи событий с сигналами, факты инцидентов и статистику сигналов ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)); это не источник истины предметной области, а восстановимое из Kafka и PostgreSQL хранилище для поиска и аналитики.
-- Пишут только Event History и Projection Service - пакетами, с токеном дедупликации вставки; читают EventHistoryService и ReportService.
-- Таблицы - Replicated-движки во всех топологиях; секционирование по суткам; retention - TTL по `RetentionSettings`; каждый запрос ограничен `tenant_id` и интервалом времени.
-- Миграции схем - версионированные DDL по правилам expand/contract (ADR-024), применяются инструментом миграций платформы.
+## 15. Internationalization
 
-## 14. Синхронное API между веб-клиентом и сервисами
+The server returns codes and parameters, not localized text (except for `title` errors in English). Localization is handled in the web client (ru, en). Names from catalogs and scenarios are stored as entered by administrators.
 
-API Gateway - обратный прокси с аутентификацией, авторизацией, ограничением частоты и маршрутизацией по префиксу пути к сервису-владельцу. Сервисы реализуют свою часть REST v1 сами. DTO описываются в OpenAPI и для C++ генерируются; способ генерации и сериализации JSON - новый ADR-026, добавляемый в реестр в шаге 0.4.
+## 16. Operational Invariants (ADR-042)
 
-## 15. Интернационализация
+[operational-capabilities.md](operational-capabilities.md) defines device state quality, FileStore, maintenance, responsibility transfer, certificate lifecycle, and replay isolation. Realtime is supplemented by device status, zones, and connectors according to the previous snapshot and delta model; contract changes are executed before implementation and are consistent with client capabilities.
 
-Сервер возвращает коды и параметры, а не локализованный текст (кроме `title` ошибок на английском). Локализация - в веб-клиенте (ru, en). Названия из каталога и сценариев хранятся как введены администратором.
-
-## 16. Эксплуатационные инварианты (ADR-042)
-
-[operational-capabilities.md](operational-capabilities.md) определяет качество состояния устройств, FileStore, обслуживание, передачу ответственности, жизненный цикл сертификатов и изоляцию replay. Realtime дополняется состоянием устройств, зон и коннекторов по прежней модели снимка и дельт; изменение контрактов выполняется до реализации и согласуется с возможностями клиента.
-
-Диагностический replay использует отдельные права, топики и хранилища. Восстановление рабочих проекций и повторная обработка рабочего DLQ - самостоятельные авторизованные операции. Передача ответственности не сбрасывает SLA, обслуживание не удаляет события, дозагрузка истории не подтверждает актуальность устройства.
+Diagnostic replay uses separate permissions, topics, and storage. Restoring operational projections and reprocessing operational DLQ are independent authorized operations. Responsibility transfer does not break SLA, maintenance does not delete events, and historical backfill does not confirm device state freshness.

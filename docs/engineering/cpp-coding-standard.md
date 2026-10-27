@@ -1,111 +1,113 @@
-# Стандарт кодирования C++23
+# C++23 Coding Standards
 
-Шаг плана 1.2 · [ADR-033](../adr/0033-code-quality-gates.md) · toolchain - [ADR-032](../adr/0032-cpp-toolchain.md)
+<!-- language-links -->
+[English](cpp-coding-standard.md) | [Русский](../ru/engineering/cpp-coding-standard.md)
+<!-- /language-links -->
 
-Правила, которые проверяет инструмент, записаны в его конфигурации: `.clang-format`, `.clang-tidy`, флаги `cmake/PsimCompiler.cmake`, `tools/arch/architecture.yaml`. Этот документ объясняет их и добавляет правила для ревью. Если документ и конфигурация расходятся, действует конфигурация, а документ исправляется.
+[ADR-033](../adr/0033-code-quality-gates.md) · toolchain - [ADR-032](../adr/0032-cpp-toolchain.md)
 
-## 1. Барьеры
+The rules checked by the tool are specified in its configuration: `.clang-format`, `.clang-tidy`, flags `cmake/PsimCompiler.cmake`, `tools/arch/architecture.yaml`. This document explains these rules and adds guidelines for reviews. If the document and configuration differ, the configuration takes precedence, and the document is revised accordingly.
 
-| Что | Чем проверяется | Задача |
+## 1. Quality Gates
+
+| What | How it is checked | Task |
 |---|---|---|
-| Формат | clang-format 21, `.clang-format` | `task cpp:format` |
-| Предупреждения компилятора | `-Wall -Wextra -Wpedantic -Wconversion ...` и `-Werror` | `task cpp:build` |
-| Статический анализ, именование, include | clang-tidy 21, `.clang-tidy`, 0 замечаний | `task cpp:lint` |
-| Санитайзеры | ASan + UBSan, TSan, 0 срабатываний | `task cpp:test:sanitizers` |
-| Покрытие | llvm-cov, пороги `tools/cpp/coverage.yaml` | `task cpp:coverage` |
-| Границы модулей | граф целей CMake и `#include` (ADR-001) | `task arch:deps` |
-| Чистота домена | запрещённые заголовки и конструкции в `libs/domain` | `task arch:domain-purity` |
-| SQL только с параметрами | эвристика по SQL-литералам (SR-13) | `task arch:sql` |
+| Formatting | clang-format 21, `.clang-format` | `task cpp:format` |
+| Compiler warnings | `-Wall -Wextra -Wpedantic -Wconversion ...` and `-Werror` | `task cpp:build` |
+| Static analysis, naming, include | clang-tidy 21, `.clang-tidy`, 0 errors | `task cpp:lint` |
+| Sanitizers | ASan + UBSan, TSan, 0 failures | `task cpp:test:sanitizers` |
+| Coverage | llvm-cov, thresholds `tools/cpp/coverage.yaml` | `task cpp:coverage` |
+| Module boundaries | CMake target graph and `#include` (ADR-001) | `task arch:deps` |
+| Domain purity | prohibited headers and constructs in `libs/domain` | `task arch:domain-purity` |
+| SQL only with parameters | SQL literal heuristic (SR-13) | `task arch:sql` |
 
-Всё перечисленное входит в `task check`, а он - в конвейер `task ci`, который запускается перед каждым коммитом ([ADR-034](../adr/0034-local-ci-and-supply-chain.md), [ADR-036](../adr/0036-no-git-hooks.md)). Быстрые проверки по отдельности: `task cpp:format`, `task arch:check`, `task docs:typography`.
+All of the above are part of `task check`, which is run in the pipeline `task ci` before each commit ([ADR-034](../adr/0034-local-ci-and-supply-chain.md), [ADR-036](../adr/0036-no-git-hooks.md)). Quick checks for individual items: `task cpp:format`, `task arch:check`, `task docs:typography`.
 
-## 2. Язык и стандартная библиотека
+## 2. Language and Standard Library
 
-- C++23 без расширений компилятора, системная libstdc++ из Debian 13. Модули C++20 не используются; заголовки защищаются `#pragma once`.
-- Предпочтительно средства стандартной библиотеки: `std::expected`, `std::span`, `std::string_view`, `std::format` и `std::print`, `std::ranges`, `std::chrono`.
-- Макросы - только там, где без них нельзя (конфигурация сборки, условная компиляция); имя с префиксом `PSIM_`.
-- C-массивы, `reinterpret_cast`, `const_cast`, вариативные функции C, `goto` не используются (clang-tidy `cppcoreguidelines-*`).
+- C++23 without compiler extensions, Debian 13 system libstdc++. C++20 modules are not used; headers are protected by `#pragma once`.
+- Prefer standard library facilities: `std::expected`, `std::span`, `std::string_view`, `std::format` and `std::print`, `std::ranges`, `std::chrono`.
+- Macros are only used where they are necessary (build configuration, conditional compilation); names with a prefix `PSIM_`.
+- C arrays, `reinterpret_cast`, `const_cast`, C variadic functions, `goto` are not used (clang-tidy `cppcoreguidelines-*`).
 
-## 3. Форматирование
+## 3. Formatting
 
-- Основа - стиль Google: отступ 2 пробела, строка до 120 символов, `*` и `&` у типа, фигурные скобки у любого тела `if`, `for`, `while`.
-- Порядок include - группами через пустую строку: собственный заголовок (для `x.cpp` и `x_test.cpp` - `x.hpp`); сторонние `<lib/header.h>`; стандартная библиотека `<header>`; проектные `"psim/..."`. clang-format сортирует и группирует их сам.
-- Формат не обсуждается на ревью: `task cpp:format:fix`.
+- Base style: Google style: 2-space indentation, up to 120 characters per line, `*` and `&` for types, curly braces for any body `if`, `for`, `while`.
+- Include order: groups by blank lines: own header (for `x.cpp` and `x_test.cpp` - `x.hpp`); external `<lib/header.h>`; standard library `<header>`; project-specific `"psim/..."`. clang-format sorts and groups them automatically.
+- Formatting is not discussed in reviews: `task cpp:format:fix`.
 
-## 4. Именование
+## 4. Naming
 
-| Сущность | Стиль | Пример |
+| Entities | Style | Example |
 |---|---|---|
-| Пространства имён | `lower_case` | `psim::domain::incident` |
-| Классы, структуры, перечисления, псевдонимы типов, концепты, параметры шаблонов | `CamelCase` | `IncidentId`, `EventPublisher` |
-| Функции, методы, переменные, параметры, открытые поля структур | `lower_case` | `open_incident`, `tenant_id` |
-| Закрытые и защищённые поля классов | `lower_case_` | `state_` |
-| Константы (`constexpr`, глобальные и статические константы), значения перечислений | `kCamelCase` | `kMaxBatchSize`, `Severity::kCritical` |
-| Макросы | `PSIM_UPPER_CASE` | `PSIM_VERSION` |
-| Файлы | `lower_case.hpp`, `lower_case.cpp`, тест - `lower_case_test.cpp` | `incident_state.hpp` |
+| Namespaces | `lower_case` | `psim::domain::incident` |
+| Classes, structures, enumerations, type aliases, concepts, template parameters | `CamelCase` | `IncidentId`, `EventPublisher` |
+| Functions, methods, variables, parameters, public struct fields | `lower_case` | `open_incident`, `tenant_id` |
+| Private and protected fields in classes | `lower_case_` | `state_` |
+| Constants (`constexpr`, global and static constants), values of enumerations | `kCamelCase` | `kMaxBatchSize`, `Severity::kCritical` |
+| Macros | `PSIM_UPPER_CASE` | `PSIM_VERSION` |
+| Files | `lower_case.hpp`, `lower_case.cpp`, test - `lower_case_test.cpp` | `incident_state.hpp` |
 
-Пространство имён повторяет путь библиотеки: `libs/platform/core` -> `psim::platform`, `libs/domain/incident` -> `psim::domain::incident`.
+Namespaces repeat the library path: `libs/platform/core` -> `psim::platform`, `libs/domain/incident` -> `psim::domain::incident`.
 
-## 5. Раскладка модуля
+## 5. Module Layout
 
 ```
 libs/<area>/<name>/
-  CMakeLists.txt          цель psim_<area>_<name>, псевдоним psim::<area>_<name>
-  include/psim/<area>/... публичные заголовки (единственный путь включения извне)
-  src/                    реализация и закрытые заголовки
-  tests/                  <name>_test.cpp, цель через psim_add_test
+  CMakeLists.txt          target psim_<area>_<name>, alias psim::<area>_<name>
+  include/psim/<area>/... public headers (the only external include path)
+  src/                    implementation and private headers
+  tests/                  <name>_test.cpp, target created through psim_add_test
 ```
 
-- Каждая цель проекта вызывает `psim_target_defaults()` (строгие предупреждения, санитайзеры, покрытие); тесты создаются функцией `psim_add_test()`.
-- Направления зависимостей - ADR-001 и `tools/arch/architecture.yaml`. Новый сервис вносится туда со списком своих контекстов домена.
+- Every project target uses `psim_target_defaults()` (strict warnings, sanitizers, coverage); tests are created by the function `psim_add_test()`.
+- Dependency directions - ADR-001 and `tools/arch/architecture.yaml`. New services are added with a list of their domain contexts.
 
-## 6. Ошибки
+## 6. Errors
 
-- Ошибки предметной области - значения: `std::expected<T, Error>`; функции, возвращающие ошибку, помечаются `[[nodiscard]]`.
-- В `libs/domain` исключения не бросаются и не перехватываются (`arch:domain-purity`).
-- В инфраструктуре исключения сторонних библиотек не пересекают границу порта: адаптер преобразует их в результат.
-- На границах портов и API ошибка - `psim::platform::Error` с кодом из каталога `contracts/errors/errors.yaml` (`ErrorCode` генерируется при сборке) и `Result<T>` = `std::expected<T, Error>`; сообщение не содержит секретов и персональных данных ([ADR-039](../adr/0039-service-runtime.md)).
-- Перемещающие конструкторы и операции присваивания, деструкторы и `swap` - `noexcept`.
+- Domain errors - values: `std::expected<T, Error>`; functions returning errors are marked `[[nodiscard]]`.
+- In `libs/domain`, exceptions are not thrown or caught (`arch:domain-purity`).
+- In the infrastructure, exceptions from external libraries do not cross the port boundary: the adapter converts them into results.
+- At port and API boundaries, an error is `psim::platform::Error` with code from the `contracts/errors/errors.yaml` catalog (`ErrorCode` generated during build) and `Result<T>` = `std::expected<T, Error>`; the message does not contain secrets or personal data ([ADR-039](../adr/0039-service-runtime.md)).
+- Move constructors and assignment operations, destructors and `swap` - `noexcept`.
 
-## 7. Ресурсы, память, типы
+## 7. Resources, Memory, Types
 
-- Владение - через RAII: `std::unique_ptr` по умолчанию, `std::shared_ptr` только при действительно разделяемом владении; `new` и `delete` в прикладном коде не пишутся.
-- Параметры только для чтения - `std::span`, `std::string_view`, `const T&`; передача владения - по значению с `std::move`.
-- Идентификаторы и величины предметной области - отдельные типы (`IncidentId`, а не `std::string`); конструкторы с одним аргументом - `explicit`.
-- Преобразования типов явные (`-Wconversion`, `-Wsign-conversion`): `static_cast` или проверяющая функция.
-- Перечисления - только `enum class`.
+- Ownership - through RAII: `std::unique_ptr` by default, `std::shared_ptr` only when truly shared; `new` and `delete` are not written in application code.
+- Parameters for only reading - `std::span`, `std::string_view`, `const T&`; transfer of ownership - by value from `std::move`.
+- Identifiers and domain values - separate types (`IncidentId`, not `std::string`); constructors with one argument - `explicit`.
+- Type conversions are explicit (`-Wconversion`, `-Wsign-conversion`): `static_cast` or a checking function.
+- Enumerations - only `enum class`.
 
-## 8. Детерминированное доменное ядро
+## 8. Deterministic Domain Core
 
-Принцип 4 плана и [crosscutting.md](../architecture/crosscutting.md#12-тестируемость-и-структура-модулей): в `libs/domain` нет системных часов, случайности, ввода-вывода, потоков и исключений. Время, идентификаторы, случайность приходят через порты (`Clock`, `IdGenerator`, `Random`), публикация - через `EventPublisher`. Разрешена только стандартная библиотека и `libs/domain/common`. Проверки - `arch:domain-purity` и `arch:deps`.
+The rule for a clean domain core from [crosscutting.md](../architecture/crosscutting.md#12-testability-and-module-structure): in `libs/domain` there are no system clocks, randomness, input/output, threads and exceptions. Time, identifiers, randomness come through ports (`Clock`, `IdGenerator`, `Random`), publication - through `EventPublisher`. Only the standard library and `libs/domain/common` are allowed. Checks - `arch:domain-purity` and `arch:deps`.
 
-## 9. Конкурентность
+## 9. Concurrency
 
-- Разделяемое изменяемое состояние без синхронизации запрещено; модель потоков и корутин фиксирует ADR-016 (шаг 2.2).
-- Тесты с потоками обязательно проходят под TSan; подавления TSan не используются - гонка исправляется.
+- Shared mutable state without synchronization is prohibited; thread and coroutine models are defined by ADR-016.
+- Thread tests must pass under TSan; TSan suppression is not used - the race is corrected.
 
 ## 10. SQL
 
-- Только параметризованные запросы; текст запроса - константа, известная при компиляции (SR-13).
-- Ключевые слова SQL пишутся в верхнем регистре: по ним `arch:sql` распознаёт SQL-литералы.
-- Если идентификатор (например, имя секции) действительно вычисляется, он строится из проверенного значения, а строка помечается `// psim-arch: allow-sql(<причина>)`.
+- Only parameterized queries; query text is a constant known at compile time (SR-13).
+- SQL keywords are written in uppercase: `arch:sql` recognizes SQL literals by them.
+- If an identifier (e.g., partition name) is actually calculated, it is built from a verified value, and the line is marked `// psim-arch: allow-sql(<reason>)`.
 
-## 11. Подавления и комментарии
+## 11. Suppression and Comments
 
-- Подавление замечания - только с именем проверки и причиной: `// NOLINT(bugprone-xxx): причина` или `// NOLINTNEXTLINE(...)`. `NOLINT` без проверки и блоки `NOLINTBEGIN` на файл не допускаются.
-- Комментарии в коде - на английском; объясняют «почему», а не «что». Публичные заголовки содержат короткое описание назначения сущности.
+- Suppression of warnings - only with the name of the check and reason: `// NOLINT(bugprone-xxx): reason` or `// NOLINTNEXTLINE(...)`. `NOLINT` without check and blocks `NOLINTBEGIN` on file are not allowed.
+- Comments in the code are in English; they explain “why” rather than “what”. Public headers provide a brief description of the object’s purpose.
 
-## 12. Тесты
+## 12. Tests
+- GoogleTest and GMock; the test name is `Suite.BehaviourUnderCondition`. It involves one test file for each module or class.
+- Domain tests do not use real time or threads: they use deterministic port implementations - `libs/sim`.
+- Coverage: 90% of lines and 80% of branches for the domain, and 75% of lines per module for the infrastructure.
 
-- GoogleTest и GMock; имя теста - `Suite.BehaviourUnderCondition`; один файл тестов на модуль или класс.
-- Тесты домена не используют реальное время и потоки: детерминированные реализации портов - `libs/sim` (шаг 2.7).
-- Покрытие: домен - 90% строк и 80% ветвей, инфраструктура - 75% строк на каждый модуль.
-
-## 13. Чек-лист самопроверки для ревью
-
-1. Имена отражают язык предметной области ([glossary](../domain/glossary.md)).
-2. Ошибки обработаны явно, ни одна не теряется; инварианты агрегата проверены тестами.
-3. Нет лишних копирований и аллокаций на горячем пути; размеры буферов ограничены.
-4. Данные извне проверены на границе; секреты не попадают в логи.
-5. Изменение контракта сопровождается обновлением `contracts/` и проходит `task contracts:check`.
-6. Значимое решение оформлено ADR.
+## 13. Self-check checklist for review
+1. The names reflect the domain language ([glossary](../domain/glossary.md)).
+2. All errors are handled explicitly; none are lost. The invariants of the aggregate have been tested.
+3. There are no unnecessary copies or allocations on the hot path; buffer sizes are limited.
+4. External data is verified at the boundary; secrets do not get logged.
+5. Any contract changes are accompanied by updates to `contracts/` and follow `task contracts:check`.
+6. Significant decisions are documented using ADR.

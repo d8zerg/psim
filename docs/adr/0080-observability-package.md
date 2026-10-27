@@ -1,40 +1,43 @@
-# ADR-080. Хранение телеметрии и пакет наблюдаемости
+# ADR-080. Telemetry storage and observability package
 
-- **Статус:** Принято
-- **Шаг плана:** 9.4
-- **Связанные:** [ADR-028](0028-clickhouse-analytical-storage.md), [ADR-035](0035-local-environment.md), [ADR-042](0042-operational-capabilities.md), [ADR-046](0046-s3-object-storage.md)
+<!-- language-links -->
+[English](0080-observability-package.md) | [Русский](../ru/adr/0080-observability-package.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-028](0028-clickhouse-analytical-storage.md), [ADR-035](0035-local-environment.md), [ADR-042](0042-operational-capabilities.md), [ADR-046](0046-s3-object-storage.md)
 
-Поставка должна содержать средства диагностики без подключения окружения разработки. Нужны связанные метрики, логи, трассы, алерты и инструкции восстановления. Нагрузка телеметрии не должна конкурировать с запросами истории событий и восстановлением предметных данных в ClickHouse.
+## Context
 
-## Варианты
+The delivery must include diagnostic tools without connecting to the development environment. Related metrics, logs, traces, alerts, and recovery instructions are required. The load of telemetry should not compete with event history queries and data recovery in ClickHouse.
 
-| Вариант | Преимущества | Ограничения |
+## Options
+
+| Option | Advantages | Limitations |
 |---|---|---|
-| Общий ClickHouse для истории и телеметрии | Один механизм хранения, Apache-2.0 | Общие ресурсы и домен отказа; дополнительные схемы, права и плагин Grafana для поиска трасс |
-| Отдельный ClickHouse для телеметрии | Изоляция нагрузки, Apache-2.0 | Дополнительный экземпляр ClickHouse; отдельные схемы и настройка интерфейса трасс |
-| Loki и Tempo как отдельные процессы | Штатные источники Grafana, OTLP, переход лог -> трасса, существующий опыт разработки | Дополнительные процессы и диски; AGPL-3.0 для самостоятельных серверов |
+| Shared ClickHouse for history and telemetry | One storage mechanism, Apache-2.0 | Shared resources and failure domain; additional schemas, rights, and Grafana plugins for trace searching |
+| Separate ClickHouse for telemetry | Isolation of load, Apache-2.0 | Additional ClickHouse instance; separate schemas and trace interface configuration |
+| Loki and Tempo as separate processes | Native Grafana data sources, OTLP, log to trace transition, existing development experience | Additional processes and disks; AGPL-3.0 for standalone servers |
 
-## Решение
+## Solution
 
-1. Поставка использует Prometheus, Alertmanager, Grafana, Loki, Tempo и OpenTelemetry Collector. Используются закреплённые образы самостоятельных серверов. Код этих серверов не связывается с исполняемыми файлами PSIM. Политика лицензий статически связанных зависимостей сохраняется; состав самостоятельных образов учитывается отдельно.
-2. Логи хранятся в Loki семь суток, трассы в Tempo трое суток. Prometheus хранит метрики до пятнадцати суток или достижения 10 ГиБ. Это исходные параметры; ёмкость дисков выбирается по фактическому потоку. Хранилища телеметрии отделены от ClickHouse и рабочего bucket планов.
-3. На каждом узле работает Collector с дисковой очередью и агент диагностики без административных операций. Межузловой OTLP и сбор метрик используют проверенный TLS; доступ к агенту требует клиентского сертификата и разрешённого имени сервиса. Локальные интерфейсы хранилищ и Alertmanager слушают loopback.
-4. Центральный пакет работает на первом узле роли `observability`. Автоматическое переключение узла наблюдаемости не реализуется. Внешняя система должна контролировать регулярность `PsimWatchdog`; локальный журнал не заменяет внешний канал оповещения.
-5. Grafana доступна через `/monitoring/`. Вход через Keycloak использует PKCE, проверку ID token и отдельные realm-роли `psim-observability-admin` и `psim-observability-viewer`. Предметные роли отдельных тенантов не дают доступа к инфраструктурной телеметрии всей поставки. Аварийная локальная учётная запись получает отдельный случайный пароль.
-6. Дашборды, правила, конфигурация источников и HTML-инструкции хранятся готовыми файлами. Генератора этих материалов нет. Рендеринг топологии подставляет адреса, идентичности, публичные URL и инвентарь экземпляров. Проверки читают материалы поставки напрямую.
-7. Ошибка сбора и отсутствие данных не означают исправное состояние. Возраст последней строки ClickHouse оценивается вместе с lag Kafka. Сквозная метрика не вычисляется сложением перцентилей этапов.
+1. The delivery uses Prometheus, Alertmanager, Grafana, Loki, Tempo, and OpenTelemetry Collector. Fixed images for standalone servers are used. These servers’ code is not linked to PSIM executable files. License policies for statically linked dependencies are maintained; the composition of standalone images is considered separately.
+2. Logs are stored in Loki for seven days, traces in Tempo for three days. Prometheus stores metrics for up to fifteen days or when reaching 10 GiB. These are default parameters; disk capacity is selected based on actual traffic. Telemetry storage is separated from ClickHouse and working floor plan bucket.
+3. Each node runs a Collector with a disk queue and diagnostic agent without administrative operations. Inter-node OTLP and metric collection use verified TLS; access to the agent requires a client certificate and authorized service name. Local interfaces of storage and Alertmanager listen on loopback.
+4. The central package operates on the first node with role `observability`. Automatic switching of the observability node is not implemented. The external system must control the regularity of `PsimWatchdog`; local logs do not replace the external notification channel.
+5. Grafana is accessible through `/monitoring/`. Access via Keycloak uses PKCE, ID token verification, and separate realm roles `psim-observability-admin` and `psim-observability-viewer`. Domain roles of individual tenants do not grant access to all infrastructure telemetry. The emergency local account receives a separate random password.
+6. Dashboards, rules, source configurations, and HTML instructions are stored as ready-made files. English is the canonical source. Reviewed translation catalogs generate the checked-in Russian dashboards; both languages are shipped as ready-to-use files. Deployment does not generate their content. Rendering the topology uses addresses, identities, public URLs, and instance inventory. Tests read delivery materials directly.
+7. An error in data collection or absence of data does not mean a correct state. The age of the last line in ClickHouse is evaluated together with Kafka lag. An end-to-end metric is not calculated by adding stage percentiles.
 
-## Последствия
+## Consequences
 
-- Пакет использует ту же топологию приложений для Docker и systemd; Grafana получает одинаковые экраны.
-- Мониторинг копий принимает только явно опубликованный результат завершённого задания. Реализация резервирования и проверка восстановления остаются отдельной работой.
-- Матрица C-01-C-15 связывает отказ с алертом, дашбордом и инструкцией. Проверка правил на временных рядах не заменяет квалификацию отказоустойчивости и RPO/RTO на кластере.
-- Регламент, параметры доступа и границы проверки приведены в [руководстве эксплуатации](../engineering/observability.md).
+- The package uses the same application topology for Docker and systemd; Grafana receives the same screens.
+- Backup monitoring accepts explicitly published results of completed tasks. Backup execution and recovery verification remain separate tasks.
+- Matrix C-01-C-15 links failure with alert, dashboard, and instructions. Checking rules on time series does not replace cluster RPO/RTO qualification for fault tolerance.
+- Schedule, access parameters, and check limits are provided in the [operating guide](../engineering/observability.md).
 
-## Основания
+## Justifications
 
-- [Конфигурация уведомлений и подавления Alertmanager](https://prometheus.io/docs/alerting/latest/configuration/).
-- [Конфигурация Tempo](https://grafana.com/docs/tempo/latest/configuration/), [структура конфигурации закреплённой версии](https://github.com/grafana/tempo/blob/v3.1.0/cmd/tempo/app/config.go).
-- [Generic OAuth Grafana и PKCE](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/generic-oauth/).
+- [Notification configuration and Alertmanager suppression](https://prometheus.io/docs/alerting/latest/configuration/).
+- [Tempo configuration](https://grafana.com/docs/tempo/latest/configuration/), [configuration structure of the fixed version](https://github.com/grafana/tempo/blob/v3.1.0/cmd/tempo/app/config.go).
+- [Generic OAuth Grafana and PKCE](https://grafana.com/docs/grafana/latest/setup-grafana/configure-access/configure-authentication/generic-oauth/).

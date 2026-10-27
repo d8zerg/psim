@@ -1,39 +1,42 @@
-# ADR-024. Обновления без простоя и миграции
+# ADR-024. Zero-downtime upgrades and migrations
 
-- **Статус:** Принято
-- **Шаг плана:** 9.2
-- **Связанные:** ADR-004, ADR-023, [deployment.md](../architecture/deployment.md#4-обновление)
+<!-- language-links -->
+[English](0024-zero-downtime-upgrades.md) | [Русский](../ru/adr/0024-zero-downtime-upgrades.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, ADR-023, [deployment.md](../architecture/deployment.md#4-update)
 
-Обновление N -> N+1 в кластере выполняется под нагрузкой без остановки обработки и без потерь (S12); откат должен быть возможен. В момент обновления одновременно работают экземпляры версий N и N+1, читающие и пишущие одни и те же топики и таблицы.
+## Context
 
-## Рассмотренные варианты
+A cluster upgrade N -> N+1 must run under load without interrupting processing or losing data (S12), and support rollback. During an upgrade, N and N+1 instances concurrently read and write the same topics and tables.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Остановка - миграция - запуск | Просто | Простой; нарушает S12 |
-| Blue-green (второй полный экземпляр платформы) | Мгновенный откат | Удвоение инфраструктуры, Kafka и PostgreSQL не дублируются просто |
-| **Последовательная замена экземпляров + совместимость N и N+1 + миграции expand/contract** | Без простоя и без удвоения инфраструктуры | Дисциплина: каждое изменение схемы - в два выпуска |
+| Stop, migrate, restart | Simple | Downtime violates S12 |
+| Blue-green: a second complete platform instance | Immediate rollback | Doubles infrastructure; Kafka and PostgreSQL cannot simply be duplicated |
+| **Rolling replacement with N/N+1 compatibility and expand/contract migrations** | No downtime or doubled infrastructure | Requires each schema change to span two releases |
 
-## Решение
+## Decision
 
-1. **Совместимость:** версии N и N+1 совместимы по схемам сообщений (ADR-004), REST (только добавления в `/v1`) и протоколу коннекторов. Подписанный выпуск содержит контрактный снимок; несовместимый переход отклоняется до замены.
-2. **Миграции expand/contract:** выпуск N+1 содержит только расширяющие миграции (новые таблицы, необязательные столбцы, новые индексы `CONCURRENTLY`); сужающие (удаление столбцов, ограничения) - в выпуске N+2. Миграции идемпотентны и версионированы; инструмент - в `libs/platform/pg`.
-3. **Порядок:** расширяющие миграции -> регистрация схем -> замена экземпляров от потребителей к производителям -> проверка.
-4. **Замена экземпляра:** HTTP-экземпляр выводится из новых назначений прокси; доступность сохраняет здоровая реплика. Для контейнеров Normalizer и Correlation Engine новая версия с отдельной producer identity запускается до остановки старой: загрузка метаданных -> назначения Kafka -> готовность -> остановка старой. Откат использует тот же порядок. Административные адреса сохраняются локальным прокси.
-5. **Откат:** последовательная замена обратно, пока сужающие миграции N+1 не выполнены.
-6. **Защита:** установщик отказывается обновлять, если предпроверка совместимости не пройдена.
+1. **Compatibility:** N and N+1 are compatible in message schemas (ADR-004), REST (additions only within `/v1`) and connector protocol. A signed release contains a contract snapshot; incompatible transitions are rejected before replacement.
+2. **Expand/contract migrations:** N+1 includes only expansion: new tables, optional columns and indexes created `CONCURRENTLY`. Contraction, such as dropped columns and constraints, belongs in N+2. Migrations are idempotent and versioned; tooling resides in `libs/platform/pg`.
+3. **Order:** expand migrations -> schema registration -> replace consumers before producers -> verification.
+4. **Instance replacement:** remove an HTTP instance from new proxy assignments while a healthy replica maintains availability. For Normalizer and Correlation Engine containers, start the new version with a separate producer identity before stopping the old one: metadata loading -> Kafka assignments -> readiness -> stop the old instance. Rollback uses the same sequence. A local proxy preserves administrative addresses.
+5. **Rollback:** replace instances back before contraction migrations; verify old-reader compatibility before starting it.
+6. **Protection:** the installer refuses upgrades that fail compatibility preflight.
 
-Идентичность поставки и динамическая версия определены в [ADR-079](0079-release-version-identification.md). Неизвестные expand-фазы требуют явного `minimum_reader`; несовместимая или неизвестная contract-фаза запрещает запуск старого читателя. Перед contract на всех узлах сохраняется запрет отката.
+[ADR-079](0079-release-version-identification.md) defines distribution identity and dynamic versioning. Unknown expand phases require an explicit `minimum_reader`; an incompatible or unknown contract phase prevents an old reader from starting. Before contract, every node persistently records that rollback is forbidden.
 
-Контейнеры и systemd используют сохранённые версии конфигурации и журнал замен. Доверенный ключ задаётся отдельно от выпуска; подпись, инвентарь, SBOM и идентичности OCI проверяются до установки. Изменённые conffiles не заменяются шаблоном. Регламент и команды - [установка и обновление](../engineering/installation-and-upgrades.md).
+Containers and systemd use saved configuration versions and a replacement journal. The trusted key is supplied independently of the release; signatures, inventory, SBOM and OCI identities are verified before installation. Modified conffiles are not replaced by templates. Procedures and commands are in [installation and upgrades](../engineering/installation-and-upgrades.md).
 
-## Последствия
+## Consequences
 
-- CI проверяет, что миграции выпуска - только расширяющие (линтер миграций).
-- Тест обновления под нагрузкой входит в набор выпуска.
+- CI migration linting checks that release migrations only expand schemas.
+- The release suite includes an upgrade-under-load test.
 
-## Проверка
+## Verification
 
-Сценарий S12/C-12: обновление и откат под `LOAD-50K` со сквозной сверкой. Статус квалификации - `Отложено` до шага 10.1. Шаг 9.2 принят с ограничением; критерии S12 сохраняются обязательным барьером выпуска.
+S12/C-12: upgrade and rollback under `LOAD-50K` with end-to-end reconciliation. Load qualification is incomplete; S12 criteria remain a mandatory release gate.

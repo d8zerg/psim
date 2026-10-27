@@ -1,36 +1,39 @@
-# ADR-026. REST-контракт и DTO: proto-first с генерацией OpenAPI
+# ADR-026. REST contracts and DTOs: proto-first OpenAPI generation
 
-- **Статус:** Принято
-- **Шаг плана:** 0.5 (реализация - 1.1, 1.5, 7.1)
-- **Связанные:** ADR-004, [crosscutting.md](../architecture/crosscutting.md#14-синхронное-api-между-веб-клиентом-и-сервисами)
+<!-- language-links -->
+[English](0026-rest-contract-and-dto.md) | [Русский](../ru/adr/0026-rest-contract-and-dto.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, [crosscutting.md](../architecture/crosscutting.md#14-synchronous-api-between-web-client-and-services)
 
-REST API v1 описывается в OpenAPI (решение плана), веб-клиент генерирует из него API-клиент (шаг 1.5), а сервисы на C++ должны сериализовать DTO в JSON без ручного кода на каждый тип. Генераторы серверного кода OpenAPI для C++ (cpp-restsdk, pistache, qt) не подходят к стеку Asio/Beast. При этом остальные контракты (Kafka, gRPC) уже на Protobuf.
+## Context
 
-## Рассмотренные варианты
+OpenAPI describes REST API v1 and generates the web API client. C++ services need JSON DTO serialization without handwritten code for every type. C++ OpenAPI server generators such as cpp-restsdk, pistache and qt do not fit Asio/Beast. Kafka and gRPC contracts already use Protobuf.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| OpenAPI-first, DTO на C++ вручную + Boost.JSON | Полный контроль над OpenAPI | Ручной код и ручная синхронизация DTO с контрактом на ~100 эндпоинтах; ошибки рассинхронизации ловятся только тестами |
-| OpenAPI-first, DTO на C++ + библиотеки рефлексии (glaze, reflect-cpp) | Меньше ручной сериализации | Структуры всё равно пишутся вручную по OpenAPI; второй IDL рядом с Protobuf |
-| TypeSpec как единый источник для OpenAPI и Protobuf | Красивый источник | Эмиттер Protobuf ограничен; новый инструмент и язык |
-| **Proto-first: REST DTO и методы описываются в Protobuf с аннотациями `google.api.http`; OpenAPI 3 генерируется; JSON - каноническое JSON-отображение Protobuf** | Один IDL для всех контрактов; C++ DTO и сериализация генерируются (`JsonStringToMessage`/`MessageToJsonString`); `buf breaking` проверяет и REST; OpenAPI остаётся опубликованным контрактом для веб-клиента | Аннотации не выражают заголовки (ETag, `Idempotency-Key`) и формат ошибок - нужен оверлей OpenAPI; правила JSON-отображения Protobuf (int64 строкой, camelCase) |
+| OpenAPI-first, handwritten C++ DTOs and Boost.JSON | Full OpenAPI control | Manual code and synchronization across roughly 100 endpoints; only tests detect drift |
+| OpenAPI-first, C++ DTOs and reflection libraries such as glaze or reflect-cpp | Less handwritten serialization | Structures still manually duplicate OpenAPI; a second IDL alongside Protobuf |
+| TypeSpec as the source for OpenAPI and Protobuf | Readable source | Limited Protobuf emitter; another tool and language |
+| **Proto-first: Protobuf REST DTOs and methods with `google.api.http` annotations; generated OpenAPI 3; canonical Protobuf JSON mapping** | One IDL for all contracts; generated C++ DTOs and serialization (`JsonStringToMessage`/`MessageToJsonString`); `buf breaking` also checks REST; OpenAPI remains the published web-client contract | Annotations cannot express headers such as ETag and `Idempotency-Key` or the error format, requiring an overlay; Protobuf JSON uses string int64 values and camelCase |
 
-## Решение
+## Decision
 
-1. REST-ресурсы описываются в `contracts/proto/psim/api/v1/*.proto` с аннотациями `google.api.http` и `buf validate` для ограничений полей.
-2. OpenAPI 3 генерируется в CI плагином protoc (`protoc-gen-openapi` или эквивалент, выбор фиксируется в шаге 1.1); затем применяется оверлей (спецификация OpenAPI Overlay) из `contracts/openapi/overlay.yaml`: схемы безопасности, заголовки `ETag`/`If-Match`/`Idempotency-Key`, ответы `application/problem+json` (RFC 9457), параметры курсорной пагинации. Результат публикуется как контракт REST v1.
-3. JSON: каноническое отображение Protobuf - имена полей `lowerCamelCase`, перечисления строками, `Timestamp` в RFC 3339, int64 строкой; неизвестные поля во входящих запросах отклоняются.
-4. Веб-клиент генерирует TypeScript-клиент из итогового OpenAPI (шаг 1.5).
-5. Ошибки - сообщение `psim.api.v1.Problem` с полями RFC 9457 и `code` из каталога.
+1. Define REST resources in `contracts/proto/psim/api/v1/*.proto` using `google.api.http` annotations and `buf validate` field constraints.
+2. CI generates OpenAPI 3 with the protoc plugin `protoc-gen-openapi`, pinned in the tools container. Then it applies `contracts/openapi/overlay.yaml` using the OpenAPI Overlay specification: security schemes, `ETag`/`If-Match`/`Idempotency-Key` headers, `application/problem+json` responses (RFC 9457) and cursor-pagination parameters. Publish the result as the REST v1 contract.
+3. JSON follows canonical Protobuf mapping: `lowerCamelCase` fields, string enums, RFC 3339 `Timestamp` values and string int64 values. Reject unknown input fields.
+4. Generate the web TypeScript client from the final OpenAPI document.
+5. Errors use `psim.api.v1.Problem`, with RFC 9457 fields and a catalog `code`.
 
-## Последствия
+## Consequences
 
-- Изменение REST - изменение `.proto`; OpenAPI и клиенты пересобираются автоматически, рассинхронизация невозможна.
-- Производительность protobuf JSON достаточна для нагрузки REST (сотни консолей); горячие пути (realtime) используют те же сообщения.
-- Оверлей - отдельный артефакт, который нужно поддерживать; его применение проверяется в CI.
+- REST changes begin in `.proto`; OpenAPI and clients regenerate automatically, preventing drift.
+- Protobuf JSON performance is sufficient for hundreds of REST consoles; realtime hot paths use the same messages.
+- The overlay is a separate maintained artifact; CI verifies its application.
 
-## Проверка
+## Verification
 
-Контрактные тесты API Gateway против итогового OpenAPI (DoD шага 7.1); CI проверяет, что сгенерированный OpenAPI в репозитории соответствует proto.
+API Gateway contract tests use the final OpenAPI document. CI verifies that committed generated OpenAPI matches the proto sources.

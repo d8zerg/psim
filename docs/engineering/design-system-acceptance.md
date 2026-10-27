@@ -1,139 +1,145 @@
-# Приёмка дизайн-системы
+# Design System Acceptance
 
-## Объём
+<!-- language-links -->
+[English](design-system-acceptance.md) | [Русский](../ru/engineering/design-system-acceptance.md)
+<!-- /language-links -->
 
-Приёмка дизайн-системы охватывает токены, доступные компоненты, локализацию, оперативные сценарии и автоматические проверки, перечисленные в реестре требований. Операторские прогоны, SUS, интервью, исследования с участниками и связанные с ними базовые замеры не требуются. MTTA, нагрузка тревог, ошибки команд и передача смены остаются показателями продукта; их человеческие значения не подменяются скоростью тестового сценария.
+## Scope
 
-Серверные контракты, хранение и распределённая синхронизация вынесены в шаг 8.1a. Витрина моделирует их детерминированно. Готовность макета не означает готовность серверной функции.
+The acceptance of the design system covers tokens, accessible components, localization, operational scenarios, and automatic checks listed in the requirement registry. Operator runs, SUS, interviews, participant studies, and related basic measurements are not required. MTTA, alarm load, command errors, and shift transfers remain product metrics; their values measured with participants are not replaced by test scenario speed.
+
+Server contracts, storage, and distributed synchronization are described in the [operational interface](operational-interface.md). The model simulates them deterministically. Model readiness does not mean server function readiness.
 
 ## DoD
 
-- Все требования реестра реализованы и проверены в пределах указанного объёма приёмки.
-- Макеты покрывают S2, S6-S9 и S13; автоматическая проверка доступности не находит критичных нарушений.
-- Визуальная регрессия, тесты смысла и бюджеты проходят в `task web:check`.
-- Визуальная проверка доступными средствами не имеет критичных замечаний; операторская приёмка не требуется.
-- Технические показатели прототипа лучше исходных по заранее выбранным метрикам при одинаковых сценариях и окружении. Сохраняются исходные результаты, команда воспроизведения, новые результаты и ограничения сравнения.
-- Итоги автоматических проверок и визуального просмотра записаны отдельно. Невыполненные требования не считаются закрытыми по наличию ADR или тестового каркаса.
+- All requirements in the registry have been implemented and verified within the specified acceptance scope.
+- Models cover S2, S6-S9, and S13; automated accessibility checks do not find critical violations.
+- Visual regression, semantic tests, and budgets are conducted in `task web:check`.
+- Visual checks using available tools have no critical issues; operator acceptance is not required.
+- The technical metrics of the prototype are better than the original ones for pre-selected metrics under the same scenarios and environment. Original results, reproduction command, new results, and comparison limits are preserved.
+- Results of automatic checks and visual reviews are recorded separately. Unmet requirements are not considered closed due to ADR or test framework.
 
-## Реестр требований
+## Requirement Registry
 
-Все требования ниже выполнены в объёме дизайн-системы и детерминированных макетов. Серверные операции требуют отдельной реализации и приёмки.
+All requirements below have been met within the design system and deterministic models. Server implementation and verification are documented separately in the service guides.
 
-| Требование | Статус |
+| Requirement | Status |
 |---|---|
-| Определить объём и DoD дизайн-системы в плане и журнале прогресса. Выделить серверную поддержку оперативного интерфейса в отдельный шаг перед рабочими экранами. | выполнено |
-| ADR «Принципы интерфейса»: предсказуемость важнее адаптивности, цвет только для отклонений (ISA-101), адаптивность только предлагает. | выполнено |
-| Философия тревог по EEMUA 191 / IEC 62682: приоритеты, полная модель состояний, допустимая нагрузка, политика звука, отложенные и подавленные тревоги. | выполнено |
-| Показатели успеха и протокол технического сравнения с исходным прототипом. Операторские прогоны, SUS и другие замеры с участниками исключены. | выполнено |
-| ADR о бюджете: ленивые точки входа, бюджеты на компонент, новый суммарный лимит JS. | выполнено |
-| ADR о шрифте и иконках. | выполнено |
-| ADR об ассистенте на базе LLM: границы, источники, аудит, работа локально, запрет на выполнение команд. | выполнено |
-| Токены в JSON по формату W3C Design Tokens. Генерация CSS, TS и цветов для theme-init.js, без дублирования. | выполнено |
-| Три уровня: базовая палитра в OKLCH со шкалами по 12 ступеней -> семантика -> токены компонентов. | выполнено |
-| Шкалы: типографика, отступы на сетке 4 px, радиусы, тени, z-index, анимация, точки перелома, размеры иконок. | выполнено |
-| Темы: тёмная, светлая, высококонтрастная (AAA 7:1), приглушённая ночная; полная поддержка forced colors. | выполнено |
-| Режим работы как слой токенов: обычный, кризис, учения, видеостена. | выполнено |
-| Плотность: обычная, компактная, крупная для видеостены. | выполнено |
-| Тест контраста по всем парам токенов во всех темах и режимах. | выполнено |
-| Проверка палитры приоритетов на дальтонизм. | выполнено |
-| Свой шрифт: woff2 с подмножеством кириллицы, табличные цифры, моноширинный вариант. | выполнено |
-| Иконки: lucide-react с tree-shaking и предметный набор. Иконка без подписи не проходит проверку типов. | выполнено |
-| Один подход к стилям всех компонентов (cva + Tailwind); классы ds-* переведены на него. | выполнено |
-| Паттерны из стилей приложения перенесены в дизайн-систему. | выполнено |
-| Правило линтера: в приложении только токены. | выполнено |
-| Исправлены текущие дефекты: scroll-padding-top (WCAG 2.4.11), формы множественного числа. | выполнено |
-| Каталог компонентов в Storybook или Ladle: аддон доступности, тесты взаимодействия. | выполнено |
-| Визуальная регрессия компонентов по темам, плотностям и языкам; отдельные снимки изменяемой области для режимов. | выполнено |
-| Тесты смысла: цвет продублирован текстом, у действий есть имена, критичное действие требует подтверждения. | выполнено |
-| ICU MessageFormat с формами множественного числа, проверка отсутствующих ключей. | выполнено |
-| Утилиты на Intl: даты, относительное время, числа, списки, сортировка, часовые пояса. | выполнено |
-| Псевдолокализация в визуальных тестах. | выполнено |
-| Ленивая загрузка словарей, демо-строки отделены от строк продукта, глоссарий ru/en. | выполнено |
-| Бюджеты размера на компонент, sideEffects, отдельные точки входа. | выполнено |
-| Версионирование через changesets, политика устаревания API. | выполнено |
-| Соглашения API: ref, asChild, управляемый и неуправляемый режимы, data-state, className, TSDoc. | выполнено |
-| Button с состоянием загрузки, IconButton с обязательной подписью, ButtonGroup. | выполнено |
-| Textarea, Checkbox, Radio, NumberInput, Slider, Switch. | выполнено |
-| Combobox с асинхронным поиском и виртуализацией, MultiSelect. | выполнено |
-| Выбор даты и периода с часовым поясом. | выполнено |
-| Загрузка файла с прогрессом и отчётом по строкам. | выполнено |
-| Формы на react-hook-form и zod: сводка ошибок, фокус на первой ошибке. | выполнено |
-| Dialog, AlertDialog, Sheet, Popover, Tooltip, DropdownMenu, ContextMenu. | выполнено |
-| Палитра команд Ctrl+K. | выполнено |
-| Боковое меню ролевых модулей, Tabs, Breadcrumbs, Pagination. | выполнено |
-| Toast, центр уведомлений, Progress, Spinner, варианты Skeleton. | выполнено |
-| DescriptionList, Stat, Timeline, Stepper, Tag, пользователь с аватаром, Kbd, EmptyState. | выполнено |
-| Клавиатурные паттерны WAI-ARIA APG с тестами для каждого составного виджета. | выполнено |
-| DataTable на TanStack Table и Virtual: сортировка, фильтры, столбцы, закрепление, выбор и групповые действия, навигация по паттерну APG grid, живые обновления с сохранением выбранной строки. | выполнено |
-| Дерево по WAI-ARIA с ленивой загрузкой и виртуализацией. | выполнено |
-| План этажа: масштабирование, маркеры, легенда, текстовая альтернатива. | выполнено |
-| Модель тревоги и жизненный цикл команды как типизированные конечные автоматы. | выполнено |
-| Проверка на этапе компиляции, что каждому enum из proto соответствует метка. | выполнено |
-| PriorityBadge, AlarmStateBadge, ConnectionIndicator, SlaTimer, AckButton, CommandLifecycle, AuditReasonField, DeviceMarker, AlarmBanner, плитка камеры. | выполнено |
-| Графики: палитра визуализации, табличная альтернатива, тренды. | выполнено |
-| Нейтральное нормальное состояние, яркие цвета только у тревог. | выполнено |
-| Отображение всех состояний тревоги. | выполнено |
-| Наплыв тревог: группировка, индикатор частоты, режим для 500+ событий. | выполнено |
-| Звук: тоны по приоритету, повтор P1 по политике, громкость, проверка динамиков, неактивная вкладка. | выполнено |
-| Время: абсолютное и относительное, часовые пояса, живые таймеры без перерисовки ленты. | выполнено |
-| Горячие клавиши и справка по ним, стабильный фокус при вставке строк. | выполнено |
-| Раскладки для нескольких мониторов и видеостены. | выполнено |
-| Стратегия live-регионов при наплыве. | выполнено |
-| Режим кризиса по решению оператора. | выполнено |
-| Честные данные: свежесть и происхождение значения как паттерн компонентов. | выполнено |
-| Эргономика смены: ночная тема по расписанию, напоминания о паузах. | выполнено |
-| Имитатор потока событий в витрине: детерминированные сценарии и управление (наплыв, разрыв связи, задержка, смена). | выполнено |
-| Шкала перемотки состояния над лентой и планом. | выполнено |
-| Сводка изменений после разрыва связи. | выполнено |
-| Брифинг передачи смены с подтверждением. | выполнено |
-| Кнопка «почему» у полей с цепочкой причин. | выполнено |
-| Предупреждение о риске нарушения SLA с переназначением. | выполнено |
-| Предпросмотр последствий команды и мобильный экран подтверждения вторым старшим смены. | выполнено |
-| Панель бюджета внимания. | выполнено |
-| Присутствие и мягкая блокировка в карточке инцидента. | выполнено |
-| Индикатор задержки и деградации канала. | выполнено |
-| Интерфейс режима учений с оценкой действий. | выполнено |
-| Панель ассистента с источниками. | выполнено |
+| Record the scope and criteria of the design system and implement server support for the operational interface. | Completed |
+| ADR “Interface Principles”: Predictability is more important than adaptability, colors only for deviations (ISA-101), adaptability is only offered. | Completed |
+| EEMUA 191 / IEC 62682 alarm philosophy: Priorities, complete state model, allowable load, sound policy, shelved and suppressed alarms. | Completed |
+| Success metrics and protocol for technical comparison with the original prototype. Operator runs, SUS, and other participant measurements are excluded. | Completed |
+| ADR on budget: Lazy entry points, component budgets, new total JS limit. | Completed |
+| ADR on font and icons. | Completed |
+| ADR on LLM-based assistant: Limits, sources, audit, local operation, command execution prohibition. | Completed |
+| Tokens in JSON format according to W3C Design Tokens. Generation of CSS, TS, and colors for theme-init.js, without duplication. | Completed |
+| Three levels: basic palette in OKLCH with 12-step scales -> semantics -> component tokens. | Completed |
+| Scales: Typography, 4 px grid spacing, radii, shadows, z-index, animation, breakpoints, icon sizes. | Completed |
+| Themes: Dark, light, high contrast (AAA 7:1), dim night; full support for forced colors. | Completed |
+| Operation mode as token layers: Normal, Crisis, Exercises, Video Wall. | Completed |
+| Density: Normal, Compact, Large for video wall. | Completed |
+| Contrast test for all token pairs in all themes and modes. | Completed |
+| Check the priority palette for achromatism. | Completed |
+| Locally hosted font: woff2 with subset of Cyrillic, tabular numbers, monospace variant. | Completed |
+| Icons: lucide-react with tree-shaking and object set. Icon without label does not pass type check. | Completed |
+| One approach to styles for all components (cva + Tailwind); ds-* classes have been transferred to it. | Completed |
+| Patterns from application styles have been transferred to the design system. | Completed |
+| Linter rule: Only tokens in the application. | Completed |
+| Current defects corrected: scroll-padding-top (WCAG 2.4.11), plural forms. | Completed |
+| Component catalog in Storybook or Ladle: Add-on for accessibility, interaction tests. | Completed |
+| Visual regression of components by theme, density, and language; separate snapshots of the changeable area for modes. | Completed |
+| Semantic tests: Color duplicated with text, actions have names, critical actions require confirmation. | Completed |
+| ICU MessageFormat with plural forms, checking for missing keys. | Completed |
+| Tools on Intl: Dates, relative time, numbers, lists, sorting, time zones. | Completed |
+| Pseudolocalization in visual tests. | Completed |
+| Lazy loading of dictionaries, demo strings separated from product strings, glossary ru/en. | Completed |
+| Budgets for component size, sideEffects, separate entry points. | Completed |
+| Versioning through changesets, API obsolescence policy. | Completed |
+| API agreements: ref, asChild, managed and unmanaged modes, data-state, className, TSDoc. | Completed |
+| Button with loading state, IconButton with mandatory label, ButtonGroup. | Completed |
+| Textarea, Checkbox, Radio, NumberInput, Slider, Switch. | Completed |
+| Combobox with asynchronous search and virtualization, MultiSelect. | Completed |
+| Selection of date and period with time zone. | Completed |
+| Loading file with progress and row report. | Completed |
+| Forms on react-hook-form and zod: Error summary, focus on the first error. | Completed |
+| Dialog, AlertDialog, Sheet, Popover, Tooltip, DropdownMenu, ContextMenu. | Completed |
+| Command palette Ctrl+K. | Completed |
+| Side menu for role modules, Tabs, Breadcrumbs, Pagination. | Completed |
+| Toast, notification center, Progress, Spinner, Skeleton options. | Completed |
+| DescriptionList, Stat, Timeline, Stepper, Tag, user with avatar, Kbd, EmptyState. | Completed |
+| WAI-ARIA APG keyboard patterns with tests for each component. | Completed |
+| DataTable on TanStack Table and Virtual: Sorting, filters, columns, pinning, selection and group actions, navigation by APG grid pattern, live updates with preserved selected row. | Completed |
+| Tree by WAI-ARIA with lazy loading and virtualization. | Completed |
+| Floor plan: Scaling, markers, legend, text alternative. | Completed |
+| Alarm and command lifecycle as typed finite-state machines. | Completed |
+| Check during compilation that each enum in proto has a label. | Completed |
+| PriorityBadge, AlarmStateBadge, ConnectionIndicator, SlaTimer, AckButton, CommandLifecycle, AuditReasonField, DeviceMarker, AlarmBanner, camera tile. | Completed |
+| Charts: visualization palette, tabular alternative, trends. | Completed |
+| Neutral normal state, bright colors only in alerts. | Completed |
+| Display of all alert states. | Completed |
+| Alert overload: grouping, frequency indicator, mode for 500+ events. | Completed |
+| Sound: tones by priority, P1 repetition according to policy, volume, speaker tests, inactive tab. | Completed |
+| Time: absolute and relative, time zones, live timers without re-rendering the feed. | Completed |
+| Hot keys and their descriptions, stable focus when inserting text. | Completed |
+| Layouts for multiple monitors and video walls. | Completed |
+| Strategy for live regions during overload. | Completed |
+| Crisis mode based on operator decisions. | Completed |
+| Honest data: freshness and origin of values as component patterns. | Completed |
+| Ergonomic switching: night theme by schedule, reminders about breaks. | Completed |
+| Event flow simulator in the interface: deterministic scenarios and control (overload, connection break, delay, change). | Completed |
+| State history scrubber over the feed and floor plan. | Completed |
+| Summary of changes after a connection break. | Completed |
+| Briefing on shift transfer with acknowledgment. | Completed |
+| “Why” button in fields with cause chains. | Completed |
+| Warning about SLA violation with reassignments. | Completed |
+| Preview of command consequences and mobile screen confirmation by the second shift supervisor. | Completed |
+| Attention budget panel. | Completed |
+| Presence and soft blocking in incident cards. | Completed |
+| Indicator for channel delay and degradation. | Completed |
+| Interface for exercise evaluation. | Completed |
+| Assistant panel with sources. | Completed |
 
-## Подтверждения реализации
+## Implementation Evidence
 
-- DTCG JSON -> CSS/TS/bootstrap: базовая палитра OKLCH, семантика, компонентные цвета, шкалы шрифтов, геометрии, теней и анимации. Генератор проверяет 1152 пары, включая тонированные поверхности и выбранные строки, и симуляции нарушений цветового зрения. Восемь отрицательных проверок покрывают контраст, ссылки, типы, темы, тени и easing.
-- CVA/Tailwind задают варианты и базовую геометрию. Приложение использует общие рецепты; функциональный CSS отвечает за нативные особенности контролов, резервирование статуса, системные цвета и reduced motion. Основная, ночная, высококонтрастная и светлая темы, три плотности и явно выбираемые режимы проверены автоматически.
-- Ladle показывает 63 компонента в четырёх группах. Визуальная матрица содержит 96 снимков компонентов и восемь вариантов псевдолокализации; витрина добавляет 24 снимка основ и четыре снимка изменяемой области режима. Итого 132 эталона. Axe сохраняет 480 сочетаний представления; режимы не умножают файлы. Дополнительные сценарии проверяют открытые оверлеи и оперативный макет.
-- Формы: отмена асинхронного поиска, виртуализация Combobox, множественный выбор, период с явным часовым поясом, прогресс и отмена загрузки файла, отчёт по строкам, RHF/Zod, сводка ошибок и фокус на первом поле.
-- Составные виджеты: диалоги и панели Radix, popover, tooltip и меню, Ctrl+K, Tabs, ролевое меню, навигация, уведомления. Проверены стрелки, Home/End, Space/Enter, Escape, цикл фокуса и восстановление фокуса, включая следующий шаг после отправки команды на мобильном экране.
-- Коллекции: TanStack Table/Virtual, сортировка, фильтры, видимость и закрепление столбцов, выбор и групповые действия; ленивое дерево, масштабируемый план с текстовым списком и график с таблицей значений. Неизменённые записи сохраняют DOM; кеш значений учитывает изменение записи и accessor.
-- Предметные компоненты показывают полную модель тревоги, приоритеты, связь, SLA, основания, жизненный цикл команды, источник и версию значения, время и камеру без ложного видеопотока. Все 21 enum собственных proto имеют проверяемые TypeScript метки ru/en; появление нового enum останавливает проверку типов до добавления меток.
-- Симулятор с seed 42 моделирует наплыв 500 событий, очередь при разрыве, задержку, восстановление и смену. История управляет лентой и планом; изменяющие действия в истории и при разрыве недоступны. Группы сохраняют счётчики и исходные записи. Live-регион агрегирует наплыв раз в секунду; звук P1/P2 требует включения и ограничивает повторы P1.
-- Макет включает сводку восстановления, передачу смены с просмотром конкретной версии, причины и источники, риск SLA и переназначение, последствия команды и второго подтверждающего, бюджет внимания, присутствие, мягкую блокировку, задержку, учения, ночное расписание и напоминание о паузе. Ассистент извлекает видимые факты с источниками и не выполняет действия.
-- ICU, Intl, ленивые ru/en, глоссарий, локальные WOFF2 и предметные иконки имеют соответствующие проверки. Changesets содержит minor дизайн-системы и realtime-клиента и зависимый patch консоли; проверка плана не изменяет версии, коммиты, теги и публикации. Политика устаревания и соглашения API описаны в [руководстве](design-system.md).
-- ADR-062-ADR-067 приняты при утверждении шага 8.1.
+- DTCG JSON -> CSS/TS/bootstrap: basic OKLCH palette, semantics, component colors, font scales, geometry, shadows, and animations. The generator checks 1152 pairs, including tinted surfaces and selected lines, and simulates color vision deficiencies. Eight negative checks cover contrast, links, types, themes, shadows, and easing.
+- CVA/Tailwind define options and basic geometry. The application uses common recipes; functional CSS handles native control features, status reservation, system colors, and reduced motion. Basic, night, high-contrast, and light themes, three densities, and explicitly selected modes are automatically tested.
+- Ladle shows 63 components in four groups. The visual matrix contains 96 component snapshots and eight pseudo-localization options; the interface adds 24 base snapshots and four variable area mode snapshots. Total: 132 baselines. Axe saves 480 presentation combinations; modes do not multiply files. Additional scenarios test open overlays and runtime templates.
+- Forms: cancellation of asynchronous search, virtualization of Combobox, multiple selection, period with explicit time zone, progress and cancellation of file loading, row report, RHF/Zod, error summary, and focus on the first field.
+- Composite widgets: dialogs and Radix panels, popovers, tooltips, menus, Ctrl+K, Tabs, role menus, navigation, notifications. Arrows, Home/End, Space/Enter, Escape, focus cycle, and focus restoration are tested, including the next step after sending commands on the mobile screen.
+- Collections: TanStack Table/Virtual, sorting, filters, visibility and pinning of columns, selection and group actions; lazy tree, scalable plan with text list and chart with value tables. Unchanged records retain DOM; value cache takes into account record changes and accessors.
+- Object components show the full model of alerts, priorities, connections, SLA, bases, command lifecycle, source and version of values, time and camera without false video stream. All 21 enums have tested TypeScript labels ru/en; adding a new enum stops type checking until labels are added.
+- The simulator with seed 42 models 500 event overload, connection break, delay, recovery, and change. History manages the feed and floor plan; changing actions in history and during a break are not available. Groups retain counters and original records. Live region aggregates overload every second; P1/P2 sound requires activation and limits P1 repetitions.
+- The template includes recovery summary, shift transfer with viewing of specific version, causes and sources, SLA risk and reassignments, command consequences and second confirmation, attention budget, presence, soft blocking, delay, exercises, night schedule, and reminder about break. The assistant extracts visible facts from sources and does not perform actions.
+- ICU, Intl, lazy ru/en, glossary, local WOFF2, and object icons have corresponding checks. Changesets contain minor design system and realtime client and dependent console patch; plan checking does not change versions, commits, tags, and publications. Deprecation policies and API agreements are described in the [guide](design-system.md).
+- Principles and limitations of the design system are defined in ADR-062-ADR-067.
 
-## Протокол технического сравнения
+The measurements below belong to the design-system acceptance profile. Current whole-application budgets are listed in [web client loading](web-client-loading.md).
 
-`task web:benchmark` собирает Ladle и запускает отдельный Chromium worker в закреплённом Playwright-контейнере, окно 1280 x 1000. Оба варианта получают одинаковый детерминированный набор из 5000 записей и три столбца значений. Пакет меняет 500 записей. Исходный вариант сохраняет прежний невиртуализированный способ отображения через map; новый использует DataTable и дополнительно содержит выбор и управление столбцами. Это сравнение способов отображения под одинаковой нагрузкой, а не исторический замер всей страницы.
+## Technical Comparison Protocol
 
-После пяти прогревочных повторов сохраняются 20 измерений каждого действия. Измеряется время от события до DOM-коммита через MutationObserver; ожидание кадра между действиями не включается в результат. p50 и p95 определяются по ближайшему порядковому рангу. Полные серии и сводка сохраняются в `build/web-benchmark/results.json`. Замер не включает последующую отрисовку пикселей и не подменяет MTTA, SUS или поведение участников.
+`task web:benchmark` collects Ladle and runs a separate Chromium worker in the fixed Playwright container, with a window size of 1280 x 1000. Both options receive the same deterministic set of 5000 records and three columns of values. The batch changes 500 records. The original version retains the previous non-virtualized display method through map; the new one uses DataTable and additionally includes column selection and control. This comparison is under the same load, not a historical measurement of the entire page.
 
-| Метрика | Исходное отображение | Виртуальная таблица |
+After five warm-up repetitions, 20 measurements are retained for each action. Time from event to DOM commit is measured using MutationObserver; waiting for a frame between actions is not included in the results. p50 and p95 are determined by the nearest order rank. Full series and summary are retained in `build/web-benchmark/results.json`. The measurement does not include subsequent pixel rendering and does not replace MTTA, SUS, or participant behavior.
+
+| Metric | Original Display | Virtual Table |
 |---|---|---|
-| Обновление пакета, p50, мс | 12,9 | 8,8 |
-| Обновление пакета, p95, мс | 15,6 | 12,3 |
-| Реакция на ввод, p50, мс | 12 | 3,7 |
-| Реакция на ввод, p95, мс | 15,1 | 4,9 |
-| DOM-строки таблицы | 5000 | 11 |
-| Пересоздания неизменённой записи | 0 | 0 |
+| Batch update, p50, ms | 12.9 | 8.8 |
+| Batch update, p95, ms | 15.6 | 12.3 |
+| Response to input, p50, ms | 12 | 3.7 |
+| Response to input, p95, ms | 15.1 | 4.9 |
+| DOM rows in table | 5000 | 11 |
+| Re-creating unchanged records | 0 | 0 |
 
-Проверка требует улучшения p50 и p95 обоих временных показателей, менее 20 строк в виртуальном DOM и нулевых пересозданий неизменённой записи. Отдельные браузерные сценарии подтверждают сохранение выбранного ID и DOM при вставке, клавиатурную навигацию и запреты автоматов. Результаты относятся к локальному окружению; на другой машине числа могут отличаться.
+The test requires improvements in both p50 and p95 time metrics. The rendered table should have fewer than 20 rows, and no re-creations of unchanged records are allowed. Individual browser scenarios confirm that the selected ID and DOM are preserved during insertion, as well as keyboard navigation and state-machine prohibitions. The results are for the local environment; numbers may differ on another machine.
 
-Исходные макеты и стили сохранены локально в `build/ux-baseline`. Проверка устойчивости измеряет положение строки через getBoundingClientRect().top + scrollY: исходный статус обновления сдвигал выбранную строку на 11 px, действующая реализация сохраняет 0 px при обновлении и ошибке, включая узкий экран и плотность видеостены. Фокус, DOM и выбор сохраняются.
+The original templates and styles are saved locally in `build/ux-baseline`. Stability is measured by getting the position of the line using getBoundingClientRect().top + scrollY. The original implementation shifted the selected line 11 px when updating, while the current implementation keeps 0 px, including on narrow screens and high video density. Focus, DOM, and selection are preserved.
 
-Первоначальный начальный JS составлял 148520 байт gzip. Действующая сборка с выбранным продуктовым словарём занимает 146170 байт для en и 147071 байт для ru; для ru уменьшение составляет 1449 байт. В начальном графе отсутствуют оперативный симулятор, демонстрационные строки и словарь другого языка. Суммарный JS с расширенной витриной составляет 237,98 КБ при лимите 260 КБ; CSS - 11,17 КБ при лимите 15 КБ, WOFF2 - 134564 байта при лимите 150000. Рост общего JS объяснён в [ADR-065](../adr/0065-ui-loading-budgets.md).
+The initial JS size was 148520 bytes gzip. The current build with the selected product dictionary occupies 146170 bytes for en and 147071 bytes for ru; for ru, the reduction is 1449 bytes. The initial graph lacks an operational simulator, demonstration lines, and a dictionary in another language. The total JS with extended showcase is 237.98 KB at a limit of 260 KB; CSS is 11.17 KB at a limit of 15 KB, and WOFF2 is 134564 bytes at a limit of 150000. The increase in total JS is explained in [ADR-065](../adr/0065-ui-loading-budgets.md).
 
-## Автоматическая и визуальная приёмка
+## Automatic and Visual Review
 
-`task web:check` проходит: 19 задач, 117 модульных тестов, 12 проверок Node.js и 274 браузерные проверки. Сравниваются все 132 эталона; матрица Axe и дополнительные сценарии проходят без нарушений. Покрытие строк: дизайн-система - 93,29%, консоль - 95,91%; порог 80% для строк, ветвей, функций и выражений сохранён. `task web:benchmark` и `task web:changeset:status` также проходят.
+`task web:check` passes: 19 tasks, 117 module tests, 12 Node.js checks, and 274 browser tests. All 132 benchmarks are compared; Axe matrix and additional scenarios pass without issues. Line coverage: design system - 93.29%, console - 95.91%; a threshold of 80% is maintained for lines, branches, functions, and statements. `task web:benchmark` and `task web:changeset:status` also pass.
 
-Визуально просмотрены обновлённые эталоны, оперативный макет с наплывом и мобильная панель второго подтверждения. Проверены читаемость, переносы, семантика цвета, доступность действий, источник значения и положение фокуса; критичных замечаний нет. Диагностические снимки находятся в `build/web-design-system`. Это визуальный просмотр доступными средствами; операторские прогоны и исследования с участниками не проводились и не требуются.
+The updated visual baselines are visually reviewed, along with the overflowing operating template and the mobile panel for the second confirmation. Readability, text wrapping, color semantics, accessibility of actions, value source, and focus position are tested; no critical issues are found. Diagnostic images are in `build/web-design-system`. This is a visual review using available tools; operator runs and participant studies were not conducted and are not required.
 
-Шаг 8.1 принят. Серверные операции реализуются отдельно: [контракты и проверки](operational-interface.md).
+Server operations and their criteria are described separately: [Contracts and Tests](operational-interface.md).

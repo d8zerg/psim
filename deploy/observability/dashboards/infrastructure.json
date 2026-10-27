@@ -1,7 +1,7 @@
 {
   "uid": "psim-infrastructure",
-  "title": "Инфраструктура и репликация",
-  "description": "Open-Source PSIM Platform. Инфраструктура и репликация. Пропуски данных требуют проверки сбора.",
+  "title": "Infrastructure and Replication",
+  "description": "Open-Source PSIM Platform. Infrastructure and replication. Check data collection when data is missing.",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -33,50 +33,57 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "Обзор платформы",
+      "title": "Platform overview",
       "url": "/monitoring/d/psim-overview",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Конвейер событий",
+      "title": "Event Pipeline",
       "url": "/monitoring/d/psim-pipeline",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Сервисы и API",
+      "title": "Services and APIs",
       "url": "/monitoring/d/psim-services",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инфраструктура и репликация",
+      "title": "Infrastructure and Replication",
       "url": "/monitoring/d/psim-infrastructure",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Хранилища и ёмкость",
+      "title": "Storage and Capacity",
       "url": "/monitoring/d/psim-storage",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инциденты и подключения",
+      "title": "Incidents and Connections",
       "url": "/monitoring/d/psim-business",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Эксплуатационные проверки",
+      "title": "Operational checks",
       "url": "/monitoring/d/psim-operations",
+      "type": "link",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "RU",
+      "url": "/monitoring/d/psim-infrastructure-ru",
       "type": "link",
       "keepTime": true,
       "includeVars": true
@@ -85,7 +92,7 @@
   "annotations": {
     "list": [
       {
-        "name": "Алерты",
+        "name": "Alerts",
         "enable": true,
         "datasource": {
           "type": "prometheus",
@@ -103,7 +110,7 @@
     "list": [
       {
         "name": "deployment",
-        "label": "Поставка",
+        "label": "Deployment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -120,14 +127,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "node",
-        "label": "Узел",
+        "label": "Node",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -144,14 +151,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "component",
-        "label": "Компонент",
+        "label": "Component",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -168,7 +175,7 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
@@ -179,8 +186,8 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Доступность и время ответа",
-      "description": "Протокольные проверки выполняются на каждом узле, поэтому видны сетевые разделения приложений и инфраструктуры.",
+      "title": "Availability and response time",
+      "description": "Protocol checks run on every node to expose network partitions between applications and infrastructure.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -192,8 +199,8 @@
     },
     {
       "id": 2,
-      "title": "Результат проверок",
-      "description": "0 - отказ, 1 - успешная проверка; component и target определяют зависимость.",
+      "title": "Results of the checks",
+      "description": "0 - failure, 1 - successful verification; the component and target determine the dependency.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -217,7 +224,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -247,7 +254,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -284,8 +291,8 @@
     },
     {
       "id": 3,
-      "title": "Длительность проверок",
-      "description": "Включает соединение, TLS и запрос.",
+      "title": "Duration of checks",
+      "description": "Includes connection, TLS, and request.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -309,7 +316,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -339,7 +346,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -377,8 +384,8 @@
     {
       "id": 4,
       "type": "row",
-      "title": "PostgreSQL, Patroni и etcd",
-      "description": "Роли и кворум проверяются отдельно от открытия TCP-порта.",
+      "title": "PostgreSQL, Patroni and etcd",
+      "description": "Roles and quorum are verified separately from the opening of the TCP port.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -391,7 +398,7 @@
     {
       "id": 5,
       "title": "Primary PostgreSQL",
-      "description": "В исправной топологии ровно один primary.",
+      "description": "In a valid topology, there is exactly one primary.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -415,7 +422,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -445,7 +452,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -482,8 +489,8 @@
     },
     {
       "id": 6,
-      "title": "Подключения PostgreSQL",
-      "description": "Сумма активных backend connections.",
+      "title": "PostgreSQL Connections",
+      "description": "The total number of active backend connections.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -507,7 +514,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -537,7 +544,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -574,8 +581,8 @@
     },
     {
       "id": 7,
-      "title": "Репликация PostgreSQL",
-      "description": "Replay lag на standby; 0 при отсутствии ожидающего WAL.",
+      "title": "Replication of PostgreSQL",
+      "description": "Replay lag on standby; 0 when no pending WAL is waiting.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -599,7 +606,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -629,7 +636,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -667,8 +674,8 @@
     {
       "id": 8,
       "type": "row",
-      "title": "Valkey, Sentinel и Keeper",
-      "description": "Отказ одной реплики отличается от потери primary или кворума.",
+      "title": "Valkey, Sentinel, and Keeper",
+      "description": "The failure of one replica differs from the loss of the primary or quorum.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -681,7 +688,7 @@
     {
       "id": 9,
       "title": "Primary Valkey",
-      "description": "Роль получена командой INFO replication.",
+      "description": "The role was received using the INFO replication command.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -705,7 +712,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -735,7 +742,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -772,8 +779,8 @@
     },
     {
       "id": 10,
-      "title": "Реплики Valkey",
-      "description": "Число подключённых реплик primary.",
+      "title": "Valkey Replicas",
+      "description": "Number of replicas connected to the primary.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -797,7 +804,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -827,7 +834,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -865,7 +872,7 @@
     {
       "id": 11,
       "title": "Keeper outstanding requests",
-      "description": "Значение mntr после проверенного TLS-соединения.",
+      "description": "The value of mntr after the verified TLS connection.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -889,7 +896,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -919,7 +926,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -957,8 +964,8 @@
     {
       "id": 12,
       "type": "row",
-      "title": "Kafka, HAProxy, Keycloak и SeaweedFS",
-      "description": "Для каждого процесса инфраструктуры есть отдельная проверка, включая master, volume, filer и S3.",
+      "title": "Kafka, HAProxy, Keycloak, and SeaweedFS",
+      "description": "For each infrastructure process, there is a separate verification, including master, volume, filer, and S3.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -970,8 +977,8 @@
     },
     {
       "id": 13,
-      "title": "Kafka недореплицированные партиции",
-      "description": "Сравнение ISR с числом реплик.",
+      "title": "Kafka under-replicated partitions",
+      "description": "Comparing the number of replicas with ISR.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -995,7 +1002,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1029,7 +1036,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1066,8 +1073,8 @@
     },
     {
       "id": 14,
-      "title": "Kafka партиции без лидера",
-      "description": "Любая партиция без лидера требует вмешательства.",
+      "title": "Kafka partitions without a leader",
+      "description": "Any partition without a leader requires intervention.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1091,7 +1098,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1125,7 +1132,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1163,7 +1170,7 @@
     {
       "id": 23,
       "type": "row",
-      "title": "Детальные метрики инфраструктуры",
+      "title": "Detailed infrastructure metrics",
       "collapsed": false,
       "panels": [],
       "gridPos": {
@@ -1175,8 +1182,8 @@
     },
     {
       "id": 17,
-      "title": "Лидер etcd",
-      "description": "1 - член etcd видит лидера; проверять на каждом узле.",
+      "title": "etcd leader",
+      "description": "1 - The member of etcd sees the leader; this needs to be checked at each node.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1200,7 +1207,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1230,7 +1237,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1267,8 +1274,8 @@
     },
     {
       "id": 18,
-      "title": "Ожидающие предложения etcd",
-      "description": "Рост показывает проблемы подтверждения записей кворумом.",
+      "title": "Pending etcd proposals",
+      "description": "The increase indicates problems with the acknowledgment of records by a quorum.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1292,7 +1299,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1322,7 +1329,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1359,8 +1366,8 @@
     },
     {
       "id": 19,
-      "title": "Backend HAProxy",
-      "description": "Штатные коды состояния HAProxy по proxy и server; 0 - DOWN, 1 - UP.",
+      "title": "HAProxy backends",
+      "description": "The status codes for HAProxy as a proxy and server are as follows: 0 - DOWN, 1 - UP.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1384,7 +1391,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1414,7 +1421,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1451,8 +1458,8 @@
     },
     {
       "id": 20,
-      "title": "Сессии HAProxy",
-      "description": "Текущие сессии каждого backend server.",
+      "title": "HAProxy Sessions",
+      "description": "Current sessions of each backend server.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1476,7 +1483,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1506,7 +1513,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1543,8 +1550,8 @@
     },
     {
       "id": 21,
-      "title": "Запросы Keycloak",
-      "description": "HTTP запросы Keycloak по результату и шаблону URI.",
+      "title": "Keycloak Requests",
+      "description": "Keycloak HTTP requests by outcome and URI pattern.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1568,7 +1575,7 @@
         "defaults": {
           "unit": "reqps",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1598,7 +1605,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1635,8 +1642,8 @@
     },
     {
       "id": 22,
-      "title": "Память Keycloak",
-      "description": "Использование памяти JVM по area и id.",
+      "title": "Keycloak Memory",
+      "description": "Using JVM memory by area and id.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1660,7 +1667,7 @@
         "defaults": {
           "unit": "bytes",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1690,7 +1697,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1728,8 +1735,8 @@
     {
       "id": 15,
       "type": "row",
-      "title": "Активные алерты и действия",
-      "description": "Алерты относятся к выбранной поставке; предупреждения и критические отказы имеют прямые ссылки на инструкции.",
+      "title": "Active Alerts and Actions",
+      "description": "Alerts apply to the selected deployment; warnings and critical failures link directly to instructions.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1742,8 +1749,8 @@
     {
       "id": 16,
       "type": "table",
-      "title": "Активные алерты",
-      "description": "Pending ещё ожидают выдержки. Firing требуют проверки. Watchdog подтверждает работу конвейера уведомлений.",
+      "title": "Active Alerts",
+      "description": "Pending alerts await the configured duration. Firing alerts require investigation. Watchdog confirms the notification pipeline is running.",
       "gridPos": {
         "x": 0,
         "y": 62,
@@ -1782,7 +1789,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Инструкция устранения",
+                    "title": "Remediation instructions",
                     "url": "../operations/runbooks/${__value.raw}",
                     "targetBlank": true
                   }
@@ -1790,7 +1797,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Алерт"
+                "value": "Alert"
               },
               {
                 "id": "custom.width",
@@ -1806,7 +1813,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Уровень"
+                "value": "Severity"
               },
               {
                 "id": "custom.width",
@@ -1822,7 +1829,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Состояние"
+                "value": "State"
               },
               {
                 "id": "custom.width",
@@ -1838,7 +1845,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Узел"
+                "value": "Node"
               },
               {
                 "id": "custom.width",
@@ -1854,7 +1861,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Контекст"
+                "value": "Context"
               },
               {
                 "id": "custom.width",
@@ -1868,7 +1875,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Уровень",
+            "displayName": "Severity",
             "desc": false
           }
         ]

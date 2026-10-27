@@ -1,0 +1,25 @@
+@startuml
+!include <C4/C4_Context>
+LAYOUT_TOP_DOWN()
+title Open-Source PSIM Platform - system context
+Person(operator, "Operator / Shift Supervisor", "Processing incidents and transferring responsibility")
+Person(admin, "Administrator / Integrator", "Configures catalog, rules, scenarios and connectors")
+Person(auditor, "Auditor / Supervisor", "Verifies audits and reports")
+Person(engineer, "Operations engineer", "Manages deliveries and restores data")
+System(psim, "Open-Source PSIM Platform", "Event reception, correlation, incidents, and response")
+System_Ext(devices, "Security Systems and Engineering Systems", "Security, fire safety, access control, video analytics, IoT")
+System_Ext(idp, "Keycloak / Corporate IdP", "OIDC, PKCE, MFA, roles and access scopes")
+System_Ext(delivery, "External Receivers", "SMTP and HTTPS webhook")
+System_Ext(telemetry, "Observability", "Prometheus, Grafana, Loki, Tempo")
+System_Ext(archive, "Independent archives", "Backup copies and signed audit checkpoints")
+Rel(operator, psim, "Console", "HTTPS / WSS")
+Rel(admin, psim, "Administration", "HTTPS / gRPC mTLS")
+Rel(auditor, psim, "Audit and Reports", "HTTPS")
+Rel(engineer, psim, "psimctl", "OIDC / mTLS")
+Rel(devices, psim, "Events and Command Results", "Connector SDK, gRPC mTLS")
+Rel(psim, devices, "Commands", "gRPC mTLS")
+Rel(psim, idp, "Authentication and authorization", "HTTPS")
+Rel(psim, delivery, "Notifications", "SMTP TLS / HTTPS HMAC")
+Rel(psim, telemetry, "Metrics, logs, traces", "mTLS / OTLP")
+Rel(psim, archive, "Verified independent copies", "HTTPS / S3")
+@enduml

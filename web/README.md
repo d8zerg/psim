@@ -1,37 +1,41 @@
-# Веб-приложение
+# Web Application
 
-Монорепозиторий pnpm и Turborepo (шаг 1.5, [ADR-037](../docs/adr/0037-web-monorepo.md)); стандарт - [TypeScript](../docs/engineering/typescript-coding-standard.md).
+<!-- language-links -->
+[English](README.md) | [Русский](../docs/ru/repository/web/README.md)
+<!-- /language-links -->
 
-| Пакет                      | Назначение                                                                                                                                           |
+The pnpm monorepo and Turborepo ([ADR-037](../docs/adr/0037-web-monorepo.md)); standard - [TypeScript](../docs/engineering/typescript-coding-standard.md).
+
+| Package                    | Purpose                                                                                                                                                   |
 | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `apps/console`             | Консоль оператора и администрирование (Vite, React 19, TanStack Router и Query, Zustand, Tailwind CSS 4); оболочка, консоль и административные формы |
-| `packages/design-system`   | Токены Tailwind 4 (тёмная тема по умолчанию), `cn`, компоненты в стиле shadcn/ui                                                                     |
-| `packages/api-client`      | REST v1: типы из `contracts/openapi/psim-api-v1.yaml`, openapi-fetch, ошибки RFC 9457                                                                |
-| `packages/realtime-client` | Realtime-канал (ADR-019): типы из `contracts/proto/psim/realtime/v1`, возобновление, переподключение, `VersionGate`                                  |
+| `apps/console`           | Operator console and administration (Vite, React 19, TanStack Router and Query, Zustand, Tailwind CSS 4); shell, console, and administrative forms |
+| `packages/design-system`          | Tailwind 4 tokens (dark theme by default), `cn`, shadcn/ui components                                                                     |
+| `packages/api-client`           | REST v1: types from `contracts/openapi/psim-api-v1.yaml`, openapi-fetch, errors RFC 9457                                                                |
+| `packages/realtime-client`            | Realtime channel (ADR-019): types from `contracts/proto/psim/realtime/v1`, rehydration, reconnection, `VersionGate`                                  |
 
-Клиенты генерируются из контрактов при каждой сборке в `src/gen` и в git не хранятся.
+Clients are generated from contracts during each build in `src/gen` and are not stored in git.
 
 ```
-task web:check      # формат, генерация, ESLint, типы, Vitest с покрытием, сборка, бюджеты, визуальная регрессия и доступность
-task web:e2e        # Playwright по собранной консоли
-task web:dev        # сервер разработки http://localhost:5173
-task web:catalogue  # каталог компонентов Ladle http://localhost:61000
-task web:benchmark  # отдельный замер больших коллекций в Chromium
-task web:changeset:status # план версий без изменения файлов версий и Git
-task web:stability  # сохранение строк, фокуса и положения при обновлении и потере связи
-task web:lock       # обновить pnpm-lock.yaml после изменения package.json
+task web:check      # Formatting, generation, ESLint, types, Vitest coverage, build, budgets, visual regression and accessibility
+task web:e2e        # Playwright against the built console
+task web:dev        # Development server at http://localhost:5173
+task web:catalogue  # Ladle component catalogue at http://localhost:61000
+task web:benchmark  # Separate large-collection measurement in Chromium
+task web:changeset:status # Version plan without changing version files or Git
+task web:stability  # Preserve rows, focus and position during updates and connection loss
+task web:lock       # Update pnpm-lock.yaml after changing package.json
 ```
 
-Node и pnpm на хосте не нужны: команды выполняются в контейнере `node:24` (pnpm 12 через corepack).
+Node and pnpm are not required on the host: commands are executed in the container `node:24` (pnpm 12 via corepack).
 
-Шаг 3.1 добавляет вход PKCE и минимальную ленту инцидентов со снимком и WebSocket-дельтами. Реальный стенд и браузерная проверка - [M1](../docs/engineering/event-flow.md), `task flow:up` и `task flow:test`.
+The console uses PKCE login and an incident feed with a snapshot and WebSocket deltas. The actual test environment and browser testing are [end-to-end environment](../docs/engineering/event-flow.md), `task flow:up`, and `task flow:test`.
 
-Дизайн-система и макеты доступны в `/design-system.html` после `task web:dev`. Темы, плотность, ru/en, подтверждения и обновление без мерцания описаны в [руководстве](../docs/engineering/design-system.md). Проверка доступности - `task web:a11y`.
+The design system and mockups are available in `/design-system.html` after `task web:dev`. The themes, density, ru/en, acknowledgments, and updates without flickering are described in the [guide](../docs/engineering/design-system.md). Accessibility testing is `task web:a11y`.
 
-Расширенный объём и исключённые операторские прогоны описаны в [реестре приёмки](../docs/engineering/design-system-acceptance.md). Визуальные эталоны витрины и каталога обновляются отдельно: `task web:visual:update` запускает только тесты `@visual`; обычная проверка сравнивает эталоны без автоматического принятия и выполняет всю матрицу Axe. Режимы проверяются отдельными снимками шапки витрины, без умножения эталонов компонентов. Каталог можно проверить отдельно через `task web:catalogue:check`. Продуктовые и демонстрационные словари загружаются раздельно; соглашения - в [глоссарии ru/en](../docs/engineering/ui-glossary.md).
+Extended scope and excluded operator runs are described in the [acceptance record](../docs/engineering/design-system-acceptance.md). Visual baselines for the showcase and catalog are updated separately: `task web:visual:update` only runs tests `@visual`; the regular test compares baselines without automatic acceptance and runs the entire Axe matrix. Modes are tested with separate snapshots of the showcase, without multiplying component baselines. The catalog can be tested separately through `task web:catalogue:check`. Product and demo dictionaries are loaded separately; agreements are in the [ru/en glossary](../docs/engineering/ui-glossary.md).
 
-Рабочая оболочка, ролевые маршруты и восстановление сессии описаны в [руководстве](../docs/engineering/application-shell.md). `task shell:test` проверяет реальный пятиминутный разрыв связи и обновление истёкшего токена.
+The working shell, role-based routes, and session recovery are described in the [guide](../docs/engineering/application-shell.md). `task shell:test` checks for real five-minute connection breaks and updates expired tokens.
 
-Администрирование, интеграции и границы доступа описаны в [руководстве](../docs/engineering/administration.md). `task admin:test` выполняет настройку через браузер с реальными сервисами, PKCE с MFA, импортом, сертификатами, проверкой правил и публикацией сценария.
+Administration, integration, and access boundaries are described in the [guide](../docs/engineering/administration.md). `task admin:test` performs settings through a browser with real services, PKCE with MFA, imports, certificates, rule checking, and scenario publishing.
 
-Полная [квалификация веб-клиента](../docs/engineering/web-client-quality.md) запускается через `task web:qualify`. Отдельные задачи: `web:loading` - размеры, холодный и прогретый кэш и восстановление чанков; `web:perf` - производительность ленты; `web:native` - сквозные сценарии с настоящими сервисами. [Сравнение вариантов](../docs/engineering/web-client-loading.md) сохраняет действующие бюджеты.
+The full [web client qualification](../docs/engineering/web-client-quality.md) is launched through `task web:qualify`. Individual tasks: `web:loading` - sizes, cold and warm caches, and chunk recovery; `web:perf` - feed performance; `web:native` - end-to-end scenarios with real services. [Comparison of options](../docs/engineering/web-client-loading.md) preserves current budgets.

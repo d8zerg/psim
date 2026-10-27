@@ -1,55 +1,59 @@
-# Методика замера задержек по event time
+# Latency Measurement by Event Time
 
-Версия 0.1 · Шаг плана 0.7 · Статус: черновик
+<!-- language-links -->
+[English](latency-measurement.md) | [Русский](../ru/quality/latency-measurement.md)
+<!-- /language-links -->
 
-Как измеряются SLO задержки (план 1.3): событие -> сигнал p99 ≤ 300 мс, событие -> инцидент в консоли p99 ≤ 1 с, REST p99 ≤ 200 мс, и бюджеты этапов ([quality.md](../architecture/quality.md#4-бюджет-задержек)). Реализация - шаги 2.1 (метрики), 3.1 (базовая линия), 4.3 (генератор), 10.1.
+Measurement of latency SLOs for G-02-G-04: event -> signal p99 ≤ 300 ms, event -> console incident p99 ≤ 1 s, REST p99 ≤ 200 ms, and phase budgets ([quality.md](../architecture/quality.md#4-delay-budget)). Measurement uses metrics such as runtime, simulator, and independent cross-checking.
+
+This is the qualification protocol. Available evidence and outstanding qualification requirements are listed in [release readiness](../product/release-readiness.md).
 
 ---
 
-## 1. Определения
+## 1. Definitions
 
-| Метрика | Начало | Конец |
+| Metric | Start | End |
 |---|---|---|
-| Событие -> этап | `occurred_at` события (время у источника) | Выход сообщения из этапа (`psim-ts-<stage>`) |
-| Событие -> сигнал | `occurred_at` завершающего события правила; для `threshold` и `absence` - время закрытия окна | `produced_at` сигнала, видимого для `read_committed` |
-| Событие -> инцидент в консоли | `occurred_at` события, создавшего инцидент | Отрисовка строки ленты в браузере |
-| REST | Приём запроса API Gateway | Отправка последнего байта ответа; дополнительно - время на стороне клиента нагрузки |
+| Event -> Phase | `occurred_at` event (time at source) | Message output from phase (`psim-ts-<stage>`) |
+| Event -> Signal | `occurred_at` final event of rule; for `threshold` and `absence` - window closing time | `produced_at` signal, visible to `read_committed` |
+| Event -> Console Incident | `occurred_at` event that created the incident | Browser display of the log line |
+| REST | API Gateway request acceptance | Last byte of response sent; additionally - client-side load time |
 
-Время источника задаёт генератор нагрузки на своих часах; узел генератора синхронизирован с узлами платформы.
+The source time is set by the load generator on its own clock; the generator node is synchronized with platform nodes.
 
-## 2. Синхронизация часов
+## 2. Clock Synchronization
 
-- Все узлы стенда и генератора синхронизируются chrony с одним источником; перед тестом и каждые 60 с фиксируется смещение каждого узла (`chronyc tracking`).
-- Допустимое рассогласование - 5 мс ([acceptance-spec.md](../product/acceptance-spec.md#общие-условия)); при превышении тест признаётся недействительным, а не проваленным.
-- Погрешность замера указывается в отчёте как максимальное наблюдённое рассогласование.
+- All test environment nodes and the generator are synchronized with a single source using chrony; before testing and every 60 seconds, the offset of each node is recorded (`chronyc tracking`).
+- Allowable deviation is 5 ms ([acceptance-spec.md](../product/acceptance-spec.md#general-conditions)); if exceeded, the test is considered invalid, not failed.
+- Report the largest observed clock offset and the uncertainty from the producer and consumer clocks. A conservative pairwise bound is the sum of their absolute offsets.
 
-## 3. Генерация нагрузки без искажения
+## 3. Generating Load Without Distortion
 
-- **Открытая модель:** генератор отправляет события по расписанию интенсивности, а не «следующее после подтверждения предыдущего». Это исключает coordinated omission - занижение хвостов задержки при замедлении системы.
-- Время `occurred_at` - момент по расписанию, а не фактической отправки: если генератор не успел, задержка учитывается.
-- Генератор контролирует собственную загрузку; при отставании от расписания больше 10 мс тест помечается недействительным.
+- **Open Model:** The generator sends events according to intensity schedule, not “next after confirmation of previous”. This excludes coordinated omission - reducing delay tails when the system slows down.
+- Time `occurred_at` is the scheduled moment, not the actual delivery: if the generator fails, the delay is counted.
+- The generator controls its own load; if it falls behind schedule by more than 10 ms, the test is marked invalid.
 
-## 4. Сбор
+## 4. Collection
 
-- Каждый этап пишет гистограммы `psim_stage_latency_seconds{stage}` и `psim_e2e_latency_seconds{stage}` ([quality.md](../architecture/quality.md#44-как-измеряется)) в формате нативных гистограмм Prometheus с относительной погрешностью не хуже 1%.
-- Для итоговых отчётов генератор и сверка дополнительно строят HDR-гистограммы по сырым данным ClickHouse (`occurred_at`, `received_at`, времена этапов из заголовков) - без погрешности бакетов.
-- Консоль: в тестовом режиме браузер отправляет время отрисовки строки инцидента с `incident_id`; Playwright и сервер замера сопоставляют его с `occurred_at` исходного события.
+- The qualification protocol requires histograms `psim_stage_latency_seconds{stage}` and `psim_e2e_latency_seconds{stage}` ([quality.md](../architecture/quality.md#44-how-it-is-measured)) in Prometheus native histogram format with a relative error of no worse than 1%.
+- For final reports, the generator and reconciliation additionally build HDR histograms from raw data ClickHouse (`occurred_at`, `received_at`, phase times from headers) - with recorded histogram precision, without reconstructing samples from Prometheus buckets.
+- Console: In test mode, the browser sends time when the incident line is displayed with `incident_id`; Playwright and the measurement server match it with `occurred_at` of the original event.
 
-## 5. Расчёт и критерии
+## 5. Calculation and Criteria
 
-1. **Прогрев:** первые 10 мин нагрузки (или 5% длительности soak) исключаются.
-2. **Окна:** перцентили считаются по всему измерительному интервалу и по скользящим окнам 1 мин; критерий выполняется, если выполнен для всего интервала, и не более 1% окон превышают порог (кратковременные всплески фиксируются в отчёте).
-3. **Хаос-тесты:** во время сбоя и восстановления SLO задержки не оцениваются; оцениваются RTO и отсутствие потерь. После восстановления - снова SLO.
-4. **Обновление (S12):** SLO оценивается на всём протяжении обновления без исключения окон.
-5. **Регрессия:** p50, p99 и p99.9 каждого этапа сравниваются с базовой линией; ухудшение больше 5% блокирует слияние (бенчмарки PR) или выпуск (нагрузочные тесты).
+1. **Warm-up:** The first 10 minutes of load (or 5% of soak duration) are excluded.
+2. **Windows:** Percentiles are calculated over the entire measurement interval and by sliding windows of 1 min; the criterion is met if it’s fulfilled for the entire interval, and no more than 1% of windows exceed the threshold (short-term spikes are reported).
+3. **Chaos Tests:** During failure and recovery, SLO delays are not evaluated; RTO and no loss are measured. After recovery - again SLO.
+4. **Update (S12):** SLO is evaluated throughout the entire update without excluding any windows.
+5. **Regression:** p50, p99, and p99.9 of each phase are compared with the baseline; an increase of more than 5% blocks merging (PR benchmarks) or release (load tests).
 
-## 6. Отчёт
+## 6. Report
 
-| Раздел | Содержание |
+| Section | Content |
 |---|---|
-| Условия | Стенд, версии, профиль, зерно, длительность, рассогласование часов |
-| Пропускная способность | Отправлено, принято, обработано по этапам; лаги групп потребителей |
-| Задержки | p50, p90, p99, p99.9, максимум по метрикам раздела 1 и по этапам; график по окнам |
-| Бюджет | Факт этапов против бюджета [quality.md](../architecture/quality.md#4-бюджет-задержек) |
-| Сверка | Результат [reconciliation.md](reconciliation.md) |
-| Вердикт | Выполнено, не выполнено, недействительно (с причиной) |
+| Conditions | Test environment, versions, profile, seed, duration, clock deviation |
+| Capacity | Sent, received, processed by phase; consumer group delays |
+| Delays | p50, p90, p99, p99.9, maximum by section 1 and by phases; graph by windows |
+| Budget | Phase facts against budget [quality.md](../architecture/quality.md#4-delay-budget) |
+| Reconciliation | Result [reconciliation.md](reconciliation.md) |
+| Verdict | Completed, not completed, invalid (with reason) |

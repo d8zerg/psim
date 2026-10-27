@@ -1,57 +1,61 @@
-# Первоначальное доверие и учётные записи поставки
+# Initial trust and deployment accounts
 
-Регламент относится к [поставке топологий](deployment-topologies.md). Области доверия и требования к сертификатам определяет [ADR-043](../adr/0043-platform-security.md). Первоначальная установка создаёт отдельные ключи, пароли и идентификаторы; готовые демонстрационные учётные записи в комплект не входят.
+<!-- language-links -->
+[English](deployment-pki.md) | [Русский](../ru/engineering/deployment-pki.md)
+<!-- /language-links -->
 
-## Внешняя PKI
+This procedure applies to [topology delivery](deployment-topologies.md). [ADR-043](../adr/0043-platform-security.md) defines trust domains and certificate requirements. Initial installation creates separate keys, passwords and identifiers; the package contains no preconfigured demonstration accounts.
 
-Скопировать подходящий профиль из `deploy/topologies`, задать реальные адреса, домены отказа, публичное DNS-имя, интерфейс и VIP. Для публичного адреса должны быть настроены DNS и маршрутизация. `security_tenant` задаёт область технического аудита; tenant прикладной установки генерируется при подготовке закрытого материала.
+## External PKI
+
+Copy a suitable profile from `deploy/topologies` and specify actual addresses, failure domains, public DNS name, interface and VIP. Configure DNS and routing for the public address. `security_tenant` defines the technical audit scope; the application tenant is generated when private material is prepared.
 
 ```sh
 task deploy:render PROFILE=deploy/topologies/cluster.json OUTPUT=build/deployment/customer
 task deploy:pki:request BUNDLE=build/deployment/customer PRIVATE=.cache/deployment/customer/material REQUESTS=build/deployment/customer-csr
 ```
 
-Публичный комплект содержит `material.json` с точными CN, SAN, URI, назначениями и UID. CSR находятся в `customer-csr/<node>/<role>/<certificate>.pem.csr`. Закрытые ключи остаются в каталоге материала `0700`; экспорт CSR передаёт только публичные запросы. Повторный экспорт выполняется через `tools/deploy/provision.py export` с новым каталогом `--requests`.
+The public bundle contains `material.json` with exact CNs, SANs, URIs, purposes and UIDs. CSRs are stored at `customer-csr/<node>/<role>/<certificate>.pem.csr`. Private keys remain in the `0700` material directory; CSR export transfers only public requests. Repeat the export using `tools/deploy/provision.py export` with a new `--requests` directory.
 
-Предусмотрены четыре области доверия: `platform`, `etcd`, `keeper`, `seaweed`. Внешние центры выдачи возвращают публичные цепочки `platform.pem`, `etcd.pem`, `keeper.pem`, `seaweed.pem` в отдельный каталог доверия. Подписанные leaf и их промежуточные цепочки размещаются в отдельном дереве с путями из `material.json`, например `signed/app-1/api-gateway/identity.pem`. Корневые ключи центров выдачи остаются во внешней PKI.
+There are four trust domains: `platform`, `etcd`, `keeper` and `seaweed`. External issuing authorities return public chains named `platform.pem`, `etcd.pem`, `keeper.pem` and `seaweed.pem` in a separate trust directory. Place signed leaf certificates and their intermediate chains in a separate tree using paths from `material.json`, such as `signed/app-1/api-gateway/identity.pem`. Issuing-authority root keys remain in external PKI.
 
 ```sh
 task deploy:pki:complete BUNDLE=build/deployment/customer PRIVATE=.cache/deployment/customer/material TRUST=build/deployment/customer-trust SIGNED=build/deployment/customer-signed
 task deploy:pki:package BUNDLE=build/deployment/customer PRIVATE=.cache/deployment/customer/material PAYLOADS=.cache/deployment/customer/payloads
 ```
 
-Завершение проверяет соответствие ключу, цепочку и текущую действительность, запас действия не менее часа, CN, точное множество SAN, `CA:FALSE`, `serverAuth` и `clientAuth`. Каталог доверия принимает публичные PEM. При неполной или ошибочной выдаче упаковка узлов запрещена.
+Completion checks key correspondence, chain and current validity, at least one hour of remaining validity, CN, the exact SAN set, `CA:FALSE`, `serverAuth` and `clientAuth`. The trust directory accepts public PEM files. Incomplete or invalid issuance prevents node packaging.
 
-Каждый архив содержит конфигурацию и материал только своего узла, числовые UID, права `0400` и контрольные суммы. CA private keys в узловые архивы не попадают. Архивы закрытого материала передаются по защищённому каналу и хранятся отдельно от публичного комплекта и образов.
+Each archive contains configuration and material for its own node only, numeric UIDs, `0400` permissions and checksums. CA private keys are excluded from node archives. Transfer private-material archives through a secure channel and store them separately from the public bundle and images.
 
-## Первоначальная настройка Keycloak
+## Initial Keycloak configuration
 
-Установка импортирует realm `psim`, публичный PKCE-клиент `psim-console`, отдельные confidential clients для introspection и служебных каталогов, аудитории серверов ресурсов и свежие секреты. Публичный issuer определяется профилем и проверяется перед запуском приложений. `psim_tenant`, `psim_scopes` и `psim_scope_set` объявлены управляемыми атрибутами с административным редактированием.
+Installation imports the `psim` realm, public PKCE client `psim-console`, separate confidential clients for introspection and service catalogs, resource-server audiences and fresh secrets. The profile determines the public issuer, which is checked before applications start. `psim_tenant`, `psim_scopes` and `psim_scope_set` are declared managed attributes that require administrative editing.
 
-Создание первоначального администратора выполняется после готовности установки:
+Create the initial administrator after the installation is ready:
 
 ```sh
 task deploy:account BUNDLE=build/deployment/customer PRIVATE=.cache/deployment/customer/material USERNAME=platform-admin
 ```
 
-Команда дважды запрашивает временный пароль длиной от 16 символов. Пароль передаётся служебному контейнеру через stdin; первый вход требует смены пароля и настройки TOTP. Существующая учётная запись сохраняется, повторное создание отклоняется. Дополнительные роли можно указать в `tools/deploy/account.py --roles`; по умолчанию создаётся администратор. Повседневные операторские учётные записи получают отдельные роли и области доступа.
+The command prompts twice for a temporary password of at least 16 characters. The password is passed to the service container through stdin. First login requires a password change and TOTP enrollment. An existing account is preserved and duplicate creation is rejected. Specify additional roles through `tools/deploy/account.py --roles`; the default creates an administrator. Everyday operator accounts receive separate roles and access scopes.
 
-Для локального стенда используются `BUNDLE=build/deployment/lab-cluster` и `PRIVATE=.cache/deployment/lab-cluster/material`. Публичный CA `build/deployment/lab-cluster-ca.pem` импортируется в доверие браузера или указывается клиенту HTTPS. После пересоздания стенда проверяется новый CA.
+For the local laboratory, use `BUNDLE=build/deployment/lab-cluster` and `PRIVATE=.cache/deployment/lab-cluster/material`. Import the public CA `build/deployment/lab-cluster-ca.pem` into browser trust or provide it to the HTTPS client. Verify the new CA after recreating the laboratory.
 
-## Регистрация коннектора
+## Registering a connector
 
-Создать UUID коннектора и его собственную пару ключей. Внешняя PKI выдаёт клиентский сертификат с URI `psim://connector/<uuid>` и `clientAuth`; цепочка должна входить в доверие Connector Gateway. Через администрирование зарегистрировать коннектор с этим UUID и публичным сертификатом, затем создать его устройства и источники с согласованными `externalRef`.
+Create a connector UUID and its own key pair. External PKI issues a client certificate with URI `psim://connector/<uuid>` and `clientAuth`; its chain must be trusted by Connector Gateway. In administration, register the connector with this UUID and public certificate, then create its devices and sources with matching `externalRef` values.
 
-В SDK передаются публичный endpoint профиля на порту `7443`, CA, сертификат, закрытый ключ и постоянный каталог локального буфера. Проверяются подключение, подтверждения событий и появление нормализованного события. `task deploy:flow` выполняет этот путь на собственном локальном стенде со свежими синтетическими удостоверениями, реальным issuer, планом этажа, правилом корреляции и инцидентом в общей модели консоли.
+Provide the SDK with the profile's public endpoint on port `7443`, CA, certificate, private key and persistent local buffer directory. Verify connection, event acknowledgments and appearance of a normalized event. `task deploy:flow` exercises this path in its own local laboratory with fresh synthetic credentials, a real issuer, a floor plan, a correlation rule and an incident in the shared console model.
 
-## Продление и замена доверия
+## Renewal and trust replacement
 
-До истечения срока действия внешний процесс выдачи подписывает продление с сохранением CN, SAN и URI. Существующие CSR позволяют продлить сертификаты с теми же ключами. Новая пара ключей требует нового CSR. Сохраняются идентификатор установки, tenant, пароли инфраструктуры и ключи подписи аудита.
+Before expiration, the external issuance process signs a renewal preserving CN, SAN and URI. Existing CSRs allow certificate renewal with the same keys. A new key pair requires a new CSR. Preserve installation identity, tenant, infrastructure passwords and audit signing keys.
 
-Проверить цепочку, действительность, EKU, ограничения leaf и соответствие публичного ключа CSR. Сверить SAN с `material.json`. Распространить публичное доверие до переключения leaf. При смене CA сначала установить совмещённые старые и новые цепочки, затем перевыпустить leaf и завершить переход после проверки всех клиентов.
+Check the chain, validity, EKU, leaf constraints and correspondence to the CSR public key. Compare SANs with `material.json`. Distribute public trust before switching leaf certificates. When changing CAs, install combined old and new chains first, reissue leaf certificates, and finish the transition only after checking every client.
 
-Обновление выполняется по одной реплике: остановить процесс, заменить его сертификат и требуемый trust bundle с прежним UID и правами `0400`, обновить производные PEM и свойства Kafka, запустить процесс и проверить health и предметный запрос. Ключи и сертификаты HAProxy входят в совмещённый `public.pem`; свойства Kafka содержат PEM и требуют согласованного обновления. Для etcd, Keeper и Patroni сохраняется кворум. Режим одной машины требует согласованного окна обслуживания.
+Update one replica at a time: stop the process, replace its certificate and required trust bundle while preserving UID and `0400` permissions, update derived PEM files and Kafka properties, start the process, and check health and a domain request. HAProxy keys and certificates are combined in `public.pem`; Kafka properties contain PEM data and must be updated consistently. Maintain quorum for etcd, Keeper and Patroni. Single-machine operation requires an agreed maintenance window.
 
-Сертификат коннектора заменяется через операцию ротации регистрации с ограниченным периодом пересечения. После подключения с новым сертификатом прежний отпечаток отзывается. История операций поступает в аудит.
+Replace a connector certificate through registration rotation with a bounded overlap period. After connection with the new certificate succeeds, revoke the previous fingerprint. Operations are recorded in the audit trail.
 
-Артефакт первоначальной установки неизменяем. После управляемой ротации сохраняется отдельная запись новых отпечатков и проверок. Повторное применение того же узлового архива не заменяет установленный материал; архив с другим содержимым отклоняется. Первоначальный архив не используется для продления или отката сертификатов. Автоматизация обновлений относится к [жизненному циклу установки](../adr/0024-zero-downtime-upgrades.md). Стендовые leaf действуют два дня, локальная фабрика восстанавливает свежую выдачу при пересоздании стенда.
+The initial installation artifact is immutable. After controlled rotation, retain a separate record of new fingerprints and checks. Reapplying the same node archive does not replace installed material; an archive with different content is rejected. Do not use the initial archive to renew or roll back certificates. Upgrade automation is covered by the [installation lifecycle](../adr/0024-zero-downtime-upgrades.md). Laboratory leaf certificates last two days; the local factory creates fresh issuance when the laboratory is recreated.

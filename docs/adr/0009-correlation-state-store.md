@@ -1,41 +1,44 @@
-# ADR-009. Хранение состояния корреляции: RocksDB с changelog-топиком
+# ADR-009. Correlation state storage: RocksDB with a changelog topic
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 5.2)
-- **Связанные:** ADR-006, ADR-007, ADR-010, ADR-011
+<!-- language-links -->
+[English](0009-correlation-state-store.md) | [Русский](../ru/adr/0009-correlation-state-store.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-006, ADR-007, ADR-010, ADR-011
 
-Правила корреляции (окна, последовательности, пороги, отсутствие) накапливают состояние по ключу корреляции. Состояние должно: изменяться атомарно с выходными сигналами и смещениями (exactly-once); переезжать с партицией при ребалансировке; восстанавливаться после падения ≤ 30 с (RTO); не ограничиваться оперативной памятью при длинных окнах. Готового фреймворка уровня Kafka Streams для C++ нет (риск раздела 20 плана).
+## Context
 
-## Рассмотренные варианты
+Correlation rules for windows, sequences, thresholds and absence accumulate state by correlation key. State must change atomically with output signals and offsets for exactly-once semantics, move with partitions during rebalancing, recover after a failure within 30 seconds RTO, and exceed RAM capacity for long windows. No ready-made Kafka Streams equivalent exists for C++.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Kafka Streams или Flink (JVM) | Готовая модель состояния и EOS | Второй язык и рантайм в ядре; противоречит решению 0.1 (сервер на C++); эксплуатация Flink-кластера |
-| Состояние в памяти + периодические снимки | Максимальная скорость | Между снимком и падением состояние теряется или требует длинного проигрывания входа; ограничено памятью |
-| Состояние в PostgreSQL | Знакомое хранилище | Общая транзакция с Kafka отсутствует; нужны inbox/outbox или иной протокол согласования. Пакетная обработка возможна, её производительность требует отдельного замера |
-| Состояние в Redis | Быстро | Нет атомарности с Kafka; Redis не источник истины (ADR-015) |
-| **RocksDB локально + changelog-топик в той же транзакции Kafka** | Атомарность с выходом и смещениями; объём больше памяти; восстановление из changelog на любом узле; проверенная модель (Kafka Streams) | Своя реализация восстановления и компактификации; время восстановления растёт с объёмом |
+| Kafka Streams or Flink on the JVM | Existing state and EOS model | Another language and runtime in the core, conflicting with the C++ server constraint; Flink-cluster operation |
+| In-memory state with periodic snapshots | Maximum speed | State between snapshot and failure is lost or requires long input replay; limited by RAM |
+| PostgreSQL state | Familiar storage | No shared transaction with Kafka; requires inbox/outbox or another coordination protocol. Batching is possible but needs separate performance measurements |
+| Redis state | Fast | No Kafka atomicity; Redis is not a source of truth under ADR-015 |
+| **Local RocksDB and a changelog topic in the same Kafka transaction** | Atomicity with output and offsets; state can exceed RAM; changelog recovery on any node; established Kafka Streams model | Custom recovery and compaction; recovery time grows with state size |
 
-PostgreSQL остаётся допустимым вариантом при другой модели фиксации. Выбор RocksDB связан с атомарностью сигналов, changelog и входных смещений в Kafka; сам по себе целевой поток 50 000 событий/с не доказывает ограничений PostgreSQL. RocksDB хранит восстановимую локальную копию, а подтверждённое состояние определяется Kafka.
+PostgreSQL remains a valid option with a different commit model. RocksDB is chosen for atomicity of signals, changelog and input offsets in Kafka; the 50,000 events/s target alone does not establish PostgreSQL limitations. RocksDB holds a recoverable local copy, while Kafka determines committed state.
 
-## Решение
+## Decision
 
-1. Каждая назначенная партиция входа имеет свой экземпляр RocksDB (column family на правило и тенанта) в локальном каталоге сервиса.
-2. Каждое изменение состояния записывается в `psim.correlation.changelog.v1` (compacted, копартиционирован с `psim.correlation.repartition.v1`, ключ `tenant_id/rule_id/rule_version/correlation_key`) в той же транзакции, что и сигналы и смещения. Удаление состояния - tombstone.
-3. Запись в RocksDB выполняется после успешного коммита транзакции Kafka (write batch на пакет); при отмене транзакции пакет RocksDB отбрасывается. Локальный файл хранит смещение changelog, до которого он согласован.
-4. Восстановление: при назначении партиции - если локальный RocksDB согласован до смещения X, дочитывается changelog с X; иначе база пересоздаётся из changelog целиком.
-5. Ограничение объёма: максимальное окно правила (R3, по умолчанию 24 ч); состояние окна хранит маски совпадений, идентификаторы и проекции полей, необходимых выражениям правила; неиспользуемые атрибуты не сохраняются; TTL по event time.
-6. Для RocksDB 10.10.1 выбрана Apache-2.0 из двух альтернатив upstream. SBOM фиксирует выбранную лицензию и исходную альтернативу; общая политика не разрешает GPL для статически связанных зависимостей.
-7. Резервные реплики состояния (горячий standby, читающий changelog) - не в MVP; включаются, если замер шага 5.2 покажет восстановление дольше 30 с.
+1. Every assigned input partition has its own RocksDB instance in the service's local directory, with a column family per rule and tenant.
+2. Record every state change in `psim.correlation.changelog.v1`, compacted and co-partitioned with `psim.correlation.repartition.v1`, keyed by `tenant_id/rule_id/rule_version/correlation_key`, in the same transaction as signals and offsets. State deletion uses a tombstone.
+3. Write a RocksDB batch only after the Kafka transaction commits successfully. Discard the RocksDB batch if the transaction aborts. A local file records the changelog offset through which local state is consistent.
+4. On partition assignment, if local RocksDB is consistent through offset X, replay the changelog from X. Otherwise, recreate the entire database from the changelog.
+5. Bound state through the maximum rule window, R3, which defaults to 24 hours. Window state stores match masks, identifiers and projections of fields required by rule expressions. Unused attributes are omitted; TTL follows event time.
+6. For RocksDB 10.10.1, select Apache-2.0 from the two upstream alternatives. SBOM records the selected license and the original alternative. The general policy does not permit GPL for statically linked dependencies.
+7. Standby state replicas that continuously read the changelog are outside the MVP. Enable them if Correlation Engine recovery measurements exceed 30 seconds.
 
-## Последствия
+## Consequences
 
-- Локальное хранилище вынесено в адаптер `StateStore`; вычислитель получает состояние как значение. Симуляция хранит это значение в памяти.
-- Локальный диск узла должен быть быстрым (NVMe); каталог состояния не требует резервного копирования - он восстановим из changelog.
-- Время восстановления - ключевая метрика; алерт при превышении 30 с.
+- Local storage is isolated behind the `StateStore` adapter. The evaluator receives state as a value; simulation stores that value in memory.
+- The node needs fast local storage, such as NVMe. The state directory does not require backup because it is recoverable from the changelog.
+- Recovery time is a key metric, with an alert above 30 seconds.
 
-## Проверка
+## Verification
 
-Симуляционные тесты: падение и ребалансировка в любой точке, сравнение сигналов с эталоном; замер восстановления на эталонном объёме состояния (шаг 5.2).
+Simulation tests inject failure and rebalance at any point and compare signals against a reference. Measure recovery with the reference state volume.

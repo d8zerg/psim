@@ -1,50 +1,53 @@
-# ADR-040. Асинхронные примитивы платформы
+# ADR-040. Asynchronous primitives of the platform
 
-- **Статус:** Принято
-- **Шаг плана:** 2.2
-- **Связанные:** [ADR-016](0016-threading-model.md) (модель потоков), [ADR-039](0039-service-runtime.md) (runtime), ADR-033 (профиль clang-tidy), требование SR-18, метод B-02
+<!-- language-links -->
+[English](0040-async-primitives.md) | [Русский](../ru/adr/0040-async-primitives.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-016](0016-threading-model.md) (thread model), [ADR-039](0039-service-runtime.md) (runtime), ADR-033 (clang-tidy profile), requirement SR-18, method B-02
 
-ADR-016 выбрал модель «поток на ядро» с корутинами Asio. Шаг 2.2 должен реализовать её: шарды, дедлайны и отмену, противодавление, пул блокирующих операций, порт времени. DoD: примитивы покрыты тестами под TSan, накладные расходы зафиксированы как базовая линия бенчмарков.
+## Context
 
-## Рассмотренные варианты
+ADR-016 chooses one thread per CPU core with Asio coroutines. These primitives implement that model: shards, deadlines and cancellation, backpressure, a blocking operations pool and a clock port. Acceptance requires TSan tests and an overhead benchmark baseline.
 
-### Ожидание в примитивах
+## Proposed Options
 
-| Вариант | Плюсы | Минусы |
+### Waiting in primitives
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| `asio::experimental::channel` как основа очереди и кредитов | Готовый примитив | Нет ожидания «n кредитов» со строгим FIFO; закрытие теряет буферизованные элементы |
-| `concurrent_channel` и мьютексы | Работают между потоками | Блокировки на горячем пути, противоречит ADR-016 |
-| **Список ожидающих (`steady_timer` с бесконечным сроком как событие) внутри одного `io_context`** | Без блокировок; отмена Asio работает штатно (отменённый ожидающий удаляет себя); строгий FIFO | Примитивы только шард-локальные |
+| `asio::experimental::channel` as a queue and credit base | Ready primitive | No “n credits” waiting with strict FIFO; closing loses buffered elements |
+| `concurrent_channel` and mutexes | Works between threads | Blocking on the hot path, contradicts ADR-016 |
+| **List of steady timers (`steady_timer`) with infinite duration as an event within one `io_context`** | No blocking; cancellation in Asio works normally (cancelled waiting removes itself); strict FIFO | Primitives are only shard-local |
 
-### Пул блокирующих операций
+### Blocking operations pool
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| `asio::post` в `thread_pool` без ограничения | Просто | Нет противодавления: очередь задач растёт без предела |
-| **`thread_pool` + `concurrent_channel` с жетонами** | Ограничение «выполняются и ждут» одним числом; ожидание жетона - корутина, шард не блокируется | Канал межпоточный (на холодном пути это допустимо) |
+| `asio::post` in `thread_pool` without limits | Simple | No backpressure: task queue grows infinitely |
+| **`thread_pool` + `concurrent_channel` with tokens** | “Executed and waiting” are counted as one; token waiting is a coroutine, shard is not blocked | Inter-thread channel (acceptable on the cold path) |
 
-## Решение
+## Solution
 
-Библиотека `libs/platform/async` (`psim::platform_async`), слой infrastructure:
+Library `libs/platform/async` (`psim::platform_async`), infrastructure layer:
 
-1. **`Clock`** - `wall()`, `steady()`, `sleep_until()`/`sleep_for()` (корутины; `false` - ожидание отменено). `SystemClock` - таймеры Asio на исполнителе вызывающего. `ManualClock` - `advance(d)` будит всех, чей срок наступил, в порядке (срок, очерёдность), `advance_to_next()`, `sleepers()`.
-2. **`with_deadline(Clock*, timeout, op)`** -> `Result<T>`: при истечении проигравшая ветвь отменяется, ошибка `COMMON_DEADLINE_EXCEEDED`. `spawn_cancellable(executor, op)` возвращает `Cancellable` - отмену корутины извне через сигнал отмены Asio.
-3. **Противодавление:** `Credits` (`grant(n)`, `try_acquire(n)`, `acquire(n)` - строгий FIFO: большой запрос в голове очереди не обгоняется меньшими; `close()` будит всех с отказом); `Semaphore` с RAII-`Permit`; `BoundedQueue<T>` (`push` ждёт места, `pop` ждёт элемента; после `close()` очередь отдаёт оставшееся, затем `nullopt`).
-4. **`Shards`** - N `io_context` в N именованных потоках (`psim-shard-<i>`), `executor(i)`, `index_for(key)`, `post`; `stop(grace)` даёт работе завершиться до срока, затем останавливает. `available_cpus()` - по affinity процесса.
-5. **`BlockingPool(threads, max_tasks)`** - `run(fn)` -> `Result<T>`: ждёт жетон (противодавление), выполняет `fn` в пуле, возвращает результат на исполнитель вызывающего; исключения -> `COMMON_INTERNAL`, `Result`-ошибки `fn` передаются как есть; после `stop()` - отказ `COMMON_UNAVAILABLE`.
-6. **Runtime** (дополнение к ADR-039): секция `runtime` конфигурации - `shards` (0 = `available_cpus()`), `blocking_threads` (4), `blocking_tasks` (64); `Context` даёт компонентам `shards()`, `clock()`, `blocking()`; метрика `psim_runtime_shards`. Шарды стартуют до компонентов и останавливаются после их дренирования, затем пул.
-7. **Правила кода:** примитивы не потокобезопасны и используются корутинами одного шарда; ссылки в параметрах корутин запрещены (`cppcoreguidelines-avoid-reference-coroutine-parameters`) - зависимости передаются указателем; `Scope` OpenTelemetry не удерживается через `co_await`.
-8. **Профиль clang-tidy:** дополнительно выключен `clang-analyzer-core.NullDereference` - как и `core.CallAndMessage` (ADR-039), анализатор не моделирует кадры корутин C++20 и даёт ложные срабатывания внутри Asio; разыменования нуля ловят `-Wnull-dereference`, ASan и UBSan.
+1. **`Clock`** - `wall()`, `steady()`, `sleep_until()`/`sleep_for()` (coroutines; `false` - cancellation). `SystemClock` - Asio timers on the calling executor. `ManualClock` - `advance(d)` wakes up all whose time has expired, in order (time, priority), `advance_to_next()`, `sleepers()`.
+2. **`with_deadline(Clock*, timeout, op)`** -> `Result<T>`: when the deadline is reached, the losing branch is cancelled, with an error `COMMON_DEADLINE_EXCEEDED`. `spawn_cancellable(executor, op)` returns a `Cancellable` - cancels a coroutine from outside through an Asio signal.
+3. **Backpressure:** `Credits` (`grant(n)`, `try_acquire(n)`, `acquire(n)` - strict FIFO: large requests in the queue cannot be preempted by smaller ones; `close()` wakes up all with failure); `Semaphore` with RAII-`Permit`; `BoundedQueue<T>` (`push` waits for space, `pop` waits for an element; after `close()`, the queue returns remaining elements, then `nullopt`).
+4. **`Shards`** - N `io_context` in N named threads (`psim-shard-<i>`), `executor(i)`, `index_for(key)`, `post`; `stop(grace)` causes the work to finish before the deadline, then stops. `available_cpus()` - based on process affinity.
+5. **`BlockingPool(threads, max_tasks)`** - `run(fn)` -> `Result<T>`: waits for a token (backpressure), executes `fn` in the pool, returns result to the calling executor; exceptions -> `COMMON_INTERNAL`, `Result`-errors from `fn` are passed as they are; after `stop()`, `COMMON_UNAVAILABLE` failure.
+6. **Runtime** (addition to ADR-039): the `runtime` section of configuration - `shards` (0 = `available_cpus()`), `blocking_threads` (4), `blocking_tasks` (64); `Context` provides components with `shards()`, `clock()`, `blocking()`; metric `psim_runtime_shards`. Shards start before components and stop after they are drained, then the pool.
+7. **Code rules:** primitives are not thread-safe and are used by coroutines of one shard; references in coroutine parameters are prohibited (`cppcoreguidelines-avoid-reference-coroutine-parameters`) - dependencies are passed by pointer; OpenTelemetry `Scope` is not held through `co_await`.
+8. **clang-tidy profile:** additionally disabled `clang-analyzer-core.NullDereference` - like `core.CallAndMessage` (ADR-039), the analyzer does not model C++20 coroutines and gives false results inside Asio; null dereference catches `-Wnull-dereference`, ASan and UBSan.
 
-## Последствия
+## Consequences
 
-- Сервисы получают шарды, время, дедлайны и пул из `Context` без своего кода; тесты логики со временем детерминированы через `ManualClock`.
-- Межшардовое взаимодействие - только `Shards::post`/`asio::post`; разделяемых примитивов между шардами нет.
-- Адаптеры Kafka (шаг 2.3) и gRPC/HTTP (шаг 2.5) закрепляют соединения и партиции за шардами через `index_for`.
+- Services receive shards, clocks, deadlines and a pool through `Context`; `ManualClock` makes time-dependent logic tests deterministic.
+- Inter-shard interaction - only `Shards::post`/`asio::post`; no shared primitives between shards.
+- Kafka and gRPC/HTTP adapters assign connections and partitions to shards through `index_for`.
 
-## Проверка
+## Verification
 
-- Модульные тесты всех примитивов (отмена в середине очереди ожидающих, закрытие, FIFO кредитов, дедлайн с `ManualClock`, остановка шардов с grace, отказ пула после остановки); прогон под ASan, UBSan и TSan; покрытие `libs/platform/async` ≥ 75% строк.
-- B-02 - `task bench:async` на Linux-стенде с нативным Docker Engine (16 CPU); регрессия > 5% - отказ `bench:compare`. Справочные результаты предыдущего стенда: возобновление корутины ~21 нс, операция кредитов ~26 нс, передача через очередь ~76 нс, `with_deadline` ~2 мкс, круг между шардами ~11 мкс, вызов через `BlockingPool` ~24 мкс. Для нативного Docker Engine базовая линия требует повторного замера.
+- Modular tests for all primitives (cancellation in the middle of waiting queues, closing, FIFO credits, deadline with `ManualClock`, stopping shards with grace, pool failure after stopping); ASan, UBSan, and TSan runs; coverage of `libs/platform/async` ≥ 75% of lines.
+- B-02 - `task bench:async` on Linux with native Docker Engine (16 CPU); regression > 5% fails `bench:compare`. Reference measurements from the previous environment: coroutine resumption ~21 ns, credit operation ~26 ns, queue transfer ~76 ns, `with_deadline` ~2 microseconds, inter-shard round trip ~11 microseconds, call through `BlockingPool` ~24 microseconds. The native Docker Engine baseline requires a new measurement.

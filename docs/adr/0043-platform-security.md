@@ -1,46 +1,48 @@
-# ADR-043. Безопасность платформы: TLS, JWT/JWKS, секреты и внешняя PKI
+# ADR-043. Platform Security: TLS, JWT/JWKS, Secrets, and External PKI
 
-**Статус:** Принято
-**Шаг:** 2.6
+<!-- language-links -->
+[English](0043-platform-security.md) | [Русский](../ru/adr/0043-platform-security.md)
+<!-- /language-links -->
 
-## Контекст
+**Status:** Accepted
+## Context
 
-Шаги 2.1-2.5 дали runtime и транспортные адаптеры. Для SR-01, SR-03, SR-04, SR-08 и SR-09 нужны единые правила доверия, проверка токенов и механизм закрытия отозванных сессий. ADR-042 требует внешнюю PKI, перекрытие двух сертификатов и восстановление доступа. Доменные сервисы и установщик ещё не реализованы.
+The platform includes runtime and transport adapters. For SR-01, SR-03, SR-04, SR-08, and SR-09, uniform trust rules, token verification, and mechanisms for closing revoked sessions are required. ADR-042 requires an external PKI, certificate renewal with overlap, and access restoration. The common library defines trust rules for services and the installer.
 
-## Варианты
+## Options
 
-| Вариант | Свойства |
+| Option | Properties |
 |---|---|
-| Проверять токены только в API Gateway | Внутренний сервис не проверяет доверие самостоятельно; не выполняет SR-04 |
-| Общая библиотека с OpenSSL 3 и проверкой в каждом сервисе | Единая политика TLS, проверка подписей через EVP, тестируемые сроки, ключи и отзыв |
-| Собственный УЦ платформы | Добавляет хранение ключей УЦ, выдачу и эксплуатацию; противоречит ADR-042 |
-| Внешняя step-ca или действующая PKI организации | Платформа создаёт CSR, оператор управляет выдачей, доверенными CA и отзывом |
+| Verify tokens only in API Gateway | Internal services do not verify trust independently; does not fulfill SR-04 |
+| Common library with OpenSSL 3 and verification in each service | Unified TLS policy, signature verification via EVP, tested expiration dates, keys, and revocation |
+| Platform-owned CA | Adds key storage, issuance, and operation; conflicts with ADR-042 |
+| External step-ca or existing organizational PKI | The platform generates CSRs, the operator manages issuance, trusted CAs, and revocation |
 
-## Решение
+## Solution
 
-1. Добавить `psim::platform_security`, использующую уже закреплённые OpenSSL 3.5.9, Boost.Asio/Beast и nlohmann_json. Криптография выполняется OpenSSL; библиотека содержит ограниченный адаптер форматов JOSE и политики доверия.
-2. На TB1/TB2 разрешить TLS 1.3; внутри - TLS 1.2 и выше с AEAD. Всегда проверять цепочку и DNS/IP сервера. Для mTLS требовать сертификат клиента. В общем контексте выключить компрессию, renegotiation, tickets и кэш TLS-сессий. CRL проверять по всей цепочке, включая срок списка; неверный или устаревший список запрещает соединение.
-3. Построить новый TLS-контекст перед публикацией. Ошибка перезагрузки сохраняет прежний контекст; действующие соединения удерживают его до закрытия. Перезагрузка контекста сама по себе не отзывает открытый поток: это делает реестр доверия через callback закрытия.
-4. Проверять только подписанные access tokens Keycloak: RS256 с RSA от 2048 бит или ES256 с P-256. Фиксировать issuer, audience и клиент ролей; проверять `sub`, `typ=Bearer`, `iat`, `exp`, необязательный `nbf`, срок не более 300 с и допуск часов не более 30 с. Отклонять `none`, HMAC, повторяющиеся JSON-поля, неподдерживаемые критические заголовки и указанные токеном адреса ключей. Роли брать только из `resource_access[roles_client]`, области - из `psim_scopes`, тенант - из `psim_tenant`.
-5. Загружать JWKS только с настроенного HTTPS-адреса, без перенаправлений. Ограничить тело, глубину JSON, число ключей и размер токена. Успешная ротация полностью заменяет ключи; неизвестный `kid` допускает один запрос за интервал охлаждения. При недоступности IdP прежний набор доступен ограниченное время; устаревший набор запрещает аутентификацию. Каждый шард владеет своим кэшем.
-6. Межсервисный вызов требует проверенный URI SAN `psim://service/<client-id>` из доверенной цепочки и JWT. Для client credentials `azp` должен совпасть с сервисом; сервис входит в разрешённый список получателя. Делегированный пользовательский токен сохраняет principal пользователя. Авторизацию действия повторяет сервис-владелец по SR-05 на последующих шагах.
-7. `ConnectorTrust` привязывает отпечаток SHA-256 к коннектору и тенанту. При продлении одновременно допустимы не более двух сертификатов. Отзыв удаляет разрешение, запрещает повторное использование сертификата до истечения и закрывает соответствующие сессии. Восстановление требует свежий сертификат и закрывает прежние сессии. Проверять срок при каждом сообщении и по таймеру. Регистрация, права оператора, хранение, аудит и подтверждённое распространение отзыва между шлюзами относятся к шагу 4.2; завершать операцию отзыва только после применения на всех шлюзах.
-8. Секреты читать из файлов пользователя сервиса с точными правами `0400`: открыть один раз, проверить fd, не следовать symlink, не принимать каталоги и FIFO, ограничить размер. Ошибки не содержат путь или содержимое. `Secret` не копируется и очищает свой буфер; строки, переданные внешним драйверам, живут в их памяти. В конфигурации остаются ссылки. Для projected volumes Kubernetes агент или init container копирует материал в файлы пользователя сервиса с нужными правами.
-9. Schema Registry использует общий HTTPS-клиент; Valkey - общий TLS-профиль и CRL. Kafka требует типизированные mTLS или SCRAM-SHA-512/TLS настройки, с секретом из файла; небезопасные переопределения TLS запрещены. PostgreSQL использует `verify-full`, по умолчанию TLS 1.3. Экспорт OTLP использует проверенный TLS и настраиваемый CA. Нативные диагностические строки Kafka не выводятся: они могут содержать чувствительные данные.
-10. Для внешней PKI выбрать open-source step-ca и step CLI. Ключи УЦ находятся под управлением оператора и не поставляются с платформой. Действующая PKI организации совместима при выдаче нужных SAN/EKU и свежих PEM CRL. Короткий срок сертификата не заменяет немедленный отзыв регистрации. step-ca имеет отдельный CRL-механизм, который оператор должен включить и обслуживать; платформе нужен актуальный полный bundle. Процедуры - в [регламенте доверия](../security/platform-trust.md); размещение и автоматизация - шаг 9.1.
-11. Изолированная инфраструктура разработки сохраняет явные исключения: `allow_plaintext=true`, `sslmode=disable`, `telemetry.otlp_tls=false`. Профиль `security` проверяет реальные mTLS Kafka/PostgreSQL/Valkey, не публикует порты и пересоздаёт только тестовые узлы. Его сертификаты и учётные данные не используются в поставке.
+1. Add `psim::platform_security`, using already established OpenSSL 3.5.9, Boost.Asio/Beast, and nlohmann_json. Cryptography is performed using OpenSSL; the library includes limited JOSE format adapters and trust policies.
+2. On TB1/TB2, allow TLS 1.3; internally, TLS 1.2 and above with AEAD. Always verify the certificate chain and server DNS/IP identity. For mTLS, require client certificates. In general, disable compression, renegotiation, tickets, and TLS session cache. Verify CRL across the entire chain, including the expiration date; an incorrect or outdated list prevents connection.
+3. Build a new TLS context before publication. A failed reload preserves the previous context; existing connections retain it until closure. Context reloading does not revoke open streams: this is done through the closure callback.
+4. Verify only signed access tokens from Keycloak: RS256 with RSA of at least 2048 bits or ES256 with P-256. Fix issuer, audience, and client roles; verify `sub`, `typ=Bearer`, `iat`, `exp`, and optional `nbf`. Token lifetime must not exceed 300 seconds, and clock tolerance must not exceed 30 seconds. Reject `none`, HMAC, repeated JSON fields, unsupported critical headers, and addresses specified by tokens. Roles should only come from `resource_access[roles_client]`, access scopes from `psim_scopes`, and tenants from `psim_tenant`.
+5. Load JWKS only from the configured HTTPS address, without redirection. Limit the body, JSON depth, number of keys, and token size. Successful rotation completely replaces keys; unknown `kid` allows one request per cooling interval. If the IdP is unavailable, the previous set is available for a limited time; an outdated set prohibits authentication. Each shard has its own cache.
+6. Inter-service calls require a verified URI SAN `psim://service/<client-id>` from a trusted chain and JWT. For client credentials `azp`, it must match the service; the service is part of the allowed recipient list. The delegated user token retains the user principal. Authorization is repeated by the service owner according to SR-05 for each action.
+7. `ConnectorTrust` links the SHA-256 fingerprint to the connector and tenant. At the same time, up to two certificates are allowed. Revocation removes permissions, prohibits re-use of certificates until expiration, and closes corresponding sessions. Restoration requires a fresh certificate and closes previous sessions. Verify the expiration date with each message and timer. Registration, operator rights, storage, audit, and confirmed revocation distribution between gateways are defined in ADR-049; complete the revocation operation only after applying it on all gateways.
+8. Secrets are read from files owned by the service user with exact permissions `0400`: open once, verify fd, do not follow symlinks, do not accept directories and FIFO, limit size. Errors do not contain paths or content. `Secret` does not copy and clears its buffer; strings passed to external drivers remain in their memory. References remain in the configuration. For projected volumes, Kubernetes agents or init containers copy material to files owned by the service user with necessary permissions.
+9. Schema Registry uses a common HTTPS client; Valkey uses a common TLS profile and CRL. Kafka requires typed mTLS or SCRAM-SHA-512/TLS settings, with secrets from files; unsafe TLS overrides are prohibited. PostgreSQL uses `verify-full`, defaulting to TLS 1.3. OTLP export uses verified TLS and customizable CA. Kafka does not display diagnostic lines: they may contain sensitive data.
+10. For external PKI, choose open-source step-ca and step CLI. CA keys are managed by the operator and not provided with the platform. Existing organizational PKIs are compatible when issuing required SAN/EKU and fresh PEM CRLs. Short certificate expiration does not replace immediate revocation of registration. Step-ca has a separate CRL mechanism, which the operator must enable and maintain; the platform needs an up-to-date full bundle. Procedures are in [trust procedures](../security/platform-trust.md); deployment and automation are described in [PKI procedures](../engineering/deployment-pki.md).
+11. Isolated development infrastructure retains explicit exceptions: `allow_plaintext=true`, `sslmode=disable`, `telemetry.otlp_tls=false`. Profile `security` verifies real mTLS Kafka/PostgreSQL/Valkey, does not publish ports, and only recreates test nodes. Its certificates and credentials are not used in delivery.
 
-## Проверка
+## Verification
 
-`task test:security`, `task test:security:sanitizers`, `task test:component`, `task cpp:test:sanitizers`. Негативные JWT/JWK, чужие CA и имена, отсутствие и истечение сертификата, свежий/отозвавший/устаревший CRL, последнее корректное состояние при ротации, ограничение размера и дедлайн HTTPS, секреты и реальное закрытие mTLS-потока. Токен настоящего Keycloak проверяется по его JWKS через HTTPS; mTLS Kafka подтверждается публикацией и чтением.
+`task test:security`, `task test:security:sanitizers`, `task test:component`, `task cpp:test:sanitizers`. Negative JWT/JWK, untrusted CAs and incorrect names, absence and expiration of certificates, fresh/revoked/outdated CRLs, last correct state during rotation, size limit and HTTPS deadline, secrets and real closure of mTLS streams. The token from the actual Keycloak is verified through its JWKS via HTTPS; mTLS Kafka is confirmed by publication and reading.
 
-## Последствия
+## Consequences
 
-Библиотека готовит проверенный principal, но не определяет права предметных действий. Реестр доверия работает на одном executor; снимки каталога и отзыв должны применяться на каждом шлюзе. Отказ Keycloak допускает проверку уже выданных токенов по свежему кэшу, но не новый вход. Инсталляционные ACL, закрытые порты и полный TLS-скан поставки остаются в шагах 9.1 и 10.3; адаптер ClickHouse получает TLS на шаге 2.8.
+The library prepares a verified principal but does not define object-level actions. The trust registry works on one executor; catalog snapshots and revocation must be applied to each gateway. Keycloak failure allows verification of already issued tokens based on fresh cache, but not new login. Installation ACLs and closed ports are configured by the installer; full TLS scanning is required for security qualification. ClickHouse TLS adapter is defined in ADR-045.
 
-## Источники
+## Sources
 
 - [JWT Best Current Practices, RFC 8725](https://www.rfc-editor.org/rfc/rfc8725.html).
 - [Keycloak OIDC endpoints](https://www.keycloak.org/securing-apps/oidc-layers).
-- [OpenSSL: минимальная версия TLS](https://docs.openssl.org/3.5/man3/SSL_CTX_set_min_proto_version/).
-- [step-ca: эксплуатация, в том числе CRL](https://smallstep.com/docs/step-ca/certificate-authority-server-production/).
+- [OpenSSL: minimum version of TLS](https://docs.openssl.org/3.5/man3/SSL_CTX_set_min_proto_version/).
+- [step-ca: usage, including CRL](https://smallstep.com/docs/step-ca/certificate-authority-server-production/).

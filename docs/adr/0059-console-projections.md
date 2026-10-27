@@ -1,24 +1,28 @@
-# ADR-059. Read-модели консоли в Projection Service
+# ADR-059. Console read models in Projection Service
 
-- **Статус:** Принято
-- **Связанные:** [ADR-019](0019-realtime-channel.md), [ADR-047](0047-event-flow.md), [ADR-057](0057-incident-reporting.md), [ADR-058](0058-api-gateway-and-configuration.md)
+<!-- language-links -->
+[English](0059-console-projections.md) | [Русский](../ru/adr/0059-console-projections.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-019](0019-realtime-channel.md), [ADR-047](0047-event-flow.md), [ADR-057](0057-incident-reporting.md), [ADR-058](0058-api-gateway-and-configuration.md)
 
-Projection Service владеет PostgreSQL-моделями инцидентов, каталога, наблюдений, связи, обслуживания и дежурства. Состояние и позиции Kafka фиксируются одной транзакцией. API Gateway передаёт запросы снимков по HTTPS с исходным JWT; авторизация области выполняется владельцем модели. Gateway сохраняет только ограниченный журнал realtime и outbox отказов доступа.
+## Solution
 
-Один процесс обновляет общую модель; PostgreSQL advisory lock исключает параллельных писателей и перестроение при работающем писателе. Дополнительные процессы обслуживают чтение. Отчётность ClickHouse и модели консоли включаются независимо.
+Projection Service maintains PostgreSQL models for incidents, catalogs, observations, connectivity, maintenance and duty assignments. Model state and Kafka offsets are updated in one transaction. The API Gateway forwards snapshot requests via HTTPS with the original JWT; access scope authorization is performed by the model owner. The gateway only stores a limited realtime log and outbox of access failures.
 
-Redis хранит ограниченные снимки исходных данных по поколению, ревизии и тенанту. Ревизия читается из PostgreSQL в Repeatable Read; ошибка или отсутствие кэша приводит к чтению PostgreSQL. Области доступа, интервалы обслуживания, свежесть и текущая lease коннектора вычисляются при каждом запросе. Закэшированное наблюдение не подтверждает доступность оборудования.
+One process updates the overall model; PostgreSQL’s advisory lock prevents parallel writers and rebuilds when writing is ongoing. Additional processes handle reading. ClickHouse reporting and console models are activated independently.
 
-Перестроение выполняется при остановленном писателе в отдельное поколение из read_committed Kafka до зафиксированных концов партиций, включая пропуски compaction и управляющие записи транзакций. Переключение поколения атомарно. Если доступный retention не позволяет восстановить прежние данные, проверка сравнения отклоняет переключение; рабочее поколение сохраняется. Для восстановления после полной потери PostgreSQL требуется Kafka с достаточной историей либо резервная копия. Текущие сроки хранения исходных топиков не расширяются неявно.
+Redis stores limited snapshots of raw data by generation, revision, and tenant. Revisions are read from PostgreSQL using Repeatable Read; errors or cache misses lead to PostgreSQL reading. Access scopes, maintenance intervals, freshness, and current connector lease are calculated with each request. Cached observations do not confirm equipment availability.
 
-Наблюдение хранит исходное время, эпоху, последовательность и сессию. История и информационные события не обновляют подтверждение состояния. Доступность оборудования подтверждает отдельный state report. Поколение модели и вектор смещений входят в токен снимка. [ADR-060](0060-realtime-delivery.md) заменяет привязку временного журнала к эпохе Gateway возобновлением из Kafka и определяет поток оперативных образов.
+Rebuilds occur with the writer stopped, into a separate generation from read_committed Kafka to the specified partition ends, including compaction gaps and transaction control records. Generation switching is atomic. If available retention does not allow restoring previous data, comparison checks prevent switching; the active generation is retained. To recover after complete PostgreSQL loss, Kafka with sufficient history or a backup is required. Current storage times for raw topics are not implicitly extended.
 
-## Обновление
+Observations store original time, epoch, sequence, and session. History and event information do not update state confirmation. Equipment availability is confirmed by a separate state report. Model generation and offset vector are included in the snapshot token. [ADR-060](0060-realtime-delivery.md) replaces the temporary journal binding to a Gateway epoch by restarting from Kafka and defining the flow of operational snapshots.
 
-Сначала запускается Projection Service и восстанавливается его модель. Затем переключается Gateway. Старые таблицы `access.incident_feed`, `access.feed_offsets` и `gateway_state` не удаляются автоматически; новые процессы Gateway их не читают и не обновляют. Удаление допускается после проверки снимков и завершения окна отката.
+## Updates
 
-## Проверка
+First, Projection Service is started and its model is restored. Then, the Gateway is switched. Old tables `access.incident_feed`, `access.feed_offsets`, and `gateway_state` are not automatically deleted; new Gateway processes do not read or update them. Deletion is allowed after checking snapshots and closing the rollback window.
 
-Сетевые проверки сверяют снимки и области доступа, очистку Redis, восстановление из Kafka, отказ переключения при неполной истории, свежесть после восстановления и задержку обновления. M1 проверяется после удаления зависимости Gateway от собственных проекций. Проверки отчётности сохраняются.
+## Tests
+
+Network tests verify snapshots and access scopes, Redis cleanup, recovery from Kafka, switching failures with incomplete history, freshness after recovery, and update delays. The end-to-end event flow is tested after removing the Gateway dependency on its own projections. Reporting tests remain in place.

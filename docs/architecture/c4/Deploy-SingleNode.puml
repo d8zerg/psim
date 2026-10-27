@@ -1,0 +1,43 @@
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+top to bottom direction
+package "Server: Debian 13 x86_64" as HOST {
+package "Infrastructure" as INFRA {
+rectangle "Kafka, 1 KRaft broker" as K
+rectangle "Schema Registry" as SR
+database "PostgreSQL" as PG
+database "Redis-compatible storage" as R
+database "ClickHouse + Keeper" as CH
+rectangle "Keycloak" as KC
+database "SeaweedFS: floor plans" as FS
+}
+package "PSIM Services: 1 instance each" as APP {
+rectangle "Connector Gateway" as S1
+rectangle "Normalizer, Event History" as S2
+rectangle "Correlation Engine" as S3
+rectangle "Incident, Response, Command, Notification" as S4
+rectangle "Projection, Audit, Catalog" as S5
+rectangle "API Gateway + web" as S6
+}
+package "Observability" as OBS {
+rectangle "OTel Collector" as OC
+rectangle "Prometheus" as PR
+rectangle "Grafana" as GR
+}
+}
+rectangle "Connectors" as CONN
+rectangle "Browsers" as USR
+OC --> PR
+PR --> GR
+CONN --> S1 : :7443 gRPC mTLS
+USR --> S6 : :443 HTTPS/WSS
+@enduml

@@ -1,33 +1,37 @@
-# Администрирование и восстановление
+# Administration and recovery
 
-Статус: Принято. Решение - [ADR-081](../adr/0081-administration-and-recovery.md).
+<!-- language-links -->
+[English](administration-and-recovery.md) | [Русский](../ru/engineering/administration-and-recovery.md)
+<!-- /language-links -->
 
-## Настройка доступа
+Status: Accepted. Decision: [ADR-081](../adr/0081-administration-and-recovery.md).
 
-`psimctl` - нативная C++-программа. Она использует платформенные клиенты Kafka, PostgreSQL, S3, ClickHouse и HTTPS. Физические копии проверяются штатными `pg_basebackup` и `pg_verifybackup`; шифрование выполняет OpenSSL CMS. В образе CLI эти утилиты включены; DEB требует OpenSSL и tar и рекомендует `postgresql-client-18` для физических копий и экспорта конфигурации. Перед выполнением этих операций установить клиент PostgreSQL 18 или использовать закреплённый административный образ. Прежние команды `psim-gateway-admin`, `psim-pg-migrate`, `psim-ch-migrate`, `psim-audit-tool`, `psim-console-tool`, `psim-report-tool` сохраняются на один выпуск.
+## Configuring access
 
-Образец конфигурации - `deploy/operations/psimctl.example.json`. Заменить endpoints, имя поставки, UID владельцев данных, пути к сертификатам и секретам, таблицу разрешённых источников DLQ и имя пространства WAL. UID берутся из сгенерированного инвентаря, а не из примера. Сертификат PostgreSQL должен иметь CN роли, например `postgres`. Для административного TLS шлюза используются `ca.pem`, `admin.pem`, `admin.key` в отдельном каталоге.
+`psimctl` is a native C++ program using the platform's Kafka, PostgreSQL, S3, ClickHouse and HTTPS clients. Physical backups use the native `pg_basebackup` and `pg_verifybackup` utilities; encryption uses OpenSSL CMS. The CLI image includes these utilities. The DEB requires OpenSSL and tar and recommends `postgresql-client-18` for physical backups and configuration export. Install PostgreSQL 18 client tools before these operations, or use the pinned administration image. Existing commands `psim-gateway-admin`, `psim-pg-migrate`, `psim-ch-migrate`, `psim-audit-tool`, `psim-console-tool` and `psim-report-tool` remain available for one release.
 
-Секреты и закрытые ключи - обычные файлы режима 0400, принадлежащие UID запускаемого клиента. Пароли и JWT не передаются аргументами команд. Административная учётная запись ОС владеет конфигурацией и каталогом журнала; `actor`, UID, идентификатор операции, параметры и результат записываются в `operations.jsonl` с принудительной записью на диск. Удалённые API дополнительно выполняют собственную авторизацию и аудит. Локальный журнал не заменяет защищённую цепочку продуктового аудита.
+The sample configuration is `deploy/operations/psimctl.example.json`. Replace endpoints, deployment name, data-owner UIDs, certificate and secret paths, the allowed DLQ-source table and WAL namespace. Obtain UIDs from the generated inventory, not the example. The PostgreSQL certificate CN must match the role, such as `postgres`. Gateway administrative TLS uses `ca.pem`, `admin.pem` and `admin.key` in a separate directory.
 
-## Независимое хранилище
+Secrets and private keys must be regular `0400` files owned by the client process UID. Do not pass passwords or JWTs as command arguments. The administrative OS account owns the configuration and journal directory. `actor`, UID, operation identifier, parameters and result are written to `operations.jsonl` and synchronized to disk. Remote APIs also perform their own authorization and auditing. The local journal does not replace the protected product audit chain.
 
-Для копий требуется отдельный S3 вне рабочего кластера SeaweedFS. Bucket не должен называться `psim-plans`. Разделить права:
+## Independent storage
 
-- запись копий: только создание объектов в выделенном bucket, без чтения, удаления и изменения retention;
-- чтение копий: отдельная идентичность с чтением и перечислением;
-- закрытый ключ получателя: только в среде восстановления; расписанию достаточно публичного сертификата RSA не менее 3072 бит;
-- управление retention и удалением: отдельная административная роль хранилища.
+Backups require a separate S3 service outside the operational SeaweedFS cluster. Its bucket must not be named `psim-plans`. Separate permissions:
 
-Шифрование - CMS AES-256-GCM и RSA-OAEP/SHA-256. Каждый большой файл разбивается на части до 8 МиБ. Манифест содержит размеры и SHA-256, шифруется и записывается последним. Успех не публикуется при неизвестном результате записи. Незавершённые объекты без манифеста не являются подтверждённой копией. Для их удаления применяется отдельная политика хранилища, без участия рабочей учётной записи.
+- Backup writer: object creation in the designated bucket only, without reading, deletion or retention changes.
+- Backup reader: a separate identity with read and list permissions.
+- Recipient private key: available only in the recovery environment; the schedule needs only the public RSA certificate, with at least 3072-bit keys.
+- Retention management and deletion: a separate storage-administration role.
 
-Окно PITR по исходной конфигурации - семь суток, интервал копирования планов - один час, защита неподвязанных объектов - восемь суток. CLI проверяет, что защита больше суммы окна и интервала. Resource Catalog удаляет неподвязанные объекты не раньше чем через восемь суток после истечения загрузки. Проверка срока загрузки сохраняется. Расписания включаются после обновления всех экземпляров Resource Catalog с этой политикой очистки. Возврат к прежней очистке до завершения используемого окна PITR нарушает защиту объектов.
+Encryption uses CMS AES-256-GCM and RSA-OAEP/SHA-256. Each large file is split into parts of at most 8 MiB. The manifest records sizes and SHA-256 values, is encrypted, and is written last. An unknown write outcome is not reported as success. Incomplete objects without a manifest are not confirmed backups. Remove them through a separate storage policy, without using the operational account.
 
-Внешнее целевое хранилище пока не настроено. Расписания не включаются автоматически. Профиль `wal_archive: false` сохраняет архивирование выключенным до настройки независимого S3. При переходе на `wal_archive: true` PostgreSQL получает `archive_mode=on`, `archive_timeout=60s` и вызов `psimctl backup wal-push`. Для действующего Patroni применить параметры через его DCS и выполнить необходимый последовательный перезапуск. Разместить конфигурацию архиватора и его отдельные секреты на каждом узле PostgreSQL, включая потенциальный primary. Закрытый ключ чтения архиватору не передаётся.
+The initial configuration uses a seven-day PITR window, hourly floor-plan backups and eight-day protection for unreferenced objects. The CLI checks that protection exceeds the sum of the window and backup interval. Resource Catalog deletes unreferenced objects no sooner than eight days after upload expiry. Upload-expiration checks remain in place. Enable schedules only after every Resource Catalog instance uses this cleanup policy. Returning to the earlier cleanup policy before the active PITR window ends breaks object protection.
 
-Архиватор хранит локальные квитанции с SHA-256 WAL. Пространство `wal_namespace` уникально для физической установки и не используется повторно для нового кластера. При неизвестном результате PUT и отсутствии локальной квитанции требуется проверка объекта отдельной идентичностью чтения; такой исход автоматически не считается успехом. Нельзя удалять WAL для устранения ошибки архиватора.
+External target storage is not yet configured. Schedules are not enabled automatically. `wal_archive: false` keeps archiving disabled until independent S3 is configured. Changing to `wal_archive: true` sets PostgreSQL `archive_mode=on`, `archive_timeout=60s` and a `psimctl backup wal-push` invocation. For an existing Patroni installation, apply parameters through its DCS and perform the required rolling restart. Place archiver configuration and its separate secrets on every PostgreSQL node, including potential primaries. Do not give the archiver the reader's private key.
 
-## Создание копий
+The archiver retains local receipts with WAL SHA-256 values. `wal_namespace` must be unique to the physical installation and must not be reused for a new cluster. If PUT has an unknown outcome and no local receipt exists, a separate reader identity must verify the object; this outcome is not automatically successful. Never delete WAL to resolve an archiver error.
+
+## Creating backups
 
 ```text
 psimctl --config /etc/psim-platform/psimctl.json backup create
@@ -36,23 +40,23 @@ psimctl --config /etc/psim-platform/psimctl.json backup inspect SNAPSHOT_ID
 psimctl --config /etc/psim-platform/psimctl.json backup status
 ```
 
-Полная операция копирует планы, физический PostgreSQL, ClickHouse, описания и compacted-топики Kafka, конфигурацию продукта и защищённый экспорт. После физической копии создаётся именованная точка, подтверждается архивирование её WAL и повторно копируются планы. Манифест фиксирует границу покрытия объектов.
+A full operation copies floor plans, physical PostgreSQL data, ClickHouse, Kafka descriptions and compacted topics, product configuration and the protected export. After the physical backup, it creates a named restore point, confirms archival of that point's WAL, and copies floor plans again. The manifest records the object-coverage boundary.
 
-ClickHouse выполняет `BACKUP DATABASE default` в диск `backups`. Его каталог - отдельный временный volume `/backups`; операторский клиент должен видеть тот же каталог. После передачи во внешний S3 архив удаляется. Не считать временный volume независимой копией. Он должен иметь место для полного архива и права владельца ClickHouse.
+ClickHouse executes `BACKUP DATABASE default` to the `backups` disk. Its directory is a separate temporary volume at `/backups`; the operator client must see the same directory. The archive is deleted after transfer to external S3. The temporary volume is not an independent backup. It must have space for the full archive and permissions for the ClickHouse owner.
 
-Экспорт конфигурации сохраняет схемы и разрешённые конфигурационные таблицы. Активные инциденты, запуски, очереди побочных эффектов, задания replay, сессии и регистрации коннекторов не импортируются как конфигурация. Сведения об отозванных сертификатах сохраняются. Импорт допустим только при отсутствии продуктовых схем и при уже созданных инфраструктурных ролях. Объекты планов восстанавливаются раньше ссылок.
+Configuration export preserves schemas and allowed configuration tables. Active incidents, runs, side-effect queues, replay jobs, connector sessions and connector registrations are not imported as configuration. Revoked-certificate information is retained. Import is allowed only when product schemas are absent and infrastructure roles already exist. Restore floor-plan objects before their references.
 
-В `protected_directory` предварительно собрать полный защищённый экспорт: конфигурацию поставки, доверие, сервисные ключи и учётные данные, независимые контрольные точки аудита, конфигурацию Keycloak и сведения о действующей политике отзыва. Физическая копия PostgreSQL включает базы Keycloak, Registry и метаданных filer. Внешние ключи CA хранятся отдельно по регламенту внешней PKI. Нельзя выдавать архиватору доступ к закрытому ключу получателя копий.
+Prepare the complete protected export in `protected_directory`: deployment configuration, trust, service keys and credentials, independent audit checkpoints, Keycloak configuration and the current revocation policy. The physical PostgreSQL backup includes the Keycloak, Registry and filer-metadata databases. External CA keys are stored separately according to the external PKI procedure. Never give the archiver access to the backup recipient's private key.
 
-`backup.status_file` должен указывать на файл в каталоге узлового volume мониторинга, который агент видит как `/var/lib/monitoring/backups.json`. Родительский каталог принадлежит UID мониторинга и доступен этому UID; сама сводка не содержит секретов и получает права `0644`.
+`backup.status_file` must point to a file in the node's monitoring volume directory, visible to the agent as `/var/lib/monitoring/backups.json`. The parent directory must be owned by and accessible to the monitoring UID. The summary itself contains no secrets and receives `0644` permissions.
 
-Готовые systemd units находятся в `deploy/operations/`. Полная копия запускается раз в сутки; отдельное задание копирования планов требуется каждый час. Heartbeat `backup status` запускается раз в минуту, обновляет состояние сбора и сохраняет прежние времена успеха. Время последней успешной копии не заменяется временем heartbeat или неудачной попытки.
+Ready-to-use systemd units are in `deploy/operations/`. Run a full backup daily and a separate floor-plan backup hourly. The `backup status` heartbeat runs once per minute, updates collection status and preserves earlier success timestamps. Never replace the time of the last successful backup with a heartbeat or failed-attempt time.
 
-## Восстановление
+## Recovery
 
-Хранить полную базовую копию, предшествующую началу окна PITR, и непрерывную цепочку WAL от неё до конца окна. Включать удаление старых копий только после проверки этой цепочки.
+Retain a full base backup predating the start of the PITR window and an uninterrupted WAL chain from it through the window's end. Enable deletion of older backups only after verifying that chain.
 
-Закрыть внешний вход, остановить прикладные потребители и внешние побочные эффекты. Для кластерного восстановления использовать новые идентичности управляющих кластеров и отдельный чистый стенд; не запускать новый Patroni поверх старого DCS и не присоединять старые диски к новому Kafka/Keeper.
+Close external ingress and stop application consumers and external side effects. For cluster recovery, use fresh control-cluster identities and a separate clean environment. Do not start a new Patroni cluster against the old DCS or attach old disks to new Kafka/Keeper clusters.
 
 ```text
 psimctl --config /etc/psim-platform/recovery.json backup restore-plans SNAPSHOT_ID
@@ -61,9 +65,9 @@ psimctl --config /etc/psim-platform/recovery.json backup recovery-check SNAPSHOT
 psimctl --config /etc/psim-platform/recovery.json plans verify
 ```
 
-Запустить PostgreSQL с восстановленным каталогом данных и тем же major. Конфигурация recovery содержит путь к `psimctl backup wal-fetch` и именованную точку из манифеста. Конфигурация чтения и закрытый ключ должны быть доступны UID PostgreSQL по тому же пути внутри процесса. Recovery останавливается на точке; `recovery-check` проверяет целевой LSN, паузу, имя точки и реальные файлы. Преждевременная готовность read-only PostgreSQL не является завершением восстановления.
+Start PostgreSQL with the restored data directory and the same major version. Recovery configuration contains the path to `psimctl backup wal-fetch` and the named point from the manifest. The reader configuration and private key must be accessible to the PostgreSQL UID at the same path inside the process. Recovery pauses at the target point; `recovery-check` checks the target LSN, pause state, point name and actual files. Early readiness of read-only PostgreSQL does not mean recovery is complete.
 
-Для PITR между полными копиями выбрать базовую копию, завершённую раньше целевого времени, и копию планов с границей покрытия не раньше целевого времени. `TARGET_TIME_UTC` задаётся в UTC с секундами или шестью знаками долей секунды и суффиксом `Z`. Восстановление выполняется с UID владельца данных PostgreSQL или root; учётные данные чтения внутри `restore_command` принадлежат UID PostgreSQL.
+For PITR between full backups, choose a base backup completed before the target time and a floor-plan backup whose coverage boundary is at or after that time. Specify `TARGET_TIME_UTC` in UTC, with seconds or six fractional-second digits and a `Z` suffix. Run restoration as the PostgreSQL data-owner UID or root; reader credentials used inside `restore_command` must belong to the PostgreSQL UID.
 
 ```text
 psimctl --config /etc/psim-platform/recovery.json backup restore-plans PLANS_SNAPSHOT_ID
@@ -71,11 +75,11 @@ psimctl --config /etc/psim-platform/recovery.json backup restore-postgres BASE_S
 psimctl --config /etc/psim-platform/recovery.json backup recovery-check BASE_SNAPSHOT_ID --target-time TARGET_TIME_UTC
 ```
 
-CLI проверяет границы базовой копии и покрытия планов, задаёт `recovery_target_time` и паузу. `recovery-check` проверяет фактическую целевую настройку, состояние паузы и все связанные файлы. При часовом копировании планов согласованный RPO метаданных с файлами ограничен одним часом; меньший RPO PostgreSQL сам по себе не уменьшает этот интервал.
+The CLI checks base-backup and floor-plan coverage boundaries and configures `recovery_target_time` and pause. `recovery-check` verifies the actual target setting, paused state and every referenced file. With hourly floor-plan backups, consistent metadata-and-file RPO is limited to one hour. A smaller PostgreSQL RPO alone does not shorten that interval.
 
-Сверка читает каждую связанную версию плана, проверяет размер и SHA-256. Недостающие или повреждённые объекты дают ненулевой exit code. Неподвязанные объекты выводятся отдельно и не удаляются. Результат сверки сохраняется в отчёте учения.
+Reconciliation reads every referenced floor-plan version and verifies its size and SHA-256. Missing or corrupted objects produce a nonzero exit code. Unreferenced objects are reported separately and are not deleted. Preserve reconciliation results in the recovery-exercise report.
 
-После проверки возобновить WAL replay штатной `pg_wal_replay_resume()` и дождаться выхода из recovery. На кластере сначала восстановить primary, затем создавать реплики штатной физической синхронизацией. Проверить синхронную репликацию и автоматическое переключение.
+After verification, resume WAL replay using native `pg_wal_replay_resume()` and wait until recovery ends. In a cluster, recover the primary first, then create replicas using native physical synchronization. Check synchronous replication and automatic failover.
 
 ```text
 psimctl --config /etc/psim-platform/recovery.json backup restore-kafka SNAPSHOT_ID --offline
@@ -84,11 +88,11 @@ psimctl --config /etc/psim-platform/recovery.json backup restore-protected SNAPS
 psimctl --config /etc/psim-platform/recovery.json backup restore-config SNAPSHOT_ID --empty-installation
 ```
 
-Восстановление Kafka требует отсутствия продуктовых топиков. Переносятся конфигурации, число партиций, репликация, ключи, значения, заголовки и tombstone compacted-топиков. Исходные физические offsets и consumer offsets не переносятся. Нельзя использовать восстановленный changelog со старой рабочей группой и считать его позиции прежними: согласование входной истории и групп выполняется до запуска обработки на чистом стенде. История вне retention берётся из ClickHouse и копий. Перестроение консоли отклоняет неполную Kafka-историю.
+Kafka recovery requires product topics to be absent. It transfers configurations, partition counts, replication, keys, values, headers and tombstones of compacted topics. Original physical offsets and consumer offsets are not transferred. Do not use the restored changelog with an old working group and assume its positions are unchanged: reconcile input history and groups before starting processing in the clean environment. History outside retention comes from ClickHouse and backups. Console rebuilding rejects incomplete Kafka history.
 
-Копия доверия извлекается в отдельный каталог для проверки, без автоматической замены работающих ключей. Применить текущую внешнюю политику отзыва и перевыпустить скомпрометированные ключи. После продвижения PostgreSQL выполнить `backup recovery-secure SNAPSHOT_ID --offline`: все восстановленные регистрации коннекторов отключаются, сессии очищаются и Keycloak получает `logout-all`. Для каждого коннектора использовать `certificates recover` с новым сертификатом; прежние fingerprints отзываются штатным управлением шлюза. Не открывать внешний вход до проверки новых входов, MFA, mTLS и отказа истёкших и отозванных ключей.
+Extract the trust backup into a separate directory for inspection without automatically replacing active keys. Apply the current external revocation policy and reissue compromised keys. After promoting PostgreSQL, run `backup recovery-secure SNAPSHOT_ID --offline`: this disables every restored connector registration, clears sessions and sends Keycloak `logout-all`. Use `certificates recover` with a new certificate for each connector; revoke previous fingerprints through normal gateway administration. Do not reopen external ingress before checking new logins, MFA, mTLS and rejection of expired and revoked keys.
 
-## Рабочие административные операции
+## Operational administration
 
 ```text
 psimctl diagnose
@@ -104,15 +108,15 @@ psimctl migrate clickhouse expand MANIFEST_JSON
 psimctl audit verify EXPORT_JSONL TRUSTED_KEYS_JSON CHECKPOINT_DIRECTORY
 ```
 
-Прежние C++-инструменты через совместимые команды используют свои `PSIM_PG_*`, `PSIM_CH_*` и `PSIM_KAFKA_*`. Совместимые команды вызываются без `--config`. Команды резервного копирования, диагностики, replay, DLQ и очистки курсоров используют настройки CLI из `--config`. Пакет поддержки содержит только сформированные агрегаты диагностики; конфигурация, токены, закрытые ключи, HTTP-тела и исходные логи в него не включаются.
+The existing C++ tools retain their `PSIM_PG_*`, `PSIM_CH_*` and `PSIM_KAFKA_*` settings through compatibility commands. Invoke compatibility commands without `--config`. Backup, diagnostics, replay, DLQ and cursor-cleanup commands use CLI settings from `--config`. The support package contains only generated diagnostic aggregates; it excludes configuration, tokens, private keys, HTTP bodies and raw logs.
 
-DLQ сначала просматривается без записи. Для повтора допускаются только источники из `dlq_sources`, заданные конфигурацией для конкретной стадии. Нужны исходная партиция и сохранённые байты. Диапазон ограничен 10000 offsets. Публикация и собственная позиция повтора фиксируются одной транзакцией Kafka; повтор завершённого диапазона не отправляет сообщения снова. Исходная рабочая группа не перематывается.
+Inspect DLQ without writing first. Retry accepts only sources allowed by `dlq_sources` for the configured processing stage. It requires the original partition and preserved bytes. The range is limited to 10,000 offsets. Publication and the retry's own position are committed in one Kafka transaction; retrying a completed range does not publish messages again. The original working consumer group is not rewound.
 
-Очистка Normalizer требует остановки всех экземпляров и принадлежности источника архивному устройству. CLI записывает tombstone каждой эпохи в прежнюю партицию. При восстановлении Normalizer удаляет только соответствующий курсор, сохраняя другие эпохи и источники. Возвращать выведенный источник в работу с прежними идентичностью и последовательностью после очистки нельзя.
+Normalizer cleanup requires every instance to be stopped and the source to belong to an archived device. The CLI writes each epoch's tombstone to its original partition. During recovery, Normalizer deletes only the matching cursor and preserves other epochs and sources. After cleanup, do not return the retired source to service using its old identity and sequence.
 
-Перезагрузка истории требует остановки всех экземпляров выбранного загрузчика и отсутствия подготовленных блоков в PostgreSQL. CLI сбрасывает только offsets разрешённой группы на доступное начало retention. Эта операция не восстанавливает недоступную историю и не очищает существующие таблицы. Для потерянных таблиц сначала восстановить схемы и независимую копию, затем загрузить доступное продолжение; пересчёт фактов инцидентов имеет отдельную команду.
+History reload requires all instances of the selected loader to be stopped and no prepared blocks to remain in PostgreSQL. The CLI resets only the allowed group's offsets to the available retention start. It neither restores unavailable history nor clears existing tables. For lost tables, first restore schemas and an independent backup, then load the available continuation. Incident-fact recomputation has a separate command.
 
-## Диагностический replay и сертификаты
+## Diagnostic replay and certificates
 
 ```text
 psimctl replay rules --rule RULE_ID --request REQUEST_JSON --replay-id REPLAY_ID
@@ -124,19 +128,19 @@ psimctl certificates revoke --request REQUEST_JSON
 psimctl certificates recover --request REQUEST_JSON
 ```
 
-Replay правил использует существующий HTTPS API с JWT, версиями правила, историческим диапазоном, областью доступа и отдельными результатами. Повтор запроса сохраняет `Idempotency-Key`. Replay сценария читает готовый файл с зафиксированной версией плана и историей, получает чистое окружение и записывает отдельный результат. Он не загружает рабочие клиенты хранилищ и не публикует команды или уведомления. Для выполнения в отдельном network namespace сохраняется проверочный контейнерный сценарий `task response:test`.
+Rule replay uses the existing HTTPS API with JWT, rule versions, historical range, access scope and separate results. A request retry preserves `Idempotency-Key`. Response replay reads a prepared file containing a fixed plan version and history, receives a clean environment and writes a separate result. It does not load operational storage clients or publish commands or notifications. `task response:test` retains a verification scenario that runs in a separate network namespace.
 
-`certificates` проверяет соответствие действия содержимому запроса и вызывает существующее mTLS/JWT-управление шлюза. Используются исходный `request_id`, ожидаемая версия и причина. При неоднозначном результате повторить тот же запрос, не создавать новый идентификатор. Продление доверия и выпуск сервисных сертификатов выполняются внешней PKI по [регламенту](deployment-pki.md).
+`certificates` checks that the action matches request contents and invokes the gateway's existing mTLS/JWT administration interface. It uses the original `request_id`, expected version and reason. After an ambiguous outcome, repeat the same request instead of creating a new identifier. External PKI handles trust renewal and service-certificate issuance according to the [procedure](deployment-pki.md).
 
-## Учения и показатели
+## Recovery exercises and objectives
 
-| Топология | Целевой RPO PostgreSQL | Целевой RPO планов | Целевой RTO полного восстановления |
+| Topology | PostgreSQL RPO target | Floor-plan RPO target | Full-recovery RTO target |
 |---|---|---|---|
-| Одна машина | 5 минут | 1 час | 4 часа |
-| Кластер | 5 минут | 1 час | 2 часа |
+| Single machine | 5 minutes | 1 hour | 4 hours |
+| Cluster | 5 minutes | 1 hour | 2 hours |
 
-Это исходные эксплуатационные цели, а не измеренная гарантия. Полные копии остальных компонентов выполняются раз в сутки; снижение RPO требует более частого расписания. Окно доступных копий должно быть не менее семи суток. Проверка retention и удаления относится к независимому хранилищу; CLI автоматически не удаляет копии.
+These are initial operational objectives, not measured guarantees. Other components receive daily full backups; lower RPO requires more frequent schedules. The available-backup window must cover at least seven days. Independent storage is responsible for retention and deletion checks; the CLI does not automatically delete backups.
 
-`task deploy:operations:test` создаёт независимые S3-процессы, PostgreSQL, Kafka и ClickHouse, вызывает собранный C++ CLI и восстанавливает данные в чистые каталоги и процессы. Проверяются права записи без чтения, зашифрованные копии, DLQ, tombstone, compacted-топики, планы и точка PostgreSQL. Отчёт находится в `build/operations/report.json`; тестовые секреты удаляются после прогона.
+`task deploy:operations:test` creates independent S3 processes, PostgreSQL, Kafka and ClickHouse, invokes the built C++ CLI, and restores data into clean directories and processes. It checks write-without-read permissions, encrypted backups, DLQ, tombstones, compacted topics, floor plans and the PostgreSQL restore point. The report is `build/operations/report.json`; test secrets are removed afterward.
 
-Для эксплуатационной приёмки каждой топологии записать объём данных, момент последней подтверждённой записи, начало отказа, выбранную точку, время готовности и результаты полной сверки. Измерить RPO и RTO при потере данных, проверить рабочий вход, MFA, мTLS коннектора, отказ старых ключей и PITR до очистки объектов. Внешнее целевое хранилище пока отсутствует; его производительность и полное восстановление двух топологий не квалифицированы. Контейнерный тест не закрывает этот DoD.
+For operational acceptance of each topology, record data volume, last acknowledged write time, failure start, selected restore point, readiness time and complete reconciliation results. Measure RPO and RTO after data loss. Verify normal login, MFA, connector mTLS, rejection of old keys and PITR before object cleanup. External target storage is not yet available; its performance and full recovery of both topologies remain unqualified. The container test does not satisfy this acceptance criterion.

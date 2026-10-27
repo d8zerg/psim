@@ -1,36 +1,40 @@
-# ADR-012. Исполнение сценариев реагирования и сервис таймеров
+# ADR-012. Response-plan execution and timers
 
-- **Статус:** Принято
-- **Связанные:** ADR-008, ADR-018, ADR-020, ADR-025, ADR-042, ADR-055
+<!-- language-links -->
+[English](0012-response-execution-and-timers.md) | [Русский](../ru/adr/0012-response-execution-and-timers.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-008, ADR-018, ADR-020, ADR-025, ADR-042, ADR-055
 
-Сценарий реагирования содержит инструкции, чек-листы, решения, команды, уведомления, ожидания, эскалации и внешние обработчики. Исполнение сохраняет выбранную версию и продолжается после остановки процесса. Погрешность таймеров в работающем окружении не превышает 1 секунды. Публикация действия и изменение состояния должны фиксироваться атомарно.
+## Context
 
-## Решение
+A response plan contains instructions, checklists, decisions, commands, notifications, waits, escalations and external handlers. Execution preserves the selected version and resumes after process termination. Timer error in an operational environment must not exceed one second. Publishing an action and changing state must commit atomically.
 
-1. Чистый интерпретатор `libs/domain/response` проверяет ацикличность и достижимость графа, управляет шагами, попытками и обязательными действиями. На каждом пути активен один шаг. Ветвление выбирает один следующий шаг; обязательные шаги невыбранных ветвей перестают блокировать инцидент.
-2. PostgreSQL Response Engine хранит версии планов, снимки запусков, проекции ресурсов, ключи идемпотентности, запросы внешних обработчиков, inbox и outbox в схеме `response`. Снимок плана копируется в запуск. Архивирование не меняет его определение и не останавливает существующие запуски. По инциденту создаётся один запуск с детерминированным идентификатором.
-3. Общая библиотека `libs/platform/timers` предоставляет сохраняемые таймеры в схеме владельца. Экземпляры опрашивают сроки каждые 200 мс. Перед изменением таймера блокируется строка агрегата, затем условное изменение таймера фиксирует срабатывание в той же транзакции, что доменное действие и outbox. Повтор после остановки не создаёт второго эффекта.
-4. Владение таймерами определяется блокировкой агрегата PostgreSQL. Привязка только к владельцу Kafka-партиции не используется: API и автоматические переходы создают таймеры независимо от текущего назначения партиций. Это позволяет другому экземпляру продолжить исполнение сразу после освобождения блокировки. Command Service сохраняет существующий механизм дедлайнов; перенос его данных не требуется.
-5. `CommandRequested` в `psim.response.events.v1` задаёт долговечный порт Command Service. Права на публикацию ограничиваются идентичностью сервиса; обработчик проверяет сервисного инициатора. Команда получает детерминированный идентификатор от запуска, шага, попытки и устройства. Command Service повторно проверяет локальный каталог, область устройства и инцидента, параметры и критичность. Ручной запрос сохраняет проверенного пользователя инициатором, автоматический - Response Engine. Критичную команду подтверждает другой supervisor; инициатор ручного шага не подтверждает собственную команду. Только конечные статусы завершают шаг; новая попытка создаёт новый идентификатор.
-6. `NotificationRequested` фиксирует намерение уведомить. Шаг завершается после записи намерения в outbox; доставка каналами относится к Notification Service. Эскалация публикует прежний `EscalationLevelTriggered`.
-7. Внешний автоматический шаг допускает только HTTPS-адрес из точного списка в конфигурации сервиса, без перенаправлений, с проверкой TLS, ограниченным ответом и дедлайном 1-30 секунд. Отправка предварительно фиксируется. Неизвестный результат после остановки или дедлайна даёт ошибку шага, без автоматической повторной отправки. Явный Retry создаёт новую попытку. Обработчик получает `effectId` для собственной идемпотентности.
-8. Отдельная программа `psim-response-replay` использует интерпретатор и имитирующие адаптеры. Она читает план и действия из stdin, пишет результат в stdout и не создаёт runtime, клиенты Kafka, PostgreSQL или HTTP. Проверка запускает её без сети, credentials и сокетов. Команды, уведомления, эскалации и обработчики дают только диагностические записи.
+## Decision
 
-## Альтернативы
+1. The pure `libs/domain/response` interpreter validates graph acyclicity and reachability and manages steps, attempts and mandatory actions. One step is active on each path. Branching selects one successor; mandatory steps on unselected branches no longer block the incident.
+2. Response Engine PostgreSQL stores plan versions, run snapshots, resource projections, idempotency keys, external-handler requests, inbox and outbox in schema `response`. The plan snapshot is copied into the run. Archiving neither changes its definition nor stops existing runs. Each incident gets one run with a deterministic identifier.
+3. Shared library `libs/platform/timers` provides persistent timers in the owner's schema. Instances poll deadlines every 200 ms. Before modifying a timer, lock its aggregate row. A conditional timer update records firing in the same transaction as the domain action and outbox. Retrying after termination does not create a second effect.
+4. PostgreSQL aggregate locking determines timer ownership. Ownership is not tied solely to a Kafka partition owner: APIs and automatic transitions create timers independently of current assignments. Another instance can therefore resume as soon as the lock is released. Command Service retains its existing deadline mechanism without data migration.
+5. `CommandRequested` in `psim.response.events.v1` is the durable Command Service port. Publication is restricted by service identity, and the handler verifies the initiating service. Command identifiers are deterministic from run, step, attempt and device. Command Service rechecks its local catalog, device and incident scope, parameters and criticality. Manual requests retain the authenticated user as initiator; automatic requests use Response Engine. A different supervisor approves a critical command; a manual-step initiator cannot approve their own command. Only terminal statuses complete the step. A new attempt creates a new identifier.
+6. `NotificationRequested` records notification intent. The step completes once intent is written to outbox; Notification Service handles channel delivery. Escalation publishes the existing `EscalationLevelTriggered` event.
+7. An automatic external step permits only an HTTPS address in the service configuration's exact allowlist, without redirects, with TLS verification, a bounded response and a 1-30 second deadline. Sending is recorded beforehand. An unknown outcome after termination or timeout fails the step without automatic resend. Explicit Retry creates a new attempt. The handler receives `effectId` for its own idempotency.
+8. The separate `psim-response-replay` program uses the interpreter and simulated adapters. It reads the plan and actions from stdin, writes results to stdout, and creates no runtime or Kafka, PostgreSQL or HTTP clients. Verification runs it without networking, credentials or sockets. Commands, notifications, escalations and handlers produce diagnostic records only.
 
-- Temporal или Camunda добавляют отдельную подсистему и модель исполнения, избыточную для ограниченных графов MVP.
-- Отложенные сообщения Kafka требуют собственной эмуляции сроков.
-- Redis не является источником истины и не позволяет атомарно изменить агрегат PostgreSQL и outbox.
-- Привязка таймеров к Kafka-партициям требует дополнительной координации для API и нескольких входных потоков.
+## Alternatives
 
-## Последствия
+- Temporal or Camunda adds a separate subsystem and execution model excessive for the MVP's bounded graphs.
+- Delayed Kafka messages require custom deadline emulation.
+- Redis is not a source of truth and cannot atomically change a PostgreSQL aggregate and outbox.
+- Tying timers to Kafka partitions adds coordination for APIs and multiple input streams.
 
-Блокировки сериализуют изменения одного запуска; разные запуски выполняются независимо. После недоступности PostgreSQL просроченные таймеры обрабатываются при восстановлении, поэтому целевая точность относится к работающему окружению. Проекции должны получить ресурсы до публикации сценария. Команды устройства ограничены зоной инцидента; поддерживаются явный UUID устройства и выражение `zone.devices` с пределом 128 целей. Остальной язык выражений отклоняется при проверке.
+## Consequences
 
-Отсутствие подходящего сценария сохраняется в аудите, счётчике и PlanUnavailable; Incident Service добавляет предупреждение для типа с обязательным реагированием. Полная эксплуатационная настройка Kafka ACL и сетевых политик поставки относится к [топологиям развёртывания](../architecture/deployment.md).
+Locks serialize changes within one run; different runs execute independently. Overdue timers are processed after PostgreSQL recovers, so the accuracy objective applies to an operational environment. Resource projections must be populated before a plan is published. Device commands are restricted to the incident's zone. Supported targeting uses an explicit device UUID or `zone.devices`, limited to 128 targets. Other expression syntax is rejected during validation.
 
-## Проверка
+A missing matching plan is recorded in audit, a counter and PlanUnavailable. Incident Service adds a warning for types requiring a response. Complete operational Kafka ACL and deployment network-policy configuration is covered by [deployment topologies](../architecture/deployment.md).
 
-Проверяются графы и переходы, публикация и конфликт привязок, фиксированная версия запуска, роли и области, отдельное подтверждение критичной команды, результат SDK, ошибки и Retry/Override, остановка обоих экземпляров посреди ожидания, отмена при закрытии инцидента, точность таймеров и нулевые внешние эффекты диагностического replay. Команды и артефакты описаны в [руководстве](../engineering/response-engine.md).
+## Verification
+
+Checks cover graphs and transitions, publication and binding conflicts, fixed run versions, roles and scopes, separate critical-command approval, SDK results, errors and Retry/Override, termination of both instances during a wait, cancellation on incident closure, timer accuracy and zero external effects from diagnostic replay. Commands and artifacts are described in the [guide](../engineering/response-engine.md).

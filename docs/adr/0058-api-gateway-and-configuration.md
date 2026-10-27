@@ -1,34 +1,38 @@
-# ADR-058. API Gateway и управление конфигурацией нормализации
+# ADR-058. API Gateway and Configuration Management for Normalization
 
-- **Статус:** Принято
-- **Связанные:** [ADR-020](0020-authorization-model.md), [ADR-026](0026-rest-contract-and-dto.md), [ADR-042](0042-operational-capabilities.md), [ADR-047](0047-event-flow.md), [ADR-052](0052-normalization-and-event-history.md)
+<!-- language-links -->
+[English](0058-api-gateway-and-configuration.md) | [Русский](../ru/adr/0058-api-gateway-and-configuration.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-020](0020-authorization-model.md), [ADR-026](0026-rest-contract-and-dto.md), [ADR-042](0042-operational-capabilities.md), [ADR-047](0047-event-flow.md), [ADR-052](0052-normalization-and-event-history.md)
 
-Минимальный Gateway обслуживал только ленту инцидентов и WebSocket. REST обработчики остальных сервисов доступны внутри стенда. Отображения нормализации и настройки retention публиковались доверенной административной утилитой. Для консоли необходимы единая защищённая точка входа, версии конфигурации и снимки с качеством данных.
+## Context
 
-## Решение
+The minimum Gateway only served the incident feed and WebSocket. REST handlers for other services are available within the test environment. Normalization mappings and retention settings were published by a trusted administrative tool. For the console, a single secure entry point, configuration versions, and data-quality snapshots are required.
 
-1. API Gateway получает маршруты из HTTP-аннотаций контрактов Protobuf. Каждая операция имеет явного владельца и действие из общей таблицы прав. Gateway проверяет подпись, issuer, audience, срок действия, тенант и роль. Сервис-владелец повторно проверяет операцию и область конкретного ресурса. Доверенные заголовки пользователя не заменяют исходный Bearer token.
-2. Внешний listener использует TLS. HTTP разрешён отдельной настройкой только вместе с разрешением открытых транспортов для локального стенда. Адреса upstream задаёт конфигурация процесса; HTTPS проверяет цепочку сертификатов и имя узла. Перенаправления не выполняются. Запрос после проверки доступа и upstream ограничены 60 секундами; остановка отменяет незавершённые операции. Внешние порты прикладных сервисов, кроме Gateway и консоли, не публикуются.
-3. Частота ограничивается token bucket по адресу соединения и по паре тенант/пользователь. По [ADR-078](0078-shared-api-rate-limits.md) квота пользователя общая для всех реплик и шардов и хранится в Valkey; ограничение соединений по адресу локальное. Превышение возвращает 429 и Retry-After; недоступность общей квоты возвращает 503. CORS использует явный список origin, preflight ограничен существующими маршрутами. Ответы получают nosniff, no-store и заголовки безопасности.
-4. Gateway проверяет ключи идемпотентности и наличие If-Match, передаёт их владельцу без изменения и сохраняет ETag ответа. Идемпотентность и оптимистическая конкуренция фиксируются в транзакции владельца. Ошибки Gateway используют Problem Details; отказы в доступе сохраняются через outbox. Для неаутентифицированного отказа применяется нулевой технический тенант, без чтения неподтверждённых claims токена.
-5. Тела запросов и ответов передаются порциями по 64 КиБ с противодавлением. Предел поэтажного плана - 20 МиБ, обычного запроса - 1 МиБ, импорта - 64 МиБ. Тип файла и ETag возвращает Catalog; Gateway допускает PNG/JPEG, добавляет Content-Disposition и nosniff. Проверка изображения и взаимодействие с объектным хранилищем остаются в Catalog.
-6. Resource Catalog владеет API отображений нормализации, retention и параметров обработки. Normalizer и Event History остаются потребителями `psim.config.v1`. Изменение версии, аудит и outbox выполняются одной транзакцией PostgreSQL. Начальная версия отсутствующего объекта - 0; создание требует `If-Match: "0"`. Следующая версия назначается сервером. Повтор ключа с другим содержимым отклоняется.
-7. Перед открытием API Catalog восстанавливает опубликованные ранее настройки из compacted-топика до зафиксированной границы. Затем обновляет реплику между операциями. Переход с административной утилиты требует прекратить её публикации до приёма изменений через REST. Общий доменный обработчик условий используется и при публикации отображения, и в Normalizer. Неизвестные типы таксономии и неподдерживаемые условия отклоняются до фиксации.
-8. Временные PostgreSQL-проекции Gateway хранят снимки инцидентов и оперативных ресурсов. Снимок и позиции Kafka читаются в REPEATABLE READ. REST совместимо дополнен качеством, временем подтверждения и resume token. Каталожный жизненный цикл, связь коннектора, доступность устройства и свежесть наблюдения различаются. Досылка истории не обновляет подтверждение; более старый курсор снимка не заменяет новое наблюдение. При чтении актуальность пересчитывается по времени и текущей lease сессии; ошибка реестра не создаёт online. Перенос этих проекций в Projection Service выполняется на шаге 7.3, расширение realtime-подписок - на шаге 7.2.
+## Solution
 
-## Последствия
+1. The API Gateway receives routes from Protobuf contract annotations. Each operation has a clear owner and actions from a common permission table. The Gateway checks the signature, issuer, audience, validity period, tenant, and role. The service owner rechecks the operation and the specific resource’s access scope. Trusted user headers do not replace the original Bearer token.
+2. The external listener uses TLS. HTTP is allowed with separate settings only when open transports are allowed for the local test environment. Upstream addresses are set by process configuration; HTTPS checks the certificate chain and node name. Redirects are not performed. Requests after access and upstream checks are limited to 60 seconds; shutdown cancels unfinished operations. External application services ports, except for the Gateway and console, are not published.
+3. Request rate is limited by token buckets based on connection address and tenant/user pair. According to [ADR-078](0078-shared-api-rate-limits.md), the user quota is shared among all replicas and shards and is stored in Valkey; connection limits are local. Exceeding limits return 429 and Retry-After; unavailable quotas return 503. CORS uses a list of origins; preflight is limited by existing routes. Responses receive nosniff, no-store, and security headers.
+4. The Gateway checks idempotence keys and If-Match presence, sends them to the owner without modification, and saves the ETag of the response. Idempotence and optimistic concurrency are recorded in the owner’s transaction. Gateway errors use Problem Details; access failures are stored in the outbox. For unauthenticated failures, a zero technical tenant is used, without reading unverified token claims.
+5. Request and response bodies are sent in batches of 64 KiB with backpressure. The floor plan limit is 20 MiB, a regular request is 1 MiB, and imports are 64 MiB. The file type and ETag are returned by Catalog; the Gateway allows PNG/JPEG, adds Content-Disposition, and nosniff. Image verification and interaction with object storage remain in Catalog.
+6. Resource Catalog has APIs for normalization mappings, retention, and processing parameters. Normalizer and Event History remain consumers of `psim.config.v1`. Version changes, auditing, and outbox are performed in one PostgreSQL transaction. The initial version of an absent object is 0; creation requires `If-Match: "0"`. The next version is assigned by the server. Repeating keys with different content is rejected.
+7. Before opening the API, Catalog restores previously published settings from the compacted topic up to a captured boundary. Then it updates its replica between operations. Switching from the administrative tool requires stopping its publication before accepting changes through REST. The shared domain condition evaluator is used both when publishing mappings and in Normalizer. Unknown taxonomy types and unsupported conditions are rejected before commit.
+8. Temporary PostgreSQL projections store incident snapshots and operational resources. Snapshots and Kafka positions are read in REPEATABLE READ. REST is compatible with quality, confirmation time, and resume token. The catalog lifecycle, connection status, device availability, and observation freshness differ. History delivery does not update confirmation; an older snapshot cursor does not replace a new observation. When reading, freshness is recalculated by time and current lease session; registry errors do not create online status. Projections are transferred to Projection Service according to ADR-059; extending real-time subscriptions is defined in ADR-060.
 
-- Gateway не хранит доменные агрегаты и не повторяет транзакции владельцев.
-- Общая квота запросов не умножается на число экземпляров; локальные ограничения соединений учитывают ёмкость каждого экземпляра.
-- Временный снимок ограничен 100 000 оперативных записей и 10 000 инцидентов одного тенанта. Порог свежести наблюдения - 60 секунд. Индексы и отдельные параметры источников развиваются вместе с полноценными read-моделями.
-- Отказы IdP, upstream и реестра сессий обрабатываются без расширения прав доступа.
+## Consequences
 
-## Проверка
+- The Gateway does not store domain aggregates and does not repeat owner transactions.
+- The overall request quota is not multiplied by the number of instances; local connection limits consider each instance’s capacity.
+- Temporary snapshots are limited to 100,000 operational records and 10,000 incidents per tenant. The observation freshness threshold is 60 seconds. Indexes and individual source parameters develop together with full read models.
+- Failures in IdP, upstream, and session registry are handled without expanding access rights.
 
-`task api:test` проверяет HTTPS, реальные JWT, роли, область доступа, CORS, ETag, версии, идемпотентность, аудит, публикацию конфигурации, снимки, replay, перезапуск и передачу плана ровно 20 МиБ с измерением памяти Gateway. Модульные тесты проверяют все маршруты контракта, неизвестные пути, заголовки, лимиты и валидацию настроек. `task api:sanitizers` запускает проверки под ASan/UBSan и TSan.
+## Verification
 
-## Передача моделей консоли
+`task api:test` checks HTTPS, real JWTs, roles, access scope, CORS, ETag, version, idempotence, auditing, configuration publishing, snapshots, replay, restart, and transfer of an exactly 20 MiB floor plan while measuring Gateway memory consumption. Module tests check all contract routes, unknown paths, headers, limits, and configuration validation. `task api:sanitizers` runs ASan/UBSan and TSan checks.
 
-[ADR-059](0059-console-projections.md) передаёт модели и Redis в Projection Service. Gateway проксирует снимки по HTTPS и сохраняет временный realtime-журнал. Описанное выше собственное хранение Gateway относится к первоначальной реализации.
+## Transferring console models
+
+[ADR-059](0059-console-projections.md) transfers models and Redis to Projection Service. The Gateway proxies snapshots via HTTPS and saves temporary real-time logs. The above-mentioned Gateway storage applies to the initial implementation.

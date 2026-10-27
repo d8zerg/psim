@@ -1,29 +1,33 @@
-# Библиотека безопасности
+# Security Library
 
-Шаг 2.6, [ADR-043](../../../docs/adr/0043-platform-security.md). Цель CMake - `psim::platform_security`; OpenSSL 3 выполняет криптографические операции, Asio/Beast - сетевые операции. Новых зависимостей не добавлено.
+<!-- language-links -->
+[English](README.md) | [Русский](../../../docs/ru/repository/libs/platform/security/README.md)
+<!-- /language-links -->
 
-| Интерфейс | Назначение |
+[ADR-043](../../../docs/adr/0043-platform-security.md). The CMake target is `psim::platform_security`; OpenSSL 3 performs cryptographic operations, while Asio/Beast handles network operations. No new dependencies have been added.
+
+| Interface | Purpose |
 |---|---|
-| `Secret`, `read_secret` | Защищённый файл `0400`, проверки fd, размер до 64 КиБ по умолчанию, очистка буфера, ошибки без пути/содержимого |
-| `TlsOptions`, `tls_context`, `configure_hostname` | TLS 1.3 снаружи, TLS 1.2+ с AEAD внутри, CA/имя, mTLS и полный свежий CRL |
-| `TlsReload` | Атомарная публикация нового контекста, сохранение прежнего при ошибке |
-| `Peer`, `authenticated_peer` | Идентичность и SHA-256 только из завершённого проверенного mTLS-соединения |
-| `make_csr` | CSR P-256 с ограниченным URI SAN для внешней PKI |
-| `http_request` | HTTPS GET/POST, SNI и DNS/IP verification, один дедлайн с DNS, ограничения заголовков/тела, без redirects и повторов |
-| `JwtVerifier` | RS256/ES256 через EVP; issuer/audience/тип/сроки; роли клиента, тенант и области |
-| `JwksCache` | Ротация JWKS, подпись JWT и introspection с кэшем 500 мс; актуальные наборы областей по ссылке |
-| `authenticate_service` | mTLS URI SAN, разрешённый сервис и JWT; привязка `azp` для client credentials |
-| `ConnectorTrust` | Регистрация отпечатка, перекрытие двух сертификатов, закрытие сессий при отзыве/истечении, восстановление |
+| `Secret`, `read_secret` | Protected file `0400`, fd checks, default size up to 64 KiB, buffer cleanup, errors without path/content |
+| `TlsOptions`, `tls_context`, `configure_hostname` | TLS 1.3 outside, TLS 1.2+ with AEAD inside, CA/name, mTLS and full fresh CRL |
+| `TlsReload` | Atomic publication of new context, saving the previous one in case of error |
+| `Peer`, `authenticated_peer` | Identity and SHA-256 only from a completed, verified mTLS-connection |
+| `make_csr` | CSR P-256 with limited URI SAN for external PKI |
+| `http_request` | HTTPS GET/POST, SNI and DNS/IP verification, one deadline with DNS, header/body limits, no redirects or repetitions |
+| `JwtVerifier` | RS256/ES256 via EVP; issuer/audience/type/validity periods; roles of client, tenant, and scopes |
+| `JwksCache` | Rotation of JWKS, JWT signature and 500 ms cache introspection; current scope sets can be found at the link |
+| `authenticate_service` | mTLS URI SAN, allowed services and JWT; binding `azp` for client credentials |
+| `ConnectorTrust` | Registration of certificate fingerprints, overlap of two certificates, sessions are closed upon revocation/expiration, restoration |
 
-## Ограничения и владение
+## Restrictions and Ownership
 
-JWT не больше 16 КиБ; header до 2 КиБ, claims до 12 КиБ, глубина JSON до 32. JWKS до 256 КиБ и 32 ключей, без повторяющихся `kid` и закрытого материала; RSA 2048-8192 бит либо P-256. Дублирующиеся JSON-поля, `none`, HMAC, неподдерживаемые `crit`, `jku/jwk/x5u`, некорректные base64url и ID tokens отклоняются. Access token имеет `typ=Bearer`, `iat` и `exp`, срок до 300 с, допуск часов до 30 с. Пустые роли и области не дают разрешений на действия.
+JWT cannot exceed 16 KiB; header up to 2 KiB, claims up to 12 KiB, JSON depth up to 32. JWKS cannot exceed 256 KiB and 32 keys, without repeated `kid` and private key material; RSA 2048-8192 bits or P-256. Repeated JSON fields, `none`, HMAC, unsupported `crit`, `jku/jwk/x5u`, incorrect base64url and ID tokens are rejected. Access token has `typ=Bearer`, `iat` and `exp`, duration up to 300 s, with clock skew tolerance up to 30 s. Empty roles and scopes do not grant permission to act.
 
-`JwksCache` и `ConnectorTrust` принадлежат одному executor; использовать экземпляр на шард. `TlsReload` публикует snapshots между потоками; опубликованный контекст больше не изменять. Создание контекстов, CSR и чтение файлов - управляющие операции, не горячий путь обработки событий. HTTPS ограничивает тело до 1 МиБ по умолчанию, заголовки до 16 КиБ; общий дедлайн - 5 с. Публикация нового контекста применяется к новым соединениям, существующие держат прежний до закрытия.
+`JwksCache` and `ConnectorTrust` belong to the same executor; use an instance on a shard. `TlsReload` publishes snapshots between threads; published context cannot be changed. Creating contexts, CSRs, and reading files are control operations, not hot event processing. HTTPS limits the body to 1 MiB by default, headers to 16 KiB; overall deadline is 5 s. Publishing a new context applies to new connections, existing ones retain the previous one until closed.
 
-Реестр по умолчанию ограничен 10 000 коннекторами и сессиями, двумя активными сертификатами на коннектор и 128 неистёкшими отпечатками в сумме с отзывами. Отзыв закрывает потоки через callbacks после удаления записей сессий, поэтому callback может безопасно вызвать `detach`. Callback не должен бросать исключения. Проверять `authenticate` на каждом сообщении, регулярно вызывать `expire`. Resource Catalog должен авторизовать регистрацию и восстановление, хранить записи и распространять изменения с подтверждением на каждый шлюз; эти сервисные функции относятся к шагу 4.2.
+The default registry limits to 10,000 connectors and sessions, two active certificates per connector, and 128 unexpired fingerprints in total, along with revocations. Revocation closes streams through callbacks after removing session records, so callbacks can safely call `detach`. Callbacks should not throw exceptions. Check `authenticate` on each message, regularly call `expire`. Connector Gateway authorizes registration and recovery, stores registrations, and distributes revisions with acknowledgement from each gateway. Resource Catalog delegates authenticated management requests to it.
 
-## Использование
+## Usage
 
 ```cpp
 using namespace psim::platform;
@@ -45,11 +49,11 @@ if (!principal) {
 // The owning service now checks the action and access scope.
 ```
 
-Промежуточные HTTP/JWT/OpenSSL ошибки не включают токен, тело, пароль и путь к ключу. `Secret` нельзя форматировать или неявно преобразовать в строку; `view` предоставляет явный доступ на срок жизни владельца. Секреты в памяти сторонних драйверов не получают гарантию очистки от этого класса.
+Intermediate HTTP/JWT/OpenSSL errors do not include token, body, password, and key path. `Secret` cannot be formatted or implicitly converted to a string; `view` provides explicit access for the lifetime of the owner. Secrets in external driver memory are not guaranteed to be cleared by this class.
 
-## Адаптеры и проверки
+## Adapters and Verifications
 
-Kafka использует внутренний TLS-профиль и требует `ClientOptions::security` с CA и защищённой парой сертификат/ключ либо SCRAM-SHA-512 `username/password_file`. Изменение native TLS/SASL параметров через `properties` запрещено. Valkey использует общий TLS-профиль и `crl_file`. PostgreSQL проверяет `verify-full` и по умолчанию требует TLS 1.3; минимальный протокол можно настроить только на TLS 1.2 или TLS 1.3. Schema Registry использует HTTPS; OTLP использует TLS по умолчанию и CA из `telemetry.otlp_ca_file`.
+Kafka uses internal TLS profile and requires `ClientOptions::security` with CA and protected certificate/key pair or SCRAM-SHA-512 `username/password_file`. Changing native TLS/SASL parameters through `properties` is prohibited. Valkey uses general TLS profile and `crl_file`. PostgreSQL verifies `verify-full` and requires TLS 1.3 by default; the minimum protocol can only be set to TLS 1.2 or TLS 1.3. Schema Registry uses HTTPS; OTLP uses TLS by default and CA from `telemetry.otlp_ca_file`.
 
 ```sh
 task test:security
@@ -57,8 +61,8 @@ task test:security:sanitizers
 task test:component
 ```
 
-Профиль `security` запускает отдельные Kafka/PostgreSQL с mTLS и `valkey-tls`, без опубликованных портов. Тесты подтверждают реальные токены Keycloak, загрузку JWKS через HTTPS, Schema Registry/mTLS, публикацию и чтение Kafka, PostgreSQL и Valkey, продление и отзыв активного потока. Тестовые ключи находятся в игнорируемом `.cache/`, генерация использует только тестовый УЦ. Обычные наборы данных локального окружения сохраняются.
+The profile `security` runs separate Kafka/PostgreSQL with mTLS and `valkey-tls`, without published ports. Tests confirm real Keycloak tokens, JWKS loading via HTTPS, Schema Registry/mTLS, Kafka publishing and reading, PostgreSQL and Valkey, extending and revoking active streams. Test keys are in an ignored `.cache/`, generation uses only test CAs. Regular local environment datasets are saved.
 
-Явные исключения для изолированного локального стенда: Kafka/HTTP `allow_plaintext=true`, PostgreSQL `sslmode=disable`, Redis `tls.enabled=false`, OTLP `telemetry.otlp_tls=false`. Эксплуатационные процедуры и внешняя step-ca описаны в [регламенте доверия](../../../docs/security/platform-trust.md). ClickHouse и gRPC/HTTP серверы предметных сервисов подключают механизмы на своих шагах; проверка защищённой поставки и её ACL относится к Ф9 и шагу 10.3.
+Explicit exceptions for isolated local environments: Kafka/HTTP `allow_plaintext=true`, PostgreSQL `sslmode=disable`, Redis `tls.enabled=false`, OTLP `telemetry.otlp_tls=false`. Operational procedures and external step-ca are described in [trust schedule](../../../docs/security/platform-trust.md). ClickHouse and domain gRPC/HTTP servers use these mechanisms. Protected deployment and ACL verification are covered by [deployment PKI](../../../docs/engineering/deployment-pki.md) and the [security verification registry](../../../docs/security/threat-register.md).
 
-Рабочие сервисы получают общую конфигурацию через `platform::stream::authentication_options`. Режим только с подписью остаётся низкоуровневым API для автономных проверок криптографии. Параметры актуальности, ссылок на области и WebSocket описаны в [руководстве авторизации](../../../docs/security/authorization.md).
+Working services receive a common configuration through `platform::stream::authentication_options`. Signature-only verification remains a low-level API for autonomous cryptographic checks. Parameters, scope references, and WebSocket are described in [authorization guide](../../../docs/security/authorization.md).

@@ -17,8 +17,8 @@
             "subsystem": "services"
           },
           "annotations": {
-            "summary": "Экземпляр сервиса недоступен",
-            "description": "Проверить узел, readiness, зависимости и последние ошибки выбранного экземпляра.",
+            "summary": "The service instance is unavailable.",
+            "description": "Check the node, its readiness, dependencies, and any recent errors of the selected instance.",
             "runbook_url": "/operations/runbooks/PsimServiceUnavailable",
             "dashboard_url": "/monitoring/d/psim-services"
           }
@@ -32,8 +32,8 @@
             "subsystem": "infrastructure"
           },
           "annotations": {
-            "summary": "Компонент инфраструктуры недоступен",
-            "description": "Проверить component, node, TLS и длительность запроса. Сравнить состояние остальных реплик.",
+            "summary": "The infrastructure component is unavailable.",
+            "description": "Check the component, node, TLS, and request duration. Compare the status of other replicas.",
             "runbook_url": "/operations/runbooks/PsimComponentUnavailable",
             "dashboard_url": "/monitoring/d/psim-infrastructure"
           }
@@ -47,8 +47,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Сбор диагностики узла недоступен",
-            "description": "Проверить агент, сертификат, порт 19443 и доступность узла.",
+            "summary": "Node diagnostic collection is unavailable",
+            "description": "Check the agent, certificate, port 19443, and the availability of the node.",
             "runbook_url": "/operations/runbooks/PsimMonitoringUnavailable",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -62,8 +62,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "Нарушена репликация Kafka",
-            "description": "Проверить доступность брокеров, ISR, диски и сетевые ошибки.",
+            "summary": "Kafka replication is degraded",
+            "description": "Check the availability of brokers, ISRs, disks, and network errors.",
             "runbook_url": "/operations/runbooks/PsimKafkaReplication",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -77,8 +77,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "Растёт отставание потребителя Kafka",
-            "description": "Сравнить входную скорость, скорость обработки, возраст данных и остановленные партиции.",
+            "summary": "Kafka consumer lag is increasing",
+            "description": "Compare the input speed, processing speed, data age, and stopped partitions.",
             "runbook_url": "/operations/runbooks/PsimKafkaLag",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -92,8 +92,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "В DLQ поступают новые записи",
-            "description": "Определить stage, code или topic; проверить схему и ошибки исходного сервиса.",
+            "summary": "New records are being added to DLQ.",
+            "description": "Determine the stage, code, or topic; check the schema and errors of the original service.",
             "runbook_url": "/operations/runbooks/PsimDeadLetters",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -107,8 +107,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "Обработка партиции остановлена",
-            "description": "Проверить stage и повторяющиеся ошибки обработки.",
+            "summary": "Processing of the partition has been stopped",
+            "description": "Check the stage and recurring processing errors.",
             "runbook_url": "/operations/runbooks/PsimPartitionStopped",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -122,8 +122,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "p99 событие -> фиксация инцидента превышает 1 с",
-            "description": "Сравнить лаг Kafka, длительности Normalizer, Correlation Engine, транзакций инцидента и состояние PostgreSQL.",
+            "summary": "Event -> incident commit p99 exceeds 1 s",
+            "description": "Compare Kafka lag, Normalizer and Correlation Engine durations, incident transaction duration and PostgreSQL state.",
             "runbook_url": "/operations/runbooks/PsimPipelineLatency",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -137,8 +137,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "Сигналы публикуются без фиксации инцидентов",
-            "description": "Проверить lag потребителя сигналов, Incident Service и PostgreSQL. Обычный поток событий без срабатываний правил не вызывает этот алерт.",
+            "summary": "Signals are published without recording incidents",
+            "description": "Check signal consumer lag, Incident Service and PostgreSQL. Normal event traffic without rule matches does not trigger this alert.",
             "runbook_url": "/operations/runbooks/PsimSignalInterrupted",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -152,8 +152,8 @@
             "subsystem": "storage"
           },
           "annotations": {
-            "summary": "Загрузка ClickHouse отстаёт",
-            "description": "Проверить pending batches, ошибки вставки, replication queue, parts и диски. Возраст последней записи без очереди не означает отказ.",
+            "summary": "ClickHouse loading is lagging",
+            "description": "Check pending batches, insertion errors, replication queue, parts and disks. Latest-record age alone does not indicate failure when there is no backlog.",
             "runbook_url": "/operations/runbooks/PsimClickHouseIngest",
             "dashboard_url": "/monitoring/d/psim-storage"
           }
@@ -167,8 +167,8 @@
             "subsystem": "storage"
           },
           "annotations": {
-            "summary": "Нарушена репликация ClickHouse",
-            "description": "Проверить Keeper, доступность второй реплики, ошибки очереди и свободное место.",
+            "summary": "ClickHouse replication is interrupted",
+            "description": "Check Keeper, the availability of the second replica, queue errors, and available space.",
             "runbook_url": "/operations/runbooks/PsimClickHouseReplication",
             "dashboard_url": "/monitoring/d/psim-storage"
           }
@@ -182,8 +182,8 @@
             "subsystem": "storage"
           },
           "annotations": {
-            "summary": "Слишком много активных частей ClickHouse",
-            "description": "Проверить table, partition, размер batch и скорость merges.",
+            "summary": "Too many active parts in ClickHouse",
+            "description": "Check the table, partition, batch size, and merge speed.",
             "runbook_url": "/operations/runbooks/PsimClickHouseParts",
             "dashboard_url": "/monitoring/d/psim-storage"
           }
@@ -197,8 +197,8 @@
             "subsystem": "infrastructure"
           },
           "annotations": {
-            "summary": "Нет единственного primary PostgreSQL",
-            "description": "Проверить Patroni, etcd, watchdog и синхронную реплику.",
+            "summary": "There is no single primary PostgreSQL",
+            "description": "Check Patroni, etcd, watchdog, and the synchronous replication.",
             "runbook_url": "/operations/runbooks/PsimPostgresPrimary",
             "dashboard_url": "/monitoring/d/psim-infrastructure"
           }
@@ -212,8 +212,8 @@
             "subsystem": "infrastructure"
           },
           "annotations": {
-            "summary": "Нет единственного primary Valkey",
-            "description": "Проверить Sentinel, доступность primary и состояние реплик.",
+            "summary": "There is no single primary Valkey",
+            "description": "Check the Sentinel, availability of the primary, and the status of the replicas.",
             "runbook_url": "/operations/runbooks/PsimValkeyPrimary",
             "dashboard_url": "/monitoring/d/psim-infrastructure"
           }
@@ -227,8 +227,8 @@
             "subsystem": "storage"
           },
           "annotations": {
-            "summary": "Свободно менее 15% диска",
-            "description": "Определить node и volume. Проверить рост Kafka, ClickHouse, SeaweedFS и телеметрии.",
+            "summary": "Less than 15% of the disk is free",
+            "description": "Determine the node and volume. Check the growth of Kafka, ClickHouse, SeaweedFS, and telemetry.",
             "runbook_url": "/operations/runbooks/PsimDiskSpace",
             "dashboard_url": "/monitoring/d/psim-storage"
           }
@@ -242,8 +242,8 @@
             "subsystem": "storage"
           },
           "annotations": {
-            "summary": "Свободно менее 5% диска",
-            "description": "Проверить противодавление и наличие подтверждённых данных. Определить самый быстро растущий volume.",
+            "summary": "Less than 5% of the disk is free",
+            "description": "Check for backpressure and the presence of acknowledged data. Determine the fastest-growing volume.",
             "runbook_url": "/operations/runbooks/PsimDiskCritical",
             "dashboard_url": "/monitoring/d/psim-storage"
           }
@@ -257,8 +257,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "До истечения сертификата менее 30 суток",
-            "description": "Проверить owner и certificate, цепочку доверия и полномочия CA.",
+            "summary": "Less than 30 days until the certificate expires",
+            "description": "Check the owner and certificate, as well as the chain of trust and CA authority.",
             "runbook_url": "/operations/runbooks/PsimCertificateExpiry",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -272,8 +272,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Нет успешной резервной копии за 24 часа",
-            "description": "Проверить backup, журнал задания, независимое целевое хранилище и время последнего подтверждённого завершения.",
+            "summary": "No successful backup available in the last 24 hours",
+            "description": "Check the backup, task log, independent target storage, and the last acknowledged completion time.",
             "runbook_url": "/operations/runbooks/PsimBackupStale",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -287,8 +287,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Состояние резервных копий неизвестно",
-            "description": "Проверить файл состояния агента, его формат, права и обновление заданиями копирования.",
+            "summary": "The status of the backup copies is unknown.",
+            "description": "Check the agent’s state file, its format, permissions, and update it with copying tasks.",
             "runbook_url": "/operations/runbooks/PsimBackupTelemetryStale",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -302,8 +302,8 @@
             "subsystem": "business"
           },
           "annotations": {
-            "summary": "На площадках отсутствует текущий дежурный",
-            "description": "Проверить tenant, число площадок без назначения и раздел дежурств в консоли.",
+            "summary": "Sites have no current duty assignee",
+            "description": "Check tenant, the number of sites without assignments and duty assignments in the console.",
             "runbook_url": "/operations/runbooks/PsimDutyMissing",
             "dashboard_url": "/monitoring/d/psim-business"
           }
@@ -317,8 +317,8 @@
             "subsystem": "business"
           },
           "annotations": {
-            "summary": "Есть отключённые коннекторы",
-            "description": "Сравнить число регистраций с живыми сессиями; проверить сеть, срок сертификата и буфер SDK.",
+            "summary": "There are disconnected connectors",
+            "description": "Compare the number of registrations with active sessions; check the network, certificate expiration, and SDK buffer.",
             "runbook_url": "/operations/runbooks/PsimConnectorOffline",
             "dashboard_url": "/monitoring/d/psim-business"
           }
@@ -332,8 +332,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Часы узла расходятся более чем на 1 с",
-            "description": "Проверить доступность источника времени, chrony и системные часы. Метрика сравнивает часы агента с часами Prometheus.",
+            "summary": "Node clock skew exceeds 1 s",
+            "description": "Check the availability of the time source, chrony, and system clocks. The metric compares the agent’s time with the Prometheus time.",
             "runbook_url": "/operations/runbooks/PsimClockSkew",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -347,8 +347,8 @@
             "subsystem": "pipeline"
           },
           "annotations": {
-            "summary": "Восстановление корреляции превышает 30 с",
-            "description": "Проверить размер состояния, changelog lag, диск и доступность Kafka.",
+            "summary": "Correlation recovery exceeds 30 s",
+            "description": "Check the state size, changelog lag, disk status, and Kafka availability.",
             "runbook_url": "/operations/runbooks/PsimCorrelationRestore",
             "dashboard_url": "/monitoring/d/psim-pipeline"
           }
@@ -362,8 +362,8 @@
             "subsystem": "services"
           },
           "annotations": {
-            "summary": "Доля ошибок проксирования API превышает 5% входных запросов",
-            "description": "Проверить operation, upstream, TLS, Valkey и ошибки проксирования.",
+            "summary": "The error rate of API proxying exceeds 5% of incoming requests",
+            "description": "Check operation, upstream, TLS, Valkey, and proxy errors.",
             "runbook_url": "/operations/runbooks/PsimApiErrors",
             "dashboard_url": "/monitoring/d/psim-services"
           }
@@ -377,8 +377,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Collector не доставляет телеметрию",
-            "description": "Проверить Loki, Tempo, очереди, диски и ошибки Collector.",
+            "summary": "The Collector does not deliver telemetry.",
+            "description": "Check Loki, Tempo, queues, disks, and Collector errors.",
             "runbook_url": "/operations/runbooks/PsimTelemetryRejected",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -392,8 +392,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Не удалось получить подробные метрики",
-            "description": "Проверить collector, component, права мониторинга, TLS и совместимость протокола. Доступность TCP не подтверждает получение метрик.",
+            "summary": "Failed to obtain detailed metrics",
+            "description": "Check the collector, components, monitoring rights, TLS, and protocol compatibility. TCP availability does not guarantee the receipt of metrics.",
             "runbook_url": "/operations/runbooks/PsimMetricCollectionFailed",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -407,8 +407,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Не доставляются уведомления об отказах",
-            "description": "Проверить receiver, TLS, доступность webhook и журнал Alertmanager.",
+            "summary": "No failure notifications are delivered",
+            "description": "Check the receiver, TLS, webhook availability, and the Alertmanager log.",
             "runbook_url": "/operations/runbooks/PsimAlertDeliveryFailed",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -422,8 +422,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Контроль работы канала наблюдаемости",
-            "description": "Проверить регулярное получение уведомления внешним мониторингом.",
+            "summary": "Observability notification channel health",
+            "description": "Check for regular receipt of notifications by external monitoring.",
             "runbook_url": "/operations/runbooks/PsimWatchdog",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -437,8 +437,8 @@
             "subsystem": "infrastructure"
           },
           "annotations": {
-            "summary": "Длительность запросов к зависимости превышает 150 мс",
-            "description": "Сравнить target с разных узлов, проверить RTT, потери пакетов и нагрузку.",
+            "summary": "The duration of requests to the dependency exceeds 150 ms",
+            "description": "Compare the target with different nodes, check RTT, packet losses, and load.",
             "runbook_url": "/operations/runbooks/PsimDependencyLatency",
             "dashboard_url": "/monitoring/d/psim-infrastructure"
           }
@@ -452,8 +452,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Последняя попытка резервного копирования завершилась ошибкой",
-            "description": "Выполнить psimctl diagnose и проверить независимое хранилище. Повторить psimctl backup create; не изменять время последней успешной копии вручную.",
+            "summary": "The last attempt at backup failed.",
+            "description": "Run psimctl diagnose and check the independent storage. Repeat psimctl backup create; do not manually change the time of the last successful backup.",
             "runbook_url": "/operations/runbooks/PsimBackupFailed",
             "dashboard_url": "/monitoring/d/psim-operations"
           }
@@ -467,8 +467,8 @@
             "subsystem": "operations"
           },
           "annotations": {
-            "summary": "Ошибки архивирования WAL PostgreSQL",
-            "description": "Проверить psimctl backup wal-push, конфигурацию PostgreSQL и отдельную учётную запись записи копий. Не удалять WAL вручную.",
+            "summary": "WAL Archiving Errors in PostgreSQL",
+            "description": "Check psimctl backup wal-push, PostgreSQL configuration and the separate backup writer account. Do not delete WAL manually.",
             "runbook_url": "/operations/runbooks/PsimWalArchiveFailed",
             "dashboard_url": "/monitoring/d/psim-operations"
           }

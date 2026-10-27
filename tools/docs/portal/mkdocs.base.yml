@@ -1,19 +1,19 @@
 # Documentation portal (ADR-038). Template: tools/docs/portal.py adds docs_dir, site_url,
 # repository links and the navigation built from docs/README.md. Built by `task docs:portal`.
 site_name: Open-Source PSIM Platform
-site_description: Документация Open-Source PSIM Platform, собранная из репозитория
+site_description: Open-Source PSIM Platform documentation built from the repository
 strict: true
 use_directory_urls: false
 theme:
   name: material
-  language: ru
+  language: en
   # No web fonts: the portal must work without internet access.
   font: false
   palette:
     - scheme: slate
-      toggle: {icon: material/weather-sunny, name: Светлая тема}
+      toggle: {icon: material/weather-sunny, name: Light theme}
     - scheme: default
-      toggle: {icon: material/weather-night, name: Тёмная тема}
+      toggle: {icon: material/weather-night, name: Dark theme}
   features:
     - navigation.sections
     - navigation.indexes
@@ -23,7 +23,7 @@ theme:
 plugins:
   # Served over HTTP (docs:serve, release archive); the offline plugin would load a shim from a CDN.
   - search:
-      lang: [ru, en]
+      lang: [en]
 markdown_extensions:
   - tables
   - admonition

@@ -1,54 +1,54 @@
-# Матрица верификации
+# Verification matrix
 
-Сгенерировано из [verification.yaml](verification.yaml) задачей `task docs:verification:gen`. Не редактировать вручную.
-Стратегия - [strategy.md](strategy.md). В скобках - барьер метода: `pr` блокирует слияние, `nightly` - следующий выпуск, `release` - выпуск; `on-demand` запускается вручную и не входит в CI.
+Generated from [verification.yaml](verification.yaml) by `task docs:verification:gen`. Do not edit manually.
+See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks merging, `nightly` blocks the next release, and `release` blocks release; `on-demand` runs manually outside CI.
 
-## 1. Сводка
+## 1. Summary
 
-| Вид | pr | nightly | release | on-demand | Всего |
+| Kind | pr | nightly | release | on-demand | Total |
 |---|---|---|---|---|---|
-| Наборы тестов | 23 | 13 | 0 | 3 | 39 |
-| Нагрузка | 0 | 3 | 8 | 0 | 11 |
-| Длительная нагрузка | 0 | 0 | 1 | 0 | 1 |
-| Хаос и отказы | 0 | 5 | 10 | 0 | 15 |
-| Бенчмарки | 5 | 1 | 0 | 1 | 7 |
+| Test suites | 23 | 13 | 0 | 3 | 39 |
+| Load tests | 0 | 3 | 8 | 0 | 11 |
+| Soak tests | 0 | 0 | 1 | 0 | 1 |
+| Chaos and failures | 0 | 5 | 10 | 0 | 15 |
+| Benchmarks | 5 | 1 | 0 | 1 | 7 |
 | Fitness functions | 19 | 1 | 2 | 0 | 22 |
-| Безопасность | 4 | 2 | 3 | 0 | 9 |
-| Ручные процедуры | 0 | 0 | 5 | 0 | 5 |
-| **Всего** | 51 | 25 | 29 | 4 | **109** |
+| Security | 4 | 2 | 3 | 0 | 9 |
+| Manual procedures | 0 | 0 | 5 | 0 | 5 |
+| **Total** | 51 | 25 | 29 | 4 | **109** |
 
-## 2. Цели SLO (план, раздел 1.3)
+## 2. SLO goals
 
-| ID | Цель | Порог | Методы |
+| ID | Goal | Target | Methods |
 |---|---|---|---|
-| G-01 | Пропускная способность | 50 000 событий/с устойчиво в течение 24 ч, пиковый ×1,5 в течение 10 мин | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
-| G-02 | Задержка событие -> сигнал | p99 ≤ 300 мс | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
-| G-03 | Задержка событие -> инцидент в консоли | p99 ≤ 1 с | L-05 (release), TS-11 (pr), FF-05 (release), TS-31 (pr), TS-32 (pr) |
-| G-04 | Задержка отклика REST API | p99 ≤ 200 мс для операций чтения консоли | L-05 (release) |
-| G-05 | Потери данных | 0 событий, 0 инцидентов (проверяется сквозной сверкой последовательностей) | TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
-| G-06 | Дубликаты инцидентов | 0 при любых перезапусках и повторах | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
-| G-07 | RTO, кластерная топология | ≤ 60 с при отказе любого одного узла | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release), C-15 (release) |
-| G-08 | RPO для инцидентов | 0 в кластерной топологии | C-03 (release), C-11 (release) |
-| G-09 | Обновление | Без простоя обработки в кластерной топологии | C-12 (release) |
-| G-10 | Консоль | Плавная работа ленты с 10 000 активных инцидентов | TS-15 (nightly), TS-14 (pr) |
+| G-01 | Throughput | 50,000 events/s sustained for 24 hours; 1.5x peak for 10 minutes | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
+| G-02 | Event to signal latency | p99 <= 300 ms | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
+| G-03 | Event to incident in the console latency | p99 <= 1 s | L-05 (release), TS-11 (pr), FF-05 (release), TS-31 (pr), TS-32 (pr) |
+| G-04 | REST API response latency | p99 <= 200 ms for console read operations | L-05 (release) |
+| G-05 | Data loss | 0 events and 0 incidents, verified by end-to-end sequence reconciliation | TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), L-03 (release), C-01 (release), C-02 (nightly), C-06 (release), C-07 (nightly), C-08 (release), C-10 (nightly), C-11 (release) |
+| G-06 | Duplicate incidents | 0 across restarts and retries | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
+| G-07 | Cluster recovery time objective | <= 60 s after failure of any one node | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release), C-15 (release) |
+| G-08 | Incident recovery point objective | 0 in the cluster topology | C-03 (release), C-11 (release) |
+| G-09 | Upgrades | No processing downtime in the cluster topology | C-12 (release) |
+| G-10 | Console | Smooth incident feed with 10,000 active incidents | TS-15 (nightly), TS-14 (pr) |
 
-## 3. Цели инженерного качества (план, раздел 1.4)
+## 3. Engineering quality goals
 
-| ID | Цель | Порог | Методы |
+| ID | Goal | Target | Methods |
 |---|---|---|---|
-| G-11 | Предупреждения компилятора и clang-tidy | 0 (`-Werror`) | FF-10 (pr) |
-| G-12 | Санитайзеры (ASan, UBSan, TSan) | Обязательны в CI, 0 срабатываний | FF-11 (pr) |
-| G-13 | Покрытие доменного ядра | ≥ 90% строк, ≥ 80% ветвей | FF-12 (pr), TS-01 (pr), TS-02 (pr) |
-| G-14 | Покрытие инфраструктурного кода | ≥ 75% | FF-12 (pr), TS-03 (pr) |
-| G-15 | Фаззинг | На шаге 5.1 - парсер и валидатор правил без падений за 10 мин; на шаге 10.3 - все внешние парсеры и DSL правил без падений за 24 ч | SEC-09 (pr), SEC-04 (nightly), SEC-05 (release) |
-| G-16 | Совместимость контрактов | Автоматическая проверка в CI, без ручных исключений | TS-04 (pr), FF-04 (pr), TS-05 (nightly) |
-| G-17 | Регрессия производительности | Автоматический барьер в CI: падение > 5% блокирует слияние | B-05 (pr), B-02 (pr), FF-05 (release), L-01 (nightly) |
-| G-18 | Сборки | Воспроизводимые, с SBOM и подписанными артефактами | FF-13 (nightly), FF-14 (release), FF-15 (pr), SEC-02 (pr) |
-| G-19 | Документация | Самодостаточная документация конечного состояния платформы: архитектура (arc42 + C4), ADR, руководства и API-справочники; EN по умолчанию и полная версия RU | FF-08 (pr), FF-09 (pr), M-01 (release) |
+| G-11 | Compiler and clang-tidy warnings | 0; warnings are errors (`-Werror`) | FF-10 (pr) |
+| G-12 | Sanitizers (ASan, UBSan, TSan) | Mandatory in CI, 0 findings | FF-11 (pr) |
+| G-13 | Domain core coverage | >= 90% of lines and >= 80% of branches | FF-12 (pr), TS-01 (pr), TS-02 (pr) |
+| G-14 | Infrastructure code coverage | >= 75% | FF-12 (pr), TS-03 (pr) |
+| G-15 | Fuzzing | Rule parser and validator: 10 minutes without crashes in CI; all external parsers and the rule DSL: 24 hours per target without crashes for release qualification | SEC-09 (pr), SEC-04 (nightly), SEC-05 (release) |
+| G-16 | Contract compatibility | Automatic CI verification without manual exceptions | TS-04 (pr), FF-04 (pr), TS-05 (nightly) |
+| G-17 | Performance regression | Automatic CI gate: a regression greater than 5% blocks merging | B-05 (pr), B-02 (pr), FF-05 (release), L-01 (nightly) |
+| G-18 | Builds | Reproducible, with SBOM and signed artifacts | FF-13 (nightly), FF-14 (release), FF-15 (pr), SEC-02 (pr) |
+| G-19 | Documentation | Self-contained documentation of the implemented platform: arc42 and C4 architecture, ADRs, guides and API references; English by default and a complete Russian version | FF-08 (pr), FF-09 (pr), M-01 (release) |
 
-## 4. Сценарии приёмки
+## 4. Acceptance scenarios
 
-| Сценарий | Методы |
+| Scenario | Methods |
 |---|---|
 | [S1](../product/acceptance-spec.md) | TS-06 (pr), TS-10 (nightly), TS-11 (pr), M-01 (release), TS-22 (nightly), TS-24 (pr), TS-28 (pr), TS-29 (pr), TS-36 (pr) |
 | [S2](../product/acceptance-spec.md) | TS-10 (nightly), TS-11 (pr), L-07 (nightly), TS-18 (nightly), TS-24 (pr), TS-29 (pr), TS-31 (pr), TS-36 (pr) |
@@ -64,214 +64,153 @@
 | [S12](../product/acceptance-spec.md) | C-12 (release) |
 | [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (pr), M-05 (release), TS-37 (pr) |
 
-## 5. Каталог методов
+## 5. Method catalog
 
-### Наборы тестов
+### Test suites
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| TS-39 | Пакет наблюдаемости | Семь статических дашбордов, корректные PromQL и конфигурации, переходы алертов и инструкции для C-01-C-15, бизнес-агрегаты без доступа к исходным таблицам, mTLS метрик, OTLP логи и трассы, доставка Prometheus -> Alertmanager -> журнал и браузерный просмотр без ошибок запросов. Назначение: Поставка наблюдаемости и диагностические маршруты отказов; не заменяет квалификацию RPO/RTO. | E-CI | pr | `task deploy:observability:test` | 9.4 |
-| TS-38 | Загрузка и восстановление веб-модулей | Сравнение исходной сборки, статических модулей, отложенных редакторов, языковых словарей и отдельных входов; ru/en, реальные холодный и прогретый HTTP-кэш, полные графы с динамическими imports и данными словарей, запрет преждевременной загрузки закрытого маршрута, ошибка чанка, обновление артефакта и повтор загрузки перевода с сохранением ввода. Назначение: Сравнение способов загрузки и проверка действующих пределов до изменения поставки. | E-CI | pr | `task web:loading` | 8.6 |
-| TS-37 | Аудит и отчёт руководителя через публичный интерфейс | Реальный PKCE с TOTP, поиск и страницы аудита, независимая проверка скачанного JSONL, точное обнаружение изменения и удаления записи в PostgreSQL, запрет чужой площадки, отзыв роли при прежнем JWT, эталонные метрики за 30 суток менее чем за три секунды и совпадающий CSV. | E-LOCAL | pr | `task insights:test` | 8.5 |
-| TS-36 | Администрирование через публичный интерфейс | Реальный PKCE с MFA, регистрация и продление сертификата, отображение нового типа коннектора, иерархия и импорт, обслуживание, SLA, правило с пробным прогоном, публикация сценария, запрет чужой площадки и недопустимых загрузок. | E-LOCAL | pr | `task admin:test` | 8.4 |
-| TS-35 | Рабочая консоль оператора | Реальный PKCE, принятие инцидента, checklist и решения, предпросмотр и исполнение команды, SLA и уведомления, частный план и передача ответственности. | E-LOCAL | on-demand | `task operator:test` | 8.3 |
-| TS-34 | Сессия и ролевые маршруты оболочки | PKCE, проверка ID token, одиночный refresh, очистка при выходе, прямой вход, ролевые границы и поздние ответы. Назначение: Проверить изоляцию сессий и общую оболочку без смешивания рабочих данных пользователей. | E-CI | pr | `task web:check` | 8.2 |
-| TS-33 | Серверные операции оперативного интерфейса | Независимая тревога, права, версии, повторы, lease между экземплярами, история, изоляция учений и разрешённые источники ассистента. Назначение: Проверить серверные операции оперативного интерфейса без использования имитатора витрины. | E-CI | pr | `task operations:test` | 8.1a |
-| TS-01 | Unit-тесты доменного ядра | Все проходят; каждый инвариант aggregates.md и каждый переход state-models.md покрыт тестом. | E-CI | pr | `task cpp:test` | 1.2, 5.3, 6.1, 6.2 |
-| TS-02 | Property-based тесты инвариантов агрегатов | Для случайных последовательностей команд инварианты соблюдены; 0 дубликатов инцидентов при повторах сигналов. | E-CI | pr | `task cpp:test:property` | 5.3, 6.1, 6.2 |
-| TS-03 | Компонентные тесты адаптеров против контейнеров | Kafka, PostgreSQL, Redis, ClickHouse - реальные контейнеры окружения 1.4; сценарии разрыва соединений и переключения. | E-CI | pr | `task test:component` | 1.4, 2.3, 2.4, 2.5, 2.8 |
-| TS-04 | Проверка контрактов | task contracts:check зелёный - формат, линтер, buf breaking, OpenAPI и AsyncAPI валидны и актуальны, согласованность реестров. | E-CI | pr | `task contracts:check` | 0.5, 1.3 |
-| TS-05 | Контрактные тесты REST против OpenAPI | Все маршруты Protobuf доступны через Gateway; реальные ответы проверяются по psim-api-v1.yaml, коды ошибок из каталога, RFC 9457. | E-CI | nightly | `task test:api-contract` | 7.1 |
-| TS-06 | Тестовый набор соответствия протоколу коннекторов | Эталонные коннекторы и симулятор проходят весь набор; обрыв связи 10 мин без потерь. | E-CI | pr | `task connectors:conformance` | 4.1, 4.3 |
-| TS-07 | Симуляция конвейера, короткий прогон | Ручной запуск 200 прогонов со случайными сбоями; сверка в памяти - 0 потерь и 0 повторных эффектов; эталонная доставка и вычислитель корреляции с независимыми оракулами (ADR-044). | E-DEV | on-demand | `task sim:short` | 2.7, 5.2 |
-| TS-08 | Симуляция конвейера, длинный прогон | Ручной запуск 10 000 прогонов; ошибка воспроизводится по зерну, версии модели и параметрам; трасса сохраняется для регрессионного теста (ADR-044). | E-DEV | on-demand | `task sim:long` | 2.7, 5.2 |
-| TS-09 | Сквозной смоук-тест конвейера в Docker Compose | Событие симулятора порождает инцидент, видимый через API и realtime; одна трассировка на весь путь. | E-CI | pr | `task test:smoke` | 3.1 |
-| TS-10 | Приёмочные API-тесты сценариев | Сценарии acceptance-spec.md, выполнимые через API и протокол коннекторов, включая негативные проверки. | E-CI | nightly | `task test:acceptance` | 3.1, 11.3 |
-| TS-11 | Сквозные UI-тесты Playwright | Сценарии S1, S2, S6-S10, S13 через интерфейс с настоящими Keycloak, Kafka и сервисами; обязательные шаги, перезапуск и сохранение версии сценария, второе подтверждение команды, передача ответственности, завершение и закрытие инцидента. | E-CI | pr | `task web:native` | 8.3, 8.4, 8.5, 8.6 |
-| TS-12 | Матрица прав «роль × действие × область» | Все действия и шесть ролей, тенант, площадка и зона; запросы к сервисам и Gateway, компактные наборы областей и отзыв REST/WSS до истечения JWT; отказы в аудите. | E-CI | pr | `task test:authz` | 7.4 |
-| TS-13 | Тест целостности аудита | Изменение, удаление и вставка записи в БД обнаруживаются проверкой с точностью до записи. | E-CI | pr | `task test:audit-integrity` | 6.4 |
-| TS-14 | Устойчивость консоли к разрывам связи | Разрыв не менее 5 мин восстанавливается без потери изменений; просроченный JWT с учётом допуска часов получает 401, новый токен отличается от прежнего; replay и перезапуск Gateway, RESYNC при выходе за окно. | E-CI | pr | `task web:session` | 8.2, 8.6 |
-| TS-15 | Производительность ленты консоли | 10 000 активных инцидентов, прокрутка ≥ 50 кадров/с, применение дельты без блокировки интерфейса. | E-CI | nightly | `task web:perf` | 8.3, 8.6 |
-| TS-16 | Автоматическая проверка доступности интерфейса | axe-core без критичных нарушений на ключевых экранах. Назначение: DoD шага 8.1. | E-CI | nightly | `task web:a11y` | 8.1 |
-| TS-17 | Возобновление сценариев и таймеров после перезапуска | Перезапуск Response Engine посреди сценария и перед срабатыванием таймера; погрешность таймеров ≤ 1 с. | E-CI | nightly | `task test:timers` | 6.1, 6.3 |
-| TS-30 | Факты инцидентов и отчётность | Метрики совпадают с эталоном; повторы и пересчёт не меняют результат; роли и области соблюдены. Назначение: Метрики, авторизация, повторы и пересчёт фактов для API отчётов. | E-LOCAL | pr | `task reports:test` | 6.5 |
-| TS-18 | Файлы планов и восстановление | Загрузка PNG/JPEG до 20 МБ, отказ поддельного типа и превышения пикселей; чужая область и публичный bucket недоступны; отказ замены сохраняет версию; восстановленные объекты и ссылки совпадают по SHA-256. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 4.4, 9.1, 9.3 |
-| TS-19 | Достоверное состояние и realtime устройств | Offline после трёх heartbeat; досылка истории и старый снимок не повышают свежесть; сверка возвращает actual; снимок и дельты после разрыва сохраняют версии и область; p99 доставки ≤ 200 мс. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 4.1, 4.2, 4.5, 7.2, 7.3, 8.3 |
-| TS-20 | Режим обслуживания и завершение | Выбранные сигналы подавлены, события сохранены; пожарные события и P1 проходят; чужая область отклонена; SLA открытых инцидентов сохранён; окончание ≤ 1 с, включая перезапуск. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 4.4, 5.1, 5.2, 8.4 |
-| TS-21 | Передача ответственности и дежурство | Подтверждение получателя, проверка версии и области, идемпотентность; прежняя ответственность до принятия; SLA и сценарий сохранены; актуальный дежурный либо резервный контакт; аудит. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 5.3, 6.3, 8.3 |
-| TS-22 | Жизненный цикл сертификатов | Первоначальная регистрация по CSR; продление с перекрытием без потери событий; отзыв закрывает сессию и блокирует повтор; после восстановления отозванный сертификат не получает доступ. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 2.6, 4.2, 9.1, 9.3, 9.5 |
-| TS-23 | Изоляция диагностического replay | История с командами, email и webhook даёт 0 изменений рабочих сигналов, инцидентов, команд и уведомлений и 0 внешних вызовов; попытки рабочей записи отклонены ACL; область и параметры запуска в аудите. Назначение: Эксплуатационные критерии ADR-042; тест реализуется на указанных шагах. | E-CI | nightly | `task test:acceptance` | 5.1, 6.1, 9.5 |
-| TS-25 | Правила: жизненный цикл и изолированный исторический прогон | Два экземпляра согласуют версии, повторы и аудит; невалидное правило не активируется; все пять видов правил дают одинаковые решения из Kafka и ClickHouse; обслуживание сохраняет объяснение и версии, пожарные события и P1 проходят; задание восстанавливается после SIGKILL; чужая область отклонена; рабочие топики не меняются, записи и фиксация смещений запрещены настоящими ACL. Назначение: Настоящие PostgreSQL, Kafka, Schema Registry, ClickHouse, Keycloak и два экземпляра Correlation Engine. | E-CI | pr | `task rules:test` | 5.1 |
-| TS-24 | Resource Catalog: ресурсы, планы и обслуживание | Иерархия и источники сохраняют инварианты; версии и повторы запросов согласованы; чужая область отклонена; PNG/JPEG до 20 МиБ и версии планов сохраняются при отказах S3 и БД; orphan очищен; обслуживание завершается ≤ 1 с, включая восстановление при запуске; все изменения и отказы доступа получены потребителем аудита. Назначение: Два настоящих экземпляра, PostgreSQL, Kafka и S3; резервное копирование и применение подавления проверяются отдельно. | E-CI | pr | `task catalog:test` | 4.4 |
-| TS-26 | Перестроение проекций из Kafka | Проекции, перестроенные проигрыванием Kafka, совпадают с рабочими; старые события не дают ложного online или actual; сквозной сценарий M1 проходит после переноса проекции API Gateway. Назначение: Воспроизводимость read-моделей (принцип 6 плана, DoD шага 7.3). | E-CI | nightly | `task test:projections` | 7.3 |
-| TS-27 | Доставка уведомлений и защита webhook | Email и webhook доставляются через тестовые SMTP и приёмник; отказ и восстановление получателя не теряют и не дублируют уведомления; запрещённые и внутренние адреса webhook отклоняются; доставка фиксируется в аудите. Назначение: DoD шага 6.3 и защита от SSRF. | E-CI | nightly | `task test:notifications` | 6.3 |
-| TS-28 | Incident Service и авторизация | Два HTTPS-экземпляра, настоящие Kafka, PostgreSQL и Keycloak; переходы, версии, повторы, окно группировки, история, область доступа и подтверждённая передача сохраняют инварианты; SIGKILL и повтор сигналов не теряют и не дублируют эффекты. Назначение: Жизненный цикл инцидентов, общая авторизация и сохранение ответственности. | E-CI | pr | `task incidents:test` | 5.3 |
-| TS-29 | История событий и связи инцидентов | Реальные загрузчики, Kafka, ClickHouse и PostgreSQL; поиск и статистика ограничены областью; сигналы продлевают TTL; SIGKILL и повторы сохраняют полное множество связей без логических дубликатов. Назначение: Полный контекст инцидента, поиск и долговечное продление хранения. | E-CI | pr | `task history:test` | 5.4 |
-| TS-31 | Общие модели консоли и восстановление Kafka | Настоящие Kafka, PostgreSQL, Valkey и HTTPS; области доступа, независимые курсоры наблюдений и отчётов, дежурство, обслуживание, fallback к PostgreSQL, равенство перестроения и отказ неполной истории; локальный p99 обновления не выше 100 мс. Назначение: Согласованные снимки консоли, актуальность состояния и безопасное восстановление. | E-CI | pr | `task projection:test` | 7.3 |
-| TS-32 | Realtime подписки, восстановление и 500 клиентов | Два Gateway, 500 WSS-клиентов и 10000 доставок без потерь; локальный p99 не выше 200 мс; восстановление 500 подписок после перезапуска узла без нового снимка; фильтры, JWT, старый клиент, несколько подписок, приватные варианты, актуальное состояние после lease expiry и отключение медленного получателя. Назначение: Совместимая доставка изменений, независимое от узла возобновление и ограничение очередей. | E-CI | pr | `task realtime:test` | 7.2 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| TS-39 | Observability package | Seven static dashboards in both languages, valid PromQL and configurations, alert transitions and instructions for C-01-C-15, business aggregates without access to source tables, mTLS metrics, OTLP logs and traces, Prometheus -> Alertmanager -> journal delivery, and browser rendering without query errors. Purpose: Delivery of observability assets and failure diagnostic procedures; does not replace RPO/RTO qualification. | E-CI | pr | `task deploy:observability:test` |
+| TS-38 | Web module loading and recovery | Compare the original build, static modules, deferred editors, language dictionaries and separate entry points; ru/en, real cold and warm HTTP caches, complete graphs including dynamic imports and dictionary data, no premature loading of restricted routes, chunk failure, artifact replacement and translation reload with input preserved. Purpose: Compare loading strategies and verify current limits before changing the distribution. | E-CI | pr | `task web:loading` |
+| TS-37 | Audit and supervisor reporting through the public interface | Real PKCE with TOTP, audit search and pagination, independent verification of downloaded JSONL, exact detection of modified and deleted PostgreSQL records, denial of access to another site, role revocation with the previous JWT, reference metrics for 30 days in under three seconds and matching CSV. | E-LOCAL | pr | `task insights:test` |
+| TS-36 | Administration through the public interface | Real PKCE with MFA, certificate registration and renewal, mapping for a new connector type, hierarchy and import, maintenance, SLA, a rule with a trial run, scenario publication, and rejection of access to another site and invalid uploads. | E-LOCAL | pr | `task admin:test` |
+| TS-35 | Operator console | Real PKCE, incident acceptance, checklist and decisions, command preview and execution, SLA and notifications, private floor plan and responsibility handover. | E-LOCAL | on-demand | `task operator:test` |
+| TS-34 | Shell session and role-based routes | PKCE, ID token validation, a single concurrent refresh, cleanup on logout, direct entry, role boundaries and late responses. Purpose: Verify session isolation and the shared shell without mixing users' operational data. | E-CI | pr | `task web:check` |
+| TS-33 | Server operations for the operational interface | Independent alarm, permissions, versions, retries, leases across instances, history, exercise isolation and authorized assistant sources. Purpose: Verify server operations for the operational interface without a read-model simulator. | E-CI | pr | `task operations:test` |
+| TS-01 | Domain core unit tests | All tests pass; every invariant in aggregates.md and every transition in state-models.md is covered. | E-CI | pr | `task cpp:test` |
+| TS-02 | Property-based aggregate invariant tests | Invariants hold for random command sequences; 0 duplicate incidents when signals are repeated. | E-CI | pr | `task cpp:test:property` |
+| TS-03 | Adapter component tests against containers | Real Kafka, PostgreSQL, Redis and ClickHouse containers in the local environment; connection loss and failover scenarios. | E-CI | pr | `task test:component` |
+| TS-04 | Contract validation | task contracts:check passes; formatting, linting, buf breaking, valid and current OpenAPI and AsyncAPI, consistent registries. | E-CI | pr | `task contracts:check` |
+| TS-05 | REST contract tests against OpenAPI | All Protobuf routes are available through Gateway; actual responses conform to psim-api-v1.yaml, catalog error codes and RFC 9457. | E-CI | nightly | `task test:api-contract` |
+| TS-06 | Connector protocol conformance suite | Reference connectors and the simulator pass the complete suite; a 10-minute connection outage causes no data loss. | E-CI | pr | `task connectors:conformance` |
+| TS-07 | Short pipeline simulation | Manually run 200 trials with random failures; in-memory reconciliation finds 0 losses and 0 duplicate effects; reference delivery and correlation evaluator with independent oracles (ADR-044). | E-DEV | on-demand | `task sim:short` |
+| TS-08 | Long pipeline simulation | Manually run 10 000 trials; reproduce failures from seed, model version and parameters; retain the trace for regression testing (ADR-044). | E-DEV | on-demand | `task sim:long` |
+| TS-09 | End-to-end pipeline smoke test in Docker Compose | A simulator event creates an incident visible through the API and realtime; one trace covers the entire path. | E-CI | pr | `task test:smoke` |
+| TS-10 | Scenario acceptance tests through the API | Scenarios in acceptance-spec.md executable through the API and connector protocol, including negative checks. | E-CI | nightly | `task test:acceptance` |
+| TS-11 | End-to-end Playwright UI tests | Scenarios S1, S2, S6-S10, S13 through the interface with real Keycloak, Kafka and services; required steps, restart with scenario version preserved, second command approval, responsibility handover, incident resolution and closure. | E-CI | pr | `task web:native` |
+| TS-12 | Role x action x scope authorization matrix | All actions and six roles, tenant, site and zone; service and Gateway requests, compact scope sets, REST/WSS revocation before JWT expiry and audited denials. | E-CI | pr | `task test:authz` |
+| TS-13 | Audit integrity test | Verification detects database record modification, deletion and insertion with record-level precision. | E-CI | pr | `task test:audit-integrity` |
+| TS-14 | Console resilience to connection loss | Recover from an outage of at least 5 minutes without losing changes; an expired JWT receives 401 after clock tolerance, and the new token differs from the old one; replay and Gateway restart, RESYNC outside the replay window. | E-CI | pr | `task web:session` |
+| TS-15 | Console feed performance | 10 000 active incidents, scrolling >= 50 frames/s, delta application without blocking the interface. | E-CI | nightly | `task web:perf` |
+| TS-16 | Automated interface accessibility check | axe-core reports no critical violations on key screens. Purpose: Accessibility of key screens. | E-CI | nightly | `task web:a11y` |
+| TS-17 | Scenario and timer resumption after restart | Restart Response Engine during a scenario and before a timer fires; timer error <= 1 s. | E-CI | nightly | `task test:timers` |
+| TS-30 | Incident facts and reporting | Metrics match reference values; retries and recomputation preserve results; roles and access scopes are enforced. Purpose: Metrics, authorization, retries and fact recomputation for the reporting API. | E-LOCAL | pr | `task reports:test` |
+| TS-18 | Floor plan files and recovery | Upload PNG/JPEG up to 20 MB; reject forged file types and pixel-limit violations; deny other access scopes and public bucket access; a failed replacement preserves the version; restored objects and links match by SHA-256. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-19 | Reliable device state and realtime updates | Offline after three missed heartbeats; historical delivery and old snapshots cannot improve freshness; reconciliation restores actual; snapshots and deltas after disconnection preserve versions and access scope; delivery p99 <= 200 ms. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-20 | Maintenance mode and completion | Selected signals are suppressed and events retained; fire events and P1 pass through; reject other access scopes; preserve open-incident SLAs; completion within 1 s, including restart recovery. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-21 | Responsibility handover and duty assignment | Recipient confirmation, version and scope checks, idempotence; the previous owner remains responsible until acceptance; preserve SLA and scenario; use the current duty assignee or fallback contact; audit actions. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-22 | Certificate lifecycle | Initial registration through CSR; overlapping renewal without event loss; revocation closes the session and blocks reconnection; revoked certificates remain denied after recovery. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-23 | Diagnostic replay isolation | History containing commands, email and webhooks causes 0 changes to production signals, incidents, commands and notifications and 0 external calls; ACLs reject production writes; audit scope and run parameters. Purpose: Operational criteria in ADR-042. | E-CI | nightly | `task test:acceptance` |
+| TS-25 | Rule lifecycle and isolated historical replay | Two instances maintain consistent versions, retries and audit; invalid rules cannot activate; all five rule types produce identical decisions from Kafka and ClickHouse; maintenance preserves explanations and versions, while fire events and P1 pass through; jobs recover after SIGKILL; reject other access scopes; production topics remain unchanged and real ACLs prohibit writes and offset commits. Purpose: Real PostgreSQL, Kafka, Schema Registry, ClickHouse, Keycloak and two Correlation Engine instances. | E-CI | pr | `task rules:test` |
+| TS-24 | Resource Catalog resources, floor plans and maintenance | Hierarchy and sources preserve invariants; versions and request retries remain consistent; reject other access scopes; PNG/JPEG up to 20 MiB and floor plan versions survive S3 and database failures; clean up orphans; maintenance ends within 1 s, including startup recovery; the audit consumer receives every change and access denial. Purpose: Two real instances, PostgreSQL, Kafka and S3; backup and suppression application are tested separately. | E-CI | pr | `task catalog:test` |
+| TS-26 | Projection rebuild from Kafka | Projections rebuilt by Kafka replay match production projections; old events cannot produce false online or actual state; the end-to-end event scenario passes after API Gateway projection migration. Purpose: Reproducibility of read models from Kafka. | E-CI | nightly | `task test:projections` |
+| TS-27 | Notification delivery and webhook protection | Email and webhooks reach test SMTP and HTTP receivers; receiver failure and recovery cause no notification loss or duplication; reject prohibited and internal webhook addresses; audit delivery. Purpose: Notification delivery and SSRF protection. | E-CI | nightly | `task test:notifications` |
+| TS-28 | Incident Service and authorization | Two HTTPS instances, real Kafka, PostgreSQL and Keycloak; transitions, versions, retries, grouping window, history, access scope and confirmed handover preserve invariants; SIGKILL and repeated signals cause no lost or duplicate effects. Purpose: Incident lifecycle, shared authorization and responsibility preservation. | E-CI | pr | `task incidents:test` |
+| TS-29 | Event history and incident links | Real ingestion workers, Kafka, ClickHouse and PostgreSQL; search and statistics enforce access scope; signals extend TTL; SIGKILL and retries preserve the full link set without logical duplicates. Purpose: Complete incident context, search and durable retention extension. | E-CI | pr | `task history:test` |
+| TS-31 | Shared console models and Kafka recovery | Real Kafka, PostgreSQL, Valkey and HTTPS; access scopes, independent observation and report cursors, duty, maintenance, PostgreSQL fallback, rebuild equality and rejection of incomplete history; local update p99 <= 100 ms. Purpose: Consistent console snapshots, state freshness and safe recovery. | E-CI | pr | `task projection:test` |
+| TS-32 | Realtime subscriptions, recovery and 500 clients | Two Gateways, 500 WSS clients and 10000 deliveries without loss; local p99 <= 200 ms; restore 500 subscriptions after a node restart without a new snapshot; filters, JWT, old clients, multiple subscriptions, private variants, current state after lease expiry and slow-consumer disconnection. Purpose: Compatible change delivery, node-independent resumption and bounded queues. | E-CI | pr | `task realtime:test` |
 
-### Нагрузка
+### Load tests
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| L-01 | Ночная нагрузка LOAD-5K | Лаг не растёт; задержки этапов не хуже базовой линии более чем на 5%; сверка без потерь. | E-CI | nightly | `task load:nightly` | 3.1, 10.1 |
-| L-02 | Устойчивая нагрузка LOAD-50K, 1 ч | 50 000 событий/с; событие -> сигнал p99 ≤ 300 мс; событие -> консоль p99 ≤ 1 с; сверка без потерь и дубликатов. | E-CLUSTER | release | `task load:steady` | 10.1 |
-| L-04 | Пик ×1,5 (75 000 событий/с), 10 мин | 0 потерь; лаг возвращается к норме ≤ 5 мин после пика. | E-CLUSTER | release | `task load:peak` | 10.1 |
-| L-05 | Консоли и REST под нагрузкой | 500 консолей; REST чтение p99 ≤ 200 мс; доставка realtime p99 ≤ 200 мс; событие -> отрисовка p99 ≤ 1 с при LOAD-50K. | E-CLUSTER | release | `task load:consoles` | 7.2, 10.1 |
-| L-06 | Ввод через два экземпляра шлюза | 50 000 событий/с через 2 экземпляра Connector Gateway до подтверждения Kafka; прочие прикладные процессы на совмещённом локальном профиле временно остановлены; падение экземпляра без потерь. | E-CLUSTER | release | `task deploy:gateway:qualify` | 4.2, 9.1 |
-| L-07 | Импорт 50 000 устройств | Импорт ≤ 5 мин; изменения каталога у потребителей ≤ 2 с. | E-LOCAL | nightly | `task catalog:bench` | 4.4 |
-| L-08 | Поиск по истории событий под нагрузкой записи | Поиск за сутки по зоне ≤ 500 мс при записи 50 000 событий/с в ClickHouse. | E-CLUSTER | release | `task history:bench` | 5.4 |
-| L-09 | Отчёт за 30 суток | Отчёт строится ≤ 3 с; значения совпадают с эталоном. | E-LOCAL | nightly | `task reports:bench` | 6.5 |
-| L-10 | Нагрузка одной машины LOAD-10K | 10 000 событий/с на эталонном сервере с SLO задержек кластера. Назначение: Целевая нагрузка топологии «одна машина» (scaling.md, 5.4). | E-LOCAL | release | `task load:single-node` | 10.1 |
-| L-11 | Обработка сигналов Incident Service | Два экземпляра; p99 обработки сигнала ≤ 50 мс; сверка сигналов и инцидентов без потерь и дубликатов после SIGKILL экземпляра. Назначение: Бюджет задержки этапа инцидентов (DoD шага 5.3). | E-LOCAL | release | `task incidents:bench` | 5.3, 10.1 |
-| L-12 | Доставка команд коннектору | p99 от запроса команды до доставки коннектору ≤ 200 мс; каждая команда получает финальный статус. Назначение: Бюджет задержки команд (DoD шага 6.2). | E-LOCAL | release | `task commands:bench` | 6.2, 10.1 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| L-01 | Nightly LOAD-5K test | Lag does not grow; stage latency regresses by no more than 5% against baseline; reconciliation finds no loss. | E-CI | nightly | `task load:nightly` |
+| L-02 | Sustained LOAD-50K for 1 hour | 50 000 events/s; event -> signal p99 <= 300 ms; event -> console p99 <= 1 s; reconciliation finds no loss or duplicates. | E-CLUSTER | release | `task load:steady` |
+| L-04 | 1.5x peak (75 000 events/s) for 10 minutes | 0 losses; lag returns to normal within 5 minutes after the peak. | E-CLUSTER | release | `task load:peak` |
+| L-05 | Consoles and REST under load | 500 consoles; REST read p99 <= 200 ms; realtime delivery p99 <= 200 ms; event -> rendering p99 <= 1 s during LOAD-50K. | E-CLUSTER | release | `task load:consoles` |
+| L-06 | Ingestion through two gateway instances | 50 000 events/s through 2 Connector Gateway instances up to Kafka acknowledgement; other application processes on the combined local profile are temporarily stopped; instance failure causes no loss. | E-CLUSTER | release | `task deploy:gateway:qualify` |
+| L-07 | Import of 50 000 devices | Import completes within 5 minutes; consumers receive catalog changes within 2 s. | E-LOCAL | nightly | `task catalog:bench` |
+| L-08 | Event history search under write load | Search one day of data for a zone within 500 ms while writing 50 000 events/s to ClickHouse. | E-CLUSTER | release | `task history:bench` |
+| L-09 | Report covering 30 days | Report generation takes <= 3 s; values match the reference. | E-LOCAL | nightly | `task reports:bench` |
+| L-10 | Single-machine LOAD-10K | 10 000 events/s on the reference server with cluster latency SLOs. Purpose: Target load for the single-machine topology (scaling.md, 5.4). | E-LOCAL | release | `task load:single-node` |
+| L-11 | Incident Service signal processing | Two instances; signal processing p99 <= 50 ms; signal and incident reconciliation finds no loss or duplicates after an instance receives SIGKILL. Purpose: Incident stage latency budget (signal processing). | E-LOCAL | release | `task incidents:bench` |
+| L-12 | Command delivery to the connector | Command request -> connector delivery p99 <= 200 ms; every command reaches a final status. Purpose: Command latency budget (command delivery). | E-LOCAL | release | `task commands:bench` |
 
-### Длительная нагрузка
+### Soak tests
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| L-03 | Длительная нагрузка LOAD-50K, 24 ч | Те же пороги, что L-02, на всём интервале; нет роста памяти, лагов и задержек. | E-CLUSTER | release | `task load:soak` | 10.1 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| L-03 | LOAD-50K soak test for 24 hours | The L-02 thresholds hold throughout the interval; memory use, lag and latency do not grow. | E-CLUSTER | release | `task load:soak` |
 
-### Хаос и отказы
+### Chaos and failures
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| C-01 | Отказ брокера Kafka | Под LOAD-50K; сверка без потерь и дубликатов; обработка продолжается; RTO ≤ 60 с. | E-CLUSTER | release | `task chaos:kafka-broker` | 10.2 |
-| C-02 | Остановка экземпляра каждого сервиса | Поочерёдно kill -9 каждого сервиса под нагрузкой; сверка без потерь и дубликатов; RTO ≤ 60 с. | E-CI | nightly | `task chaos:service-kill` | 3.1, 10.2 |
-| C-03 | Переключение мастера PostgreSQL | Отказ лидера Patroni под нагрузкой; 0 потерянных инцидентов (RPO = 0); переключение ≤ 30 с. | E-CLUSTER | release | `task chaos:postgres-failover` | 10.2 |
-| C-04 | Отказ основного узла Redis-совместимого хранилища | Обработка событий не останавливается; сессии коннекторов восстанавливаются. | E-CLUSTER | release | `task chaos:redis` | 10.2 |
-| C-05 | Отказ реплики ClickHouse | Поиск и отчёты работают на второй реплике; загрузка догоняет без потерь после восстановления. | E-CLUSTER | release | `task chaos:clickhouse` | 10.2 |
-| C-06 | Сетевое разделение узла приложений и узлов инфраструктуры | Партиции переходят к доступным экземплярам; после восстановления сверка без потерь и дубликатов. | E-CLUSTER | release | `task chaos:partition` | 10.2 |
-| C-07 | Задержки и потери пакетов | Toxiproxy - задержка 200 мс и потеря 5% на каналах к Kafka и PostgreSQL; нет потерь и дубликатов, деградация задержек в пределах отчёта. | E-CI | nightly | `task chaos:network` | 1.4, 10.2 |
-| C-08 | Заполнение диска | Алерт до остановки; при заполнении - противодавление, а не потеря подтверждённых данных. | E-CLUSTER | release | `task chaos:disk-full` | 10.2 |
-| C-09 | Рассогласование часов узла и источника | Источник с часами +10 мин - события скорректированы и помечены clock_skew; узел с рассогласованием - алерт. | E-CI | nightly | `task chaos:clock-skew` | 10.2 |
-| C-10 | Обрыв связи коннектора на 10 мин | События досылаются из буфера SDK без потерь; команды в период обрыва завершаются финальным статусом. | E-CI | nightly | `task chaos:connector-disconnect` | 4.1, 10.2 |
-| C-11 | Отключение питания узла кластера | Замер RTO ≤ 60 с и RPO = 0 для каждого узла поочерёдно; сверка без потерь. | E-CLUSTER | release | `task chaos:node-down` | 10.2 |
-| C-12 | Обновление N -> N+1 и откат под нагрузкой | Нет интервала > 5 с без новых сигналов; SLO задержек на всём протяжении; сверка без потерь и дубликатов. | E-CLUSTER | release | `task deploy:upgrade:qualify` | 10.1 |
-| C-13 | Недоступность Keycloak | Открытые сессии работают; новые входы получают понятную ошибку; обработка событий не затронута. Назначение: Угроза T38 модели угроз. | E-CI | nightly | `task chaos:idp` | 10.2 |
-| C-14 | Восстановление состояния корреляции | После падения Correlation Engine с эталонным объёмом состояния восстановление ≤ 30 с. | E-CLUSTER | release | `task chaos:correlation-restore` | 5.2, 10.2 |
-| C-15 | Отказ узлов файлового хранилища | Остановка volume-сервера, filer, S3 gateway и master-лидера SeaweedFS под чтением и загрузкой планов; текущие планы читаются, отказ загрузки сохраняет прежнюю версию, после восстановления реплики томов восстановлены и SHA-256 всех версий совпадают. Назначение: Отказоустойчивость хранения планов в кластере (ADR-042, ADR-046). | E-CLUSTER | release | `task chaos:filestore` | 9.1, 10.2 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| C-01 | Kafka broker failure | Under LOAD-50K, reconciliation finds no loss or duplicates; processing continues; RTO <= 60 s. | E-CLUSTER | release | `task chaos:kafka-broker` |
+| C-02 | Termination of an instance of each service | Run kill -9 against each service in turn under load; reconciliation finds no loss or duplicates; RTO <= 60 s. | E-CI | nightly | `task chaos:service-kill` |
+| C-03 | PostgreSQL primary failover | Patroni leader failure under load; 0 lost incidents (RPO = 0); failover <= 30 s. | E-CLUSTER | release | `task chaos:postgres-failover` |
+| C-04 | Redis-compatible storage primary failure | Event processing continues; connector sessions recover. | E-CLUSTER | release | `task chaos:redis` |
+| C-05 | ClickHouse replica failure | Search and reports use the second replica; ingestion catches up without loss after recovery. | E-CLUSTER | release | `task chaos:clickhouse` |
+| C-06 | Network partition between an application node and infrastructure nodes | Available instances take over partitions; reconciliation after recovery finds no loss or duplicates. | E-CLUSTER | release | `task chaos:partition` |
+| C-07 | Packet delays and loss | Toxiproxy injects 200 ms latency and 5% packet loss on Kafka and PostgreSQL connections; no data loss or duplicate effects; record latency degradation in the report. | E-CI | nightly | `task chaos:network` |
+| C-08 | Disk exhaustion | Alert before processing stops; a full disk applies backpressure without losing acknowledged data. | E-CLUSTER | release | `task chaos:disk-full` |
+| C-09 | Node and source clock skew | A source clock is 10 minutes ahead; events are corrected and marked clock_skew; node clock skew raises an alert. | E-CI | nightly | `task chaos:clock-skew` |
+| C-10 | Connector connection loss for 10 minutes | SDK-buffered events are delivered without loss; commands issued during the outage reach a final status. | E-CI | nightly | `task chaos:connector-disconnect` |
+| C-11 | Cluster node power loss | Measure RTO <= 60 s and RPO = 0 for each node in turn; reconciliation finds no loss. | E-CLUSTER | release | `task chaos:node-down` |
+| C-12 | N -> N+1 upgrade and rollback under load | No interval longer than 5 s without new signals; latency SLOs hold throughout; reconciliation finds no loss or duplicates. | E-CLUSTER | release | `task deploy:upgrade:qualify` |
+| C-13 | Keycloak unavailability | Existing sessions continue; new sign-ins receive a clear error; event processing is unaffected. Purpose: Threat T38 in the threat model. | E-CI | nightly | `task chaos:idp` |
+| C-14 | Correlation state recovery | Correlation Engine recovers within 30 s after crashing with the reference state size. | E-CLUSTER | release | `task chaos:correlation-restore` |
+| C-15 | File storage node failures | Stop the SeaweedFS volume server, filer, S3 gateway and master leader during floor plan reads and uploads; existing plans remain readable, failed uploads preserve the previous version, volume replicas recover and SHA-256 matches for every version. Purpose: Cluster floor plan storage resilience (ADR-042, ADR-046). | E-CLUSTER | release | `task chaos:filestore` |
 
-### Бенчмарки
+### Benchmarks
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| B-07 | Виртуализированная лента оператора | 10000 инцидентов, прокрутка не ниже 50 кадров/с, realtime -> DOM не выше 1 с p99; сырые серии и один браузерный worker. Назначение: Проверить отзывчивость рабочей ленты без подмены полного SLO входного конвейера. | E-CI | on-demand | `task operator:benchmark` | 8.3 |
-| B-01 | Слой Kafka | ≥ 200 000 сообщений/с на продюсер и потребитель на эталонном стенде. | E-LOCAL | nightly | `task bench:kafka` | 2.3 |
-| B-02 | Асинхронные примитивы | Накладные расходы зафиксированы как базовая линия. | E-CI | pr | `task bench:async` | 2.2 |
-| B-03 | Normalizer на ядро | Пропускная способность на ядро и p99 этапа ≤ 30 мс на базовой линии. | E-CI | pr | `task bench:normalizer` | 4.5 |
-| B-04 | Вычисление правил корреляции | Пропускная способность правил всех видов, стоимость выражений CEL. | E-CI | pr | `task bench:rules` | 5.2 |
-| B-05 | Барьер регрессии производительности | Сравнение всех бенчмарков с базовой линией master; ухудшение > 5% блокирует слияние. | E-CI | pr | `task bench:compare` | 1.3, 10.1 |
-| B-06 | Генератор эталонного симулятора | Не менее 75 000 долговечно сохранённых событий/с с одной машины; TLS-приёмник сверяет все номера и порядок источников. Назначение: Проверка производительности генератора отдельно от платформенного конвейера. | E-LOCAL | pr | `task connectors:bench` | 4.3 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| B-07 | Virtualized operator feed | 10000 incidents, scrolling at least 50 frames/s, realtime -> DOM p99 at most 1 s; raw measurement series and one browser worker. Purpose: Verify responsiveness of the operational feed without substituting for the full ingestion pipeline SLO. | E-CI | on-demand | `task operator:benchmark` |
+| B-01 | Kafka layer | At least 200 000 messages/s for both producer and consumer on the reference environment. | E-LOCAL | nightly | `task bench:kafka` |
+| B-02 | Asynchronous primitives | Record overhead as the baseline. | E-CI | pr | `task bench:async` |
+| B-03 | Normalizer per CPU core | Record per-core throughput and stage p99 <= 30 ms as the baseline. | E-CI | pr | `task bench:normalizer` |
+| B-04 | Correlation rule evaluation | Throughput for every rule type and cost of CEL expression evaluation. | E-CI | pr | `task bench:rules` |
+| B-05 | Performance regression gate | Compare all benchmarks against the master baseline; regression greater than 5% blocks merging. | E-CI | pr | `task bench:compare` |
+| B-06 | Reference simulator event generator | At least 75 000 durably stored events/s from one machine; the TLS receiver reconciles every sequence number and source ordering. Purpose: Verify generator performance independently of the platform pipeline. | E-LOCAL | pr | `task connectors:bench` |
 
 ### Fitness functions
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| FF-01 | Направления зависимостей модулей | libs/domain не зависит от инфраструктуры; сервисы не зависят друг от друга (ADR-001). Назначение: Архитектурные правила (принцип 10 плана, ADR-001). | E-CI | pr | `task arch:deps` | 1.2 |
-| FF-02 | Чистота доменного ядра | В libs/domain запрещены системные часы, случайность, ввод-вывод, исключения как механизм ошибок домена. Назначение: Детерминированное ядро (принцип 4 плана). | E-CI | pr | `task arch:domain-purity` | 1.2 |
-| FF-03 | tenant_id во всех запросах к хранилищам | Статическая проверка SQL репозиториев и запросов ClickHouse (ADR-022). Назначение: Мультитенантность (ADR-022). | E-CI | pr | `task arch:tenant` | 2.4, 2.8 |
-| FF-04 | Совместимость схем в Schema Registry | Регистрация схем ветки против последнего выпуска с правилами ADR-004. | E-CI | pr | `task contracts:registry-compat` | 2.3 |
-| FF-05 | Бюджет задержек по этапам | В нагрузочных тестах p99 каждого этапа не превышает бюджет quality.md, раздел 4. | E-CLUSTER | release | `task load:budget` | 10.1 |
-| FF-06 | Наблюдаемость каждого сервиса | После старта каждый сервис отдаёт /health/live, /health/ready, /metrics и экспортирует трассировки. Назначение: Наблюдаемость с первого шага (принцип 7 плана). | E-CI | pr | `task test:observability` | 2.1 |
-| FF-07 | Запрет конкатенации пользовательского ввода в запросах | Статическая проверка (требование SR-13). Назначение: Требование безопасности SR-13. | E-CI | pr | `task arch:sql` | 1.2 |
-| FF-08 | Документация как код | task docs:check зелёный - ссылки, типографика, Mermaid, C4, реестры угроз и верификации актуальны. | E-CI | pr | `task docs:check` | 0.5, 0.6, 0.7 |
-| FF-09 | Сборка портала документации | Портал собирается; справочники OpenAPI, AsyncAPI, Protobuf генерируются из репозитория. | E-CI | pr | `task docs:portal` | 1.6 |
-| FF-10 | Ноль предупреждений компилятора и clang-tidy | Сборка с -Werror; clang-tidy по профилю проекта без замечаний. | E-CI | pr | `task cpp:lint` | 1.2 |
-| FF-11 | Санитайзеры | Unit, property, component тесты под ASan+UBSan и TSan без срабатываний. | E-CI | pr | `task cpp:test:sanitizers` | 1.2 |
-| FF-12 | Пороги покрытия | Доменное ядро ≥ 90% строк и ≥ 80% ветвей; инфраструктура ≥ 75% строк. | E-CI | pr | `task cpp:coverage` | 1.2 |
-| FF-13 | Воспроизводимость сборки | Две независимые сборки одного коммита дают идентичные артефакты. | E-CI | nightly | `task cpp:reproducible` | 1.1, 1.3 |
-| FF-14 | SBOM и подписи артефактов | Каждый артефакт выпуска имеет SBOM CycloneDX и подпись, проверяемую установщиком. | E-CI | release | `task release:verify` | 1.3 |
-| FF-15 | Запуск артефактов на целевой платформе | Тестовые исполняемые файлы и psimctl проходят на Debian 13 x86_64 без toolchain; все зависимости от системных разделяемых библиотек разрешаются (ADR-032). | E-CI | pr | `task cpp:runtime-test` | 1.1 |
-| FF-16 | Формат кода C++ | clang-format по .clang-format не меняет ни одного файла проекта. Назначение: Стандарт кодирования (шаг 1.2, ADR-033). | E-CI | pr | `task cpp:format` | 1.2 |
-| FF-17 | Самопроверка fitness functions | Для каждого правила arch:deps, arch:domain-purity, arch:sql тест с нарушением даёт отказ. Назначение: Достоверность архитектурных проверок при пустом доменном ядре (ADR-033). | E-CI | pr | `task arch:selftest` | 1.2 |
-| FF-18 | Установка пакетов на целевой платформе | Каждый пакет DEB ставится, запускается и удаляется в чистом образе Debian 13 x86_64; зависимости вычислены dpkg-shlibdeps по фактическим символам исполняемых файлов. Назначение: Поставка для Debian 13 x86_64 (F-PLT-06, ADR-034). | E-CI | pr | `task release:package:test` | 1.3 |
-| FF-19 | Образы без root и лишних прав | Каждый образ запускается не под root, с файловой системой только для чтения, без capabilities и с no-new-privileges. Назначение: Требование SR-24 (ADR-034). | E-CI | pr | `task release:images:test` | 1.3 |
-| FF-20 | Локальное окружение с нуля | Окружение поднимается с нуля не дольше 5 минут (1 и 3 брокера Kafka); смоук-тесты всех компонентов и путей между ними проходят; SR-02 в realm Keycloak. Назначение: DoD шага 1.4 и требование SR-02 (ADR-035). | E-CI | pr | `task env:ci-test` | 1.4 |
-| FF-21 | Качество веб-клиента | Формат, ESLint без предупреждений, строгая проверка типов, Vitest с покрытием не ниже 80% на пакет, бюджеты бандла, клиенты REST и realtime генерируются из контрактов; E2E-смоук консоли в Chromium. Назначение: Стандарт TypeScript и DoD шага 1.5 (ADR-037). | E-CI | pr | `task web:check` | 1.5 |
-| FF-22 | Общая авторизация сервисов | В сервисах нет собственных проверок областей и JWT-проверок без общей конфигурации introspection; негативные самопроверки выявляют нарушения. Назначение: Единая реализация RBAC/ABAC и обязательная проверка актуальности идентичности. | E-CI | pr | `task arch:authz` | 7.4 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| FF-01 | Module dependency directions | libs/domain has no infrastructure dependencies; services do not depend on each other (ADR-001). Purpose: Architecture rules (ADR-001). | E-CI | pr | `task arch:deps` |
+| FF-02 | Domain core purity | libs/domain prohibits system clocks, randomness, input/output and exceptions as the domain error mechanism. Purpose: Deterministic domain core. | E-CI | pr | `task arch:domain-purity` |
+| FF-03 | tenant_id in all storage queries | Static checks of repository SQL and ClickHouse queries (ADR-022). Purpose: Multitenancy (ADR-022). | E-CI | pr | `task arch:tenant` |
+| FF-04 | Schema Registry compatibility | Register working-tree schemas against the latest release using ADR-004 compatibility rules. | E-CI | pr | `task contracts:registry-compat` |
+| FF-05 | Per-stage latency budgets | Each stage's p99 in load tests stays within its budget in quality.md, section 4. | E-CLUSTER | release | `task load:budget` |
+| FF-06 | Service observability | After startup, each service serves /health/live, /health/ready and /metrics and exports traces. Purpose: Metrics, logs and traces for every service. | E-CI | pr | `task test:observability` |
+| FF-07 | Prohibit concatenation of user input into queries | Static analysis (requirement SR-13). Purpose: Security requirement SR-13. | E-CI | pr | `task arch:sql` |
+| FF-08 | Documentation as code | task docs:check passes; links, typography, PlantUML, C4, threat and verification registries are current; both language versions are complete and reviewed. | E-CI | pr | `task docs:check` |
+| FF-09 | Documentation portal build | English is the default; complete English and Russian portals build from maintained sources and generated OpenAPI, AsyncAPI and Protobuf references; offline archive, local search and section-preserving language switches pass browser checks. | E-CI | pr | `task docs:portal` |
+| FF-10 | Zero compiler and clang-tidy warnings | Build with -Werror; clang-tidy reports no findings under the project profile. | E-CI | pr | `task cpp:lint` |
+| FF-11 | Sanitizers | Unit, property and component tests pass under ASan+UBSan and TSan without findings. | E-CI | pr | `task cpp:test:sanitizers` |
+| FF-12 | Coverage thresholds | Domain core coverage >= 90% of lines and >= 80% of branches; infrastructure coverage >= 75% of lines. | E-CI | pr | `task cpp:coverage` |
+| FF-13 | Build reproducibility | Two independent builds of the same commit produce identical artifacts. | E-CI | nightly | `task cpp:reproducible` |
+| FF-14 | SBOM and artifact signatures | Every release artifact has a CycloneDX SBOM and a signature verified by the installer. | E-CI | release | `task release:verify` |
+| FF-15 | Artifact execution on the target platform | Test executables and psimctl pass on Debian 13 x86_64 without the toolchain; all system shared-library dependencies resolve (ADR-032). | E-CI | pr | `task cpp:runtime-test` |
+| FF-16 | C++ formatting | clang-format with .clang-format changes no project files. Purpose: Coding standard (ADR-033). | E-CI | pr | `task cpp:format` |
+| FF-17 | Architecture check self-tests | For every arch:deps, arch:domain-purity and arch:sql rule, a violating fixture fails. Purpose: Verify architecture checks even with an empty domain core (ADR-033). | E-CI | pr | `task arch:selftest` |
+| FF-18 | Package installation on the target platform | Each DEB package installs, runs and uninstalls in a clean Debian 13 x86_64 image; dpkg-shlibdeps derives dependencies from actual executable symbols. Purpose: Debian 13 x86_64 distribution (F-PLT-06, ADR-034). | E-CI | pr | `task release:package:test` |
+| FF-19 | Images without root or unnecessary privileges | Every image runs as a non-root user with a read-only filesystem, no capabilities and no-new-privileges. Purpose: Requirement SR-24 (ADR-034). | E-CI | pr | `task release:images:test` |
+| FF-20 | Local environment from scratch | Start a fresh environment within 5 minutes with 1 and 3 Kafka brokers; all component and inter-component smoke tests pass; Keycloak realm enforces SR-02. Purpose: Reproducible environment and requirement SR-02 (ADR-035). | E-CI | pr | `task env:ci-test` |
+| FF-21 | Web client quality | Formatting, ESLint without warnings, strict type checks, Vitest coverage >= 80% per package, bundle budgets, REST and realtime clients generated from contracts, and an end-to-end console smoke test in Chromium. Purpose: TypeScript standard and web client checks (ADR-037). | E-CI | pr | `task web:check` |
+| FF-22 | Shared service authorization | Services contain neither custom scope checks nor JWT validation without shared introspection configuration; negative self-tests detect violations. Purpose: Shared RBAC/ABAC implementation and mandatory identity freshness checks. | E-CI | pr | `task arch:authz` |
 
-### Безопасность
+### Security
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| SEC-01 | Статический анализ безопасности | Профиль clang-tidy с проверками bugprone, cert, security; 0 замечаний. Назначение: Требования безопасности, проверка scan. | E-CI | pr | `task cpp:lint` | 1.2 |
-| SEC-02 | Уязвимости и лицензии зависимостей | Trivy по lock-файлам и SBOM; критичные и высокие уязвимости и запрещённые лицензии блокируют. | E-CI | pr | `task security:deps` | 1.3 |
-| SEC-03 | Сканирование образов | Trivy по образам выпуска; критичные и высокие уязвимости блокируют. Назначение: Требования SR-23, SR-24. | E-CI | nightly | `task security:images` | 1.3 |
-| SEC-04 | Фаззинг, ночной | Каждая цель фаззинга 1 ч без падений; новые падения сохраняются в корпус. | E-CI | nightly | `task fuzz:nightly` | 4.2, 10.3 |
-| SEC-05 | Фаззинг, 24 ч | Все разборщики недоверенных данных и DSL правил 24 ч без падений. | E-LOCAL | release | `task fuzz:release` | 10.3 |
-| SEC-09 | Фаззинг парсера и валидатора правил, 10 мин | Парсер и валидатор DSL правил проходят 10 минут без падений и ошибок санитайзеров; корпус и отчёт сохранены. | E-LOCAL | pr | `task fuzz:rules` | 5.1 |
-| SEC-06 | DAST REST и WebSocket | OWASP ZAP по OpenAPI и realtime; нет находок высокого уровня. Назначение: Требования безопасности, проверка pentest и scan. | E-LOCAL | release | `task security:dast` | 10.3 |
-| SEC-07 | Конфигурация TLS | testssl.sh по внешним портам - только TLS 1.3 на TB1 и TB2, без слабых наборов. Назначение: Требование SR-08. | E-LOCAL | release | `task security:tls` | 10.3 |
-| SEC-08 | Платформенное доверие и аутентификация | JWT/JWKS и ротация, отказ чужому issuer/audience/алгоритму, TLS/mTLS с проверкой CA/имени/CRL, продление без потери тестовых событий, отзыв открытого потока, истечение и защищённые файлы секретов; реальные Keycloak, Kafka, PostgreSQL и Valkey; ASan/UBSan и TSan. Назначение: Платформенные механизмы SR-01, SR-03, SR-04, SR-08, SR-09; полный сервисный цикл остаётся в TS-22. | E-CI | pr | `task test:security:sanitizers` | 2.6 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| SEC-01 | Static security analysis | clang-tidy profile with bugprone, cert and security checks; 0 findings. Purpose: Security requirements verified by scanning. | E-CI | pr | `task cpp:lint` |
+| SEC-02 | Dependency vulnerabilities and licenses | Trivy scans lockfiles and SBOMs; critical and high vulnerabilities and prohibited licenses block the pipeline. | E-CI | pr | `task security:deps` |
+| SEC-03 | Image vulnerability scanning | Trivy scans release images; critical and high vulnerabilities block the pipeline. Purpose: Requirements SR-23, SR-24. | E-CI | nightly | `task security:images` |
+| SEC-04 | Nightly fuzzing | Every fuzz target runs for 1 hour without crashes; new crashing inputs are added to the corpus. | E-CI | nightly | `task fuzz:nightly` |
+| SEC-05 | Fuzzing for 24 hours | Every untrusted-data parser and the rule DSL run for 24 hours without crashes. | E-LOCAL | release | `task fuzz:release` |
+| SEC-09 | Rule parser and validator fuzzing for 10 minutes | Rule DSL parser and validator run for 10 minutes without crashes or sanitizer findings; retain the corpus and report. | E-LOCAL | pr | `task fuzz:rules` |
+| SEC-06 | REST and WebSocket DAST | OWASP ZAP scans OpenAPI and realtime; no high-severity findings. Purpose: Security requirements verified by penetration testing and scanning. | E-LOCAL | release | `task security:dast` |
+| SEC-07 | TLS configuration | testssl.sh checks external ports; only TLS 1.3 on TB1 and TB2, with no weak cipher suites. Purpose: Requirement SR-08. | E-LOCAL | release | `task security:tls` |
+| SEC-08 | Platform trust and authentication | JWT/JWKS and key rotation, rejection of incorrect issuer/audience/algorithm, TLS/mTLS with CA/name/CRL verification, renewal without losing test events, revocation of an active stream, expiry and protected secret files; real Keycloak, Kafka, PostgreSQL and Valkey; ASan/UBSan and TSan. Purpose: Platform mechanisms for SR-01, SR-03, SR-04, SR-08, SR-09; the complete service lifecycle remains in TS-22. | E-CI | pr | `task test:security:sanitizers` |
 
-### Ручные процедуры
+### Manual procedures
 
-| ID | Метод | Критерий прохождения | Стенд | Барьер | Запуск | Шаги плана |
-|---|---|---|---|---|---|---|
-| M-01 | Установка и подключение коннектора сторонним инженером | По каждой полной версии EN и RU независимо, с английским по умолчанию, без помощи разработчиков и без доступа к плану, прогрессу и стартовым диаграммам разработки; проверяются конечное состояние платформы и отсутствие прямых и косвенных ссылок на удалённые материалы; время и замечания фиксируются. | E-LOCAL | release, ручной | регламент | 11.2, 11.2a |
-| M-02 | Учения по восстановлению из резервной копии | Восстановление на чистом стенде по регламенту; время замерено; планы, ссылки и SHA-256 совпадают, Keycloak и доверие восстановлены, отозванные ключи не дают доступ. Назначение: DoD шага 9.3. | E-LOCAL | release, ручной | регламент | 9.3 |
-| M-03 | Внутренний пентест по модели угроз | Проверены все угрозы высокого риска threat-register.md; нет открытых критичных и высоких находок. Назначение: Требования безопасности, проверка pentest. | E-CLUSTER | release, ручной | регламент | 10.3 |
-| M-04 | Воспроизведение демонстрации с нуля | Демонстрационный стенд и сценарии воспроизводятся по инструкции. Назначение: DoD шага 11.1. | E-LOCAL | release, ручной | регламент | 11.1 |
-| M-05 | Приёмочный прогон S1-S13 | Итоговый прогон всех сценариев с подписью владельца продукта. | E-CLUSTER | release, ручной | регламент | 11.3 |
-
-## 6. Методы по шагам плана
-
-Шаг создаёт перечисленные методы проверки; задача Task метода появляется вместе с шагом.
-
-| Шаг | Методы |
-|---|---|
-| 0.5 | TS-04, FF-08 |
-| 0.6 | FF-08 |
-| 0.7 | FF-08 |
-| 1.1 | FF-13, FF-15 |
-| 1.2 | TS-01, FF-01, FF-02, FF-07, FF-10, FF-11, FF-12, FF-16, FF-17, SEC-01 |
-| 1.3 | TS-04, B-05, FF-13, FF-14, FF-18, FF-19, SEC-02, SEC-03 |
-| 1.4 | TS-03, C-07, FF-20 |
-| 1.5 | FF-21 |
-| 1.6 | FF-09 |
-| 2.1 | FF-06 |
-| 2.2 | B-02 |
-| 2.3 | TS-03, B-01, FF-04 |
-| 2.4 | TS-03, FF-03 |
-| 2.5 | TS-03 |
-| 2.6 | SEC-08, TS-22 |
-| 2.7 | TS-07, TS-08 |
-| 2.8 | TS-03, FF-03 |
-| 3.1 | TS-09, TS-10, L-01, C-02 |
-| 4.1 | TS-06, C-10, TS-19 |
-| 4.2 | L-06, SEC-04, TS-19, TS-22 |
-| 4.3 | TS-06, B-06 |
-| 4.4 | L-07, TS-18, TS-20, TS-24 |
-| 4.5 | B-03, TS-19 |
-| 5.1 | SEC-09, TS-20, TS-23, TS-25 |
-| 5.2 | TS-07, TS-08, C-14, B-04, TS-20 |
-| 5.3 | TS-01, TS-02, L-11, TS-21, TS-28 |
-| 5.4 | L-08, TS-29 |
-| 6.1 | TS-01, TS-02, TS-17, TS-23 |
-| 6.2 | TS-01, TS-02, L-12 |
-| 6.3 | TS-17, TS-21, TS-27 |
-| 6.4 | TS-13 |
-| 6.5 | TS-30, L-09 |
-| 7.1 | TS-05 |
-| 7.2 | L-05, TS-19, TS-32 |
-| 7.3 | TS-19, TS-26, TS-31 |
-| 7.4 | TS-12, FF-22 |
-| 8.1 | TS-16 |
-| 8.1a | TS-33 |
-| 8.2 | TS-34, TS-14 |
-| 8.3 | TS-35, B-07, TS-11, TS-15, TS-19, TS-21 |
-| 8.4 | TS-36, TS-11, TS-20 |
-| 8.5 | TS-37, TS-11 |
-| 8.6 | TS-38, TS-11, TS-14, TS-15 |
-| 9.1 | L-06, C-15, TS-18, TS-22 |
-| 9.3 | M-02, TS-18, TS-22 |
-| 9.4 | TS-39 |
-| 9.5 | TS-22, TS-23 |
-| 10.1 | L-01, L-02, L-03, L-04, L-05, L-10, L-11, L-12, C-12, B-05, FF-05 |
-| 10.2 | C-01, C-02, C-03, C-04, C-05, C-06, C-07, C-08, C-09, C-10, C-11, C-13, C-14, C-15 |
-| 10.3 | SEC-04, SEC-05, SEC-06, SEC-07, M-03 |
-| 11.1 | M-04 |
-| 11.2 | M-01 |
-| 11.2a | M-01 |
-| 11.3 | TS-10, M-05 |
+| ID | Method | Pass criterion | Environment | Gate | Command |
+|---|---|---|---|---|---|
+| M-01 | Installation and connector integration by an independent engineer | Use each complete EN and RU version independently, with English as the default, without developer assistance or development-only materials; verify actual platform behavior and absence of direct and indirect dependencies on removed materials; record elapsed time and findings. | E-LOCAL | release, manual | procedure |
+| M-02 | Backup recovery exercise | Restore into a clean environment using the procedure and measure elapsed time; floor plans, links and SHA-256 match, Keycloak and trust recover, and revoked keys cannot grant access. Purpose: Recovery from an independent backup. | E-LOCAL | release, manual | procedure |
+| M-03 | Internal penetration test against the threat model | Test every high-risk threat in threat-register.md; no open critical or high-severity findings. Purpose: Security requirements verified by penetration testing. | E-CLUSTER | release, manual | procedure |
+| M-04 | Reproduce the demonstration from scratch | Reproduce the demonstration environment and scenarios using the instructions. Purpose: Reproducible synthetic demonstration. | E-LOCAL | release, manual | procedure |
+| M-05 | S1-S13 acceptance run | Final execution of every scenario, signed off by the product owner. | E-CLUSTER | release, manual | procedure |

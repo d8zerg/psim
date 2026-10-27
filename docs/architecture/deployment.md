@@ -1,161 +1,196 @@
-# Представление развёртывания
+# Deployment view
 
-Версия 0.1 · Шаг плана 0.3 · Статус: черновик
+<!-- language-links -->
+[English](deployment.md) | [Русский](../ru/architecture/deployment.md)
+<!-- /language-links -->
 
-Раздел 7 arc42. Топологии MVP: одна машина и кластер на VM. Kubernetes вне MVP (X15), но образы готовы к нему: без root, конфигурация через файлы и переменные, health-эндпоинты, корректная остановка по `SIGTERM`. Решения - ADR-023 и ADR-024; реализация - шаги 9.1 и 9.2.
+Section 7 arc42. MVP topologies: one machine and cluster on VMs. Kubernetes is not part of the MVP (X15), but images are ready for it: without root, configuration via files and variables, health endpoints, proper shutdown via `SIGTERM`. Solutions are ADR-023 and ADR-024; implementation is described in [topologies](../engineering/deployment-topologies.md) and [upgrade procedure](../engineering/installation-and-upgrades.md).
 
 ---
 
-## 1. Артефакты поставки
+## 1. Delivery artifacts
 
-| Артефакт | Содержимое |
+| Artifact | Content |
 |---|---|
-| Контейнерные образы | Один образ на сервис; минимальная база; пользователь без root; подпись и SBOM |
-| Пакеты `.deb` | Бинарники приложений и общий пакет таксономии; systemd-юниты и конфигурацию формирует профиль. Инфраструктура использует Docker Compose на Debian 13 x86_64 |
-| Веб-приложение | Статические файлы, раздаются API Gateway или веб-сервером |
-| Установщик | Проверка предусловий, генерация конфигурации по профилю топологии, создание топиков и схем БД, загрузка realm Keycloak |
-| Пакет наблюдаемости | Конфигурация Collector, Prometheus, дашборды Grafana, правила алертов, runbook |
-| CLI администратора | `psimctl` |
-| Файловое хранилище | SeaweedFS с закрытым bucket `psim-plans`; версии планов ведёт Resource Catalog, независимая резервная копия - вне рабочего кластера ([ADR-042](../adr/0042-operational-capabilities.md), [ADR-046](../adr/0046-s3-object-storage.md)) |
+| Container images | One image per service; minimum base; user without root; signature and SBOM |
+| Packages `.deb` | Binary applications and common taxonomy package; systemd units and configuration form a profile. Infrastructure uses Docker Compose on Debian 13 x86_64 |
+| Web application | Static files, distributed via API Gateway or web server |
+| Installer | Precondition checks, generates configuration based on topology profile, creates database tables and schemas, loads Keycloak realm |
+| Observability package | Configuration for Collector, Prometheus, Grafana dashboards, alert rules, runbook |
+| Administrative CLI | `psimctl` |
+| File storage | SeaweedFS with private bucket `psim-plans`; plan versions are managed by Resource Catalog, independent backup outside the working cluster ([ADR-042](../adr/0042-operational-capabilities.md), [ADR-046](../adr/0046-s3-object-storage.md)) |
 
-Сервисы одинаковы во всех топологиях; различаются конфигурация, число экземпляров и параметры инфраструктуры. Первоначальная настройка включает внешнюю PKI, доверие mTLS и Keycloak по [эксплуатационному регламенту](operational-capabilities.md#6-сертификаты-секреты-и-восстановление-доступа).
+Services are the same in all topologies; differences lie in configuration, number of instances, and infrastructure parameters. Initial setup includes external PKI, mTLS trust, and Keycloak according to [operational procedure](operational-capabilities.md#6-certificates-secrets-and-access-restoration).
 
-Реализованные профили и команды установки: [поставка двух топологий](../engineering/deployment-topologies.md), [локальные VM](../engineering/local-vm-lab.md), [первоначальная PKI и учётные записи](../engineering/deployment-pki.md), [обновление и откат](../engineering/installation-and-upgrades.md). Локальный кластер размещает три гостевые ОС на одном физическом хосте; независимые физические домены отказа проверяются отдельным размещением.
+Implemented profiles and installation commands: [deployment of both topologies](../engineering/deployment-topologies.md), [local VMs](../engineering/local-vm-lab.md), [initial PKI and accounts](../engineering/deployment-pki.md), [update and rollback](../engineering/installation-and-upgrades.md). The local cluster runs three guest OSs on a single physical host; independent failure domains are tested separately.
 
-## 2. Топология «одна машина»
+## 2. “One machine” topology
 
-```mermaid
-flowchart TB
-    subgraph HOST [Сервер: Debian 13 x86_64]
-        direction TB
-        subgraph INFRA [Инфраструктура]
-            K[Kafka, 1 брокер KRaft]
-            SR[Schema Registry]
-            PG[(PostgreSQL)]
-            R[(Redis-совместимое хранилище)]
-            CH[(ClickHouse + Keeper)]
-            KC[Keycloak]
-            FS[(SeaweedFS: планы)]
-        end
-        subgraph APP [Сервисы PSIM: по 1 экземпляру]
-            S1[Connector Gateway]
-            S2[Normalizer, Event History]
-            S3[Correlation Engine]
-            S4[Incident, Response, Command, Notification]
-            S5[Projection, Audit, Catalog]
-            S6[API Gateway + веб]
-        end
-        subgraph OBS [Наблюдаемость]
-            OC[OTel Collector] --> PR[Prometheus] --> GR[Grafana]
-        end
-    end
-    CONN[Коннекторы] -- ":7443 gRPC mTLS" --> S1
-    USR[Браузеры] -- ":443 HTTPS/WSS" --> S6
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+top to bottom direction
+package "Server: Debian 13 x86_64" as HOST {
+package "Infrastructure" as INFRA {
+rectangle "Kafka, 1 KRaft broker" as K
+rectangle "Schema Registry" as SR
+database "PostgreSQL" as PG
+database "Redis-compatible storage" as R
+database "ClickHouse + Keeper" as CH
+rectangle "Keycloak" as KC
+database "SeaweedFS: floor plans" as FS
+}
+package "PSIM Services: 1 instance each" as APP {
+rectangle "Connector Gateway" as S1
+rectangle "Normalizer, Event History" as S2
+rectangle "Correlation Engine" as S3
+rectangle "Incident, Response, Command, Notification" as S4
+rectangle "Projection, Audit, Catalog" as S5
+rectangle "API Gateway + web" as S6
+}
+package "Observability" as OBS {
+rectangle "OTel Collector" as OC
+rectangle "Prometheus" as PR
+rectangle "Grafana" as GR
+}
+}
+rectangle "Connectors" as CONN
+rectangle "Browsers" as USR
+OC --> PR
+PR --> GR
+CONN --> S1 : :7443 gRPC mTLS
+USR --> S6 : :443 HTTPS/WSS
+@enduml
 ```
 
-Запуск - Docker Compose или systemd-юниты из пакетов `.deb`.
+Launch via Docker Compose or systemd units from packages `.deb`.
 
-**Границы надёжности** (документируются для заказчика явно):
+**Reliability boundaries** (documented explicitly for the client):
 
-| Свойство | Значение |
+| Property | Value |
 |---|---|
-| Отказ процесса сервиса | Перезапуск supervisor'ом (Docker или systemd); без потерь, RTO - время перезапуска |
-| Отказ сервера | Простой до восстановления сервера |
-| Отказ диска | Потеря данных после последней резервной копии; рекомендуется RAID 1 или 10 и архивирование WAL PostgreSQL |
-| RPO | 0 при отказе процесса; интервал резервного копирования при потере диска |
-| Обновление | С кратким простоем обработки: события буферизуются в SDK коннекторов и досылаются |
-| Производительность | Цель 10 000 событий/с на эталонном сервере ([scaling.md](scaling.md#54-эталонные-стенды)) |
+| Service process failure | Restart by supervisor (Docker or systemd); no loss, RTO - restart time |
+| Server failure | Downtime until the server is restored |
+| Disk failure | Data loss after last backup; recommended RAID 1 or 10 and WAL archiving in PostgreSQL |
+| RPO | 0 in case of process failure; interval for backup when disk fails |
+| Update | With a short processing interruption: events are buffered in connector SDKs and sent after recovery |
+| Performance | Goal is 10,000 events/s on the reference server ([scaling.md](scaling.md#54-standard-test-environments)) |
 
-## 3. Топология «кластер на VM»
+## 3. “Cluster on VMs” topology
 
-```mermaid
-flowchart TB
-    LB[HAProxy ×2 + keepalived VIP<br/>:443 HTTPS/WSS, :7443 gRPC L4]
-    subgraph I1 [infra-1]
-        K1[Kafka broker+controller]
-        P1[(PostgreSQL + Patroni)]
-        E1[etcd]
-        R1[(Redis master/replica)]
-        C1[(ClickHouse реплика + Keeper)]
-        F1[(SeaweedFS master, volume, filer, S3)]
-    end
-    subgraph I2 [infra-2]
-        K2[Kafka broker+controller]
-        P2[(PostgreSQL + Patroni)]
-        E2[etcd]
-        R2[(Redis master/replica)]
-        C2[(ClickHouse реплика + Keeper)]
-        F2[(SeaweedFS master, volume, filer, S3)]
-    end
-    subgraph I3 [infra-3]
-        K3[Kafka broker+controller]
-        P3[(PostgreSQL + Patroni)]
-        E3[etcd]
-        R3[(Redis master/replica)]
-        C3[ClickHouse Keeper]
-        F3[SeaweedFS master]
-    end
-    subgraph A1 [app-1]
-        SA[Экземпляры сервисов PSIM, Keycloak]
-    end
-    subgraph A2 [app-2]
-        SB[Экземпляры сервисов PSIM, Keycloak]
-    end
-    OBS[obs-1: Collector, Prometheus, Grafana,<br/>логи и трассировки]
-    LB --> A1
-    LB --> A2
-    A1 --> I1 & I2 & I3
-    A2 --> I1 & I2 & I3
-    A1 -.-> OBS
-    A2 -.-> OBS
+```plantuml
+@startuml
+skinparam backgroundColor white
+skinparam defaultFontName SansSerif
+skinparam defaultFontSize 13
+skinparam shadowing false
+skinparam roundcorner 6
+skinparam ArrowColor #475569
+skinparam packageStyle rectangle
+skinparam nodesep 35
+skinparam ranksep 45
+
+top to bottom direction
+rectangle "HAProxy ×2 + keepalived VIP\n:443 HTTPS/WSS, :7443 gRPC L4" as LB
+package "infra-1" as I1 {
+rectangle "Kafka broker+controller" as K1
+database "PostgreSQL + Patroni" as P1
+rectangle "etcd" as E1
+database "Redis master/replica" as R1
+database "ClickHouse replication + Keeper" as C1
+database "SeaweedFS master, volume, filer, S3" as F1
+}
+package "infra-2" as I2 {
+rectangle "Kafka broker+controller" as K2
+database "PostgreSQL + Patroni" as P2
+rectangle "etcd" as E2
+database "Redis master/replica" as R2
+database "ClickHouse replication + Keeper" as C2
+database "SeaweedFS master, volume, filer, S3" as F2
+}
+package "infra-3" as I3 {
+rectangle "Kafka broker+controller" as K3
+database "PostgreSQL + Patroni" as P3
+rectangle "etcd" as E3
+database "Redis master/replica" as R3
+rectangle "ClickHouse Keeper" as C3
+rectangle "SeaweedFS master" as F3
+}
+package "app-1" as A1 {
+rectangle "Instances of PSIM services, Keycloak" as SA
+}
+package "app-2" as A2 {
+rectangle "Instances of PSIM services, Keycloak" as SB
+}
+rectangle "obs-1: Collector, Prometheus, Grafana,\nlogs and traces" as OBS
+LB --> A1
+LB --> A2
+A1 --> I1
+A1 --> I2
+A1 --> I3
+A2 --> I1
+A2 --> I2
+A2 --> I3
+A1 ..> OBS
+A2 ..> OBS
+@enduml
 ```
 
-| Компонент | Конфигурация | Поведение при отказе одного узла |
+| Component | Configuration | Behavior in case of one node failure |
 |---|---|---|
-| Kafka | 3 узла в совмещённом режиме broker + controller (KRaft); RF 3, `min.insync.replicas` 2 | Новые лидеры партиций за секунды; запись продолжается |
-| PostgreSQL | Patroni + etcd (3 узла); одна синхронная реплика (`synchronous_mode: true`), одна асинхронная; доступ через HAProxy по роли лидера | Переключение ≤ 30 с; зафиксированные транзакции не теряются |
-| Redis-совместимое хранилище | Valkey: primary + 2 реплики на разных узлах, 3 Sentinel с quorum 2 ([ADR-015](../adr/0015-redis-client-and-role.md)). Обнаружение primary и проверка ROLE выполняются клиентом; шардирование Cluster в MVP не используется | Реплика становится мастером; кэши и лимиты допускают кратковременную потерю, реестр сессий восстанавливается переподключением коннекторов |
-| Сервисы PSIM | ≥ 2 экземпляра каждого, на разных узлах приложений ([scaling.md](scaling.md#53-экземпляры-сервисов-при-50-000-событийс-кластер)) | Партиции переходят к оставшимся экземплярам |
-| Keycloak | 2 экземпляра, база в PostgreSQL кластера | Уже выданные токены проверяются по кэшу JWKS; новый вход - через оставшийся экземпляр |
-| HAProxy | 2 экземпляра с общим VIP (keepalived) | Переключение VIP за секунды |
-| ClickHouse | 1 шард × 2 реплики (ReplicatedMergeTree) на infra-1 и infra-2; ClickHouse Keeper на трёх узлах инфраструктуры ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) | Чтение и запись переходят на вторую реплику; после восстановления реплика догоняет; загрузчики Kafka догружают накопившееся |
-| Файловое хранилище | SeaweedFS: 3 master (Raft), volume-серверы с репликацией томов на разных узлах, 2 filer и 2 S3 gateway за HAProxy; хранилище метаданных filer и шифрование томов фиксируются ADR шага 9.1 | Текущие планы читаются при отказе одного узла; незавершённая замена сохраняет прежнюю версию |
-| Наблюдаемость | Отдельный узел; не влияет на обработку | Потеря телеметрии на время отказа; сервисы не блокируются экспортом |
+| Kafka | 3 nodes in combined broker + controller mode (KRaft); RF 3, `min.insync.replicas` 2 | New leaders of partitions appear within seconds; writing continues |
+| PostgreSQL | Patroni + etcd (3 nodes); one synchronous replica (`synchronous_mode: true`), one asynchronous; access via HAProxy based on leader role | Switching ≤ 30 seconds; committed transactions are not lost |
+| Redis-compatible storage | Valkey: primary + 2 replicas on different nodes, 3 Sentinels with quorum 2 ([ADR-015](../adr/0015-redis-client-and-role.md)). Detection of primary and role checking are performed by the client; Cluster sharding in MVP is not used | Replica becomes master; caches and limits allow temporary loss, session registry is restored by reconnected connectors |
+| PSIM services | ≥ 2 instances of each service, distributed across application nodes ([scaling.md](scaling.md#53-service-instances-at-50000-eventss-cluster)) | Partitions are transferred to remaining instances |
+| Keycloak | 2 instances, database in PostgreSQL cluster | Already issued tokens are checked against JWKS cache; new login via remaining instance |
+| HAProxy | 2 instances with shared VIP (keepalived) | VIP switching within seconds |
+| ClickHouse | 1 shard × 2 replicas (ReplicatedMergeTree) on infra-1 and infra-2; ClickHouse Keeper on three infrastructure nodes ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)) | Reading and writing go to the second replica; after recovery, the replica catches up; Kafka loaders deliver accumulated data |
+| File storage | SeaweedFS: 3 masters (Raft), volume servers with replication on different nodes, 2 filer and 2 S3 gateways via HAProxy; metadata storage and file encryption are recorded by ADR-077 | Current plans are read in case of one node failure; unfinished replacement retains previous version |
+| Observability | Separate node; does not affect processing | Loss of telemetry during failure; services are not blocked by exports |
 
-Минимальная конфигурация - 3 узла, на которых совмещены инфраструктура и сервисы; эталонная для 50 000 событий/с - 3 узла инфраструктуры + 2 узла приложений + узел наблюдаемости.
+Minimum configuration is 3 nodes with combined infrastructure and services; for 50,000 events/s, it’s 3 infrastructure nodes + 2 application nodes + one observability node.
 
-## 4. Обновление
+## 4. Update
 
-Обновление без простоя (S12, QS-O1) в кластере:
+Update without downtime (S12, QS-O1) in the cluster:
 
-1. **Предпроверка.** Установщик сверяет совместимость: схемы Protobuf N+1 совместимы с N, миграции N+1 только расширяющие, версия протокола коннекторов поддерживается.
-2. **Расширяющие миграции.** Применяются до замены кода; код N продолжает работать на расширенной схеме.
-3. **Регистрация схем.** Новые версии схем регистрируются в Schema Registry.
-4. **Последовательная замена.** По одному экземпляру: `ready = false` -> дренирование -> остановка -> запуск N+1 с тем же `group.instance.id` -> ожидание `ready` и отсутствия роста лага -> следующий экземпляр. Порядок сервисов - от потребителей к производителям, чтобы новые потребители были готовы к новым полям до их появления.
-5. **Сужающие миграции.** Выполняются в следующем выпуске (N+2), когда код N гарантированно выведен.
-6. **Откат.** Последовательная замена обратно на N; возможна, пока не выполнены сужающие миграции N+1.
+1. **Pre-check.** The installer checks compatibility: Protobuf N+1 schemas are compatible with N, N+1 migrations only expand; connector protocol version is supported.
+2. **Expansion migrations.** Applied before code replacement; N code continues to work on expanded schema.
+3. **Schema registration.** New schema versions are registered in Schema Registry.
+4. **Sequential replacement.** One instance at a time: `ready = false` -> drain -> stop -> restart N+1 with the same service instance identity -> wait for `ready` and no increase in lag -> next instance. Service order is from consumers to producers, so new consumers are ready for new fields before they appear.
+5. **Shrinking migrations.** Performed in the next release (N+2), once N code has been fully retired.
+6. **Rollback.** Sequential replacement back to N; possible until shrinking migrations N+1 are completed.
 
-Для контейнеров Normalizer и Correlation Engine реализован запуск дополнительной реплики с отдельной producer identity до остановки старой; назначения Kafka и готовность проверяются перед передачей обработки. Подробности и фактические границы проверки приведены в [руководстве по обновлению](../engineering/installation-and-upgrades.md).
+For Normalizer and Correlation Engine containers, additional replica startup with separate producer identity is implemented until the old one stops; Kafka assignments and readiness are checked before processing is transferred. Details and actual check boundaries are provided in [update guide](../engineering/installation-and-upgrades.md).
 
-Шаг 9.2 принят с ограничением: S12/C-12 отложен до 10.1 и остаётся обязательным перед выпуском. Обновление без нарушения SLO под LOAD-50K пока не подтверждено. На одной машине последовательная замена допускает краткий простой каждого сервиса.
+The S12/C-12 qualification is not completed and remains mandatory before release. Updates without violating the SLO have not been confirmed for LOAD-50K. On a single machine, sequential replacement allows a short outage for each service.
 
-## 5. Сетевые порты
+## 5. Network Ports
 
-| Порт | Компонент | Доступ |
+| Port | Component | Access |
 |---|---|---|
-| 443 | API Gateway: HTTPS, WSS, веб-приложение | Пользователи |
-| 7443 | Connector Gateway: gRPC, mTLS | Коннекторы |
-| 8443 | Keycloak | Пользователи (вход), сервисы |
-| 9092-9094 | Kafka (TLS) | Только сервисы платформы |
-| 9440, 8443 | ClickHouse: нативный протокол TLS, HTTPS | Только сервисы платформы |
-| 9234, 9281 | ClickHouse Keeper: межузловой протокол, клиентский протокол TLS | Только узлы ClickHouse |
-| 5432 | PostgreSQL (через HAProxy: 5000 - лидер, 5001 - реплики) | Только сервисы платформы |
-| 6379 | Redis-совместимое хранилище (TLS) | Только сервисы платформы |
-| S3 HTTPS (порт фиксируется на 9.1 без пересечения с 8443) | SeaweedFS S3 gateway | Только сервисы платформы |
-| 9333, 8080, 8888 и gRPC-порты +10000 | SeaweedFS master, volume, filer | Только узлы SeaweedFS |
-| 8081 | Schema Registry | Только сервисы платформы |
-| 4317 | OTel Collector (OTLP gRPC) | Только сервисы платформы |
-| 9090, 3000 | Prometheus, Grafana | Эксплуатация |
-| 8080 на каждом сервисе | `/metrics`, `/health/*` | Prometheus, балансировщик |
+| 443 | API Gateway: HTTPS, WSS, web application | Users |
+| 7443 | Connector Gateway: gRPC, mTLS | Connectors |
+| 8443 | Keycloak | Users (login), services |
+| 9092-9094 | Kafka (TLS) | Only platform services |
+| 9440, 8443 | ClickHouse: native TLS protocol, HTTPS | Only platform services |
+| 9234, 9281 | ClickHouse Keeper: inter-node protocol, client TLS protocol | Only ClickHouse nodes |
+| 5432 | PostgreSQL (through HAProxy: 5000 - leader, 5001 - replicas) | Only platform services |
+| 6379 | Redis-compatible storage (TLS) | Only platform services |
+| 18333 (S3 HTTPS) | SeaweedFS S3 gateway | Only platform services |
+| 9333, 8080, 8888 and gRPC ports +10000 | SeaweedFS master, volume, filer | Only SeaweedFS nodes |
+| 8081 | Schema Registry | Only platform services |
+| 4317 | OTel Collector (OTLP gRPC) | Only platform services |
+| 9090, 3000 | Prometheus, Grafana | Operation |
+| 8080 on each service | `/metrics`, `/health/*` | Prometheus, balancer |
 
-Внутренние порты закрыты для сетей пользователей и коннекторов межсетевым экраном; установщик выдаёт шаблон правил.
+Internal ports are closed to user networks and connectors by a network firewall; the installer generates a rules template.

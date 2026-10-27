@@ -1,30 +1,34 @@
-# ADR-057. Факты инцидентов и отчётность
+# ADR-057. Incident Facts and Reporting
 
-- **Статус:** Принято
-- **Связанные:** [ADR-028](0028-clickhouse-analytical-storage.md), [ADR-045](0045-clickhouse-layer.md), [ADR-056](0056-sla-and-notifications.md), [ADR-020](0020-authorization-model.md)
+<!-- language-links -->
+[English](0057-incident-reporting.md) | [Русский](../ru/adr/0057-incident-reporting.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related to:** [ADR-028](0028-clickhouse-analytical-storage.md), [ADR-045](0045-clickhouse-layer.md), [ADR-056](0056-sla-and-notifications.md), [ADR-020](0020-authorization-model.md)
 
-Отчётность должна считать инциденты и показатели реакции независимо от повторов Kafka, изменения политики SLA, передачи ответственности и переоткрытия. PostgreSQL хранит рабочие агрегаты; ClickHouse обслуживает аналитику. Обычное суммирование событий в материализованном представлении даёт неверный результат после повторной доставки или изменения агрегата.
+## Context
 
-## Решение
+Reporting must count incidents and response metrics regardless of Kafka redelivery, SLA policy changes, responsibility transfers, and reopening. PostgreSQL stores working aggregates; ClickHouse handles analytics. Regular summarization in a materialized view yields incorrect results after repeated delivery or aggregate changes.
 
-1. Projection Service загружает `psim.incidents.events.v1` и `psim.response.events.v1` через общий журнал пакетов Kafka -> ClickHouse. Повреждённые записи попадают в `psim.dlq.projection.v1`; корректные события других функций пропускаются с сохранением позиции без DLQ.
-2. `incident_facts` содержит типизированные снимки инцидентов и исходных значений SLA. Retention - 400 суток от создания инцидента. `ReplicatedReplacingMergeTree` использует версию агрегата, а материализованное представление сохраняет `argMaxState` в `ReplicatedAggregatingMergeTree`. Чтение использует `argMaxMerge`, поэтому результаты корректны до фонового слияния и после повторного пересчёта. Все таблицы создаются `ON CLUSTER`.
-3. Response Engine атомарно публикует совместимое событие `SlaPolicyPinned` при первом сохранении SLA инцидента. Оно содержит исходные длительности принятия и решения. Изменение политики и приоритета не меняет их. Старые инциденты получают значения при пересчёте из сохранённой политики и исходного приоритета `escalation.incidents`.
-4. Интервал отчёта полуоткрытый, точность миллисекунда. Созданные считаются по времени создания, MTTA - по времени принятия, решённые, MTTR и ложные тревоги - по времени решения. Инцидент может быть создан до начала периода. Группировка по дням использует время соответствующего наблюдения. Используется последнее состояние инцидента: переоткрытие исключает прежнее решение, передача меняет группу ответственного. Нагрузка - количество инцидентов у последнего ответственного, а не число действий каждого оператора.
-5. MTTA - среднее время от создания до принятия среди принятых. MTTR - среднее время от создания до текущего решения среди решённых. Ложные тревоги делятся на число решённых за период, согласно S13. SLA принятия отсчитывается от создания, SLA решения - от принятия, согласно исполнительной модели. В знаменатель входят завершённые или просроченные наблюдения с известными исходными значениями; ожидающие и инциденты без SLA исключаются. Наблюдение SLA относится к моменту завершения или дедлайну, в зависимости от того, что наступило раньше; размеры знаменателей возвращаются явно. Пустой знаменатель даёт ноль.
-6. Один запрос ClickHouse строит группы и итоги через `ROLLUP`; средние и доли итогов считаются по инцидентам. Фильтры и область доступа передаются нативными параметрами. Доступ `report.read` и `report.export` имеют `manager`, `supervisor` и `auditor`; роль администратора сама по себе доступа не даёт. Разрешённые операции и отказы фиксируются через outbox.
-7. Пересчёт читает PostgreSQL в транзакции `REPEATABLE READ READ ONLY`, ограниченными порциями, и вставляет снимки без удаления назначения. Он совместим с работающим загрузчиком: старые версии не заменяют новые. При отставании SLA от Incident Service пересчёт завершается ошибкой, допускающей повтор. Утилита не изменяет рабочие агрегаты или позиции Kafka.
+## Solution
 
-## Последствия
+1. The Projection Service loads `psim.incidents.events.v1` and `psim.response.events.v1` through a shared Kafka -> ClickHouse batch journal. Damaged records go to `psim.dlq.projection.v1`; correct events from other functions are skipped with position retention without DLQ.
+2. `incident_facts` contains typed incident snapshots and SLA source values. Retention is 400 days from incident creation. `ReplicatedReplacingMergeTree` uses the aggregate version, while the materialized view stores `argMaxState` in `ReplicatedAggregatingMergeTree`. Reading uses `argMaxMerge`, so results are correct before background merging and after repeated recomputation. All tables are created by `ON CLUSTER`.
+3. The Response Engine atomically publishes a compatible event `SlaPolicyPinned` when an incident SLA is first persisted. It contains original acknowledgement and resolution durations. Policy and priority changes do not alter them. During recomputation, old incidents receive values from the saved policy and original priority in `escalation.incidents`.
+4. The reporting interval is half-open, with millisecond accuracy. Created incidents are counted by creation time, MTTA by acceptance time, resolved, MTTR, and false alarms by resolution time. An incident can be created before the period starts. Daily grouping uses corresponding observation time. The latest incident state is used: reopening excludes previous resolutions, transfer changes the responsible group. Load is the number of incidents for the last responsible person, not actions per operator.
+5. MTTA is the average time from creation to acceptance among accepted incidents. MTTR is the average time from creation to current resolution among resolved incidents. False alarms are divided by the number resolved in a period, according to S13. SLA acceptance counts from creation, SLA resolution from acceptance, according to the execution model. Denominators include completed or overdue observations with known source values; pending and incidents without SLA are excluded. SLA observation relates to completion or deadline, depending on which occurred first; denominator sizes are returned explicitly. Empty denominators give zero.
+6. One ClickHouse query builds groups and totals through `ROLLUP`; averages and percentages are counted by incidents. Filters and access scope are passed as native parameters. Roles `manager`, `supervisor` and `auditor` have `report.read` and `report.export`; administrator status alone does not grant access. Allowed operations and failures are recorded through outbox.
+7. Recomputation reads PostgreSQL in a transaction `REPEATABLE READ READ ONLY`, in limited batches, and inserts snapshots without deleting target data. It is compatible with running loaders: older versions do not replace new ones. If the SLA falls behind the Incident Service, re-calculation ends with a retryable error. The tool does not change working aggregates or Kafka positions.
 
-- Отчёт отражает последнее доставленное состояние, поэтому отставание Kafka влияет на свежесть. Отчёт не является снимком исторического состояния на конец выбранного периода.
-- Исправление данных с той же версией не является поддерживаемой операцией. Источник обязан увеличивать версию и сохранять время создания.
-- Таблицы обслуживают локальный шард. Распределённые таблицы для нескольких шардов и кластерные проверки входят в эксплуатационную топологию.
-- Утрата материализованного состояния требует пересчёта из PostgreSQL. Факты и их агрегаты восстанавливаются вместе; повторная вставка уже дедуплицированного блока сама по себе не восстанавливает удалённое представление.
-- Механизм состояний агрегатов соответствует [документации ClickHouse](https://clickhouse.com/blog/using-materialized-views-in-clickhouse).
+## Consequences
 
-## Проверка
+- Reporting reflects the last delivered state, so Kafka delays affect freshness. Reporting is not a snapshot of historical state at the end of the selected period.
+- Fixing data with the same version is not supported. The source must increase the version and save creation time.
+- Tables serve local shards. Distributed tables for multiple shards and cluster checks are part of the operational topology.
+- Losing the materialized state requires re-calculation from PostgreSQL. Facts and their aggregates are restored together; reinserting already deduplicated blocks does not restore the deleted view.
+- The aggregate state mechanism follows [ClickHouse documentation](https://clickhouse.com/blog/using-materialized-views-in-clickhouse).
 
-`task reports:test` проверяет известные показатели, две копии сервиса, повторы, старые версии, повреждённый ввод, роли, область доступа, CSV, SIGKILL и пересчёт. `task reports:bench` проверяет отчёт за 30 суток на миллионе инцидентов. Санитайзеры и покрытие запускаются отдельными задачами.
+## Verification
+
+`task reports:test` checks known metrics, two service copies, repetitions, older versions, damaged input, roles, access scope, CSV, SIGKILL, and re-calculation. `task reports:bench` checks reporting over 30 days for one million incidents. Sanitizers and coverage are run as separate tasks.

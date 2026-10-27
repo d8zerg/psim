@@ -10,7 +10,7 @@ import "psim/catalog/v1/catalog.proto";
 import "psim/catalog/v1/maintenance.proto";
 
 // CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.
-// Owner: Resource Catalog. Scenarios S1, S2.
+// Owner: Resource Catalog.
 service CatalogService {
   // GetDeviceType returns one device type.
   rpc GetDeviceType(GetDeviceTypeRequest) returns (GetDeviceTypeResponse) {

@@ -1,35 +1,36 @@
-# ADR-NNN. Краткое название решения
+# ADR-NNN. Short decision title
 
-- **Статус:** Предложено | Принято | Заменено ADR-NNN | Отклонено
-- **Шаг плана:** N.N
-- **Связанные:** ADR-NNN, документы
+<!-- language-links -->
+[English](template.md) | [Русский](../ru/adr/template.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Proposed | Accepted | Superseded by ADR-NNN | Rejected
+- **Related to:** ADR-NNN, documents
 
-Какая проблема решается, какие силы и ограничения действуют. Ссылки на требования, сценарии качества, SLO.
+## Context
 
-## Рассмотренные варианты
+What problem is being solved, what forces and constraints are in play. References to requirements, quality scenarios, SLOs.
 
-### Вариант A. Название
+## Proposed Options
 
-- плюсы
-- минусы
+### Option A. Name
+- Pros
+- Cons
 
-### Вариант B. Название
+### Option B. Name
+- Pros
+- Cons
 
-- плюсы
-- минусы
+## Decision
 
-## Решение
+The chosen option and why. Specific parameters, if they are part of the solution.
 
-Выбранный вариант и почему. Конкретные параметры, если они часть решения.
+## Consequences
 
-## Последствия
+- Positive.
+- Negative and risks, how they are mitigated.
+- Necessary changes to components and artifacts.
 
-- Положительные.
-- Отрицательные и риски, как они смягчаются.
-- Что нужно сделать (шаги плана, артефакты).
+## Verification
 
-## Проверка
-
-Как убедиться, что решение соблюдается: fitness function, тест, замер.
+How to ensure the solution is followed: fitness function, test, measurement.

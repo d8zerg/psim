@@ -1,5 +1,9 @@
-# Системные тесты
+# System Tests
 
-Сквозные, нагрузочные, хаос- и контрактные тесты уровня системы ([стратегия качества](../docs/quality/strategy.md)). Unit- и компонентные тесты лежат рядом с кодом.
+<!-- language-links -->
+[English](README.md) | [Русский](../docs/ru/repository/tests/README.md)
+<!-- /language-links -->
 
-[Детерминированная симуляция](../libs/sim/README.md) выполняется отдельно и только вручную: `task sim:test`, `task sim:short`, `task sim:long`, `task sim:replay SEED=42`. В CTest и CI она не подключена (ADR-044).
+End-to-end, load, chaos, and contract tests at system level ([Quality Strategy](../docs/quality/strategy.md)). Unit and component tests are placed alongside the code.
+
+[Deterministic simulation](../libs/sim/README.md) is performed separately and manually: `task sim:test`, `task sim:short`, `task sim:long`, `task sim:replay SEED=42`. It is not integrated in CTest and CI (ADR-044).

@@ -1,76 +1,80 @@
-# ADR-033. Контроль качества кода: форматирование, clang-tidy, контроль include, санитайзеры, покрытие, fitness functions
+# ADR-033. Code quality gates: formatting, clang-tidy, includes, sanitizers, coverage and fitness functions
 
-- **Статус:** Принято
-- **Шаг плана:** 1.2
-- **Связанные:** ADR-001, ADR-030, ADR-031, ADR-032, [стандарт C++](../engineering/cpp-coding-standard.md), [стандарт TypeScript](../engineering/typescript-coding-standard.md), требование SR-13 ([threat-register.md](../security/threat-register.md))
+<!-- language-links -->
+[English](0033-code-quality-gates.md) | [Русский](../ru/adr/0033-code-quality-gates.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Refinement:** [ADR-036](0036-no-git-hooks.md) replaces the Git-hook rules: run `task ci` before committing; `hooks:*` tasks have been removed.
+- **Related:** ADR-001, ADR-030, ADR-031, ADR-032, [C++ standard](../engineering/cpp-coding-standard.md), [TypeScript standard](../engineering/typescript-coding-standard.md), requirement SR-13 ([threat-register.md](../security/threat-register.md))
 
-Шаг 1.2 требует, чтобы нарушение стандарта кодирования, направлений зависимостей или порогов покрытия блокировало слияние. Цели инженерного качества (план, раздел 1.4): 0 предупреждений компилятора и clang-tidy, санитайзеры ASan, UBSan и TSan без срабатываний, покрытие доменного ядра ≥ 90% строк и ≥ 80% ветвей, инфраструктуры ≥ 75% строк. Методы реестра верификации FF-01, FF-02, FF-07, FF-10, FF-11, FF-12, SEC-01 вводятся на этом шаге.
+## Context
 
-Ограничения:
+Coding-standard violations, incorrect dependency directions and insufficient coverage block merging. Engineering goals G-11-G-14 require zero compiler and clang-tidy warnings, no ASan, UBSan or TSan findings, at least 90% line and 80% branch coverage in the domain core, and at least 75% line coverage in infrastructure. Registry methods FF-01, FF-02, FF-07, FF-10, FF-11, FF-12 and SEC-01 verify these requirements.
 
-- toolchain - clang 21 и системная libstdc++ в контейнере на Debian 13 x86_64 (ADR-032); любые инструменты анализа должны понимать тот же код и те же заголовки стандартной библиотеки;
-- обычные зависимости Conan собираются без инструментирования; для пресета `tsan` заголовки protobuf требуют библиотеку, собранную с TSan (ADR-032);
-- CI появляется на шаге 1.3, поэтому барьер слияния - задача `task check`, которую CI вызывает без изменений;
-- доменных библиотек ещё нет: проверки чистоты домена должны доказывать, что ловят нарушения, без доменного кода.
+Constraints:
 
-## Рассмотренные варианты
+- The toolchain is Clang 21 with system libstdc++ in a Debian 13 x86_64 container (ADR-032); analysis tools must understand the same code and standard-library headers.
+- Ordinary Conan dependencies are not instrumented; the `tsan` preset's protobuf headers require a TSan-built library (ADR-032).
+- The merge gate is `task check`, invoked unchanged by CI.
+- Architecture-check self-tests must demonstrate detection with negative examples.
 
-### Контроль include (план: include-what-you-use)
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Include checks
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| include-what-you-use | Названо в плане; зрелые отчёты | Выпуск IWYU привязан к версии clang: для clang 21 его нужно собирать из исходников против `llvm-21-dev` в образе toolchain; отдельный прогон и отдельный формат подавлений |
-| **clang-tidy `misc-include-cleaner`** | Та же библиотека анализа include (include-cleaner из LLVM), что и в clangd; поставляется в `clang-tidy-21`, уже есть в образе; один прогон, одни подавления `NOLINT`, тот же барьер `WarningsAsErrors`; редактор показывает замечания сразу | Не предлагает forward-declarations; соответствия для заголовков сторонних библиотек задаются регулярными выражениями |
+| include-what-you-use | Mature reports | IWYU releases depend on Clang versions; Clang 21 requires a source build against `llvm-21-dev` in the toolchain image, a separate pass and suppression format |
+| **clang-tidy `misc-include-cleaner`** | Same LLVM include-cleaner analysis as clangd; included in `clang-tidy-21`; one pass, `NOLINT` format and `WarningsAsErrors` gate; immediate editor diagnostics | Does not suggest forward declarations; third-party header mappings use regular expressions |
 
-### Санитайзер потоков
+### Thread sanitizer
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Подавления TSan для protobuf и gRPC | Без пересборки зависимостей | Подавления скрывают и настоящие гонки в нашем коде, проходящем через эти библиотеки; ложные `heap-use-after-free` из `TSanRead` подавлениями не убираются |
-| **Отдельный профиль Conan с `-fsanitize=thread` для зависимостей** | Весь код процесса инструментирован, отчёты TSan достоверны | Вторая сборка зависимостей (кэшируется); флаги должны входить в идентификатор пакета, чтобы инструментированные и обычные двоичные пакеты не смешивались |
+| TSan suppressions for protobuf and gRPC | No dependency rebuild | Can hide real application races through these libraries; do not remove false `heap-use-after-free` reports from `TSanRead` |
+| **Separate Conan profile with `-fsanitize=thread` for dependencies** | Entire process is instrumented; reliable reports | A second cached dependency build; flags must affect package identity to prevent mixing instrumented and ordinary binaries |
 
-### Барьер покрытия
+### Coverage gate
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Общий процент по проекту | Просто | Хорошо покрытый модуль скрывает непокрытый |
-| **Порог по модулю (каталог) с группами `domain` и `infrastructure`** | Пороги стратегии качества применяются к каждой библиотеке отдельно | Конфигурация групп (`tools/cpp/coverage.yaml`) |
+| One project-wide percentage | Simple | Well-tested modules conceal untested ones |
+| **Per-module directory thresholds with `domain` and `infrastructure` groups** | Quality thresholds apply to each library | Group configuration in `tools/cpp/coverage.yaml` |
 
-### Fitness function зависимостей
+### Dependency fitness function
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Разбор `CMakeLists.txt` регулярными выражениями | Без сборки | Хрупко: переменные, функции, генераторные выражения |
-| `cmake --graphviz` | Встроено в CMake | Формат для людей; нет каталогов целей и include |
-| **CMake File API (code model v2) + анализ `#include`** | Точный граф целей с каталогами, источниками и путями include после конфигурации; include ловит зависимости через заголовки, которых нет в графе целей | Нужна конфигурация сборки (секунды при готовых зависимостях) |
+| Parse `CMakeLists.txt` with regular expressions | No build required | Fragile with variables, functions and generator expressions |
+| `cmake --graphviz` | Built into CMake | Human-oriented format without target directories or includes |
+| **CMake File API code model v2 plus `#include` analysis** | Accurate configured target graph with directories, sources and include paths; include analysis finds header dependencies absent from the target graph | Requires build configuration, taking seconds with prepared dependencies |
 
-## Решение
+## Decision
 
-1. **Стандарт кодирования** - [cpp-coding-standard.md](../engineering/cpp-coding-standard.md) и [typescript-coding-standard.md](../engineering/typescript-coding-standard.md). Правила, которые проверяет инструмент, записаны в его конфигурации; документ объясняет их и содержит то, что проверяется на ревью.
-2. **Форматирование:** `.clang-format` (основа Google, 120 колонок, группировка include), `.editorconfig`; `task cpp:format` - проверка, `task cpp:format:fix` - исправление.
-3. **clang-tidy:** профиль `.clang-tidy` - группы `bugprone`, `cert`, `clang-analyzer`, `concurrency`, `cppcoreguidelines`, `misc`, `modernize`, `performance`, `portability`, `readability` с явным списком исключений; соглашения об именовании; `WarningsAsErrors: '*'`. `task cpp:lint` проверяет все единицы трансляции проекта по `compile_commands.json` сборки `debug`; сгенерированный и вендоренный код не проверяется. Подавление - только `NOLINT(<проверка>)` с причиной.
-4. **Контроль include** - `misc-include-cleaner` в составе профиля clang-tidy вместо отдельного include-what-you-use.
-5. **Санитайзеры:** `asan` (ASan + UBSan) использует обычные зависимости; `tsan` - зависимости, собранные профилем `tools/conan/profiles/clang21-libstdcxx-tsan` (флаги санитайзера входят в идентификатор пакета через `tools.info.package_id:confs`; инструменты сборки protoc и `grpc_cpp_plugin` - из обычного профиля) в `build/debian13/conan-tsan`. `task cpp:test:sanitizers` запускает тесты под обоими пресетами; любое срабатывание завершает тест с ошибкой (`-fno-sanitize-recover=all`).
-6. **Покрытие:** llvm-cov source-based (`coverage` пресет); `task cpp:coverage` сливает профили, пишет текстовый и HTML-отчёт и проверяет пороги по модулям: `libs/domain/*` - 90% строк и 80% ветвей, `libs/platform/*` и `services/*/adapters` - 75% строк. Тесты, сгенерированный код и зависимости не измеряются.
-7. **Fitness functions** (`tools/arch/arch_check.py`, правила - `tools/arch/architecture.yaml`):
-   - `task arch:deps` (FF-01) - граф целей CMake из File API и директивы `#include` проверяются по правилам ADR-001: домен зависит только от `libs/domain/common` и стандартной библиотеки (в том числе нет внешних каталогов include), контексты домена не зависят друг от друга, сервис не зависит от другого сервиса и использует только свои контексты домена; тесты дополнительно могут использовать `libs/sim`;
-   - `task arch:domain-purity` (FF-02) - в `libs/domain` запрещены системные часы, случайность, ввод-вывод, потоки и исключения (заголовки и конструкции кода, без учёта комментариев и строк);
-   - `task arch:sql` (FF-07, SR-13) - SQL-литерал (ключевые слова в верхнем регистре) не склеивается с данными времени выполнения и не передаётся в форматирование; обоснованное исключение - комментарий `psim-arch: allow-sql(<причина>)`. Это эвристика; строгая гарантия появится в слое PostgreSQL (шаг 2.4): API запросов принимает только текст, известный при компиляции;
-   - `task arch:selftest` - модульные тесты проверок: каждое правило доказывает, что ловит своё нарушение.
-8. **Хуки git:** `tools/git-hooks/pre-commit` (подключение - `task hooks:install`) - быстрые проверки индексируемых файлов: пробелы и маркеры конфликтов, формат C++ и proto, чистота домена, SQL, типографика и ссылки документации.
-9. **Барьер слияния** - `task check`: контракты, `arch:check`, `cpp:format`, `cpp:lint`, `cpp:test`, `cpp:test:sanitizers`, `cpp:coverage`, `cpp:runtime-test`, документация. Хук ускоряет обратную связь, но не заменяет барьер: `git commit --no-verify` не обходит CI (шаг 1.3).
-10. **TypeScript:** стандарт фиксируется сейчас; линтер, форматтер, проверка типов и покрытие Vitest настраиваются вместе с веб-монорепозиторием на шаге 1.5 и входят в `task check` там же.
+1. **Coding standards:** [cpp-coding-standard.md](../engineering/cpp-coding-standard.md) and [typescript-coding-standard.md](../engineering/typescript-coding-standard.md). Tool configurations define automated rules; the documents explain them and review-only rules.
+2. **Formatting:** `.clang-format`, based on Google style with 120 columns and include grouping, plus `.editorconfig`; `task cpp:format` checks and `task cpp:format:fix` fixes.
+3. **clang-tidy:** `.clang-tidy` enables `bugprone`, `cert`, `clang-analyzer`, `concurrency`, `cppcoreguidelines`, `misc`, `modernize`, `performance`, `portability` and `readability`, with explicit exclusions and naming rules; `WarningsAsErrors: '*'`. `task cpp:lint` checks all project translation units using the `debug` build's `compile_commands.json`, excluding generated and vendored code. Suppressions require `NOLINT(<check>)` and a reason.
+4. **Includes:** use `misc-include-cleaner` within clang-tidy instead of separate include-what-you-use.
+5. **Sanitizers:** `asan` combines ASan and UBSan with ordinary dependencies. `tsan` uses `tools/conan/profiles/clang21-libstdcxx-tsan` dependencies in `build/debian13/conan-tsan`. Sanitizer flags affect package identity through `tools.info.package_id:confs`; protoc and `grpc_cpp_plugin` build tools use the ordinary profile. `task cpp:test:sanitizers` runs both presets; any finding fails the test through `-fno-sanitize-recover=all`.
+6. **Coverage:** llvm-cov source-based coverage uses the `coverage` preset. `task cpp:coverage` merges profiles, writes text and HTML reports, and enforces module thresholds: `libs/domain/*` needs 90% lines and 80% branches; `libs/platform/*` and `services/*/adapters` need 75% lines. Tests, generated code and dependencies are excluded.
+7. **Fitness functions:** implementation in `tools/arch/arch_check.py`, rules in `tools/arch/architecture.yaml`:
+   - `task arch:deps` (FF-01) checks the CMake File API target graph and `#include` directives against ADR-001: domain code depends only on `libs/domain/common` and the standard library, with no external include directories; domain contexts do not depend on each other; services do not depend on other services and use only their own domain contexts; tests may additionally use `libs/sim`.
+   - `task arch:domain-purity` (FF-02) prohibits system clocks, randomness, I/O, threads and exceptions in `libs/domain`, checking headers and code constructs while excluding comments and strings.
+   - `task arch:sql` (FF-07, SR-13) prohibits concatenating uppercase-keyword SQL literals with runtime data or passing them to formatting. Justified exceptions require `psim-arch: allow-sql(<reason>)`. This is a heuristic; the PostgreSQL query API provides the strict guarantee by accepting only compile-time-known text.
+   - `task arch:selftest` verifies that each rule detects its own violation.
+8. **Git hooks:** the original `tools/git-hooks/pre-commit`, installed by `task hooks:install`, checked staged-file whitespace and conflict markers, C++ and proto formatting, domain purity, SQL, documentation typography and links. The refinement above supersedes this mechanism.
+9. **Merge gate:** `task check` runs contracts, `arch:check`, `cpp:format`, `cpp:lint`, `cpp:test`, `cpp:test:sanitizers`, `cpp:coverage`, `cpp:runtime-test` and documentation. In the original hook workflow, fast hooks did not replace the gate, and `git commit --no-verify` did not bypass CI.
+10. **TypeScript:** linting, formatting, type checks and Vitest coverage are included in `task web:check` and `task check`.
 
-## Последствия
+## Consequences
 
-- Нарушение формата, замечание clang-tidy, недопустимая зависимость модуля, нечистый домен, составной SQL, срабатывание санитайзера или падение покрытия ниже порога делают `task check` красным.
-- Первый запуск `tsan` собирает зависимости второй раз (десятки минут), далее - кэш Conan.
-- clang-tidy проверяет только код, собранный пресетом `debug`; код под условной компиляцией других платформ не проверяется (других платформ нет).
-- Новый сервис добавляется в `tools/arch/architecture.yaml` с перечнем своих контекстов домена, иначе `arch:deps` не проходит.
-- Новые группы покрытия (например, Connector SDK) добавляются в `tools/cpp/coverage.yaml` с порогом из стратегии качества.
+- Formatting violations, clang-tidy diagnostics, invalid module dependencies, impure domain code, constructed SQL, sanitizer findings or insufficient coverage fail `task check`.
+- The first `tsan` run rebuilds dependencies, taking tens of minutes; later runs use Conan cache.
+- clang-tidy checks only code built by `debug`; conditionally compiled code for other platforms is not checked, and no other platforms are supported.
+- A new service must declare its domain contexts in `tools/arch/architecture.yaml` or `arch:deps` fails.
+- New coverage groups, such as Connector SDK, are added to `tools/cpp/coverage.yaml` with the quality-strategy threshold.
 
-## Проверка
+## Verification
 
-`task check`; самопроверка правил - `task arch:selftest`. Отрицательные проверки на шаге 1.2: внесённое нарушение формата, замечание clang-tidy, гонка данных под TSan и падение покрытия ниже порога делают соответствующую задачу красной.
+Run `task check` and rule self-tests through `task arch:selftest`. Negative checks introduce formatting errors, clang-tidy diagnostics, a TSan data race and insufficient coverage; each must fail its task.

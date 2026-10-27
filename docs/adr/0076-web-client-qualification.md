@@ -1,22 +1,26 @@
-# ADR-076. Квалификация веб-клиента
+# ADR-076. Web Client Qualification
 
-- **Статус:** Принято
-- **Связанные:** [ADR-065](0065-ui-loading-budgets.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-070](0070-lazy-loading-and-delivery-budgets.md), [ADR-075](0075-audit-and-reporting-delivery-budget.md)
+<!-- language-links -->
+[English](0076-web-client-qualification.md) | [Русский](../ru/adr/0076-web-client-qualification.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-065](0065-ui-loading-budgets.md), [ADR-069](0069-application-shell-and-session-recovery.md), [ADR-070](0070-lazy-loading-and-delivery-budgets.md), [ADR-075](0075-audit-and-reporting-delivery-budget.md)
 
-Квалификация объединяет проверки контрактов и типов, модульные проверки, визуальную регрессию и доступность, измерения загрузки и ленты, нативные сценарии администратора, оператора, аудитора и руководителя, а также восстановление консоли после разрыва связи. Сценарии установки и отказов кластерной поставки сохраняют свои отдельные проверки.
+## Solution
 
-Сравнение выполняется на воспроизводимых артефактах: исходная сборка, статическая загрузка модулей, отложенные редакторы, выбранный язык модулей и отдельные входы приложения и витрины. Измеряются оба языка, каждый маршрут, холодный и прогретый HTTP-кэш, статические и полные графы. Общие файлы не суммируются повторно. Динамические imports входят в полный граф. Отдельные артефакты считаются каждый полностью и совместно; исключение витрины из рабочей поставки не объявляется удалением её зависимостей.
+Qualification combines contract and type checks, module validation, visual regression and accessibility, loading and feed measurements, native administrator, operator, auditor, and manager scenarios, as well as reconnection after disconnection. Cluster deployment setup and failure scenarios retain their separate checks.
 
-В рабочей конфигурации оба языка входят в код открываемого модуля. В экспериментальном варианте выбранный JSON-словарь загружается до отображения. Переключение языка ждёт продуктовый словарь и словари уже открытых модулей; ошибка сохраняет прежний язык и ввод. Кэш словарей содержит только переводимые строки. Он не заменяет изоляцию серверных данных по сессии и области доступа.
+Comparison is performed on reproducible artifacts: source build, static module loading, deferred editors, selected module language, and individual application and showcase entry points. Both languages are measured, each route, cold and warmed HTTP caches, static and full graphs. Common files are not summed repeatedly. Dynamic imports are included in the full graph. Separate artifacts are measured both individually in full and together; excluding a showcase from the working deployment does not mean removing its dependencies.
 
-Измерения загрузки используют статический сервер с настоящими заголовками кэша и отдельными контролируемыми ответами идентификации и API. Они не подменяют приёмку с Keycloak, Kafka и базами данных. Сырые размеры, сетевые события, времена, состав артефактов и результаты сохраняются для проверки. Недоступный чанк, обновление сборки, закрытый маршрут и восстановление соединения проверяются отдельно.
+In the working configuration, both languages are included in the code of the opened module. In the experimental variant, the selected JSON dictionary is loaded before display. Switching languages requires the product dictionary and dictionaries of already opened modules; an error retains the previous language and input. Dictionary caches contain only translatable strings. They do not replace session-based isolation of server data and access scope.
 
-Действующие пределы ADR-075 сохраняются. Выбранная конфигурация и функциональные проверки входят в CI; сравнение альтернатив запускается задачей `web:loading` в том же конвейере. Для стендовых задержек установлен p95 до 2000 мс при холодном входе и первом переходе и до 1500 мс при прогретом кэше. Нативная приёмка проверяет завершение инцидента, обязательные шаги, сохранение версии и состояния сценария при перезапуске, команды, SLA, администрирование, аудит и отчёты.
+Load measurements use a static server with real cache headers and separate controlled identification and API responses. They do not replace processing with Keycloak, Kafka, and databases. Raw sizes, network events, times, artifact composition, and results are saved for verification. Unavailable chunks, build updates, closed routes, and reconnection are checked separately.
 
-Метод и результаты: [квалификация](../engineering/web-client-quality.md), [сравнение загрузки](../engineering/web-client-loading.md).
+The limits of ADR-075 are maintained. The selected configuration and functional checks are included in CI; alternative runs are initiated by the `web:loading` task in the same pipeline. For test environment latency, p95 is set to 2000 ms with cold input and first transition, and 1500 ms with warmed cache. The native processing checks incident completion, required steps, scenario version and state preservation upon restart, commands, SLA, administration, auditing, and reports.
 
-Квалифицированный каталог содержит 50000 устройств с источниками, а также площадку, здание, этажи и зоны. Исторический replay ограничен 60000 записями устройств и объектов, live-копия управления - 120000 записями устройств, источников и объектов. Прежние суммарные пределы 50000 и 100000 не вмещали такой набор. Ограничения остаются конечными; бюджеты JS-поставки не меняются. Проверка импорта и его применение вместе ограничены 300000 мс.
+Method and results: [qualification](../engineering/web-client-quality.md), [load comparison](../engineering/web-client-loading.md).
 
-Исторический список источников строится только для периодической проверки отсутствия событий без триггера. Остальные типы правил используют события, иерархию объектов и обслуживание без полного списка источников. Для периодической проверки сохраняются предел 10000 источников и ограничение снимка 8 МиБ; квалификация одиночного правила на каталоге из 50000 устройств не отменяет эти ограничения.
+The qualified catalog contains 50000 devices with sources, as well as a site, building, floors, and zones. Historical replay is limited to 60000 device and object records, while live control copies have 120000 device, source, and object records. Previous total limits were 50000 and 100000, which did not accommodate such a set. Limits remain finite; JS deployment budgets do not change. Import validation and application together are limited to 300000 ms.
+
+The historical list of sources is only used for periodic checks to ensure no events occur without a trigger. Other types of rules use events, object hierarchy and maintenance without a full list of sources. For periodic checks, a limit of 10000 sources and a snapshot size of 8 MiB are maintained; qualifying a single rule on a catalog of 50000 devices does not remove these limits.

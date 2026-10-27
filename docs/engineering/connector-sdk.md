@@ -1,10 +1,14 @@
-# Разработка коннектора с Connector SDK
+# Developing a connector with Connector SDK
 
-Шаг 4.1, [ADR-048](../adr/0048-connector-sdk.md), [протокол v1](../../contracts/proto/psim/connector/v1/connector.proto).
+<!-- language-links -->
+[English](connector-sdk.md) | [Русский](../ru/engineering/connector-sdk.md)
+<!-- /language-links -->
 
-## Подключение библиотеки
+[ADR-048](../adr/0048-connector-sdk.md), [protocol v1](../../contracts/proto/psim/connector/v1/connector.proto).
 
-SDK собирается для Debian 13 x86_64 проектным toolchain. Нужны C++23, gRPC/Protobuf и зависимости проекта. В монорепозитории используйте CMake-цель `psim::platform_connector`:
+## Linking the library
+
+Build the SDK for Debian 13 x86_64 with the project toolchain. C++23, gRPC/Protobuf and the project dependencies are required. In the monorepo, link the CMake target `psim::platform_connector`:
 
 ```cmake
 add_executable(my-connector main.cpp)
@@ -12,7 +16,7 @@ target_link_libraries(my-connector PRIVATE psim::platform_connector)
 psim_target_defaults(my-connector)
 ```
 
-Публичные заголовки - `psim/platform/connector/client.hpp`, `state.hpp`, `grpc_process.hpp`. Пример, использующий только публичный API SDK, находится в [basic.cpp](../../libs/platform/connector/examples/basic.cpp). Знать устройство сервисов ядра для его сборки не требуется.
+The public headers are `psim/platform/connector/client.hpp`, `state.hpp` and `grpc_process.hpp`. The [basic.cpp](../../libs/platform/connector/examples/basic.cpp) example uses only the public SDK API. Building it does not require knowledge of the core services' internals.
 
 ```cpp
 namespace sdk = psim::platform::connector;
@@ -41,79 +45,79 @@ client.stop();
 return drained ? 0 : 1;
 ```
 
-`GrpcProcess` создаётся один раз в `main`, раньше любого использования gRPC и OpenSSL, и разрушается последним. Как и gRPC, SDK инициализирует OpenSSL с `OPENSSL_INIT_NO_ATEXIT`: глобальный криптоконтекст живёт до выхода процесса. Клиент закрывает свои RPC и каналы; выгружать глобальное криптосостояние из деструктора библиотеки нельзя. Успех `start` означает запуск клиента; фактическое соединение показывает `diagnostics().connected`. `publish_batch` атомарно сохраняет до 1000 событий с одним `fsync`; `publish_once` сохраняет квитанцию внешнего ключа вместе с историческим событием и возвращает её при повторе, включая перезапуск и подтверждение шлюза. Реестр ограничен `max_idempotency_keys`, ключи не вытесняются. Изменение содержимого при том же ключе отклоняется.
+Create one `GrpcProcess` in `main`, before any use of gRPC or OpenSSL, and destroy it last. Like gRPC, the SDK initializes OpenSSL with `OPENSSL_INIT_NO_ATEXIT`: the global cryptographic context remains alive until process exit. The client closes its own RPCs and channels; a library destructor must not destroy global cryptographic state. A successful `start` means that the client has started; `diagnostics().connected` reports the actual connection. `publish_batch` atomically persists up to 1000 events with one `fsync`. `publish_once` persists an external-key receipt together with the historical event and returns that receipt on retries, including after a restart or a gateway acknowledgment. The registry is bounded by `max_idempotency_keys`; keys are not evicted. Reusing a key with different content is rejected.
 
-`publish` разрешён до запуска и при отсутствии связи. Успех означает сохранение на локальном диске; запись в Kafka подтверждается позднее через `BatchAck`. Вызов `publish` синхронный: используйте поток коннектора или блокирующий пул, а не шард платформы. `flush` ожидает удаления всех событий после принятия или окончательного отклонения. Для окончательных отказов обязательно подключите `Callbacks::rejection` к диагностике или своему хранилищу отказов: успешное опустошение буфера само по себе не означает принятия всех событий шлюзом.
+`publish` is allowed before startup and while disconnected. Success means that the event is stored on local disk; Kafka persistence is acknowledged later through `BatchAck`. `publish` is synchronous: call it from the connector thread or a blocking pool, not a platform shard. `flush` waits until all events are removed following acceptance or permanent rejection. Connect `Callbacks::rejection` to diagnostics or your rejection store. Successfully draining the buffer does not, by itself, mean that the gateway accepted every event.
 
-## Долговечность и ограничения
+## Durability and limits
 
-Используйте постоянный локальный каталог, принадлежащий пользователю процесса. Его нельзя разделять между экземплярами или удалять при перезапуске. Права каталога - `0700`, файлов - `0600`; повторное открытие вторым процессом отклоняется. Приватный ключ читается по правилам [библиотеки безопасности](../../libs/platform/security/README.md).
+Use a persistent local directory owned by the process user. Do not share it between instances or delete it on restart. Directory permissions must be `0700` and file permissions `0600`; a second process cannot open the same directory. Private keys follow the [security library](../../libs/platform/security/README.md) rules.
 
-SDK присваивает `event_id` UUIDv7 и `source_seq`. Не заполняйте их самостоятельно. Первая эпоха - 1; сохранённый номер продолжается после перезапуска. Для смены нумерации источника передайте большую `source_epoch`; меньшая эпоха отклоняется. Время события заполняется SDK, если источник его не указал. Если оборудование предоставляет своё время, передавайте его без замены временем досылки.
+The SDK assigns a UUIDv7 `event_id` and `source_seq`; do not populate these fields yourself. The first epoch is 1, and the persisted sequence continues after restart. To reset a source's numbering, provide a higher `source_epoch`; a lower epoch is rejected. The SDK fills in event time if the source omitted it. When equipment provides its own timestamp, preserve it rather than replacing it with retransmission time.
 
-По умолчанию: журнал 64 МиБ, до 100 000 неподтверждённых событий, до 10 000 идентификаторов команд. `Options` позволяет настроить пределы. Размер одного события ограничен примерно 64 КиБ; если согласованный предел шлюза меньше первого события в очереди, SDK сохраняет событие и сообщает об остановке отправки в диагностике. Нужна коррекция лимита или входных данных; скрытого удаления нет. При сжатии журнала нужен запас для второго файла. Удаление подтверждённых событий не сбрасывает последовательности и реестр команд.
+Defaults are a 64 MiB journal, up to 100,000 unacknowledged events and up to 10,000 command identifiers. Configure limits through `Options`. An event is limited to approximately 64 KiB. If the negotiated gateway limit is smaller than the first queued event, the SDK retains the event and reports that sending has stopped. Correct the limit or the input; events are never silently removed. Journal compaction requires space for a second file. Removing acknowledged events does not reset sequences or the command registry.
 
-Новые версии читают прежние записи журнала; пакетные записи, Protobuf/Base64 и реестр ключей требуют нового SDK. Откат бинарного файла к прежней версии с таким журналом не поддерживается.
+New versions can read earlier journal records. Batch records, Protobuf/Base64 records and the key registry require a newer SDK. Rolling the binary back to an earlier version with such a journal is unsupported.
 
-Ошибки диска, нехватка места и переполнение должны останавливать подтверждение источнику. После ошибки записи/`fsync` остановите и уничтожьте объект `Client`, восстановите диск и создайте новый объект с тем же каталогом. Неопределённый результат записи может уже присутствовать в журнале; сначала проверьте сохранённые данные, не вводите событие повторно вслепую. Повреждение законченной записи - ошибка открытия, а не разрешение пропустить её. Гарантии предполагают корректную работу `fsync` и атомарного переименования на локальной файловой системе.
+Disk errors, insufficient space and buffer overflow must stop acknowledgments to the upstream source. After a write or `fsync` error, stop and destroy the `Client`, repair the disk, and create a new client with the same directory. A write with an unknown outcome may already be in the journal: inspect persisted data before resubmitting the event. A corrupt complete record causes opening to fail; it is not permission to skip that record. Durability assumes correct `fsync` and atomic rename behavior on the local filesystem.
 
-## Сессия и управление потоком
+## Sessions and flow control
 
-SDK первым отправляет `Register`, предлагает `1.1` и `1.0`, передаёт версию коннектора, идентификатор процесса и известную версию конфигурации. Отправка учитывает `initial_credits`, дополнительные `Credits`, ограничения числа и размера событий. Одновременно ожидается один `BatchAck`; неправильный или неполный ответ разрывает сессию без удаления событий. Heartbeat работает и при отсутствии кредитов. Таймаут регистрации, сессии и подтверждения пакета ограничивает зависание; `stop` отменяет активный RPC и сохраняет неотправленное.
+The SDK sends `Register` first, offers versions `1.1` and `1.0`, and provides the connector version, process identifier and known configuration version. Sending respects `initial_credits`, additional `Credits`, and event count and size limits. Only one `BatchAck` is outstanding at a time. An invalid or incomplete acknowledgment closes the session without deleting events. Heartbeats continue even with no credits. Registration, session and batch acknowledgment timeouts bound stalls; `stop` cancels the active RPC and preserves unsent events.
 
-Настройки повторного подключения - `reconnect_min`, `reconnect_max`; применяется экспоненциальная задержка с небольшим случайным разбросом. TLS проверяет CA, имя сервера и клиентскую идентичность, минимальная версия - TLS 1.3. Подмены имени и небезопасного транспорта в API нет. Для смены сертификата остановите и уничтожьте прежний объект `Client`, затем создайте новый с обновлёнными файлами и прежним каталогом буфера.
+`reconnect_min` and `reconnect_max` control exponential reconnect backoff with jitter. TLS verifies the CA, server name and client identity; TLS 1.3 is the minimum. The API provides neither server-name overrides nor insecure transport. To rotate a certificate, stop and destroy the previous `Client`, then create a new one with the updated files and the same buffer directory.
 
-`Callbacks::config` получает только большую `config_version` в пределах жизни объекта. После перезапуска версия запрашивается заново; применение конфигурации должно быть идемпотентным. Обработчики конфигурации и окончательных отказов вызываются на потоке сессии и должны быстро завершаться. Управляйте временем жизни клиента из владеющего потока; обработчик сообщает владельцу об остановке, а не вызывает `stop` или уничтожение клиента из своего callback.
+`Callbacks::config` receives only increasing `config_version` values during a client's lifetime. After restart, the version is requested again, so configuration application must be idempotent. Configuration and permanent-rejection handlers run on the session thread and must return promptly. Manage the client lifetime from its owning thread: a handler requests shutdown from the owner instead of calling `stop` or destroying the client inside the callback.
 
-## Команды
+## Commands
 
-`Callbacks::command` объявляет `commands.v1`. Обработчик получает команду и `std::stop_token`; проверяет поддержку `capability`, параметры оборудования, дедлайн и остановку. Он выполняется на отдельном рабочем потоке, не задерживая heartbeat. Верните `CommandResult`, укажите `success`, а при отказе - код из [каталога ошибок](../../contracts/errors/errors.yaml). SDK выставляет идентификатор команды сам; сообщение результата ограничено 1 024 байтами и не должно содержать секретов.
+Providing `Callbacks::command` advertises `commands.v1`. The handler receives a command and a `std::stop_token`; it checks the supported `capability`, equipment parameters, deadline and cancellation. It runs on a separate worker thread without delaying heartbeats. Return a `CommandResult` with `success`, and an [error catalog](../../contracts/errors/errors.yaml) code on failure. The SDK sets the command identifier. The result message is limited to 1024 bytes and must not contain secrets.
 
-До вызова обработчика SDK синхронизирует запись о начале исполнения. После вызова синхронизируется результат. Дубликат не вызывает обработчик повторно. Если процесс завершился между этими записями, возвращается `COMMAND_INVALID_STATE` с неопределённым исходом. Это требует проверки оборудования; автоматически повторять действие нельзя. Истёкший до начала исполнения дедлайн даёт `COMMAND_EXPIRED`.
+Before invoking the handler, the SDK synchronizes an execution-start record to disk. It synchronizes the result afterward. A duplicate does not invoke the handler again. If the process terminates between these records, the SDK returns `COMMAND_INVALID_STATE` with an unknown outcome. Inspect the equipment; do not automatically repeat the action. A deadline that expires before execution returns `COMMAND_EXPIRED`.
 
-Реестр команд автоматически не очищается. Его заполнение блокирует новые команды, сохраняя защиту от повторного исполнения. Рассчитывайте размер и наблюдайте ошибки; удаление каталога отменяет долговечность событий, нумерации и защиты команд.
+The command registry is not automatically cleared. Once full, it blocks new commands while preserving duplicate-execution protection. Size it appropriately and monitor errors. Deleting the directory removes durability for events, numbering and command protection.
 
-## Сверка состояния и доступность
+## State reconciliation and availability
 
-`Callbacks::snapshot` опрашивает оборудование после подключения, если шлюз согласовал `state.v1` и `snapshot.v1`. Возможность `state.v1` обозначает формат наблюдений; `snapshot.v1` объявляется только при наличии обработчика снимка. Аргумент содержит границы последовательностей, снятые до запроса. Возвращайте только реально опрошенные источники с временем наблюдения, доступностью и значениями. SDK заменяет курсор ответа сохранённой границей. Обработчик получает также `std::stop_token`, выполняется на рабочем потоке и обязан учитывать остановку и завершаться за ограниченное время. На один снимок допускается до 1 000 источников, сообщения автоматически разбиваются по 64 КиБ и передаются с ожиданием места в ограниченной очереди управления. Отсутствующий источник остаётся `unknown`; завершение снимка не означает, что все устройства исправны.
+`Callbacks::snapshot` polls equipment after connection if the gateway negotiated `state.v1` and `snapshot.v1`. `state.v1` identifies the observation format; `snapshot.v1` is advertised only when a snapshot handler exists. The argument contains sequence boundaries captured before the request. Return only sources that were actually polled, including observation time, availability and values. The SDK replaces each response cursor with the saved boundary. The handler also receives a `std::stop_token`, runs on a worker thread, and must respect cancellation and finish within a bounded time. A snapshot supports up to 1000 sources. Messages are automatically split at 64 KiB and wait for space in a bounded control queue. A missing source remains `unknown`; snapshot completion does not mean that all equipment is healthy.
 
-При обычном наблюдении доступность и значения можно передать через `Client::report`. Без согласования `state.v1`, активной сессии или места в очереди метод возвращает ошибку. Нельзя выдавать сохранённое старое состояние за новое наблюдение оборудования.
+For a regular observation, send availability and values through `Client::report`. The method returns an error if `state.v1` was not negotiated, no session is active, or the queue has no room. Never present persisted old state as a new equipment observation.
 
-`live_observation` и `observation_session_id` заполняются SDK. По умолчанию `publish` принимает историю; для непосредственно полученного текущего наблюдения передайте `Observation::kCurrent` вторым аргументом. Даже при активной связи импорт истории не должен получать этот признак. При отправке через другую сессию событие получает `live_observation=false`, сохраняя исходные время и идентификатор. История не подтверждает свежесть. Получатель использует порядок эпохи/номера и границу снимка: событие, пришедшее во время запроса, должно иметь приоритет перед старым снимком. `StateTracker` содержит проверяемую модель этого поведения, отдельные качества `unknown`, `actual`, `stale` и явное истечение срока свежести.
+The SDK fills in `live_observation` and `observation_session_id`. By default, `publish` accepts historical data. For a directly received current observation, pass `Observation::kCurrent` as the second argument. Imported history must not receive this flag even while connected. An event sent through a different session gets `live_observation=false` while retaining its original timestamp and identifier. History does not prove freshness. The receiver uses epoch/sequence ordering and the snapshot boundary: an event received during the request takes precedence over an older snapshot. `StateTracker` provides a testable model of this behavior, separate `unknown`, `actual` and `stale` qualities, and explicit freshness expiration.
 
-Connector Gateway согласует протокол 1.1, принимает историю без ограничения давности и фильтрует снимок по новым наблюдениям; регистрация, отзыв и серверные проверки описаны в [руководстве шлюза](connector-gateway.md). Нормализация состояния и конечные проекции относятся к 4.5 и 7.3.
+Connector Gateway negotiates protocol 1.1, accepts history regardless of age, and filters snapshots against newer observations. Registration, revocation and server checks are described in the [gateway guide](connector-gateway.md). State normalization is covered in [normalization and history](normalization-and-history.md), and console state reads in [projections](console-projections.md).
 
-## Метрики и диагностика
+## Metrics and diagnostics
 
-`diagnostics()` возвращает состояние связи, глубину буфера, размер журнала, счётчики сессий, принятых и отклонённых событий и последнюю ошибку. `metrics()` выдаёт текст Prometheus с префиксом `psim_connector_`; разместите его в своём endpoint диагностики. Соединение с платформой не подтверждает доступность каждого устройства, а число успешных `publish` не равно числу подтверждений Kafka.
+`diagnostics()` reports connection state, buffer depth, journal size, session counts, accepted and rejected event counts, and the last error. `metrics()` emits Prometheus text with the `psim_connector_` prefix; expose it through your diagnostics endpoint. A platform connection does not prove that every device is available. The number of successful `publish` calls is not the number of Kafka acknowledgments.
 
-## Тестовый набор соответствия
+## Conformance suite
 
-Полная проверка, включая реальный обрыв на 600 секунд:
+Run the full check, including an actual 600-second outage:
 
 ```bash
 task connectors:conformance
 ```
 
-Короткая проверка для отладки; десятиминутный DoD она не подтверждает:
+Use the shorter check for debugging; it does not satisfy the ten-minute outage acceptance criterion:
 
 ```bash
 task connectors:conformance OUTAGE_SECONDS=1
 ```
 
-Набор сначала запускает модульные проверки SDK, затем отдельный TLS-сервер и пример коннектора. Сервер выдаёт нулевые кредиты до heartbeat, ограничивает пакет двумя событиями, разрывает связь до подтверждения, требует досылку с прежним идентификатором/номером и без признака актуального наблюдения. После восстановления он проверяет повторную и истёкшую команды, версионную конфигурацию, свежий снимок и окончательный отказ одному событию. Артефакты - `build/connector-conformance/<preset>/example`: `client.log`, `peer.log`, `report.json`.
+The suite first runs SDK unit tests, then a separate TLS server and the example connector. The server grants zero credits until a heartbeat, limits batches to two events, disconnects before acknowledgment, and requires retransmission with the original identifier and sequence without the current-observation flag. After recovery, it checks duplicate and expired commands, versioned configuration, a fresh snapshot and a permanent rejection for one event. Artifacts are in `build/connector-conformance/<preset>/example`: `client.log`, `peer.log` and `report.json`.
 
-Для другого исполняемого файла используйте внутри toolchain:
+For another executable, run inside the toolchain:
 
 ```bash
 python3 -I tools/connectors/conformance.py --outage-seconds 600 -- /repo/build/my-connector --conformance
 ```
 
-Fixture-контракт внешнего клиента:
+External-client fixture contract:
 
-- Считать endpoint, CA, сертификат, ключ, отдельный каталог буфера и срок ожидания из `PSIM_CONNECTOR_ENDPOINT`, `PSIM_CONNECTOR_CA_FILE`, `PSIM_CONNECTOR_CERTIFICATE_FILE`, `PSIM_CONNECTOR_PRIVATE_KEY_FILE`, `PSIM_CONNECTOR_BUFFER_DIRECTORY`, `PSIM_CONNECTOR_FLUSH_TIMEOUT_SECONDS`.
-- Предложить протокол 1.1 и фактически поддерживаемые возможности. Передать 20 событий источника `door-1` с интервалом 50 мс; первые 19 с `raw_code=ALARM`, последнее с `raw_code=REJECT`.
-- Если объявлены команды, поддержать `arm` для `device-1`, исполнить один раз, вернуть результат повтору, отклонить истёкший дедлайн. Если объявлена сверка `snapshot.v1`, заново опросить `door-1` после подключения.
-- Оставаться подключённым до проверки ответов и дренирования; завершиться кодом 0. Каталог fixture изолирован и удаляется только после завершения всех дочерних процессов.
+- Read the endpoint, CA, certificate, key, separate buffer directory and wait timeout from `PSIM_CONNECTOR_ENDPOINT`, `PSIM_CONNECTOR_CA_FILE`, `PSIM_CONNECTOR_CERTIFICATE_FILE`, `PSIM_CONNECTOR_PRIVATE_KEY_FILE`, `PSIM_CONNECTOR_BUFFER_DIRECTORY` and `PSIM_CONNECTOR_FLUSH_TIMEOUT_SECONDS`.
+- Offer protocol 1.1 and capabilities that are actually supported. Send 20 events from `door-1` at 50 ms intervals: the first 19 with `raw_code=ALARM`, the last with `raw_code=REJECT`.
+- If commands are advertised, support `arm` for `device-1`, execute it once, return the stored result for a duplicate, and reject an expired deadline. If `snapshot.v1` is advertised, poll `door-1` again after connection.
+- Stay connected until responses are checked and the buffer is drained, then exit with code 0. The fixture directory is isolated and removed only after all child processes finish.
 
-Отдельный сценарий `ConnectorConformance.TenMinuteOutage` в C++-наборе дополнительно перезапускает объект клиента во время обрыва и сверяет множество исходных идентификаторов. Переменная `PSIM_CONNECTOR_OUTAGE_SECONDS=600` задаёт реальную длительность; без неё используется секундный smoke-прогон. Проверки порядка снимка, старой истории, аварийного завершения без деструкторов и повреждения журнала не требуют внешних сервисов.
+The C++ `ConnectorConformance.TenMinuteOutage` scenario additionally restarts the client object during the outage and compares the set of original identifiers. `PSIM_CONNECTOR_OUTAGE_SECONDS=600` sets the actual duration; without it, the test uses a one-second smoke run. Snapshot ordering, old history, termination without destructors and journal corruption tests require no external services.

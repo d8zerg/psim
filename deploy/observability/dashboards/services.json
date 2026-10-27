@@ -1,7 +1,7 @@
 {
   "uid": "psim-services",
-  "title": "Сервисы и API",
-  "description": "Open-Source PSIM Platform. Сервисы и API. Пропуски данных требуют проверки сбора.",
+  "title": "Services and APIs",
+  "description": "Open-Source PSIM Platform. Services and APIs. Check data collection when data is missing.",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -33,50 +33,57 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "Обзор платформы",
+      "title": "Platform overview",
       "url": "/monitoring/d/psim-overview",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Конвейер событий",
+      "title": "Event Pipeline",
       "url": "/monitoring/d/psim-pipeline",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Сервисы и API",
+      "title": "Services and APIs",
       "url": "/monitoring/d/psim-services",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инфраструктура и репликация",
+      "title": "Infrastructure and Replication",
       "url": "/monitoring/d/psim-infrastructure",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Хранилища и ёмкость",
+      "title": "Storage and Capacity",
       "url": "/monitoring/d/psim-storage",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инциденты и подключения",
+      "title": "Incidents and Connections",
       "url": "/monitoring/d/psim-business",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Эксплуатационные проверки",
+      "title": "Operational checks",
       "url": "/monitoring/d/psim-operations",
+      "type": "link",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "RU",
+      "url": "/monitoring/d/psim-services-ru",
       "type": "link",
       "keepTime": true,
       "includeVars": true
@@ -85,7 +92,7 @@
   "annotations": {
     "list": [
       {
-        "name": "Алерты",
+        "name": "Alerts",
         "enable": true,
         "datasource": {
           "type": "prometheus",
@@ -103,7 +110,7 @@
     "list": [
       {
         "name": "deployment",
-        "label": "Поставка",
+        "label": "Deployment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -120,14 +127,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "node",
-        "label": "Узел",
+        "label": "Node",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -144,14 +151,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "service",
-        "label": "Сервис",
+        "label": "Service",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -168,7 +175,7 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
@@ -179,8 +186,8 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Состояние экземпляров",
-      "description": "Выбрать сервис и узел; запросы и ресурсы отображаются для выбранного набора.",
+      "title": "State of Instances",
+      "description": "Select a service and node; requests and resources are displayed for the selected set.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -193,7 +200,7 @@
     {
       "id": 2,
       "title": "Readiness",
-      "description": "Готовность экземпляра принимать работу.",
+      "description": "The instance is ready to take work.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -217,7 +224,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -247,7 +254,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -284,8 +291,8 @@
     },
     {
       "id": 3,
-      "title": "Активные запросы",
-      "description": "Одновременные запросы REST API.",
+      "title": "Active Requests",
+      "description": "Concurrent REST API requests.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -309,7 +316,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -339,7 +346,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -376,8 +383,8 @@
     },
     {
       "id": 4,
-      "title": "WebSocket-соединения",
-      "description": "Текущие realtime-соединения.",
+      "title": "WebSocket connections",
+      "description": "Current real-time connections.",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -401,7 +408,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -431,7 +438,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -469,8 +476,8 @@
     {
       "id": 5,
       "type": "row",
-      "title": "Золотые сигналы API",
-      "description": "Трафик, длительность, ошибки, насыщение. operation и status сохраняются в легенде запроса Explore.",
+      "title": "API traffic, latency, errors and saturation",
+      "description": "Traffic, duration, errors and saturation. The Explore query legend retains operation and status.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -482,8 +489,8 @@
     },
     {
       "id": 6,
-      "title": "REST запросы по операции",
-      "description": "Количество запросов по операции контракта.",
+      "title": "REST requests by operation",
+      "description": "Number of requests for contract operations.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -507,7 +514,7 @@
         "defaults": {
           "unit": "reqps",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -537,7 +544,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -574,8 +581,8 @@
     },
     {
       "id": 7,
-      "title": "REST длительность p99",
-      "description": "Полная длительность запроса Gateway.",
+      "title": "REST duration p99",
+      "description": "The total duration of the Gateway request.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -599,7 +606,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -629,7 +636,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -666,8 +673,8 @@
     },
     {
       "id": 8,
-      "title": "Ошибки upstream",
-      "description": "Ошибки передачи запроса или ответа.",
+      "title": "Upstream errors",
+      "description": "Error in request or response transmission.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -691,7 +698,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -721,7 +728,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -758,8 +765,8 @@
     },
     {
       "id": 9,
-      "title": "Отказы общей квоты",
-      "description": "Ошибки Valkey при проверке общей квоты.",
+      "title": "Shared quota failures",
+      "description": "Valkey errors while checking the shared quota.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -783,7 +790,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -813,7 +820,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -851,8 +858,8 @@
     {
       "id": 10,
       "type": "row",
-      "title": "Ограничения и клиенты",
-      "description": "Разделять защитные отказы доступа, 429 и технические ошибки.",
+      "title": "Constraints and Clients",
+      "description": "Separate access protection failures, 429, and technical errors.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -864,8 +871,8 @@
     },
     {
       "id": 11,
-      "title": "Ограничение частоты",
-      "description": "Срабатывания квоты.",
+      "title": "Rate limiting",
+      "description": "Quota limit activations.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -889,7 +896,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -919,7 +926,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -956,8 +963,8 @@
     },
     {
       "id": 12,
-      "title": "Медленные realtime-клиенты",
-      "description": "Клиенты, превысившие бюджет очереди или записи.",
+      "title": "Slow real-time clients",
+      "description": "Clients exceeding queue capacity or write deadline.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -981,7 +988,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1011,7 +1018,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1048,8 +1055,8 @@
     },
     {
       "id": 13,
-      "title": "Процессор узла",
-      "description": "Доля занятого CPU узла за интервал сбора.",
+      "title": "Node Processor",
+      "description": "The percentage of CPU usage of the node during the collection interval.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1073,7 +1080,7 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1111,7 +1118,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1148,8 +1155,8 @@
     },
     {
       "id": 14,
-      "title": "Использование памяти узла",
-      "description": "MemAvailable учитывает освобождаемый кэш.",
+      "title": "Memory Usage of Nodes",
+      "description": "MemAvailable includes reclaimable cache.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1173,7 +1180,7 @@
         "defaults": {
           "unit": "percentunit",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1211,7 +1218,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1249,8 +1256,8 @@
     {
       "id": 15,
       "type": "row",
-      "title": "Активные алерты и действия",
-      "description": "Алерты относятся к выбранной поставке; предупреждения и критические отказы имеют прямые ссылки на инструкции.",
+      "title": "Active Alerts and Actions",
+      "description": "Alerts apply to the selected deployment; warnings and critical failures link directly to instructions.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1263,8 +1270,8 @@
     {
       "id": 16,
       "type": "table",
-      "title": "Активные алерты",
-      "description": "Pending ещё ожидают выдержки. Firing требуют проверки. Watchdog подтверждает работу конвейера уведомлений.",
+      "title": "Active Alerts",
+      "description": "Pending alerts await the configured duration. Firing alerts require investigation. Watchdog confirms the notification pipeline is running.",
       "gridPos": {
         "x": 0,
         "y": 40,
@@ -1303,7 +1310,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Инструкция устранения",
+                    "title": "Remediation instructions",
                     "url": "../operations/runbooks/${__value.raw}",
                     "targetBlank": true
                   }
@@ -1311,7 +1318,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Алерт"
+                "value": "Alert"
               },
               {
                 "id": "custom.width",
@@ -1327,7 +1334,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Уровень"
+                "value": "Severity"
               },
               {
                 "id": "custom.width",
@@ -1343,7 +1350,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Состояние"
+                "value": "State"
               },
               {
                 "id": "custom.width",
@@ -1359,7 +1366,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Узел"
+                "value": "Node"
               },
               {
                 "id": "custom.width",
@@ -1375,7 +1382,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Контекст"
+                "value": "Context"
               },
               {
                 "id": "custom.width",
@@ -1389,7 +1396,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Уровень",
+            "displayName": "Severity",
             "desc": false
           }
         ]
@@ -1453,8 +1460,8 @@
     {
       "id": 17,
       "type": "logs",
-      "title": "Логи выбранных сервисов",
-      "description": "Структурированные логи с trace_id для перехода к трассе. Нет записей - нет логов в выбранном интервале.",
+      "title": "Logs of selected services",
+      "description": "Structured logs with trace_id for navigating to the trace. No records = no logs in the selected interval.",
       "gridPos": {
         "x": 0,
         "y": 47,

@@ -11,7 +11,7 @@ import "psim/processing/v1/rules.proto";
 import "psim/processing/v1/signal.proto";
 
 // CorrelationRuleService manages correlation rules and the active rule set.
-// Owner: Correlation Engine (rule management module). Scenario S4.
+// Owner: Correlation Engine (rule management module).
 service CorrelationRuleService {
   // ListRules lists the latest version of each rule.
   rpc ListRules(ListRulesRequest) returns (ListRulesResponse) {
@@ -66,7 +66,7 @@ service CorrelationRuleService {
   }
 }
 
-// MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1. Scenario S1.
+// MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1.
 service MappingService {
   // ListMappingRuleSets lists the active mapping rule set of each connector type.
   rpc ListMappingRuleSets(ListMappingRuleSetsRequest) returns (ListMappingRuleSetsResponse) {

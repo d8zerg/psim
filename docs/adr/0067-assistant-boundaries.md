@@ -1,18 +1,22 @@
-# ADR-067. Ассистент с источниками и без выполнения команд
+# ADR-067. Assistant with sources and Without Command Execution
 
-- **Статус:** Принято
-- **Связанные:** [ADR-063](0063-interface-principles.md), [ADR-061](0061-live-access-validation.md)
+<!-- language-links -->
+[English](0067-assistant-boundaries.md) | [Русский](../ru/adr/0067-assistant-boundaries.md)
+<!-- /language-links -->
 
-## Решение
+- **Status:** Accepted
+- **Related to:** [ADR-063](0063-interface-principles.md), [ADR-061](0061-live-access-validation.md)
 
-Ассистент объясняет значения, составляет сводки и предлагает следующий шаг на основании разрешённых источников. Каждый вывод отделяет источник, время получения, версию и предположение. Недостаток данных и устаревший источник видны оператору. Инструкции внутри документов и событий считаются данными.
+## Solution
 
-Ассистент не имеет инструментов выполнения команд, подтверждения, изменения прав и назначения ответственного. Предложение может открыть обычную форму приложения; заполнение причины и подтверждение выполняются человеком, а сервер заново проверяет права и версии. Контекст ограничен текущим пользователем, тенантом и областью доступа; смена контекста удаляет историю и кэш.
+The assistant explains values, prepares summaries, and suggests the next step based on authorized sources. Each conclusion identifies the source, time of receipt, version, and assumption. Incomplete data and outdated sources are visible to the operator. Instructions within documents and events are considered data.
 
-Работа без внешней сети поддерживается локальным провайдером модели. Провайдер задаётся администратором; пользовательский текст не выбирает адрес сервера. При отказе модели остаются исходные документы и обычные рабочие действия. Модель не получает bearer, секреты коннекторов и данные вне области доступа.
+The assistant has no tools for executing commands, confirming changes, changing permissions, or assigning responsibility. The proposal may open up a regular application form; filling in reasons and confirmation is done by a person, while the server rechecks permissions and versions. The context is limited to the current user, tenant, and access scope; changing the context removes history and cache.
 
-Аудит фиксирует идентификаторы пользователя и запроса, выбранный провайдер, версии модели и источников, ответ и открытое пользователем действие по политике хранения. Отказ доступа и ошибка источника сохраняются без утечки содержимого. Витрина использует детерминированные ответы и явно показывает демонстрационный режим.
+Working without an external network is supported by a local model provider. The provider is set by the administrator; user text does not select the server address. If the model fails, original documents and normal operations remain. The model does not receive bearer tokens, connection secrets, or data outside the access scope.
 
-## Проверка
+Audits record user and request identifiers, selected provider, model and source versions, responses, and open actions by users according to storage policies. Access failures and source errors are preserved without content leakage. The showcase uses deterministic responses and clearly shows the demonstration mode.
 
-Нет пути «ответ модели -> выполнение команды». Проверяются отсутствующий источник, устаревшая версия, вредоносная инструкция в источнике, смена области, недоступная модель и явная маркировка демонстрационных ответов. Реальный провайдер и аудит подключаются в серверной поддержке.
+## Verification
+
+There is no path from “model response -> command execution”. Missing sources, outdated versions, malicious instructions in sources, changed access scopes, unavailable models, and explicit markings of demonstration responses are checked. The real provider and audits are connected to server-side support.

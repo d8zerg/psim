@@ -1,4 +1,8 @@
 # Protocol Documentation
+
+<!-- language-links -->
+[English](proto-reference.md) | [Русский](../../docs/ru/repository/contracts/docs/proto-reference.md)
+<!-- /language-links -->
 <a name="top"></a>
 
 ## Table of Contents
@@ -927,7 +931,7 @@ VerifyAuditIntegrityResponse is the response of VerifyAuditIntegrity.
 <a name="psim-api-v1-AuditService"></a>
 
 ### AuditService
-AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service. Scenario S10.
+AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -2434,7 +2438,7 @@ ImportState is the state of an import job.
 
 ### CatalogService
 CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.
-Owner: Resource Catalog. Scenarios S1, S2.
+Owner: Resource Catalog.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -2924,7 +2928,7 @@ RequestCommandResponse is the response of RequestCommand.
 <a name="psim-api-v1-CommandService"></a>
 
 ### CommandService
-CommandService manages commands to devices. Owner: Command Service. Scenario S8.
+CommandService manages commands to devices. Owner: Command Service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -3221,7 +3225,7 @@ StoredEvent is a normalized event with its envelope times.
 <a name="psim-api-v1-EventHistoryService"></a>
 
 ### EventHistoryService
-EventHistoryService searches stored events (ADR-028). Owner: Event History. Scenario S7.
+EventHistoryService searches stored events (ADR-028). Owner: Event History.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -4296,7 +4300,7 @@ ValidatePlanResponse is the response of ValidatePlan.
 <a name="psim-api-v1-EscalationPolicyService"></a>
 
 ### EscalationPolicyService
-EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.
+EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -4308,7 +4312,7 @@ EscalationPolicyService manages SLA and escalation policies. Owner: Response Eng
 <a name="psim-api-v1-ResponsePlanService"></a>
 
 ### ResponsePlanService
-ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
+ResponsePlanService manages response plans. Owner: Response Engine.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -4323,7 +4327,7 @@ ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.
 <a name="psim-api-v1-ResponseRunService"></a>
 
 ### ResponseRunService
-ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.
+ResponseRunService executes plan steps. Owner: Response Engine.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -4959,7 +4963,7 @@ DataQuality separates observed equipment freshness from resource lifecycle.
 <a name="psim-api-v1-FeedService"></a>
 
 ### FeedService
-FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.
+FeedService serves console read models. Owner: Projection Service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -5483,7 +5487,7 @@ ResolveIncidentRequest is the request of ResolveIncident.
 | incident_id | [string](#string) |  |  |
 | resolution | [psim.incident.v1.Resolution](#psim-incident-v1-Resolution) |  |  |
 | note | [string](#string) |  |  |
-| known_response_run_version | [uint64](#uint64) |  | Response run version known to the client; guards against unseen mandatory steps (runtime-view R2). |
+| known_response_run_version | [uint64](#uint64) |  | Response run version known to the client; guards against unseen mandatory steps. |
 
 
 
@@ -6010,7 +6014,7 @@ NotificationContactService manages channel destinations. Owner: Notification Ser
 <a name="psim-api-v1-NotificationService"></a>
 
 ### NotificationService
-NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.
+NotificationService serves in-app notifications of the caller. Owner: Notification Service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -6576,7 +6580,7 @@ ReportGrouping is the grouping dimension of report rows.
 
 ### ReportService
 ReportService builds incident reports (ADR-028: analytics in ClickHouse).
-Owner: Projection Service. Scenario S13.
+Owner: Projection Service.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -7358,7 +7362,7 @@ DryRunState is the state of a dry run.
 
 ### CorrelationRuleService
 CorrelationRuleService manages correlation rules and the active rule set.
-Owner: Correlation Engine (rule management module). Scenario S4.
+Owner: Correlation Engine (rule management module).
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -7376,7 +7380,7 @@ Owner: Correlation Engine (rule management module). Scenario S4.
 <a name="psim-api-v1-MappingService"></a>
 
 ### MappingService
-MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1. Scenario S1.
+MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1.
 
 | Method Name | Request Type | Response Type | Description |
 | ----------- | ------------ | ------------- | ------------|
@@ -9268,8 +9272,8 @@ Stream selects what to receive.
 | ----------- | ----- | --- | ---- | ------ | -- | -- | --- | ---- |
 | <a name="double" /> double |  | double | double | float | float64 | double | float | Float |
 | <a name="float" /> float |  | float | float | float | float32 | float | float | Float |
-| <a name="int32" /> int32 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint32 instead. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
-| <a name="int64" /> int64 | Uses variable-length encoding. Inefficient for encoding negative numbers – if your field is likely to have negative values, use sint64 instead. | int64 | long | int/long | int64 | long | integer/string | Bignum |
+| <a name="int32" /> int32 | Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values, use sint32 instead. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
+| <a name="int64" /> int64 | Uses variable-length encoding. Inefficient for encoding negative numbers - if your field is likely to have negative values, use sint64 instead. | int64 | long | int/long | int64 | long | integer/string | Bignum |
 | <a name="uint32" /> uint32 | Uses variable-length encoding. | uint32 | int | int/long | uint32 | uint | integer | Bignum or Fixnum (as required) |
 | <a name="uint64" /> uint64 | Uses variable-length encoding. | uint64 | long | int/long | uint64 | ulong | integer/string | Bignum or Fixnum (as required) |
 | <a name="sint32" /> sint32 | Uses variable-length encoding. Signed int value. These more efficiently encode negative numbers than regular int32s. | int32 | int | int | int32 | int | integer | Bignum or Fixnum (as required) |
@@ -9282,3 +9286,40 @@ Stream selects what to receive.
 | <a name="string" /> string | A string must always contain UTF-8 encoded or 7-bit ASCII text. | string | String | str/unicode | string | string | string | String (UTF-8) |
 | <a name="bytes" /> bytes | May contain any arbitrary sequence of bytes. | string | ByteString | str | []byte | ByteString | string | String (ASCII-8BIT) |
 
+<!-- imported-types -->
+## Imported Message Types
+
+Specifications: [Protobuf types](https://protobuf.dev/reference/protobuf/google.protobuf/), [HTTP body](https://github.com/googleapis/googleapis/blob/master/google/api/httpbody.proto).
+
+<a name="google-protobuf-Timestamp"></a>
+### google.protobuf.Timestamp
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| seconds | [int64](#int64) | | UTC seconds relative to the Unix epoch. |
+| nanos | [int32](#int32) | | Nanosecond fraction, from 0 through 999999999. |
+
+<a name="google-protobuf-Duration"></a>
+### google.protobuf.Duration
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| seconds | [int64](#int64) | | Signed whole seconds. |
+| nanos | [int32](#int32) | | Nanosecond fraction; its sign matches nonzero seconds. |
+
+<a name="google-protobuf-Any"></a>
+### google.protobuf.Any
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| type_url | [string](#string) | | URL identifying the fully qualified message type. |
+| value | [bytes](#bytes) | | Serialized bytes of the identified message. |
+
+<a name="google-api-HttpBody"></a>
+### google.api.HttpBody
+
+| Field | Type | Label | Description |
+| --- | --- | --- | --- |
+| content_type | [string](#string) | | MIME type for the HTTP body. |
+| data | [bytes](#bytes) | | Raw request or response content. |
+| extensions | [google.protobuf.Any](#google-protobuf-Any) | repeated | Additional response metadata; streaming APIs put it in the first response. |

@@ -1,96 +1,100 @@
-# Контракты Open-Source PSIM Platform v1
+# Open-Source PSIM Platform v1 Contracts
 
-Шаг плана 0.5. Публичные версионируемые контракты платформы - единственный источник истины для кода, генерации клиентов и документации (ADR-001, ADR-004, ADR-026).
+<!-- language-links -->
+[English](README.md) | [Русский](../docs/ru/repository/contracts/README.md)
+<!-- /language-links -->
 
-## Состав
+The public versioned contracts of the platform are the sole source of truth for code, client generation, and documentation (ADR-001, ADR-004, ADR-026).
 
-| Каталог | Что | Источник истины или генерируется |
+## Composition
+
+| Category | What | Source or Generated |
 |---|---|---|
-| [proto/psim/common/v1](proto/psim/common/v1) | Конверт сообщения, общие перечисления (ADR-005) | источник |
-| [proto/psim/ingest/v1](proto/psim/ingest/v1) | Сырое событие, топик `psim.ingest.raw.v1` | источник |
-| [proto/psim/processing/v1](proto/psim/processing/v1) | Нормализованное событие, сигнал, правила корреляции и отображения, внутренние топики | источник |
-| [proto/psim/catalog/v1](proto/psim/catalog/v1) | Локации, типы устройств, устройства, источники, коннекторы | источник |
-| [proto/psim/incident/v1](proto/psim/incident/v1) | Инцидент, тип инцидента, хронология, события инцидентов | источник |
-| [proto/psim/response/v1](proto/psim/response/v1) | Сценарии, запуски, команды, эскалации, уведомления, их события и топики команд | источник |
-| [proto/psim/config/v1](proto/psim/config/v1) | Записи конфигурационного топика | источник |
-| [proto/psim/audit/v1](proto/psim/audit/v1) | Записи аудита и контрольные точки | источник |
-| [proto/psim/connector/v1](proto/psim/connector/v1) | Протокол коннекторов, gRPC (ADR-017) | источник |
-| [proto/psim/realtime/v1](proto/psim/realtime/v1) | Протокол realtime-канала, WebSocket (ADR-019) | источник |
-| [proto/psim/api/v1](proto/psim/api/v1) | REST API v1: сервисы с `google.api.http` (ADR-026) | источник |
-| [openapi/overlay.yaml](openapi/overlay.yaml) | То, что не выражается аннотациями: безопасность, `If-Match`, `Idempotency-Key`, RFC 9457, бинарные тела | источник |
-| [openapi/psim-api-v1.yaml](openapi/psim-api-v1.yaml) | OpenAPI 3 REST API v1 | генерируется |
-| [topics/topics.yaml](topics/topics.yaml) | Реестр топиков Kafka: ключи, партиции, retention, семантика, производители и потребители | источник |
-| [asyncapi/psim-topics.yaml](asyncapi/psim-topics.yaml) | AsyncAPI 3 топиков Kafka | генерируется |
-| [taxonomy/v1/taxonomy.yaml](taxonomy/v1/taxonomy.yaml) | Таксономия событий v1 | источник |
-| [errors/errors.yaml](errors/errors.yaml) | Каталог кодов ошибок | источник |
-| [docs/proto-reference.md](docs/proto-reference.md) | Справочник по всем сообщениям и сервисам | генерируется |
+| [proto/psim/common/v1](proto/psim/common/v1) | Message container, common enumerations (ADR-005) | source |
+| [proto/psim/ingest/v1](proto/psim/ingest/v1) | Raw event, topic `psim.ingest.raw.v1` | source |
+| [proto/psim/processing/v1](proto/psim/processing/v1) | Normalized event, signals, correlation and mapping rules, internal topics | source |
+| [proto/psim/catalog/v1](proto/psim/catalog/v1) | Locations, device types, devices, sources, connectors | source |
+| [proto/psim/incident/v1](proto/psim/incident/v1) | Incident, incident type, chronology, incident events | source |
+| [proto/psim/response/v1](proto/psim/response/v1) | Scenarios, executions, commands, escalation, notifications, their events and topic | source |
+| [proto/psim/config/v1](proto/psim/config/v1) | Configuration topic records | source |
+| [proto/psim/audit/v1](proto/psim/audit/v1) | Audit records and checkpoints | source |
+| [proto/psim/connector/v1](proto/psim/connector/v1) | Connector protocol, gRPC (ADR-017) | source |
+| [proto/psim/realtime/v1](proto/psim/realtime/v1) | Real-time channel protocol, WebSocket (ADR-019) | source |
+| [proto/psim/api/v1](proto/psim/api/v1) | REST API v1: services with `google.api.http` (ADR-026) | source |
+| [openapi/overlay.yaml](openapi/overlay.yaml) | What is not expressed in annotations: security, `If-Match`, `Idempotency-Key`, RFC 9457, binary bodies | source |
+| [openapi/psim-api-v1.yaml](openapi/psim-api-v1.yaml) | OpenAPI 3 REST API v1 | generated |
+| [topics/topics.yaml](topics/topics.yaml) | Kafka topics registry: keys, partitions, retention, semantics, producers and consumers | source |
+| [asyncapi/psim-topics.yaml](asyncapi/psim-topics.yaml) | AsyncAPI 3 Kafka topics | generated |
+| [taxonomy/v1/taxonomy.yaml](taxonomy/v1/taxonomy.yaml) | Event taxonomy v1 | source |
+| [errors/errors.yaml](errors/errors.yaml) | Code catalog of errors | source |
+| [docs/proto-reference.md](docs/proto-reference.md) | Reference guide for all messages and services | generated |
 
-Сгенерированные файлы хранятся в репозитории, чтобы их можно было читать и ревьюить, но правятся только через источники.
+Generated files are stored in the repository so they can be read and reviewed, but are only managed through sources.
 
-## Соглашения
+## Conventions
 
-- Пакеты `psim.<context>.v<N>`, файлы `proto/psim/<context>/v<N>/*.proto`; линтер buf `STANDARD` + `COMMENTS`.
-- Значение сообщения в топике - запись `<...>Record { Envelope envelope = 1; oneof payload {...} }`; суффикс `Record` зарезервирован за записями топиков.
-- События агрегатов несут состояние агрегата после изменения; `envelope.sequence` = версия агрегата. Потребители применяют событие, только если версия больше применённой.
-- Идентификаторы - строки UUID; правила построения - ADR-005 и ADR-029.
-- Ограничения полей - аннотации protovalidate (`buf.validate`); сервисы проверяют входящие сообщения теми же правилами.
-- REST: каноническое JSON-отображение Protobuf, курсорная пагинация, `If-Match` для изменений версионированных ресурсов, `Idempotency-Key` для неидемпотентных операций, ошибки `application/problem+json`.
+- Packages `psim.<context>.v<N>`, files `proto/psim/<context>/v<N>/*.proto`; buf rules `STANDARD` + `COMMENTS`.
+- Message value in a topic is a record `<...>Record { Envelope envelope = 1; oneof payload {...} }`; the suffix `Record` is reserved for topic records.
+- Aggregate events carry the aggregate state after the change; `envelope.sequence` equals its version. Consumers apply the event only if the version is higher than the applied one.
+- Identifiers are UUID strings; construction rules - ADR-005 and ADR-029.
+- Field restrictions - annotations protovalidate (`buf.validate`); services verify incoming messages with the same rules.
+- REST: canonical Protobuf JSON mapping, cursor pagination, `If-Match` for versioned resource changes, `Idempotency-Key` for non-idempotent operations, errors `application/problem+json`.
 
-## Правила эволюции (ADR-004)
+## Evolution Rules (ADR-004)
 
-1. Только добавление необязательных полей с новыми номерами; удалённые поля и номера - в `reserved`.
-2. Тип и смысл поля не меняются; новый смысл - новое поле.
-3. Новый тип события - новая ветвь `oneof`; потребители игнорируют неизвестные ветви.
-4. Несовместимое изменение - новый пакет `v2` и новый топик `.v2`.
-5. Таксономия и каталог ошибок - только добавление; коды не переименовываются и не переиспользуются.
+1. Only adding optional fields with new numbers; deleted fields and numbers - in `reserved`.
+2. The type and meaning of a field do not change; new meaning - new field.
+3. New event type - new branch `oneof`; consumers ignore unknown branches.
+4. Incompatible changes - new package `v2` and new topic `.v2`.
+5. Taxonomy and error catalog - only adding; codes are not renamed or reused.
 
-Автоматизация: `buf breaking` (правила `WIRE_JSON`) против ветки `master`; в Schema Registry - режимы совместимости из ADR-004 (шаг 2.3).
+Automation: `buf breaking` (rules `WIRE_JSON`) against branch `master`; in Schema Registry - compatibility modes from ADR-004.
 
-## Проверка
+## Verification
 
-Все действия выполняются задачами [Task](https://taskfile.dev) ([ADR-030](../docs/adr/0030-task-runner.md)):
+All actions are performed by [Tasks](https://taskfile.dev) ([ADR-030](../docs/adr/0030-task-runner.md)):
 
 ```
-task contracts:check     # проверить всё; падает, если сгенерированные файлы устарели
-task contracts:gen       # перегенерировать OpenAPI, AsyncAPI, справочник и проверить согласованность
-task contracts:lint      # отдельные шаги: format, format:fix, lint, breaking, build, openapi, asyncapi, reference, verify
-task contracts:buf -- dep update   # произвольная команда buf
+task contracts:check     # Check everything; fail if generated files are stale
+task contracts:gen       # Regenerate OpenAPI, AsyncAPI and the reference; check consistency
+task contracts:lint      # Individual tasks: format, format:fix, lint, breaking, build, openapi, asyncapi, reference, verify
+task contracts:buf -- dep update   # Run an arbitrary buf command
 ```
 
-Что проверяется:
+What is verified:
 
-| Проверка | Инструмент |
+| Verification | Tool |
 |---|---|
-| Форматирование, линтер, сборка proto | buf 1.73 |
-| Обратная совместимость против `master` | `buf breaking` |
-| OpenAPI: генерация, оверлей, валидность | protoc-gen-openapi, `tools/contracts/openapi_overlay.py`, Redocly CLI |
-| AsyncAPI: генерация из реестра, валидность | `tools/contracts/contracts.py`, AsyncAPI CLI |
-| Справочник proto актуален | protoc-gen-doc |
-| Реестр топиков: записи существуют в proto, имеют конверт и `oneof payload`; каждая запись привязана к топику; совпадение с таблицей в [data-flows.md](../docs/architecture/data-flows.md#4-сводная-таблица) | `contracts.py verify` |
-| Таксономия: уникальность, формат, классы, критичность, ссылки на восстановление; совпадение с [event-taxonomy.md](../docs/domain/event-taxonomy.md) | `contracts.py verify` |
-| Каталог ошибок: формат, HTTP и gRPC статусы; все коды, упомянутые в документации и proto, есть в каталоге | `contracts.py verify` |
-| Схема `Problem` в оверлее совпадает с `psim.api.v1.Problem` | `contracts.py verify` |
+| Formatting, linting, proto build | buf 1.73 |
+| Backward compatibility against `master` | `buf breaking` |
+| OpenAPI: generation, overlay, validity | protoc-gen-openapi, `tools/contracts/openapi_overlay.py`, Redocly CLI |
+| AsyncAPI: generation from registry, validity | `tools/contracts/contracts.py`, AsyncAPI CLI |
+| Proto reference is up-to-date | protoc-gen-doc |
+| Topics registry: records exist in proto, have container and `oneof payload`; each record is linked to a topic; matches table in [data-flows.md](../docs/architecture/data-flows.md#4-summary-table) | `contracts.py verify` |
+| Taxonomy: uniqueness, format, classes, criticality, references to restoration; matches [event-taxonomy.md](../docs/domain/event-taxonomy.md) | `contracts.py verify` |
+| Error catalog: format, HTTP and gRPC status; all codes mentioned in documentation and proto are in the catalog | `contracts.py verify` |
+| The `Problem` schema in the overlay matches `psim.api.v1.Problem` | `contracts.py verify` |
 
-Инструменты запускаются в контейнерах с закреплёнными версиями; нужны Docker, Python 3 с PyYAML и Task. buf и плагины `protoc-gen-openapi`, `protoc-gen-doc` собраны в локальный образ ([tools/contracts/image](../tools/contracts/image/Dockerfile), задача `task tools:build`), поэтому проверки не зависят от лимитов Buf Schema Registry и после первой загрузки зависимостей работают без сети. В CI (шаг 1.3) `task check` становится обязательным барьером слияния.
+Tools are run in containers with fixed versions; Docker, Python 3 with PyYAML and Task are required. Buf and the plugins `protoc-gen-openapi`, `protoc-gen-doc` are built into the local image ([tools/contracts/image](../tools/contracts/image/Dockerfile), task `task tools:build`), so verifications do not depend on Buf Schema Registry limits and work without a network after the first dependency load. The local CI verifies contracts as part of `task ci`.
 
-## Покрытие сценариев приёмки
+## Coverage of Acceptance Scenarios
 
-Каждый сценарий S1-S13 ([acceptance-spec.md](../docs/product/acceptance-spec.md)) выражается через контракты:
+Each scenario S1-S13 ([acceptance-spec.md](../docs/product/acceptance-spec.md)) is expressed through contracts:
 
-| Сценарий | Контракты |
+| Scenario | Contracts |
 |---|---|
-| S1 Подключение коннектора | `CatalogService.RegisterConnector`; `ConnectorGatewayService.Session` (`Register`, `Registered`, `EventBatch`, `BatchAck`, `ConfigUpdate`); `MappingService.PublishMappingRuleSet`; `CatalogService.ListConnectors` (`ConnectorStatus.online`); топики `psim.ingest.raw.v1`, `psim.events.normalized.v1`, `psim.dlq.normalizer.v1`; коды `AUTH_UNAUTHENTICATED`, `INGEST_UNKNOWN_CONNECTOR`, `INGEST_INVALID_EVENT`, `PROCESSING_NO_MAPPING` |
-| S2 Описание объекта | `CatalogService`: `CreateLocation`, `UploadFloorPlan`, `StartImport`, `GetImport` (`ImportJob.errors`), `UpdateDevice` (`position`); топик `psim.catalog.v1`; коды `CATALOG_DUPLICATE_EXTERNAL_ID`, `CATALOG_IMPORT_ROW_INVALID` |
-| S3 Нормализация | `RawEvent` -> `Event` (тип таксономии, `severity`, `site_id`, `zone_id`, `device_id`); `Envelope.sequence`, `traceparent`; `SourceSequenceState` (дедупликация); коды `PROCESSING_DEVICE_NOT_FOUND`, `PROCESSING_DEVICE_DISABLED` |
-| S4 Корреляция | `CorrelationRule` (`ConjunctionSpec`, `window`, `correlation_scope`); `CorrelationRuleService`: `SaveRuleDraft`, `ValidateRule`, `StartDryRun`, `ActivateRuleSet`; `ConfigRecord.rule_set`; `Signal` (`event_ids`, `origin`); код `PROCESSING_RULE_INVALID` |
-| S5 Инцидент без дубликатов | `Signal.grouping_key`, детерминированный `Envelope.message_id` сигнала; `IncidentCreated`, `SignalAttached` |
-| S6 Инцидент в консоли | `FeedService.GetIncidentFeed` (`resume_token`); realtime `Subscribe`, `Delta`; `Envelope.occurred_at` для замера задержки; код `AUTH_SCOPE_DENIED` |
-| S7 Сценарий | `IncidentService.AcknowledgeIncident`, `ResolveIncident` (`known_response_run_version`); `ResponsePlan` (`ChecklistParams`, `DecisionParams`, `Step.mandatory`); `ResponseRunService.CompleteStep`; `RunUpdated`; код `INCIDENT_MANDATORY_STEPS_PENDING` |
-| S8 Команда | `CommandService.RequestCommand`, `ApproveCommand`; `CommandDeliveryRecord`; протокол `Command`, `CommandAck`, `CommandResult`; `CommandUpdated`; коды `COMMAND_APPROVAL_SELF`, `COMMAND_CONNECTOR_OFFLINE`, `COMMAND_TIMED_OUT`, `COMMAND_DEVICE_REJECTED` |
-| S9 Эскалация | `EscalationPolicy` (`SlaTarget`, `EscalationLevel`); `SlaBreached`, `EscalationLevelTriggered`, `IncidentEscalated`; `NotificationUpdated`; `NotificationService.ListMyNotifications` |
-| S10 Аудит | `AuditEventRecord` (`AuditEntry`, `AuditCheckpoint`); `AuditService`: `SearchAuditRecords`, `VerifyAuditIntegrity` (`first_broken_seq`), `ExportAuditRecords`; `AuditOutcome.AUDIT_OUTCOME_DENIED` |
-| S11 Отказ без потерь | Семантика топиков в [topics.yaml](topics/topics.yaml); `ConnectorEvent.event_id`, `source_seq`; `BatchAck`; realtime `resume_token`, `ResyncRequired`; код `REALTIME_RESYNC_REQUIRED` |
-| S12 Обновление | Правила эволюции и `buf breaking`; согласование версии в `Register.protocol_versions`; `Envelope.schema_version` |
-| S13 Отчёт | `ReportService.GetIncidentReport` (`IncidentMetrics`: `mtta`, `mttr`, `false_alarm_rate`, соблюдение SLA), `ExportIncidentReport` (CSV) |
+| S1 Connector integration | `CatalogService.RegisterConnector`; `ConnectorGatewayService.Session` (`Register`, `Registered`, `EventBatch`, `BatchAck`, `ConfigUpdate`); `MappingService.PublishMappingRuleSet`; `CatalogService.ListConnectors` (`ConnectorStatus.online`); topics `psim.ingest.raw.v1`, `psim.events.normalized.v1`, `psim.dlq.normalizer.v1`; codes `AUTH_UNAUTHENTICATED`, `INGEST_UNKNOWN_CONNECTOR`, `INGEST_INVALID_EVENT`, `PROCESSING_NO_MAPPING` |
+| S2 Site configuration | `CatalogService`: `CreateLocation`, `UploadFloorPlan`, `StartImport`, `GetImport` (`ImportJob.errors`), `UpdateDevice` (`position`); topic `psim.catalog.v1`; codes `CATALOG_DUPLICATE_EXTERNAL_ID`, `CATALOG_IMPORT_ROW_INVALID` |
+| S3 Normalization | `RawEvent` -> `Event` (taxonomy type, `severity`, `site_id`, `zone_id`, `device_id`); `Envelope.sequence`, `traceparent`; `SourceSequenceState` (duplication elimination); codes `PROCESSING_DEVICE_NOT_FOUND`, `PROCESSING_DEVICE_DISABLED` |
+| S4 Correlation | `CorrelationRule` (`ConjunctionSpec`, `window`, `correlation_scope`); `CorrelationRuleService`: `SaveRuleDraft`, `ValidateRule`, `StartDryRun`, `ActivateRuleSet`; `ConfigRecord.rule_set`; `Signal` (`event_ids`, `origin`); code `PROCESSING_RULE_INVALID` |
+| S5 Incident deduplication | `Signal.grouping_key`, deterministic signal `Envelope.message_id`; `IncidentCreated`, `SignalAttached` |
+| S6 Incident in the console | `FeedService.GetIncidentFeed` (`resume_token`); realtime `Subscribe`, `Delta`; `Envelope.occurred_at` for latency measurement; code `AUTH_SCOPE_DENIED` |
+| S7 Scenario | `IncidentService.AcknowledgeIncident`, `ResolveIncident` (`known_response_run_version`); `ResponsePlan` (`ChecklistParams`, `DecisionParams`, `Step.mandatory`); `ResponseRunService.CompleteStep`; `RunUpdated`; code `INCIDENT_MANDATORY_STEPS_PENDING` |
+| S8 Command | `CommandService.RequestCommand`, `ApproveCommand`; `CommandDeliveryRecord`; protocol `Command`, `CommandAck`, `CommandResult`; `CommandUpdated`; codes `COMMAND_APPROVAL_SELF`, `COMMAND_CONNECTOR_OFFLINE`, `COMMAND_TIMED_OUT`, `COMMAND_DEVICE_REJECTED` |
+| S9 Escalation | `EscalationPolicy` (`SlaTarget`, `EscalationLevel`); `SlaBreached`, `EscalationLevelTriggered`, `IncidentEscalated`; `NotificationUpdated`; `NotificationService.ListMyNotifications` |
+| S10 Audit | `AuditEventRecord` (`AuditEntry`, `AuditCheckpoint`); `AuditService`: `SearchAuditRecords`, `VerifyAuditIntegrity` (`first_broken_seq`), `ExportAuditRecords`; `AuditOutcome.AUDIT_OUTCOME_DENIED` |
+| S11 Failure without data loss | Semantics of topics in [topics.yaml](topics/topics.yaml); `ConnectorEvent.event_id`, `source_seq`; `BatchAck`; realtime `resume_token`, `ResyncRequired`; code `REALTIME_RESYNC_REQUIRED` |
+| S12 Update | Rules for evolution and `buf breaking`; version synchronization in `Register.protocol_versions`; `Envelope.schema_version` |
+| S13 Report | `ReportService.GetIncidentReport` (`IncidentMetrics`: `mtta`, `mttr`, `false_alarm_rate`, SLA compliance), `ExportIncidentReport` (CSV) |
 
-Квалификация S12 отложена до [шага 10.1](../docs/psim-mvp-development-plan.md#шаг-101-производительность). Контрактные механизмы обновления реализованы; успешный нагрузочный сценарий остаётся обязательным перед выпуском. Шаг 9.2 принят с этим ограничением.
+Contract upgrade mechanisms are implemented; a successful S12 load scenario is required before release. Unverified criteria are listed in [release readiness](../docs/product/release-readiness.md).

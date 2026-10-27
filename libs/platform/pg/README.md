@@ -1,16 +1,20 @@
-# Слой PostgreSQL
+# PostgreSQL Layer
 
-Шаг 2.4 · [ADR-014](../../../docs/adr/0014-postgresql-async-driver.md) · PostgreSQL и libpq 18.x · цель `psim::platform_pg`.
+<!-- language-links -->
+[English](README.md) | [Русский](../../../docs/ru/repository/libs/platform/pg/README.md)
+<!-- /language-links -->
 
-Библиотека интегрирует libpq с корутинами Boost.Asio. Соединение, пул, lease и транзакция используются в одном шарде; один запрос на соединение. libpq и его результаты скрыты за публичными интерфейсами.
+[ADR-014](../../../docs/adr/0014-postgresql-async-driver.md) · PostgreSQL and libpq 18.x · target `psim::platform_pg`.
 
-libpq 18.6 собирается [локальным Conan-рецептом](../../../tools/conan/recipes/libpq/conanfile.py) из официального архива с проверкой SHA-256. Версии и ревизии закреплены в `conan.lock`; задачи сборки экспортируют рецепт автоматически. В поставку входит статический клиент с OpenSSL, сервер PostgreSQL этим рецептом не собирается.
+The library integrates libpq with Boost.Asio. Connection, pool, lease, and transactions are used in one shard; one request runs per connection. libpq and its results are hidden behind public interfaces.
 
-Сборка также экспортирует [рецепт librdkafka 2.14.2](../../../tools/conan/recipes/librdkafka/conanfile.py) с атомарными флагами consumer group: межкомпонентная проверка под TSan выявила гонку между heartbeat и чтением очереди. Патч применяется ко всем профилям; пояснение - в [ADR-041](../../../docs/adr/0041-kafka-layer.md).
+libpq 18.6 is built using the [local Conan recipe](../../../tools/conan/recipes/libpq/conanfile.py) from the official repository, with SHA-256 verification. Versions and revisions are defined in `conan.lock`; the build tasks automatically export the recipe. The package includes a static client with OpenSSL, but the server PostgreSQL is not built using this recipe.
 
-## Соединение и запросы
+The build also exports the [librdkafka 2.14.2 recipe](../../../tools/conan/recipes/librdkafka/conanfile.py) with atomic consumer-group flags: inter-component checks under TSan identified a race between heartbeat and queue reading. The patch applies to all profiles; details are in [ADR-041](../../../docs/adr/0041-kafka-layer.md).
 
-`Connection::connect` разрешает имя через Asio и подключается к одному endpoint. Для кластера endpoint - HAProxy; по умолчанию `target_session_attrs=read-write` и `sslmode=verify-full`. Параметры CA, клиентского сертификата и ключа передаются через `ConnectionOptions::properties`. Пароль передаётся отдельным полем и не выводится в ошибки.
+## Connection and Requests
+
+`Connection::connect` resolves names through Asio and connects to one endpoint. For the cluster of endpoints, HAProxy is used; default values are `target_session_attrs=read-write` and `sslmode=verify-full`. Parameters for CA, client certificate, and key are sent via `ConnectionOptions::properties`. Password is sent as a separate field and is not included in errors.
 
 ```cpp
 using namespace psim::platform;
@@ -25,29 +29,29 @@ auto rows = co_await (*lease)->query({.sql = "SELECT version FROM incident WHERE
                                     .parameters = {pg::Parameter::text(incident_id)}});
 ```
 
-SQL ограничен 1 МиБ; параметры одного запроса и всего pipeline вместе с SQL - 16 МиБ. SQL остаётся константой; данные передаются через `$1`, `$2` и другие параметры. `Parameter` владеет значением, отличает NULL от пустой строки и поддерживает бинарные данные. Результат `Rows` владеет памятью; `value` возвращает view, `integer` проверяет преобразование, метаданные доступны через `column_name` и `column_type`. Остальные типы читаются как текст и преобразуются в адаптере репозитория.
+SQL is limited to 1 MiB; the size of one request and the entire pipeline including SQL is 16 MiB. SQL remains constant; data is sent via `$1`, `$2`, and other parameters. `Parameter` stores values, distinguishes NULL from empty strings, and supports binary data. The result of `Rows` occupies memory; `value` returns a view, `integer` checks conversion, metadata is available via `column_name` and `column_type`. Other types are read as text and converted by the repository adapter.
 
-Подготовленные выражения создаются через `prepare` и исполняются через `execute`. Они принадлежат конкретному соединению: после его замены нужно подготовить их заново.
+Prepared statements are created via `prepare` and executed via `execute`. They belong to a specific connection: they need to be prepared again after being replaced.
 
-## Дедлайны и пул
+## Deadlines and Pool
 
-Подключение, выдача lease и запросы ограничены дедлайнами. Пул создаёт соединения по мере необходимости, ограничивает их количество и обслуживает ожидающих в порядке поступления. Lease возвращает в пул только соединение без активной транзакции и незавершённого протокольного обмена. `close` будит ожидающих и закрывает свободные соединения; активные lease остаются действительными до возврата.
+Connection, lease issuance, and requests are limited by deadlines. The pool creates connections as needed, limits their number, and serves pending requests in order of arrival. Lease returns only connections without active transactions or unfinished protocol exchanges. `close` wakes up pending connections and closes free ones; active leases remain valid until returned.
 
-Таймаут, отмена и разрыв транспорта закрывают соединение. Отправленный запрос может ещё выполняться на сервере; его длительность ограничивают серверные таймауты. Ошибка записи или COMMIT не означает, что запись не состоялась. Библиотека не повторяет её автоматически; повторение бизнес-операции опирается на inbox, ключ идемпотентности и сверку состояния.
+Timeouts, cancellations, and transport breaks close connections. A sent request can still be executed on the server; its duration is limited by server timeouts. An error returned for a write or COMMIT does not mean the operation failed. The library does not automatically repeat it; business operations rely on the inbox, idempotence, and state synchronization.
 
-`query_timeout` задаёт клиентский предел, `properties.options` - серверные параметры. По умолчанию `statement_timeout` и `idle_in_transaction_session_timeout` составляют 30 с. Пул, соединение и связанные объекты должны жить до завершения запущенных на них корутин.
+`query_timeout` sets client limits, `properties.options` sets server parameters. Default values are `statement_timeout` and `idle_in_transaction_session_timeout`, which are 30 seconds. The pool, connection, and related objects must remain alive until the running routines are completed.
 
-## Pipeline, COPY и уведомления
+## Pipeline, COPY, and Notifications
 
-- `pipeline` отправляет до 1024 параметризованных запросов перед чтением ответов. Без явной транзакции пакет атомарен. SQL-ошибка откатывает неявную транзакцию; результаты вычитываются до точки синхронизации, затем соединение можно использовать снова. Лимит памяти результата применяется ко всему пакету. Он проверяется после получения результата libpq; SQL должен сам ограничивать объём выборки.
-- `copy_in` принимает константный SQL `COPY ... FROM STDIN` и порции подготовленных текстовых или бинарных данных. COPY выполняется вне pipeline.
-- `notification` ждёт событие после `LISTEN` на выделенном соединении. Уведомления помогают быстрее разбудить потребителя; проверка долговременного состояния выполняется независимо от них.
+- `pipeline` sends up to 1024 parameterized requests before reading responses. Without an explicit transaction, the batch is atomic. An SQL error aborts the implicit transaction; results are drained until synchronization point, then the connection can be used again. The memory limit of the result applies to the entire batch. It is checked after receiving libpq results; SQL should limit the sample size itself.
+- `copy_in` accepts constant SQL `COPY ... FROM STDIN` and prepared text or binary data. COPY is performed outside the pipeline.
+- `notification` waits for an event after `LISTEN` on a dedicated connection. Notifications help wake up consumers faster; long-term state checks are performed independently of them.
 
-## Транзакции, inbox и outbox
+## Transactions, Inbox, and Outbox
 
-`Transaction::begin` поддерживает read committed, repeatable read и serializable. COMMIT и ROLLBACK вызываются явно; незавершённая транзакция при разрушении закрывает соединение. Получение командного тега ROLLBACK вместо COMMIT возвращает ошибку.
+`Transaction::begin` supports read committed, repeatable read, and serializable. COMMIT and ROLLBACK are explicitly called; destroying an unfinished transaction closes its connection. Receiving the ROLLBACK tag instead of COMMIT returns an error.
 
-`in_transaction<T>` - шаблон единицы работы для инфраструктурного репозитория. Обработка сообщения включает inbox, доменные изменения и outbox в одной транзакции:
+`in_transaction<T>` is a template for infrastructure repositories. Message processing includes inbox, domain changes, and outbox in one transaction:
 
 ```cpp
 pg::MessageStore store("incident_service");
@@ -71,21 +75,21 @@ auto result = co_await pg::in_transaction<void>(&pool,
 // Commit the input Kafka offset only after result succeeds.
 ```
 
-`MessageStore::initialize` создаёт схему и таблицы перед запуском обработчиков. В поставке эту операцию выполняет этап подготовки БД с DDL-правами. Повтор inbox/outbox идентификатора с другим содержимым отклоняется. Отпечаток inbox передаёт обработчик; он должен отражать неизменяемое содержимое события.
+`MessageStore::initialize` creates schemas and tables before running processors. This operation is performed by the database preparation phase with DDL rights. Repeating inbox/outbox with different content is rejected. The inbox fingerprint is sent to the processor; it must reflect the unchangeable content of the event.
 
-Payload outbox ограничен 1 МиБ, ключ - 64 КиБ, JSON с hex-кодированными заголовками - 64 КиБ, идентификатор - 1024 байта. Бинарные значения заголовков и повторяющиеся имена сохраняются.
+The payload outbox is limited to 1 MiB, key to 64 KiB, JSON with hex-encoded headers to 64 KiB, and identifier to 1024 bytes. Binary values of headers and repeated names are saved.
 
-Пределы `message.max.bytes` продюсера, `max.message.bytes` топика/брокера и размеры репликации/чтения должны покрывать полное сообщение с ключом и заголовками. Эти настройки задаёт конфигурация сервиса и окружения; лимит payload библиотеки сам их не меняет.
+The limits of `message.max.bytes` for the producer, `max.message.bytes` for the topic/broker, and replication/read size must cover the entire message with key and headers. These settings are determined by service configuration and environment; the library does not change them itself.
 
-`OutboxRelay` ограничивает пакет числом строк и 4 МиБ кодированных данных выборки (лимит результата соединения должен быть не меньше 8 МиБ). Крупные сообщения публикуются меньшими пакетами. Реле читает ожидающие строки и удерживает транзакционную advisory-блокировку на схему. `kafka_publisher` использует выделенный идемпотентный `Producer` с пустым `transactional_id`, отправляет пакет и ждёт подтверждений Kafka. Открытая транзакция Kafka отклоняется: подтверждение доставки ещё не делает её сообщения доступными потребителям `read_committed`. Только затем реле помечает строки опубликованными и фиксирует транзакцию. Идентификатор сохраняется в заголовке `psim-event-id`; ключ, бинарный payload, заголовки и явная партиция сохраняются.
+`OutboxRelay` limits the batch by number of rows and 4 MiB of encoded data (the connection result limit should be at least 8 MiB). Large messages are published in smaller batchs. The relay reads pending rows and holds a transaction advisory lock on the schema. `kafka_publisher` uses a dedicated idempotent `Producer` with empty `transactional_id`, sends the batch, and waits for acknowledgments from Kafka. An open Kafka transaction is rejected: delivery acknowledgment does not make the message available to consumers `read_committed`. Only then does the relay mark the rows as published and commit the transaction. The identifier is saved in the header `psim-event-id`; key, binary payload, headers, and explicit partition are saved.
 
-При сбое после подтверждения Kafka пакет публикуется повторно. Доставка имеет семантику at least once; inbox потребителя обеспечивает один зафиксированный эффект. Несколько реле одной схемы выбирают единственного активного издателя. `run` опрашивает таблицу через `Clock` и повторяет временные ошибки; `drain_once` позволяет управлять циклом вручную. Строки не удаляются автоматически: retention inbox/outbox должен учитывать максимальное окно повторной доставки.
+If an error occurs after acknowledgment, the batch is republished. Delivery has a semantic of at least once; the consumer’s inbox ensures one recorded effect. Multiple relays on the same schema select the only active publisher. `run` queries the table via `Clock` and repeats temporary errors; `drain_once` allows manual control of the cycle. Rows are not deleted automatically: retention inbox/outbox must consider the maximum window for repeated delivery.
 
-## Миграции
+## Migrations
 
-`Migrator` принимает полную упорядоченную историю `Migration`. Для каждого номера заданы константные SQL-команды expand и необязательный отдельный contract. `@schema@` подставляет только проверенный идентификатор схемы. На схему берётся транзакционная advisory-блокировка; применённые команды защищены SHA-256. Изменение применённого скрипта, пропуск истории и запуск contract до expand отклоняются.
+`Migrator` accepts a fully sorted history of `Migration`. For each number, constant SQL commands expand and the optional contract are defined. `@schema@` only substitutes a verified schema identifier. The transaction advisory lock is used for the schema; the applied commands are protected by SHA-256. Changes to the applied script, skipping history, and running contract before expand are rejected.
 
-CLI `psim-pg-migrate` читает доверенный манифест выпуска:
+The CLI `psim-pg-migrate` reads the trusted release manifest:
 
 ```json
 {
@@ -106,11 +110,11 @@ psim-pg-migrate expand migrations.json
 psim-pg-migrate contract migrations.json
 ```
 
-Параметры подключения: `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. Тайна передаётся через окружение процесса, а не аргумент командной строки.
+Connection parameters: `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. The secret is transmitted through the process environment, not as a command-line argument.
 
-Contract запускается процессом выпуска после вывода несовместимых старых экземпляров; сам инструмент не определяет версии запущенных сервисов. План выполняется транзакционно и не поддерживает команды, запрещённые внутри транзакции, например `CREATE INDEX CONCURRENTLY`.
+The contract is executed by the release process after removing incompatible old instances; the tool itself does not define the versions of the running services. The plan is executed transactionally and does not support commands prohibited within a transaction, such as `CREATE INDEX CONCURRENTLY`.
 
-## Проверка
+## Verification
 
 ```bash
 task cpp:test
@@ -120,6 +124,6 @@ task test:pg:sanitizers
 task bench:pg
 ```
 
-Компонентные тесты работают с PostgreSQL и Kafka из окружения. Они проверяют запросы и типы, ошибки, pipeline, COPY, уведомления, дедлайны и отмену, read-only endpoint, замену соединений, транзакции, миграции, inbox/outbox и повтор публикации. Рабочий процесс принудительно завершается SIGKILL до COMMIT, после COMMIT и после подтверждения Kafka; повторная обработка проверяется через inbox. `task test:pg:sanitizers` повторяет компонентные сценарии PostgreSQL под ASan/UBSan и TSan, включая KIP-848 чтение опубликованных сообщений.
+Component tests work with PostgreSQL and Kafka from the environment. They test queries and types, errors, pipeline, COPY, notifications, deadlines and revocation, read-only endpoints, connection replacement, transactions, migrations, inbox/outbox, and repeated publication. The working process forcibly terminates with SIGKILL before COMMIT, after COMMIT, and after Kafka confirmation; re-processing is checked through the inbox. `task test:pg:sanitizers` repeats component scenarios from PostgreSQL under ASan/UBSan and TSan, including KIP-848 reading published messages.
 
-`task bench:pg` измеряет пропускную способность COPY и pipeline и p50/p99 запроса. Эти измерения относятся к слою доступа к БД; сквозные цели MVP проверяются на соответствующих эталонных стендах в Ф10.
+`task bench:pg` measures COPY and pipeline throughput and p50/p99 queries. These measurements relate to database access layers; cross-MVP targets are tested in the corresponding system qualification environments.

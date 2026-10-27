@@ -1,32 +1,35 @@
-# ADR-036. Отказ от git-хуков: `task ci` перед коммитом
+# ADR-036. Remove Git hooks and run `task ci` before committing
 
-- **Статус:** Принято
-- **Шаг плана:** 1.4
-- **Связанные:** уточняет [ADR-033](0033-code-quality-gates.md) (п. 8, хук `pre-commit`) и [ADR-034](0034-local-ci-and-supply-chain.md) (п. 3-4, фоновый прогон после коммита и хук `pre-push`)
+<!-- language-links -->
+[English](0036-no-git-hooks.md) | [Русский](../ru/adr/0036-no-git-hooks.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** refines [ADR-033](0033-code-quality-gates.md), decision 8 on `pre-commit`, and [ADR-034](0034-local-ci-and-supply-chain.md), decisions 3-4 on post-commit background runs and `pre-push`
 
-ADR-033 ввёл хук `pre-commit` с быстрыми проверками, ADR-034 - фоновый `task ci` после коммита (`post-commit`) и хук `pre-push`, требующий записи о прохождении конвейера. Принято: перед коммитом и так выполняется `task ci`, поэтому хуки дублируют проверку и только добавляют ожидание и движущиеся части.
+## Context
 
-## Рассмотренные варианты
+ADR-033 introduced fast `pre-commit` checks. ADR-034 added background `task ci` through `post-commit` and a `pre-push` hook requiring a successful pipeline record. The working procedure already runs `task ci` before committing; hooks duplicate checks and add waiting and maintenance.
 
-| Вариант | Плюсы | Минусы |
+## Options considered
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Оставить хуки | Барьер срабатывает автоматически | Двойная работа при принятом порядке «сначала `task ci`, потом коммит»; задержки коммита и push; ещё один механизм для сопровождения |
-| **Убрать хуки; `task ci` перед каждым коммитом - правило работы** | Один механизм; коммит и push мгновенны | Барьер держится на дисциплине; ошибка, пропущенная из-за забытого прогона, обнаруживается ночным прогоном |
+| Keep hooks | Automatic gate | Duplicates the established `task ci` -> commit workflow; delays commits and pushes; another maintained mechanism |
+| **Remove hooks; require `task ci` before every commit** | One mechanism; immediate commits and pushes | Relies on discipline; missed runs are caught by nightly checks |
 
-## Решение
+## Decision
 
-1. Хуки `pre-commit`, `post-commit`, `pre-push` и задачи `hooks:*` удалены; `core.hooksPath` не используется.
-2. Правило: перед каждым коммитом выполняется `task ci` (область изменения - ADR-034, п. 2); коммит делается при зелёном прогоне.
-3. Сохраняется необязательный `task ci:run [SHA=<commit>]` - конвейер на закоммиченном содержимом в чистом клоне `.cache/ci/repo` (общие кэши, свои каталоги сборки): он ловит то, что в рабочем дереве маскируется незакоммиченными или неотслеживаемыми файлами. `task ci:status` и `task ci:log` показывают результат.
-4. Полная область по-прежнему проверяется `task ci:nightly` и `task release`.
+1. Remove `pre-commit`, `post-commit`, `pre-push` and `hooks:*` tasks; do not use `core.hooksPath`.
+2. Run `task ci` before every commit, using ADR-034 decision 2 for scope. Commit only after a passing run.
+3. Retain optional `task ci:run [SHA=<commit>]`, which tests committed content in clean clone `.cache/ci/repo` with shared caches and separate build directories. It catches problems masked by uncommitted or untracked working-tree files. `task ci:status` and `task ci:log` expose results.
+4. `task ci:nightly` and `task release` continue to check the full scope.
 
-## Последствия
+## Consequences
 
-- Коммит и push не ждут конвейер.
-- Барьер слияния (DoD шага 1.3, стратегия качества) обеспечивается правилом работы, а не механизмом git; при появлении других участников - пересмотр (хуки или серверный CI).
+- Commits and pushes do not wait for a pipeline.
+- The merge gate is a working rule rather than a Git mechanism. Additional contributors require reconsidering hooks or server-side CI.
 
-## Проверка
+## Verification
 
-Ночной прогон `task ci:nightly` в полной области; `task ci:run` перед выпуском проверяет закоммиченное состояние.
+`task ci:nightly` checks the full scope; `task ci:run` verifies committed state before release.

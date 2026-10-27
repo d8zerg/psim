@@ -1,38 +1,41 @@
 # ADR-003. Schema Registry
 
-- **Статус:** Принято
-- **Шаг плана:** 0.4 (реализация - 1.4, 2.3)
-- **Связанные:** ADR-004, ADR-005
+<!-- language-links -->
+[English](0003-schema-registry.md) | [Русский](../ru/adr/0003-schema-registry.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-004, ADR-005
 
-Схемы сообщений в топиках должны быть версионированы, проверяться на совместимость при регистрации и быть доступными внешним потребителям (интеграторам, будущим ИИ-модулям) для декодирования. Нужна реализация с открытой лицензией и Confluent-совместимым API: это стандарт де-факто для инструментов и формата сообщений.
+## Context
 
-## Рассмотренные варианты
+Topic-message schemas must be versioned, checked for compatibility during registration, and available to external consumers such as integrators and future AI modules for decoding. An open-source implementation with a Confluent-compatible API is required because that API is the de facto standard for tooling and message framing.
 
-| Вариант | Плюсы | Минусы |
+## Considered options
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Apicurio Registry 3.x** | Apache 2.0; Confluent-совместимый API (`ccompat/v7`); зрелая поддержка Protobuf с зависимостями; правила совместимости; хранение в PostgreSQL или Kafka; несколько экземпляров без состояния | JVM; дополнительный сервис |
-| Karapace | Apache 2.0; drop-in замена Confluent SR; хранение в Kafka | Python; поддержка Protobuf с импортами развивалась позже, чем Avro |
-| Confluent Schema Registry | Эталон API | Confluent Community License - не открытая лицензия |
-| Без реестра: схемы только в репозитории, тип в заголовке | Ноль инфраструктуры | Нет проверки совместимости во время выполнения и центрального источника для внешних потребителей; противоречит решению 0.1 плана |
+| **Apicurio Registry 3.x** | Apache 2.0; Confluent-compatible API (`ccompat/v7`); mature Protobuf dependency support; compatibility rules; PostgreSQL or Kafka storage; multiple stateless instances | JVM; another service |
+| Karapace | Apache 2.0; drop-in Confluent SR replacement; Kafka storage | Python; Protobuf import support developed later than Avro support |
+| Confluent Schema Registry | Reference API implementation | Non-open Confluent Community License |
+| No registry: schemas only in the repository, type in a header | No infrastructure | No runtime compatibility checks or central source for external consumers; no centralized schema control |
 
-## Решение
+## Decision
 
-Apicurio Registry 3.x:
+Use Apicurio Registry 3.x:
 
-- хранение в PostgreSQL платформы (отдельная база `registry`), что даёт отказоустойчивость через уже существующий кластер PostgreSQL;
-- 2 экземпляра без состояния в кластере, 1 на одной машине;
-- клиенты используют Confluent-совместимый API и формат сообщений (ADR-004);
-- правила совместимости задаются на subject при регистрации схем установщиком и CI;
-- регистрация схем - только установщиком и CI (учётная запись с правом записи); сервисы читают реестр с кэшем и не регистрируют схемы автоматически.
+- Store data in a separate `registry` database on platform PostgreSQL, using the existing PostgreSQL cluster for high availability.
+- Run two stateless instances in a cluster and one on a single machine.
+- Clients use the Confluent-compatible API and message framing from ADR-004.
+- The installer and CI set per-subject compatibility rules during schema registration.
+- Only the installer and CI register schemas, using a write-authorized account. Services read through a cache and never register schemas automatically.
 
-## Последствия
+## Consequences
 
-- Готового C++-клиента нет: в шаге 2.3 пишется тонкий клиент (получение схемы по идентификатору, поиск идентификатора по subject и версии, кэш).
-- Сервисы не зависят от реестра на горячем пути: идентификаторы схем известны при старте и кэшируются; недоступность реестра не останавливает обработку.
-- Резервный путь: Karapace совместим по API; смена реализации не затрагивает сервисы.
+- No ready-made C++ client is available. The platform library implements a small client for schema lookup by ID, ID lookup by subject and version, and caching.
+- Services do not depend on the registry on the event-processing path. Schema IDs are known and cached at startup; registry unavailability does not stop processing.
+- Karapace is an API-compatible fallback; changing the implementation does not affect services.
 
-## Проверка
+## Verification
 
-Контрактный тест в CI: регистрация схем текущей ветки в реестре с правилами совместимости против схем последнего выпуска.
+A CI contract test registers current-branch schemas with compatibility rules against the latest release's schemas.

@@ -1,71 +1,75 @@
-# Квалификация веб-клиента
+# Web Client Qualification
 
-Статус: Принято. Решение - [ADR-076](../adr/0076-web-client-qualification.md), сравнение загрузки - [отчёт](web-client-loading.md).
+<!-- language-links -->
+[English](web-client-quality.md) | [Русский](../ru/engineering/web-client-quality.md)
+<!-- /language-links -->
 
-## Запуск
+Status: Accepted. Solution - [ADR-076](../adr/0076-web-client-qualification.md), load comparison - [report](web-client-loading.md).
+
+## Launch
 
 ```bash
 task web:qualify
 ```
 
-Задача последовательно проверяет типы, форматирование, контракты, модульные тесты с покрытием, визуальные эталоны и доступность; сравнивает загрузку; измеряет ленту; выполняет бизнес-сценарии с настоящими сервисами и пятиминутный разрыв связи. Нужны Linux, нативный Docker Engine и Docker Compose. Node.js, pnpm и браузеры запускаются в закреплённых образах. Измерения выполняются до запуска сервисного окружения.
+The task sequentially checks types, formatting, contracts, module tests with coverage, visual baselines, and accessibility; compares load; measures the feed; executes business scenarios with real services and a five-minute network outage. Linux, native Docker Engine, and Docker Compose are required. Node.js, pnpm, and browsers run in fixed images. Measurements are performed before launching the service environment.
 
-| Задача | Проверка | Артефакты |
+| Task | Verification | Artifacts |
 |---|---|---|
-| `task web:check` | Генерация, ESLint, TypeScript, Vitest с покрытием, сборка, размеры, Chromium, Axe, сравнение снимков | `web/*/*/coverage/`, отчёты Playwright |
-| `task web:loading` | Холодный и прогретый HTTP-кэш, оба языка, прямой вход и переходы, альтернативные артефакты, отказы загрузки | `build/web-quality/variants.json`, `loading.json`, `comparison.json` в `build/web-quality/` |
-| `task web:perf` | 10000 строк, FPS и p99 поступление -> отображение, отдельный Chromium worker | `build/operator/performance.json` |
-| `task web:native` | Однократная сборка клиента и release-сервисов, затем приёмка оператора, администратора и аналитики | `build/web-quality/native.json`, `build/operator/release/`, `build/admin/release/`, `build/insights/release/` |
-| `task web:session` | Истёкший JWT, пять минут без сети, replay и перезапуск Gateway | `build/event-flow-test/` |
+| `task web:check` | Generation, ESLint, TypeScript, Vitest with coverage, build, size, Chromium, Axe, comparison with snapshots | `web/*/*/coverage/`, Playwright reports |
+| `task web:loading` | Cold and warm HTTP cache, both languages, direct input and transitions, alternative artifacts, load failures | `build/web-quality/variants.json`, `loading.json`, `comparison.json` in `build/web-quality/` |
+| `task web:perf` | 10,000 lines, FPS and p99 realtime -> DOM, separate Chromium worker | `build/operator/performance.json` |
+| `task web:native` | Single build of client and release services, then automated operator, administrator, and analyst acceptance scenarios | `build/web-quality/native.json`, `build/operator/release/`, `build/admin/release/`, `build/insights/release/` |
+| `task web:session` | Expired JWT, five minutes without network, replay and restart of Gateway | `build/event-flow-test/` |
 
-Для повтора после исправления драйвера доступно `task web:native NATIVE_RESUME=--resume`: уже успешная группа переиспользуется только при совпадении отпечатка сборки, сервисных исходников, контрактов и её тестов. Обычный CI всегда выполняет все группы заново.
+For reruns after driver corrections, `task web:native NATIVE_RESUME=--resume` is available: the already successful group is reused only if the build fingerprint, service source code, contracts, and their tests match. The regular CI always runs all groups again.
 
-Точные каталоги отдельных артефактов задают соответствующие задачи. `task web:e2e` остаётся отдельным запуском всех браузерных проверок собранного приложения и каталога. `task web:visual:update` обновляет эталоны для проверки изменения; обычный CI только сравнивает их.
+The exact directories for individual artifacts are defined by corresponding tasks. `task web:e2e` remains a separate launch for all browser checks of the built application and component catalog. `task web:visual:update` updates benchmarks for change checking; the regular CI only compares them.
 
-## Сквозные сценарии
+## Cross-Scenario Tests
 
-Нативные браузеры входят через настоящий Keycloak с PKCE и MFA. Ответы бизнес-API и канал WSS не подменяются. Каждый прогон создаёт отдельный Compose-проект, собственные ресурсы и пользователей, затем удаляет окружение вместе со всеми профилями и томами тестового проекта. Префикс проектов задаётся через `NATIVE_PROJECT`; отдельный проект проверки сессии - через `SESSION_PROJECT`.
+Native browsers enter through the real Keycloak with PKCE and MFA. Business-API responses and WSS channels are not replaced. Each run creates a separate Compose project, its own resources and users, then deletes the environment along with its profiles and test volumes. The project prefix is set via `NATIVE_PROJECT`; a separate session check project via `SESSION_PROJECT`.
 
-| Сценарий | Проверка через интерфейс | Связанные серверные проверки |
+| Scenario | Verification through interface | Related server checks |
 |---|---|---|
-| S1 | Регистрация коннектора, публичный сертификат внешней PKI и продление; сохранение отображения, проверка и активация правила. Созданный коннектор отправляет событие по mTLS до настоящего инцидента и сценария | Соответствие SDK и отказы сертификатов сохраняют отдельные проверки |
-| S2 | Площадка, здание, три этажа, двадцать зон, планы этажей, импорт файла из 50000 устройств с созданием и обновлением, не более пяти минут; отказ неподдерживаемого файла и чужого плана | Нагрузочные проверки каталога и восстановление S3 не заменяются браузерным тестом |
-| S6 | Принять инцидент, начать работу, открыть дерево и приватный план, увидеть состояние устройства | Нагрузка и серверная матрица доступа проверяются отдельно |
-| S7 | Обязательный контрольный список и решение, перезапуск обеих реплик Response Engine, публикация новой версии, сохранение старой версии и текущего шага; предложение и принятие ответственности другим оператором с прежним SLA | Конкурентные операции, повтор запросов и остальные ветви проверяет Response Engine |
-| S8 | Предпросмотр и исполнение команды из активного шага сценария; критичная команда требует другого старшего смены, инициатор не видит подтверждение; отказ устройства и таймаут получают конечные статусы; новая команда требует конечного результата предыдущей, новой причины и предпросмотра | Задержка доставки и отсутствие повторных исполнений проверяются Command Service |
-| S9 | Получение настоящего SLA-уведомления и отметка о прочтении | Уровни, email/webhook, сроки и повторы доставки проверяются Notification Service |
-| S10 | Поиск и страницы аудита, проверка целостности, отзыв роли и области без нового JWT, отсутствие чужих данных в CSV | Криптографические оракулы и повреждение цепочки проверяются Audit Service |
-| S13 | Отчёт по заранее подготовленным данным, фильтры, группировка, SVG-графики и CSV; исходные SLA, время отчёта и отказ после отзыва области | Нагрузочные сценарии отчётов проверяются отдельно |
+| S1 | Connector registration, public certificate from external PKI and renewal; saving mappings, checking, and activating rules. The registered connector sends events via mTLS until the current incident and scenario | SDK compliance and certificate failures have separate checks |
+| S2 | Site, building, three floors, twenty zones, floor plans, importing file containing 50,000 devices with creation and updates, no more than five minutes; failure of non-supported files and other sites’ floor plans | Load tests on the directory and S3 recovery are not replaced by browser tests |
+| S6 | Accepting an incident, starting operations, opening the tree and private plan, seeing the device status | Load and server access matrix are checked separately |
+| S7 | Required checklist and decision, restarting both replicas of the Response Engine, publishing a new version, saving the old version and current step; proposal and acceptance of responsibility by another operator with the same SLA | Concurrent operations, repeated requests and other branches are checked by the Response Engine |
+| S8 | Previewing and executing commands from the active step of the scenario; critical command requires another shift supervisor, the initiator is not offered self-approval; device failure and timeout get final statuses; new command requires final result of the previous one, new reason and preview | Delivery delay and lack of repeated executions are checked by the Command Service |
+| S9 | Receiving the current SLA notification and marking it as read | Levels, email/webhook, deadlines and delivery repetitions are checked by the Notification Service |
+| S10 | Searching and pages for audit, checking integrity, revoking role and scope without new JWT, absence of out-of-scope data in CSV | Cryptographic checkpoints and chain damage are checked by the Audit Service |
+| S13 | Report based on pre-prepared data, filters, grouping, SVG graphs and CSV; original SLA, reporting time and failure after scope revocation | Load scenarios for reports are checked separately |
 
-Веха M4 проверяется до конечного состояния: получатель передачи не может решить инцидент с незавершённым обязательным шагом; после выполнения шага он решает и закрывает инцидент. Нативный драйвер дополнительно читает состояния `CLOSED` и `RUN_STATE_COMPLETED` с сервера.
+The operator scenario is checked until the final state: the recipient cannot resolve an incident with an unfinished required step; after completing the step, it resolves and closes the incident. The native driver additionally reads states `CLOSED` and `RUN_STATE_COMPLETED` from the server.
 
-Проверка импорта включает чтение файла, полную валидацию и применение. Валидация сохраняет модель, ссылки, права и ограничения базы внутри откатываемой транзакции, но не формирует временные публикации для каждой строки. Пакет содержит до 64 строк. Исторический replay вмещает до 60000 устройств и объектов, live-каталог управления - до 120000 устройств, источников и объектов. Добавление нового устройства не сканирует источники ранее добавленных устройств; замена известного устройства удаляет только его прежние источники. Эти изменения нужны для полного набора из 50000 устройств с источниками и иерархией объектов. Список источников в историческом снимке нужен только периодической проверке отсутствия событий без триггера; её пределы 10000 источников и 8 МиБ сохраняются.
+Import verification includes reading the file, full validation, and application. Validation retains the model, links, rights, and restrictions of the database within the rollback transaction, but does not create temporary publications for each line. The batch contains up to 64 lines. Historical replay can handle up to 60,000 devices and objects, live rule catalog - up to 120,000 devices, sources, and objects. Adding a new device does not scan previously added devices; replacing an existing device only removes its previous sources. These changes are needed for a complete set of 50,000 devices with sources and object hierarchy. The list of sources in historical snapshots is only needed for periodic checks to ensure absence-rule timers without new events; its limit is 10,000 sources and 8 MiB saved.
 
-Разрыв связи проверяется настоящим сетевым отказом не менее 300000 мс: учитывается допуск Gateway до 30 секунд на расхождение часов, просроченный токен явно получает 401, изменения поступают без браузера, обновление токена и replay восстанавливают состояние; Gateway перезапускается. Компактные браузерные проверки дополнительно покрывают ошибку HTTP-снимка, RESYNC, сохранение отображаемых данных и запрет записи при потере связи.
+Connection interruption is checked by a real network failure of at least 300,000 ms: the Gateway is allowed up to 30 seconds for time differences, delayed tokens receive a 401, changes occur without the browser, token updates and replay restore the state; the Gateway is restarted. Compact browser checks additionally cover HTTP snapshot errors, RESYNC, saving mappingsed data, and prohibition of writing when connection is lost.
 
-Браузерные части S1/S2/S6-S10/S13 автоматизированы. Серверные, симуляционные, нагрузочные и кластерные части этих сценариев остаются в [матрице проверки](../quality/verification-matrix.md). S3-S5 не требуют браузера, полная кластерная устойчивость S11 и установка S12 относятся к эксплуатационной квалификации.
+The browser parts S1/S2/S6-S10/S13 are automated. The server, simulation, load, and cluster parts of these scenarios remain in [the test matrix](../quality/verification-matrix.md). S3-S5 do not require a browser, full cluster stability S11 and installation S12 belong to operational qualification.
 
-## CI и пределы
+## CI and Limits
 
-При изменениях веб-клиента или его драйверов локальный CI запускает сравнение загрузки и изолированную проверку ленты до сервисов, затем `web:check`, `web:native` и `web:session`. Методы TS-11, TS-14, TS-15 и TS-38 связаны с задачами и сценариями в [реестре](../quality/verification.yaml).
+When changes are made to the web client or its drivers, the local CI runs a comparison of load and an isolated test of the feed before services. Then, it performs `web:check`, `web:native`, and `web:session`. Methods TS-11, TS-14, TS-15, and TS-38 are related to tasks and scenarios in the [registry](../quality/verification.yaml).
 
-Пределы ADR-075 сохранены: начальная загрузка - 150000 байт gzip для каждого языка; полный граф приложения - 250000; витрины - 260000; уникальные JS и словари поставки - 300000; CSS - 15000. Подсчёт полного графа включает динамические imports и JSON-словари. Перенос данных из JS в JSON не уменьшает измеряемую поставку.
+The limits of ADR-075 are maintained: initial load is 150,000 bytes gzip per language; the total application graph is 250,000; the showcase graph is 260,000; unique JS and JSON dictionaries are 300,000; CSS is 15,000. The calculation of the total graph includes dynamic imports and JSON dictionaries. Transferring data from JS to JSON does not reduce the measured delivery.
 
-Для стендового сравнения задержки ограничены p95 2000 мс при холодном входе или первом переходе и 1500 мс при прогретом кэше. Три повтора предназначены для обнаружения крупной регрессии на изолированном CI-хосте. Это не оценка пользовательского p95 и не замена нагрузочным SLO. Проверка ленты отдельно сохраняет не менее 50 FPS и p99 не более 1000 мс.
+For bench testing, the latency limits are p95 2000 ms for cold start or first transition, and 1500 ms for warmed cache. Three repetitions are intended to detect large regressions on the isolated CI host. This is not an evaluation of the user’s p95 and does not replace the load-based SLO. Testing the feed separately ensures at least 50 FPS and p99 not exceeding 1000 ms.
 
-## Результаты
+## Results
 
-| Проверка | Результат |
+| Test | Result |
 |---|---|
-| `web:check` | 19 задач, 220 модульных и 282 браузерные проверки: 76 консоли и 206 дизайн-системы; типы, покрытие, Axe и визуальные эталоны проходят |
-| `web:loading` | Восемь артефактов; 70 пар маршрут/язык по три повтора холодного и прогретого входа, 56 пар переходов по три повтора, пять проверок границ и восстановления |
-| `web:perf` | 10000 записей, 60,00 FPS, p99 realtime -> DOM 12,30 мс |
-| `web:native` | Шесть браузерных сценариев прошли на настоящих сервисах: один операторский, два административных и три аудита и отчётов; M4 завершена, хэши всех трёх клиентских артефактов совпадают с замерами |
-| `web:session` | Реальный разрыв 318834 мс при заданных 300000; просроченный JWT отвергнут с 401, новый токен получен, replay и перезапуск Gateway проходят |
-| C++ и архитектура | 10 модульных проверок каталога и 38 правил проходят в release, ASan/UBSan и TSan; отдельные нативные проверки каталога и всех пяти видов правил, clang-tidy и архитектурные ограничения проходят |
+| `web:check` | 19 tasks, 220 module and 282 browser tests: 76 consoles and 206 design systems; types, coverage, Axe, and visual baselines pass |
+| `web:loading` | Eight artifacts; 70 route/language pairs with three repetitions for cold and warmed starts, 56 transitions with three repetitions, five boundary and recovery tests |
+| `web:perf` | 10,000 records, 60.00 FPS, p99 realtime -> DOM 12.30 ms |
+| `web:native` | Six browser scenarios passed on actual services: one operator, two administrative, and three audit and reporting; incident closed, scenario completed, hashes of all three client artifacts match measurements |
+| `web:session` | Actual delay of 318834 ms with a limit of 300,000; expired JWT rejected with 401, new token received, replay and restart of Gateway passed |
+| C++ and Architecture | 10 module tests for the directory and 38 rule unit tests pass in release, ASan/UBSan, and TSan; individual native directory tests and all five types of rules, clang-tidy, and architectural constraints pass |
 
-Выбранный вариант: начальный JS EN/RU - 128466/129859 байт gzip, полный граф приложения - 240519, витрины - 183963, уникальные JS/JSON - 297812. Все прежние бюджеты проходят. Максимальный стендовый p95 холодного/прогретого входа - 193/89 мс, первого/повторного перехода - 81/69 мс. Метод и все альтернативы приведены в [сравнении загрузки](web-client-loading.md).
+The selected option: initial JS EN/RU - 128,466/129,859 bytes gzip, total application graph - 240,519, showcase graph - 183,963, unique JS/JSON - 297,812. All previous budgets pass. The maximum bench p95 for cold/warmed starts is 193/89 ms, for first/repetition transitions - 81/69 ms. Methods and alternatives are provided in [load comparison](web-client-loading.md).
 
-После конечного результата доступна новая команда с новой причиной и предпросмотром. Команда активного шага создаётся через Response Engine и продвигает выполнение сценария. Явная проверка сохраняет результаты всех команд группы, включая команды из незагруженной страницы списка. Потерянный ответ не приводит к повторной отправке. Нативный полный импорт 50000 строк занял 275339 мс при пределе 300000; отчёт подтвердил 49999 созданий и одно обновление. Для каталога устранены временные публикации при валидации импорта, повторное сканирование источников при первичной live-загрузке и ненужный список источников в историческом прогоне обычного правила.
+After the final result, a new command with a new reason and preview is available. The active step command is created through the Response Engine and advances the scenario execution. Explicit testing preserves results of all commands in the group, including those from unloaded pages in the list. Lost responses do not lead to re-sending. The native full import of 50,000 lines took 275,339 ms with a limit of 300,000; the report confirmed 49,999 creations and one update. For the directory, temporary publications are removed during validation of imports, source scanning is done during initial live loading, and unnecessary sources are removed in historical filtering using the usual rule.
 
-Все задачи квалификации проходят. Веха M4 проверена на настоящих сервисах до закрытого инцидента и завершённого выполнения сценария. Шаг 8.6 принят.
+All qualification tasks pass. The operator scenario was tested on actual services through incident closure and scenario completion.

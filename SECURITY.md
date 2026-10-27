@@ -1,24 +1,28 @@
-# Сообщения о проблемах безопасности
+# Reporting security issues
 
-Open-Source PSIM Platform находится в разработке MVP. Реализованные функции перечислены в [progress.md](docs/progress.md); правила поддержки выпусков - в [политике совместимости](docs/engineering/compatibility-and-support.md).
+<!-- language-links -->
+[English](SECURITY.md) | [Русский](docs/ru/repository/SECURITY.md)
+<!-- /language-links -->
 
-## Поддерживаемые версии
+Open-Source PSIM Platform is under MVP development. Implemented capabilities and limitations are listed in [release readiness](docs/product/release-readiness.md); release support rules are defined in the [compatibility policy](docs/engineering/compatibility-and-support.md).
 
-Исправления безопасности готовятся для основной ветки и последнего опубликованного выпуска. Для более старой версии потребуется обновление. Отдельные LTS-ветки и гарантированные сроки ответа пока не установлены.
+## Supported versions
 
-## Как сообщить
+Security fixes target the main branch and the latest published release. Older versions must be upgraded. Separate LTS branches and guaranteed response times have not been established.
 
-Если на странице [Security](https://github.com/d8zerg/psim/security) доступна кнопка **Report a vulnerability**, отправьте закрытое сообщение через неё. Если закрытый канал недоступен, создайте issue только с просьбой организовать конфиденциальный контакт; не публикуйте детали эксплуатации, секреты и данные объекта. После согласования канала передайте описание владельцу проекта.
+## How to report
 
-Укажите:
+If the [Security](https://github.com/d8zerg/psim/security) page provides **Report a vulnerability**, use it to submit a private report. If a private channel is unavailable, open an issue requesting confidential contact only; do not publish exploitation details, secrets or site data. Once a channel is agreed, send the description to the project owner.
 
-- затронутую версию или коммит и конфигурацию;
-- влияние и необходимые условия;
-- минимальные шаги воспроизведения с синтетическими данными;
-- предполагаемое исправление, если оно известно.
+Include:
 
-Согласуйте публикацию подробностей с владельцем проекта после подготовки исправления. Проверки выполняйте на своём стенде или в среде с разрешением её владельца.
+- Affected version or commit and configuration.
+- Impact and required conditions.
+- Minimal reproduction steps using synthetic data.
+- A proposed fix, if known.
 
-## Требования проекта
+Coordinate disclosure with the project owner after a fix is prepared. Perform testing only in your own environment or with its owner's permission.
 
-[Модель угроз](docs/security/threat-model.md) и [реестр требований](docs/security/threat-register.md) определяют защитные меры. Проект проверяет зависимости, контейнерные образы и SBOM; эти проверки дополняют тесты поведения и рецензирование изменений.
+## Project requirements
+
+The [threat model](docs/security/threat-model.md) and [requirements register](docs/security/threat-register.md) define protective controls. The project checks dependencies, container images and SBOM; these checks complement behavioral tests and change review.

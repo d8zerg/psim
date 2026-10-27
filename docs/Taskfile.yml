@@ -1,12 +1,12 @@
-# Documentation checks: links and anchors, typography, Mermaid diagrams, C4 model.
+# Documentation checks: links and anchors, typography, PlantUML diagrams and C4 views.
 # Included from the root Taskfile as namespace "docs"; working directory is docs/.
 version: '3'
 
 vars:
   TOOLS: '{{.ROOT_DIR}}/tools/docs'
-  MERMAID_OUT: '{{.CACHE}}/mermaid'
+  PLANTUML_OUT: '{{.CACHE}}/plantuml'
   # Markdown with links to check; text sources with typography rules.
-  LINK_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts/README.md {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/libs/platform/redis/README.md {{.ROOT_DIR}}/libs/platform/security/README.md {{.ROOT_DIR}}/libs/platform/clickhouse/README.md {{.ROOT_DIR}}/libs/platform/s3/README.md {{.ROOT_DIR}}/libs/sim/README.md'
+  LINK_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts/docs {{.ROOT_DIR}}/contracts/README.md {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/libs/platform/redis/README.md {{.ROOT_DIR}}/libs/platform/security/README.md {{.ROOT_DIR}}/libs/platform/clickhouse/README.md {{.ROOT_DIR}}/libs/platform/s3/README.md {{.ROOT_DIR}}/libs/sim/README.md {{.ROOT_DIR}}/connectors/README.md {{.ROOT_DIR}}/deploy/README.md {{.ROOT_DIR}}/web/README.md {{.ROOT_DIR}}/libs/domain/README.md {{.ROOT_DIR}}/libs/platform/README.md {{.ROOT_DIR}}/services/README.md {{.ROOT_DIR}}/tests/README.md'
   TEXT_SOURCES: '{{.ROOT_DIR}}/docs {{.ROOT_DIR}}/contracts {{.ROOT_DIR}}/tools {{.ROOT_DIR}}/README.md {{.ROOT_DIR}}/CONTRIBUTING.md {{.ROOT_DIR}}/SECURITY.md {{.ROOT_DIR}}/libs/platform/pg/README.md {{.ROOT_DIR}}/libs/platform/redis/README.md {{.ROOT_DIR}}/libs/platform/security/README.md {{.ROOT_DIR}}/libs/platform/clickhouse/README.md {{.ROOT_DIR}}/libs/platform/s3/README.md {{.ROOT_DIR}}/libs/sim/README.md {{.ROOT_DIR}}/Taskfile.yml'
 
 tasks:
@@ -15,11 +15,15 @@ tasks:
     cmds:
       - task: links
       - task: typography
-      - task: mermaid
-      - task: c4
+      - task: comments
+      - task: localization
+      - task: plantuml
       - task: threats
       - task: verification
+      - task: registries:test
       - task: portal
+      - task: release:check
+      - task: browser
 
   links:
     desc: Check relative links and heading anchors in Markdown
@@ -32,16 +36,44 @@ tasks:
     cmds:
       - '{{.PYTHON}} {{.TOOLS}}/check_typography.py {{.TEXT_SOURCES}}'
 
-  mermaid:
-    desc: Render every Mermaid diagram in docs to catch syntax errors
+  comments:
+    desc: Require English source comments while preserving localized strings
     cmds:
-      - '{{.PYTHON}} {{.TOOLS}}/extract_mermaid.py {{.MERMAID_OUT}} {{.ROOT_DIR}}/docs'
-      - cmd: |
-          cd "{{.MERMAID_OUT}}"
-          ls *.mmd | xargs -P 4 -I{} sh -c '
-            docker run --rm -u {{.UID}}:{{.GID}} -v "$PWD":/data {{.MERMAID_IMAGE}} \
-              -i /data/{} -o /data/{}.svg >"{}.log" 2>&1 \
-              && echo "ok: {}" || { echo "FAIL: {}"; grep -m3 "Error\|Expecting" "{}.log"; exit 255; }'
+      - '{{.PYTHON}} {{.TOOLS}}/check_comments.py {{.ROOT_DIR}}'
+
+  localization:
+    desc: Verify complete English and Russian documentation and translation freshness
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/localization.py {{.ROOT_DIR}}'
+      - '{{.PYTHON}} {{.TOOLS}}/localized_assets.py {{.ROOT_DIR}}'
+      - '{{.PYTHON}} {{.TOOLS}}/proto_reference.py {{.ROOT_DIR}}'
+
+  review:
+    desc: Record a paired translation review for explicitly listed page paths or identifiers
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/localization.py {{.ROOT_DIR}} --review {{.CLI_ARGS}}'
+
+  plantuml:
+    desc: Render all UML and C4 diagrams with the pinned PlantUML image
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/extract_plantuml.py {{.PLANTUML_OUT}} {{.ROOT_DIR}}/docs'
+      - >-
+        docker run --rm --network none -u {{.UID}}:{{.GID}} -v "{{.PLANTUML_OUT}}":/data
+        {{.PLANTUML_IMAGE}} -charset UTF-8 -failfast2 -tsvg -nometadata /data/*.puml
+
+  registries:test:
+    desc: Verify independent quality and security registry invariants
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/test_registries.py'
+      - '{{.PYTHON}} {{.TOOLS}}/test_comments.py'
+      - '{{.PYTHON}} {{.TOOLS}}/test_localization.py'
+      - '{{.PYTHON}} {{.TOOLS}}/test_document_links.py'
+      - '{{.PYTHON}} {{.TOOLS}}/test_proto_reference.py'
+
+  release:check:
+    desc: Check the release source copy and portal without development-only materials
+    cmds:
+      - '{{.PYTHON}} {{.TOOLS}}/check_release.py {{.ROOT_DIR}} {{.ROOT_DIR}}/build/portal/site {{.PORTAL_IMAGE}} {{.PLANTUML_IMAGE}}'
 
   threats:
     desc: Verify the threat model registry and that the rendered register is up to date
@@ -53,6 +85,9 @@ tasks:
       - '{{.PYTHON}} {{.ROOT_DIR}}/tools/security/threat_model.py render security/threat-model.yaml {{.CACHE}}/security/threat-register.md'
       - task: :_publish
         vars: {SRC: '{{.CACHE}}/security/threat-register.md', DST: '{{.TASKFILE_DIR}}/security/threat-register.md', UPDATE: '{{.UPDATE}}'}
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/security/threat_model.py render security/threat-model.yaml {{.CACHE}}/security/threat-register-ru.md ru'
+      - task: :_publish
+        vars: {SRC: '{{.CACHE}}/security/threat-register-ru.md', DST: '{{.TASKFILE_DIR}}/ru/security/threat-register.md', UPDATE: '{{.UPDATE}}'}
 
   threats:gen:
     desc: Regenerate the threat register from the registry
@@ -63,7 +98,7 @@ tasks:
         vars: {UPDATE: 'true'}
 
   verification:
-    desc: Verify the verification registry against plan goals and scenarios; the matrix must be up to date
+    desc: Verify coverage of permanent quality requirements and acceptance scenarios; the matrix must be up to date
     vars:
       UPDATE: '{{.UPDATE | default "false"}}'
     cmds:
@@ -72,6 +107,9 @@ tasks:
       - '{{.PYTHON}} {{.ROOT_DIR}}/tools/quality/verification.py render {{.ROOT_DIR}} quality/verification.yaml {{.CACHE}}/quality/verification-matrix.md'
       - task: :_publish
         vars: {SRC: '{{.CACHE}}/quality/verification-matrix.md', DST: '{{.TASKFILE_DIR}}/quality/verification-matrix.md', UPDATE: '{{.UPDATE}}'}
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/quality/verification.py render {{.ROOT_DIR}} quality/verification.yaml {{.CACHE}}/quality/verification-matrix-ru.md ru'
+      - task: :_publish
+        vars: {SRC: '{{.CACHE}}/quality/verification-matrix-ru.md', DST: '{{.TASKFILE_DIR}}/ru/quality/verification-matrix.md', UPDATE: '{{.UPDATE}}'}
 
   verification:gen:
     desc: Regenerate the verification matrix from the registry
@@ -80,48 +118,37 @@ tasks:
         vars: {UPDATE: 'true'}
 
   c4:
-    desc: Validate the C4 model (Structurizr DSL)
+    desc: Validate the PlantUML C4 views
     cmds:
-      - >-
-        docker run --rm -v "{{.TASKFILE_DIR}}/architecture/c4":/usr/local/structurizr {{.STRUCTURIZR_IMAGE}}
-        validate -workspace workspace.dsl
+      - task: plantuml
 
   portal:
     desc: Build the documentation portal into build/portal/site (FF-09); references are generated from the contracts
     vars:
       OUT: '{{.ROOT_DIR}}/build/portal'
-      C4_OUT: '{{.CACHE}}/portal/c4'
-      REDOC_CDN: https://cdn.redocly.com/redoc/v{{.REDOC_VERSION}}/bundles/redoc.standalone.js
       REPO_URL:
         sh: git -C {{.ROOT_DIR}} remote get-url origin 2>/dev/null | sed -E 's#^git@([^:]+):#https://\1/#; s#\.git$##' || echo https://github.com/d8zerg/psim
       COMMIT:
         sh: git -C {{.ROOT_DIR}} rev-parse HEAD
     cmds:
       - task: portal:image
-      # C4 views -> Mermaid (Structurizr exports next to the workspace, so it works on a copy).
-      - rm -rf {{.C4_OUT}} && mkdir -p {{.C4_OUT}} && cp {{.TASKFILE_DIR}}/architecture/c4/workspace.dsl {{.C4_OUT}}/
+      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/docs/portal.py stage {{.ROOT_DIR}} {{.OUT}} {{.TASKFILE_DIR}}/architecture/c4 {{.REPO_URL}} {{.COMMIT}}'
+      # The browser renderer and branding are bundled for offline use.
       - >-
-        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.C4_OUT}}":/usr/local/structurizr {{.STRUCTURIZR_IMAGE}}
-        export -workspace workspace.dsl -format mermaid -output views >/dev/null
-      - '{{.PYTHON}} {{.ROOT_DIR}}/tools/docs/portal.py stage {{.ROOT_DIR}} {{.OUT}} {{.C4_OUT}}/views {{.REPO_URL}} {{.COMMIT}}'
-      # REST reference: Redoc HTML built from the OpenAPI contract.
+        docker run --rm --network none -u {{.UID}}:{{.GID}} -v "{{.OUT}}":/work {{.PORTAL_IMAGE}} sh -c
+        'cp /opt/portal/redoc.standalone.js /opt/portal/redoc-logo.svg /work/src/reference/ &&
+        cp /opt/portal/redoc.standalone.js /opt/portal/redoc-logo.svg /work/ru/src/reference/'
+      # PlantUML renders SVG during the build; the portal loads no external renderer.
       - >-
-        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo {{.REDOCLY_IMAGE}}
-        build-docs contracts/openapi/psim-api-v1.yaml --disableGoogleFont --output build/portal/src/reference/rest-api.html >/dev/null
+        docker run --rm --network none -u {{.UID}}:{{.GID}} -v "{{.OUT}}":/data
+        {{.PLANTUML_IMAGE}} -charset UTF-8 -failfast2 -tsvg -nometadata /data/**/_diagrams/*.puml
       - >-
-        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal/src/reference {{.PORTAL_IMAGE}} sh -c
-        'grep -q "{{.REDOC_CDN}}" rest-api.html || { echo "Redoc version changed; update tools/docs/portal/Dockerfile" >&2; exit 1; };
-        cp /opt/portal/redoc.standalone.js . && sed -i "s#{{.REDOC_CDN}}#redoc.standalone.js#" rest-api.html'
-      # Mermaid -> SVG on white, readable in both themes; the portal needs no JavaScript renderer.
-      - cmd: |
-          cd {{.OUT}}/src
-          find . -name '*.mmd' -path '*/_diagrams/*' | xargs -P 4 -I{} sh -c '
-            docker run --rm -u {{.UID}}:{{.GID}} -v "$PWD":/data {{.MERMAID_IMAGE}} -i "/data/{}" -o "/data/$(echo {} | sed "s/\\.mmd$/.svg/")" -b white >/dev/null 2>&1 \
-              || { echo "FAIL: mermaid {}"; exit 255; }'
-          find . -name '*.mmd' -path '*/_diagrams/*' -delete
-      - >-
-        docker run --rm -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal {{.PORTAL_IMAGE}}
+        docker run --rm --network none -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal {{.PORTAL_IMAGE}}
         mkdocs build
+      - >-
+        docker run --rm --network none -u {{.UID}}:{{.GID}} -v "{{.ROOT_DIR}}":/repo -w /repo/build/portal/ru {{.PORTAL_IMAGE}}
+        mkdocs build
+      - '{{.PYTHON}} {{.TOOLS}}/portal.py finalize {{.OUT}}/site'
       - 'echo "portal: build/portal/site/index.html ($(find {{.OUT}}/site -name "*.html" | wc -l) pages)"'
 
   portal:image:
@@ -130,6 +157,23 @@ tasks:
       - docker image inspect {{.PORTAL_IMAGE}} >/dev/null 2>&1
     cmds:
       - docker build --quiet -t {{.PORTAL_IMAGE}} {{.ROOT_DIR}}/tools/docs/portal >/dev/null
+
+  browser:
+    desc: Check the extracted documentation archive in an offline browser
+    cmds:
+      - task: browser:image
+      - >-
+        docker run --rm --network none --ipc=host -u {{.UID}}:{{.GID}}
+        -v "{{.ROOT_DIR}}":/repo {{.DOCS_BROWSER_IMAGE}} bash -c
+        'python3 -c "import tarfile; tarfile.open(\"/repo/build/portal-validation.tar\").extractall(\"/tmp/psim-docs-archive\", filter=\"data\")" &&
+        node /repo/tools/docs/browser/check.mjs /tmp/psim-docs-archive/portal /repo/build/portal-browser'
+
+  browser:image:
+    desc: Build the pinned browser image for documentation verification
+    status:
+      - docker image inspect {{.DOCS_BROWSER_IMAGE}} >/dev/null 2>&1
+    cmds:
+      - docker build --quiet -t {{.DOCS_BROWSER_IMAGE}} {{.ROOT_DIR}}/tools/docs/browser >/dev/null
 
   serve:
     desc: Serve the built portal on http://localhost:8000

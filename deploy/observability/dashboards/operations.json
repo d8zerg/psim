@@ -1,7 +1,7 @@
 {
   "uid": "psim-operations",
-  "title": "Эксплуатационные проверки",
-  "description": "Open-Source PSIM Platform. Эксплуатационные проверки. Пропуски данных требуют проверки сбора.",
+  "title": "Operational checks",
+  "description": "Open-Source PSIM Platform. Operational checks. Check data collection when data is missing.",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -33,50 +33,57 @@
   "graphTooltip": 1,
   "links": [
     {
-      "title": "Обзор платформы",
+      "title": "Platform overview",
       "url": "/monitoring/d/psim-overview",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Конвейер событий",
+      "title": "Event Pipeline",
       "url": "/monitoring/d/psim-pipeline",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Сервисы и API",
+      "title": "Services and APIs",
       "url": "/monitoring/d/psim-services",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инфраструктура и репликация",
+      "title": "Infrastructure and Replication",
       "url": "/monitoring/d/psim-infrastructure",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Хранилища и ёмкость",
+      "title": "Storage and Capacity",
       "url": "/monitoring/d/psim-storage",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Инциденты и подключения",
+      "title": "Incidents and Connections",
       "url": "/monitoring/d/psim-business",
       "type": "link",
       "keepTime": true,
       "includeVars": true
     },
     {
-      "title": "Эксплуатационные проверки",
+      "title": "Operational checks",
       "url": "/monitoring/d/psim-operations",
+      "type": "link",
+      "keepTime": true,
+      "includeVars": true
+    },
+    {
+      "title": "RU",
+      "url": "/monitoring/d/psim-operations-ru",
       "type": "link",
       "keepTime": true,
       "includeVars": true
@@ -85,7 +92,7 @@
   "annotations": {
     "list": [
       {
-        "name": "Алерты",
+        "name": "Alerts",
         "enable": true,
         "datasource": {
           "type": "prometheus",
@@ -103,7 +110,7 @@
     "list": [
       {
         "name": "deployment",
-        "label": "Поставка",
+        "label": "Deployment",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -120,14 +127,14 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
       },
       {
         "name": "node",
-        "label": "Узел",
+        "label": "Node",
         "type": "query",
         "datasource": {
           "type": "prometheus",
@@ -144,7 +151,7 @@
         "includeAll": true,
         "allValue": ".*",
         "current": {
-          "text": "Все",
+          "text": "All",
           "value": "$__all"
         },
         "options": []
@@ -155,8 +162,8 @@
     {
       "id": 1,
       "type": "row",
-      "title": "Резервные копии и доверие",
-      "description": "Отсутствие задания копирования видно как 0 успешного timestamp и не считается успешным состоянием.",
+      "title": "Backup and Trust",
+      "description": "A missing backup job appears as a zero successful timestamp and does not indicate success.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -168,8 +175,8 @@
     },
     {
       "id": 2,
-      "title": "Возраст успешной копии",
-      "description": "Timestamp=0 означает, что подтверждённой копии нет. Порог по умолчанию 24 часа.",
+      "title": "Age of the last successful backup",
+      "description": "Timestamp=0 indicates that there is no acknowledged copy. The default threshold is 24 hours.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -193,7 +200,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет подтверждённой копии",
+          "noValue": "No confirmed copy",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -227,7 +234,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -264,8 +271,8 @@
     },
     {
       "id": 3,
-      "title": "Размер последней копии",
-      "description": "Измеренный размер завершённой копии.",
+      "title": "Last backup size",
+      "description": "Measured size of the completed backup.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -289,7 +296,7 @@
         "defaults": {
           "unit": "bytes",
           "min": 0,
-          "noValue": "Нет подтверждённой копии",
+          "noValue": "No confirmed copy",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -319,7 +326,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -356,8 +363,8 @@
     },
     {
       "id": 4,
-      "title": "Срок сертификатов",
-      "description": "Оставшееся время по каждому owner и certificate; предупреждение менее 30 суток.",
+      "title": "Certificate time remaining",
+      "description": "The remaining time for each owner and certificate; a warning if it’s less than 30 days.",
       "type": "table",
       "datasource": {
         "type": "prometheus",
@@ -381,7 +388,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "custom": {
             "filterable": true
           }
@@ -431,7 +438,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Осталось",
+            "displayName": "Remaining",
             "desc": false
           }
         ],
@@ -449,10 +456,10 @@
               "deployment": true
             },
             "renameByName": {
-              "owner": "Владелец",
-              "certificate": "Сертификат",
-              "node": "Узел",
-              "Value": "Осталось"
+              "owner": "Owner",
+              "certificate": "Certificate",
+              "node": "Node",
+              "Value": "Remaining"
             }
           }
         }
@@ -460,8 +467,8 @@
     },
     {
       "id": 5,
-      "title": "Возраст состояния копий",
-      "description": "Обновление файла состояния заданиями. Более 10 минут - неизвестное состояние.",
+      "title": "Backup status age",
+      "description": "Jobs update the status file. More than 10 minutes without an update means unknown status.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -485,7 +492,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Состояние копий отсутствует",
+          "noValue": "Backup status unavailable",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -519,7 +526,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -556,8 +563,8 @@
     },
     {
       "id": 6,
-      "title": "Сбор подробных метрик",
-      "description": "Отдельно от доступности компонента; ошибки прав и разбора ответа не скрываются.",
+      "title": "Detailed metric collection",
+      "description": "Separately from component availability; errors in rights and response parsing are not hidden.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -581,7 +588,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -611,7 +618,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -648,8 +655,8 @@
     },
     {
       "id": 14,
-      "title": "Результат последней попытки копирования",
-      "description": "1 означает успешную попытку. Отказ не изменяет возраст последней успешной копии.",
+      "title": "Last backup attempt result",
+      "description": "1 indicates a successful attempt. Failure does not change the age of the last successful copy.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -673,7 +680,7 @@
         "defaults": {
           "unit": "bool",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -707,7 +714,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -744,8 +751,8 @@
     },
     {
       "id": 15,
-      "title": "Длительность копирования",
-      "description": "Длительность подтверждённой полной операции копирования.",
+      "title": "Backup duration",
+      "description": "Duration of the acknowledged complete backup operation.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -769,7 +776,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -803,7 +810,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -840,8 +847,8 @@
     },
     {
       "id": 16,
-      "title": "Возраст архивирования WAL",
-      "description": "Возраст подтверждённой отправки WAL. При отсутствии новых WAL сам по себе не означает отказ.",
+      "title": "Age of WAL Archiving",
+      "description": "Age of the confirmed WAL delivery. The absence of new WALs does not in itself indicate a failure.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -865,7 +872,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -899,7 +906,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -936,8 +943,8 @@
     },
     {
       "id": 17,
-      "title": "Ошибки архивирования WAL",
-      "description": "Ошибки архиватора за выбранное окно. Проверить независимое хранилище и журналы PostgreSQL.",
+      "title": "WAL archiving errors",
+      "description": "Errors from the archiver for the selected window. Check the independent storage and PostgreSQL logs.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -961,7 +968,7 @@
         "defaults": {
           "unit": "short",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -995,7 +1002,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1033,8 +1040,8 @@
     {
       "id": 7,
       "type": "row",
-      "title": "Часы и собственная наблюдаемость",
-      "description": "Внешний получатель должен контролировать регулярность Watchdog, иначе отказ единственного узла мониторинга останется без уведомления.",
+      "title": "Clock synchronization and monitoring health",
+      "description": "The external recipient must control the regularity of Watchdog; otherwise, a failure of the only monitoring node will go unnoticed.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1046,8 +1053,8 @@
     },
     {
       "id": 8,
-      "title": "Расхождение часов",
-      "description": "Часы агента минус часы Prometheus. Проверяется абсолютное значение.",
+      "title": "Time difference",
+      "description": "Agent clocks minus Prometheus clocks. Checking the absolute value.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1071,7 +1078,7 @@
         "defaults": {
           "unit": "s",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1105,7 +1112,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1142,8 +1149,8 @@
     },
     {
       "id": 9,
-      "title": "Ошибки доставки уведомлений",
-      "description": "Ошибки webhook Alertmanager.",
+      "title": "Notification delivery errors",
+      "description": "Webhook errors in Alertmanager.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1167,7 +1174,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1197,7 +1204,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1234,8 +1241,8 @@
     },
     {
       "id": 10,
-      "title": "Недоставленные трассы",
-      "description": "Ошибки экспорта Collector -> Tempo.",
+      "title": "Undelivered traces",
+      "description": "Export errors from Collector -> Tempo.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1259,7 +1266,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1289,7 +1296,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1326,8 +1333,8 @@
     },
     {
       "id": 11,
-      "title": "Недоставленные логи",
-      "description": "Ошибки экспорта Collector -> Loki.",
+      "title": "Undelivered logs",
+      "description": "Collector -> Loki export errors.",
       "type": "timeseries",
       "datasource": {
         "type": "prometheus",
@@ -1351,7 +1358,7 @@
         "defaults": {
           "unit": "ops",
           "min": 0,
-          "noValue": "Нет данных",
+          "noValue": "No data",
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -1381,7 +1388,7 @@
               "options": {
                 "match": "null",
                 "result": {
-                  "text": "Нет данных",
+                  "text": "No data",
                   "color": "gray"
                 }
               }
@@ -1419,8 +1426,8 @@
     {
       "id": 12,
       "type": "row",
-      "title": "Активные алерты и действия",
-      "description": "Алерты относятся к выбранной поставке; предупреждения и критические отказы имеют прямые ссылки на инструкции.",
+      "title": "Active Alerts and Actions",
+      "description": "Alerts apply to the selected deployment; warnings and critical failures link directly to instructions.",
       "collapsed": false,
       "gridPos": {
         "x": 0,
@@ -1433,8 +1440,8 @@
     {
       "id": 13,
       "type": "table",
-      "title": "Активные алерты",
-      "description": "Pending ещё ожидают выдержки. Firing требуют проверки. Watchdog подтверждает работу конвейера уведомлений.",
+      "title": "Active Alerts",
+      "description": "Pending alerts await the configured duration. Firing alerts require investigation. Watchdog confirms the notification pipeline is running.",
       "gridPos": {
         "x": 0,
         "y": 59,
@@ -1473,7 +1480,7 @@
                 "id": "links",
                 "value": [
                   {
-                    "title": "Инструкция устранения",
+                    "title": "Remediation instructions",
                     "url": "../operations/runbooks/${__value.raw}",
                     "targetBlank": true
                   }
@@ -1481,7 +1488,7 @@
               },
               {
                 "id": "displayName",
-                "value": "Алерт"
+                "value": "Alert"
               },
               {
                 "id": "custom.width",
@@ -1497,7 +1504,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Уровень"
+                "value": "Severity"
               },
               {
                 "id": "custom.width",
@@ -1513,7 +1520,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Состояние"
+                "value": "State"
               },
               {
                 "id": "custom.width",
@@ -1529,7 +1536,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Узел"
+                "value": "Node"
               },
               {
                 "id": "custom.width",
@@ -1545,7 +1552,7 @@
             "properties": [
               {
                 "id": "displayName",
-                "value": "Контекст"
+                "value": "Context"
               },
               {
                 "id": "custom.width",
@@ -1559,7 +1566,7 @@
         "showHeader": true,
         "sortBy": [
           {
-            "displayName": "Уровень",
+            "displayName": "Severity",
             "desc": false
           }
         ]

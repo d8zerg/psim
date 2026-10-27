@@ -56,12 +56,19 @@ class Package(unittest.TestCase):
                 self.assertEqual(entry['runbook'], rule['annotations']['runbook_url'])
 
     def test_dashboards_navigation_units_and_layout(self):
-        boards = [json.loads(path.read_text()) for path in (PACKAGE / 'dashboards').glob('*.json')]
-        self.assertEqual(len(boards), 7)
-        uids = {board['uid'] for board in boards}
+        boards = [(language, json.loads(path.read_text())) for language, directory in
+                  [('en', PACKAGE / 'dashboards'), ('ru', PACKAGE / 'ru/dashboards')]
+                  for path in directory.glob('*.json')]
+        self.assertEqual(len(boards), 14)
+        uids = {language: {board['uid'] for lang, board in boards if lang == language} for language in ('en', 'ru')}
         expressions = []
-        for board in boards:
-            self.assertEqual({link['url'].split('/')[-1] for link in board['links']}, uids)
+        for language, board in boards:
+            self.assertEqual({link['url'].split('/')[-1] for link in board['links'][:-1]}, uids[language])
+            alternate = board['links'][-1]
+            self.assertEqual(alternate['title'], 'RU' if language == 'en' else 'EN')
+            self.assertEqual(alternate['url'], '/monitoring/d/' +
+                             (board['uid'] + '-ru' if language == 'en' else board['uid'].removesuffix('-ru')))
+            self.assertTrue(alternate['keepTime'] and alternate['includeVars'])
             self.assertEqual(board['timezone'], 'browser')
             self.assertEqual(len({panel['id'] for panel in board['panels']}), len(board['panels']))
             self.assertTrue({'deployment', 'node'} <= {v['name'] for v in board['templating']['list']})
@@ -77,6 +84,7 @@ class Package(unittest.TestCase):
                     self.assertTrue(panel['description'])
                     self.assertTrue(panel['fieldConfig']['defaults']['unit'])
                     self.assertIn(panel['fieldConfig']['defaults']['noValue'],
+                                  ('No data', 'No confirmed copy', 'Backup status unavailable') if language == 'en' else
                                   ('Нет данных', 'Нет подтверждённой копии', 'Состояние копий отсутствует'))
                 if panel['datasource']['uid'] == 'prometheus':
                     for target in panel.get('targets', []):
@@ -85,6 +93,19 @@ class Package(unittest.TestCase):
                         expressions.append({'record': 'psim_dashboard_expression_' + str(len(expressions)), 'expr': expr})
         output = ROOT / 'build/observability'; output.mkdir(parents=True, exist_ok=True)
         (output / 'dashboard-expressions.json').write_text(json.dumps({'groups': [{'name': 'dashboard-syntax', 'rules': expressions}]}))
+
+    def test_translation_preserves_queries_filters_and_panel_identity(self):
+        for path in (PACKAGE / 'dashboards').glob('*.json'):
+            en = json.loads(path.read_text())
+            ru = json.loads((PACKAGE / 'ru/dashboards' / path.name).read_text())
+            self.assertEqual([panel['id'] for panel in en['panels']], [panel['id'] for panel in ru['panels']])
+            for left, right in zip(en['panels'], ru['panels'], strict=True):
+                self.assertEqual(left['gridPos'], right['gridPos'])
+                self.assertEqual([target.get('expr') for target in left.get('targets', [])],
+                                 [target.get('expr') for target in right.get('targets', [])])
+            for left, right in zip(en['templating']['list'], ru['templating']['list'], strict=True):
+                for field in ('name', 'type', 'query', 'allValue'):
+                    self.assertEqual(left.get(field), right.get(field))
 
 
 

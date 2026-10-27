@@ -1,73 +1,77 @@
-# Правила корреляции и исторический прогон
+# Correlation Rules and Historical Evaluation
 
-## Запуск
+<!-- language-links -->
+[English](correlation-rules.md) | [Русский](../ru/engineering/correlation-rules.md)
+<!-- /language-links -->
 
-Correlation Engine имеет две роли: `settings.role: live` для рабочего потока и `management` для HTTPS API правил и исторических прогонов. Один процесс запускает одну роль. Управление использует один shard на экземпляр; несколько экземпляров совместно работают через PostgreSQL и outbox. Это роли существующего сервиса, а не отдельные микросервисы.
+## Launch
 
-Проверочный стенд запускается командой `task rules:test`. Его конфигурация - `deploy/local/config/rules/management.yaml`, профиль Compose - `rules-test`. Команда поднимает собственный проект с двумя экземплярами управления, проверяет настоящие хранилища и брокер и сохраняет отчёт в `build/rules/debug/`. Проект можно задать через `PROJECT`, сборку - через `PRESET`.
+The Correlation Engine has two main deployment roles: `settings.role: live` for the live processing and `management` for HTTPS API rules and historical executions. One process launches one role. Management uses one shard per instance; multiple instances work together through PostgreSQL and outbox. These roles represent existing services, not separate microservices.
 
-Для поставки используются HTTPS, проверка JWT с аудиторией `psim`, TLS хранилищ и отдельный сертификат чтения Kafka для replay. `allow_plaintext: true` предназначен для локального проверочного стенда. Таксономия поставляется с сервисом в `/usr/share/psim/correlation-taxonomy.yaml`.
+The launch test environment is initiated with the command `task rules:test`. Its configuration is `deploy/local/config/rules/management.yaml`, and its Compose profile is `rules-test`. The command raises a project with two management instances, checks the actual storage and broker, and saves the report in `build/rules/debug/`. The project can be specified via `PROJECT`, and the build via `PRESET`.
 
-## Жизненный цикл и доступ
+HTTPS is used for delivery, and JWT verification with an audience of `psim` is performed. TLS-protected storage and a separate Kafka read certificate are used for replay. `allow_plaintext: true` is designed for local test environments. The taxonomy is provided with the service in `/usr/share/psim/correlation-taxonomy.yaml`.
 
-Сохранение создаёт неизменяемую версию в состоянии `draft`; состояние из входного документа игнорируется. Успешная валидация переводит версию в `testing`. Активация принимает только успешно проверенные версии и атомарно заменяет набор тенанта. Снятые версии получают состояние `archived`. Сохранение нового черновика не меняет уже активную версию. Архивация правила снимает все его версии с публикацией нового набора.
+## Lifecycle and Access
 
-Изменения доступны администратору с глобальной областью `*`. Чтение и исторический прогон доступны ролям admin, integrator, supervisor и auditor в пределах их областей. Для ограниченной площадками области правило должно явно перечислять разрешённые площадки. Результат прогона виден владельцу либо глобальному администратору; при чтении повторно проверяется текущая область доступа. Данные и задания из другого тенанта недоступны.
+Saving creates an immutable version in the `draft` state; the input document state is ignored. Successful validation moves the version to `testing`. Activation accepts only successfully verified versions and atomically replaces the tenant set. Archived versions become `archived`. Saving a new draft does not change the active version. Archiving a rule removes all its versions from the active set and publishes the new set.
 
-Все POST требуют UUID в `Idempotency-Key`. Повтор возвращает прежний результат; другой запрос с тем же ключом даёт 422. Изменение существующего правила требует `If-Match` с номером последней версии, активация - с версией набора. Отсутствие заголовка даёт 428, устаревшая версия - 412. Невалидный документ даёт 400, недопустимый переход состояния - 409. Набор ограничен 1000 правилами и размером конфигурационного сообщения 1 МиБ.
+Changes are accessible to the administrator with a global access scope of `*`. Reading and historical execution are accessible to admin, integrator, supervisor, and auditor within their scopes. For limited-site scopes, the rule must explicitly list allowed sites. The execution result is visible to the owner or global administrator; reading rechecks the current access scope. Data and tasks from other tenants are not accessible.
 
-Изменение, аудит и сообщение конфигурации сохраняются одной транзакцией PostgreSQL. Outbox публикует полную версию набора в `psim.config.v1` и аудит в `psim.audit.v1`. Повтор доставки возможен, идентификатор сообщения сохраняется. Снятие критических правил отмечается в аудите для последующей обработки уведомлений.
+All POST requests require a UUID in `Idempotency-Key`. A repeat returns the previous result; another request with the same key results in 422. Changing an existing rule requires `If-Match` with the last version number, and activation requires the version set. Missing headers result in 428, outdated versions in 412. Invalid documents result in 400, invalid state transitions in 409. The set limits to 1000 rules and a configuration message size of 1 MiB.
 
-## Выражения
+Changes, audits, and configuration messages are saved as a single PostgreSQL transaction. Outbox publishes the complete set in `psim.config.v1` and audits in `psim.audit.v1`. Redelivery is possible, and the message identifier is retained. Deleting critical rules is noted in the audit for subsequent notification.
 
-Документ JSON или YAML соответствует `CorrelationRule`. Вид правила, окно, фильтры и области задаются декларативно. Условия, приоритет и подстановки текста используют типизированное подмножество CEL из [ADR-011](../adr/0011-correlation-rule-language.md).
+## Expressions
 
-Поддерживаются `bool`, `int64`, `string`, `has(field)`, `&&`, `||`, `!`, сравнения, целочисленная арифметика, `condition ? a : b`, конкатенация строк, `startsWith`, `endsWith`, `contains`. Строковые атрибуты читаются как `event.attributes['key']`; обязательность проверяется через `has`. Тип проверяется до активации; неявных преобразований нет. Циклы, регулярные выражения и внешние вызовы отсутствуют.
+A JSON or YAML document matches `CorrelationRule`. The format of the rule, window, filters, and scope are declared. Conditions, priorities, and text substitutions use a typed subset of CEL from [ADR-011](../adr/0011-correlation-rule-language.md).
 
-Примеры: `event.severity >= 3 && has(event.attributes['door'])`, `event.severity >= 3 ? 1 : 2`, текст `Зона ${event.zone_id}`. Выражение приоритета должно статически гарантировать результат 1..4. В фильтрах недоступен `matches.count`; это значение предназначено для вывода. Текстовые подстановки должны возвращать строку.
+`bool`, `int64`, `string`, `has(field)`, `&&`, `||`, `!` are supported, along with comparisons, integer arithmetic, `condition ? a : b`, string concatenation, `startsWith`, `endsWith`, `contains`. String attributes are read as `event.attributes['key']`; necessity is checked through `has`. Types are checked before activation; no implicit conversions are allowed. Loops, regular expressions, and external calls are not allowed.
 
-Документ ограничен 64 КиБ, выражение - 4000 байт, AST - 512 узлами и глубиной 32. Значение строки ограничено 4096 байтами, итоговый текст сигнала - 1024 байтами. Вычисление ограничено бюджетом 4096 операций с учётом стоимости строковых операций. Переполнение, деление на ноль и отсутствие обязательного поля дают ошибку. В YAML запрещены якоря, псевдонимы, повторяющиеся ключи и несколько документов; допустимы глубина 32 и 4096 узлов.
+Examples: `event.severity >= 3 && has(event.attributes['door'])`, `event.severity >= 3 ? 1 : 2`, text `Zone ${event.zone_id}`. The priority expression must statically guarantee a result of 1..4. `matches.count` is not available in filters; this value is available to output expressions. Text substitutions must return a string.
 
-## Виды правил
+The document limits to 64 KiB, the expression to 4000 bytes, AST to 512 nodes with a depth of 32. String values are limited to 4096 bytes, and the final signal text to 1024 bytes. Calculations are limited by a budget of 4096 operations, considering the cost of string operations. Overflow, division by zero, and absence of mandatory fields result in errors. YAML prohibits anchors, aliases, repeated keys, and multiple documents; a depth of 32 and 4096 nodes is allowed.
 
-| Вид | Семантика исторического прогона |
+## Types of Rules
+
+| Type | Semantic Description of Historical Execution |
 |---|---|
-| `single` | Каждый подходящий вход даёт решение с учётом интервала подавления повторов |
-| `conjunction` | Для каждой части требуется отдельное подходящее событие в одном окне; событие не занимает две части |
-| `sequence` | Части выполняются в заданном порядке со строго возрастающим временем события |
-| `threshold` | Порог числа событий либо различных значений указанного поля достигается в окне |
-| `absence` с trigger | Триггер открывает ожидание; отсутствие подходящего события до границы даёт решение |
-| `absence` без trigger | Активные ресурсы каталога открывают периодические ожидания, отсчитываемые от начала прогона; отсутствие может дать сигнал без событий |
+| `single` | Each matching input produces a decision considering the repetition suppression interval |
+| `conjunction` | Each part requires a suitable event in a single window; an event does not occupy two parts |
+| `sequence` | Parts are executed in a specified order with increasing time of events |
+| `threshold` | The threshold for the number of events or different values of a field is reached in a window |
+| `absence` with trigger | A trigger opens a waiting state; absence of a suitable event before the limit produces a decision |
+| `absence` without trigger | Active resources in the catalog open periodic waiting periods, starting from the beginning of the execution; absence can signal without events |
 
-Окна полуоткрытые: событие ровно на границе уже не закрывает ожидание. Граница окончания прогона также исключена. После успешного составного совпадения использованные события потребляются; последовательности и сочетания не перекрываются. Для периодического отсутствия фильтр ресурсов и вывод используют только поля инвентаризации, метаданные правила и число совпадений. Значения severity, type и attributes отсутствующего события недоступны. Ограничения применяются при валидации.
+Windows are half-open: an event exactly at the boundary no longer closes the waiting state. The end of the execution boundary is also excluded. After a successful composite match, used events are consumed; sequences and combinations do not overlap. For periodic absence, resource filters and output use only inventory fields, rule metadata, and the number of matches. Values for severity, type, and attributes of an absent event are not available. Constraints apply during validation.
 
-Ключ корреляции выбирается из источника, устройства, зоны, этажа, здания или площадки. Область группировки не может быть уже области корреляции; ключ группировки также содержит тип инцидента. Идентификатор сигнала детерминирован по тенанту, правилу и версии, ключу, событиям и границе отсутствия. Дубликаты событий удаляются по идентификатору; разные данные с одним идентификатором завершают задание ошибкой. Обработка упорядочена по времени события и идентификатору.
+The correlation key is selected from a source, device, zone, floor, building, or site. The grouping scope cannot be narrower than the correlation scope; the grouping key also contains the incident type. The signal identifier is determined by the tenant, rule, version, key, events, and absence boundary. Duplicates of events are removed by identifier; different data with the same identifier ends the task with an error. Processing is ordered by event time and identifier.
 
-## Исторические данные и обслуживание
+## Historical Data and Maintenance
 
-Запуск принимает исторический диапазон длительностью до 24 часов и источник Kafka либо ClickHouse. Начальное состояние корреляции пустое. Для сравнения источников им задаются один диапазон, правило и контекст каталога. Прогон не моделирует состояние рабочего движка до начала диапазона, водяные знаки или допустимое опоздание.
+Launch takes a historical range up to 24 hours and a Kafka or ClickHouse source. The initial state of correlation is empty. For comparing sources, one range, rule, and catalog context are assigned. Execution does not model the live engine state before the start of the range, watermarks, or allowed lateness.
 
-Kafka читается вручную до зафиксированных верхних смещений с `read_committed`, без вступления в consumer group и фиксации смещений. Читатель ограничен нормализованными событиями, каталогом, конфигурацией и аудитом. Недостаточная глубина доступной истории отклоняется. ClickHouse выполняет параметризованный SELECT полного события только из таблицы `events` с обязательными тенантом и временем. Адреса, таблицы и топики из HTTP-запроса не принимаются.
+Kafka is read using manual partition assignment and `read_committed` up to captured upper offsets, without joining a consumer group or committing offsets. The reader is limited to normalized events, catalog, configuration, and audit. Insufficient retained history is rejected. ClickHouse runs a parameterized SELECT of complete events only from `events`, with mandatory tenant and time bounds. Addresses, tables, and topics supplied through HTTP requests are not accepted.
 
-Каталог фиксируется при чтении входа. Исторические версии обслуживания восстанавливаются из конфигурации и снимков аудита и выбираются по времени получения события; для таймера используется граница ожидания. Если нужная историческая версия недоступна, прогон завершается ошибкой. Все события составного сигнала должны быть покрыты политикой. Подавление широкого ожидания отсутствия политикой только одного устройства не допускается.
+The catalog is fixed during input reading. Historical maintenance policy versions are restored from configuration and audit snapshots, and selected by the time of event receipt; a waiting period is used for timers. If the desired historical version is unavailable, the process ends with an error. All composite signal events must be covered by the policy. Suppression of broad expectations due to a single device’s policy is not allowed.
 
-Подавленные решения сохраняют сигнал, идентификаторы и точные версии политик обслуживания. Пожарные события и P1 проходят независимо от политики. Подавленное обслуживанием решение не запускает интервал подавления повторов, чтобы после окончания обслуживания новое событие могло создать сигнал. Рабочая история не изменяется.
+Suppressed decisions retain signal, identifiers, and exact versions of maintenance policies. Fire events and P1 pass regardless of the policy. A suppressed decision does not start a repetition suppression interval so that a new event can create a signal after maintenance ends. The working history remains unchanged.
 
-## Задания и изоляция
+## Tasks and Isolation
 
-Задание долговечно: один исполнитель захватывает его с арендой 15 секунд и обновляет аренду каждые 2 секунды. Сохранённый вход повторно используется после перезапуска; устаревший исполнитель не может зафиксировать результат. Снимок содержит события и контекст, а не JWT. Ошибка не оставляет частичных решений, в API возвращается безопасный код причины.
+A task is persistent: one executor captures it with a lease of 15 seconds and updates the lease every 2 seconds. Saved input is reused after restarting; an outdated executor cannot record results. A snapshot contains events and context, not JWTs. An error does not leave partial decisions; the API returns a safe cause code.
 
-Ограничения прогона: до 100 000 событий, 10 000 ключей и 10 000 решений, до 50 млн операций сопоставления, до 10 ожидающих заданий на тенанта. Входной снимок ограничен 8 МиБ, результат - 16 МиБ. Kafka дополнительно ограничивает чтение одним миллионом сообщений и временем 45 секунд. Превышение любого лимита завершает задание ошибкой; очередь сверх квоты даёт 429.
+Process limits: up to 100,000 events, 10,000 keys, 10,000 decisions, up to 50 million matching operations, up to 10 pending tasks per tenant. The input snapshot is limited to 8 MiB, and the result to 16 MiB. Kafka additionally limits reading to one million messages and a time limit of 45 seconds. Exceeding any limit ends the task with an error; exceeding the quota gives 429.
 
-`signalsProduced` считает все решения, включая подавленные обслуживанием. `signals[]` содержит только сигналы текущей страницы, прошедшие обслуживание, `decisions[]` - все решения страницы с объяснениями подавления. Пагинация возвращает до 200 решений за запрос.
+`signalsProduced` counts all decisions, including those suppressed by maintenance. `signals[]` contains only non-suppressed simulated signals from the current page, `decisions[]` - all decisions from the current page with suppression explanations. Pagination returns up to 200 decisions per request.
 
-Исторический читатель использует отдельные Kafka ACL без права записи и фиксации групповых смещений и ClickHouse-пользователя только с SELECT. Управление имеет право публикации только конфигурации и аудита и использует собственную схему PostgreSQL. Проверка реально пытается записать в топики сигналов, инцидентов, команд и результатов действий, зафиксировать смещения, изменить чужую схему PostgreSQL и записать в ClickHouse. Все операции должны быть отклонены. Прогон не создаёт рабочие сигналы, инциденты, команды и уведомления и не вызывает внешние системы.
+The historical reader uses separate Kafka ACLs without write permission and without committing group offsets, and the ClickHouse user only has SELECT rights. Management has only publication rights for configuration and auditing and uses its own PostgreSQL schema. Verification actually tries to record signals, incidents, commands, and action results to topics, commit offsets, change another PostgreSQL schema, and record in ClickHouse. All operations must be rejected. The process does not create production signals, incidents, commands, or notifications and does not trigger external systems.
 
-## Проверка
+## Verification
 
-- `task rules:test` - HTTPS/JWT, версии, идемпотентность, конкуренция двух экземпляров, все виды правил, оба источника, обслуживание, изоляция и восстановление задания после SIGKILL.
-- `task rules:sanitizers` - модульные и реальные проверки под ASan/UBSan и TSan.
-- `task rules:coverage` - покрытие по модульным и реальным проверкам; пороги домена 90% строк и 80% ветвей, сервиса - 75% строк.
-- `task fuzz:rules` - минимум 600 секунд фаззинга парсера и валидатора под ASan/UBSan, отчёт в `build/rules/fuzz/`.
+- `task rules:test` - HTTPS/JWT, versions, immutability, concurrency between two instances, all types of rules, both sources, maintenance, isolation, and restoration of tasks after SIGKILL.
+- `task rules:sanitizers` - unit and live-process checks under ASan/UBSan and TSan.
+- `task rules:coverage` - coverage by unit and live-process checks; domain thresholds of 90% lines and 80% branches, service - 75% lines.
+- `task fuzz:rules` - minimum 600 seconds of parser and validator fuzzing under ASan/UBSan, report in `build/rules/fuzz/`.
 
-Эти проверки подключены к CI по затронутым компонентам. Для шага 5.1 достаточно 10 минут фаззинга. Обязательные 24 часа для всех внешних парсеров и DSL остаются финальной проверкой готовности MVP на шаге 10.3. Рабочее применение опубликованного набора, RocksDB/changelog, водяные знаки и транзакции Kafka описаны в [руководстве по рабочей корреляции](live-correlation.md).
+These checks are connected to the CI by affected components. CI performs 10 minutes of fuzzing. Qualification release requires 24 hours for each external parser and DSL target. The published live rule set, RocksDB/changelog, watermarks, and Kafka transactions are described in the [live correlation guide](live-correlation.md).

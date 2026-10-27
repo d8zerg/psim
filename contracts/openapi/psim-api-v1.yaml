@@ -5629,7 +5629,7 @@ components:
           type: string
         knownResponseRunVersion:
           type: string
-          description: Response run version known to the client; guards against unseen mandatory steps (runtime-view R2).
+          description: Response run version known to the client; guards against unseen mandatory steps.
       description: ResolveIncidentRequest is the request of ResolveIncident.
     psim.api.v1.ResolveIncidentResponse:
       type: object
@@ -7890,42 +7890,40 @@ components:
             $ref: '#/components/schemas/Problem'
 tags:
 - name: AuditService
-  description: 'AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service. Scenario S10.'
+  description: 'AuditService searches and verifies the audit chain (ADR-021). Owner: Audit Service.'
 - name: CatalogService
   description: "CatalogService manages sites, buildings, floors, zones, device types, devices and connectors.\n Owner: Resource\
-    \ Catalog. Scenarios S1, S2."
+    \ Catalog."
 - name: CommandService
-  description: 'CommandService manages commands to devices. Owner: Command Service. Scenario S8.'
+  description: 'CommandService manages commands to devices. Owner: Command Service.'
 - name: CorrelationRuleService
   description: "CorrelationRuleService manages correlation rules and the active rule set.\n Owner: Correlation Engine (rule\
-    \ management module). Scenario S4."
+    \ management module)."
 - name: EscalationPolicyService
-  description: 'EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine. Scenario S9.'
+  description: 'EscalationPolicyService manages SLA and escalation policies. Owner: Response Engine.'
 - name: EventHistoryService
-  description: 'EventHistoryService searches stored events (ADR-028). Owner: Event History. Scenario S7.'
+  description: 'EventHistoryService searches stored events (ADR-028). Owner: Event History.'
 - name: FeedService
-  description: 'FeedService serves console read models. Owner: Projection Service. Scenarios S6, S11.'
+  description: 'FeedService serves console read models. Owner: Projection Service.'
 - name: IncidentService
   description: 'IncidentService manages incidents and incident types. Owner: Incident Service.'
 - name: MappingService
-  description: 'MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1.
-    Scenario S1.'
+  description: 'MappingService manages mapping rules of connector types. Owner: Resource Catalog; publishes to psim.config.v1.'
 - name: MeService
   description: 'MeService describes the caller. Owner: API Gateway (from the access token and the policy table).'
 - name: NotificationContactService
   description: 'NotificationContactService manages channel destinations. Owner: Notification Service.'
 - name: NotificationService
-  description: 'NotificationService serves in-app notifications of the caller. Owner: Notification Service. Scenario S9.'
+  description: 'NotificationService serves in-app notifications of the caller. Owner: Notification Service.'
 - name: OperationalService
   description: "OperationalService owns alarm controls, collaboration, history and isolated exercises.\n Owner: Incident Service.\
     \ All source data is resolved using the caller's current scope."
 - name: ReportService
-  description: "ReportService builds incident reports (ADR-028: analytics in ClickHouse).\n Owner: Projection Service. Scenario\
-    \ S13."
+  description: "ReportService builds incident reports (ADR-028: analytics in ClickHouse).\n Owner: Projection Service."
 - name: ResponsePlanService
-  description: 'ResponsePlanService manages response plans. Owner: Response Engine. Scenario S7.'
+  description: 'ResponsePlanService manages response plans. Owner: Response Engine.'
 - name: ResponseRunService
-  description: 'ResponseRunService executes plan steps. Owner: Response Engine. Scenario S7.'
+  description: 'ResponseRunService executes plan steps. Owner: Response Engine.'
 - name: SettingsService
   description: "SettingsService manages tenant-wide retention and processing settings.\n Owner: Resource Catalog; changes\
     \ are published to psim.config.v1."

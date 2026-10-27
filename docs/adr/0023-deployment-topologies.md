@@ -1,49 +1,52 @@
-# ADR-023. Топологии развёртывания и границы надёжности режима «одна машина»
+# ADR-023. Deployment topologies and single-machine reliability limits
 
-- **Статус:** Принято
-- **Шаг плана:** 9.1
-- **Связанные:** ADR-002, ADR-015, ADR-024, [deployment.md](../architecture/deployment.md)
+<!-- language-links -->
+[English](0023-deployment-topologies.md) | [Русский](../ru/adr/0023-deployment-topologies.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-002, ADR-015, ADR-024, [deployment.md](../architecture/deployment.md)
 
-Одна поставка должна работать от одной машины до кластера; Kubernetes вне MVP (решение Q1). Кластер должен обеспечивать RTO ≤ 60 с и RPO = 0 при отказе одного узла. Пользователи самостоятельно выбирают локальную или облачную инфраструктуру; официально поддерживается Debian 13 x86_64. Опыт эксплуатации у пользователей различается.
+## Context
 
-## Рассмотренные варианты
+One distribution must support a single machine through a cluster; Kubernetes is outside MVP scope. The cluster must achieve RTO ≤ 60 s and RPO = 0 after one node fails. Users choose local or cloud infrastructure; Debian 13 x86_64 is officially supported. Users have different levels of operational experience.
 
-### Отказоустойчивость PostgreSQL
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### PostgreSQL high availability
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Patroni + etcd** | Стандарт де-факто; синхронная репликация с автоматическим переключением; зрелая документация | Ещё два компонента (Patroni, etcd) |
-| pg_auto_failover | Проще | Узел-монитор - единая точка отказа; меньше распространён |
-| Ручное переключение | Ничего нового | Не выполняет RTO ≤ 60 с |
+| **Patroni + etcd** | De facto standard; synchronous replication and automatic failover; mature documentation | Two additional components: Patroni and etcd |
+| pg_auto_failover | Simpler | Monitor node is a single point of failure; less widely used |
+| Manual failover | No additional components | Cannot meet RTO ≤ 60 s |
 
-### Запуск сервисов
+### Service execution
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| **Инфраструктура в Docker Compose; приложения в контейнерах или `.deb` под systemd** | Единый набор инфраструктуры и конфигурации приложений; две формы запуска процессов | Обе формы приложений требуют сквозной проверки |
-| Только контейнеры | Один способ | Нет нативной установки пакетами под systemd на Debian 13 x86_64 |
-| Kubernetes | Оркестрация | Вне MVP (X15) |
+| **Docker Compose infrastructure; application containers or `.deb` packages under systemd** | Shared infrastructure and application configuration; two process-launch formats | Both application formats require end-to-end tests |
+| Containers only | One format | No native package installation under systemd on Debian 13 x86_64 |
+| Kubernetes | Orchestration | Outside MVP (X15) |
 
-## Решение
+## Decision
 
-1. **Одна машина:** все компоненты на одном сервере; Kafka 1 узел; явно документированные границы надёжности ([deployment.md](../architecture/deployment.md#2-топология-одна-машина)): RTO при отказе сервера - до восстановления сервера; RPO при потере диска - интервал резервного копирования.
-2. **Кластер на VM:** Kafka 3 узла (broker + controller), RF 3, `min.insync.replicas=2`; PostgreSQL под Patroni + etcd с одной синхронной репликой; Redis-совместимое хранилище по ADR-015; HAProxy ×2 + keepalived; ≥ 2 экземпляра каждого сервиса на разных узлах.
-3. Инфраструктура использует нативный Docker Engine и Compose на Debian 13 x86_64. Прикладные сервисы имеют две формы запуска: контейнеры и `.deb` под systemd. Обе формы проходят сквозной тест с одинаковыми портами, UID, файлами конфигурации, PKI и каталогами данных.
-4. Установщик генерирует конфигурацию из профиля топологии; различия топологий - только конфигурация и число экземпляров.
-5. Локальный E-CLUSTER использует три KVM-гостя по 4 vCPU, 12 ГиБ RAM и 60 ГиБ диска на одном Linux-хосте. Он проверяет отказ гостевой ОС и процессов. Подтверждение независимых физических доменов отказа требует раздельных хостов.
-6. L-06 на совмещённом локальном профиле проверяет отдельно ввод через два шлюза до подтверждения Kafka: прочие прикладные процессы временно остановлены и восстанавливаются с проверкой готовности. Порог сохраняется 50 000 событий/с. Совместная производительность сервисов и длительная нагрузка всего конвейера проверяются отдельно на эталонной конфигурации; локальный результат ввода их не подтверждает.
+1. **Single machine:** all components on one server, with one Kafka node and explicit [reliability limits](../architecture/deployment.md#2-one-machine-topology): server-failure RTO lasts until server recovery; disk-loss RPO equals the backup interval.
+2. **VM cluster:** 3 Kafka broker/controller nodes, RF 3, `min.insync.replicas=2`; PostgreSQL with Patroni, etcd and one synchronous replica; the ADR-015 Redis-compatible store; HAProxy ×2 and keepalived; at least 2 instances of every service on separate nodes.
+3. Infrastructure uses native Docker Engine and Compose on Debian 13 x86_64. Applications support containers and `.deb` packages under systemd. Both formats undergo end-to-end testing with the same ports, UIDs, configuration files, PKI and data directories.
+4. The installer generates configuration from a topology profile; topologies differ only in configuration and instance counts.
+5. Local E-CLUSTER uses three KVM guests, each with 4 vCPU, 12 GiB RAM and 60 GiB disk, on one Linux host. It tests guest-OS and process failure. Qualifying independent physical failure domains requires separate hosts.
+6. L-06 on the colocated local profile separately tests input through two gateways up to Kafka acknowledgement. Other application processes are temporarily stopped, then restored with readiness checks. The threshold remains 50,000 events/s. Combined service performance and sustained full-pipeline load are qualified separately on the reference configuration; local input measurements do not prove them.
 
-## Последствия
+## Consequences
 
-- В поставку входят Patroni, etcd, HAProxy, keepalived - с runbook и мониторингом.
-- Helm-чарт включает backend, веб-клиент и публичный proxy; инфраструктура использует готовые операторы из закреплённого каталога. Проверяются рендеринг, digest образов, изоляция файлового материала, запуск без root, health и `SIGTERM`. Живая установка и полная квалификация Kubernetes находятся за пределами MVP.
-- Режим одной машины прекращает обслуживание при потере машины; кластер на одном физическом хосте сохраняет эту общую границу отказа.
-- Регламент внешней PKI и первоначальных учётных записей входит в комплект установки.
+- The distribution includes Patroni, etcd, HAProxy and keepalived, with runbooks and monitoring.
+- The Helm chart contains backend services, web client and public proxy; infrastructure uses operators from a pinned catalog. Checks cover rendering, image digests, file-material isolation, non-root execution, health and `SIGTERM`. Live Kubernetes installation and full qualification are outside MVP.
+- A single-machine deployment stops serving when that machine is lost. A cluster on one physical host retains the same shared failure boundary.
+- External PKI and initial-account procedures are included in the installation package.
 
-## Проверка
+## Verification
 
-Установка каждой топологии по документации и сквозной тест (DoD шага 9.1); хаос-тест отказа узла (S11).
+Install each topology using its documentation, run an end-to-end test and execute node-failure chaos scenario S11.
 
-Команды, результаты и ограничения: [поставка топологий](../engineering/deployment-topologies.md), [KVM-стенд](../engineering/local-vm-lab.md), [доверие и учётные записи](../engineering/deployment-pki.md). Топология файлового хранилища - [ADR-077](0077-seaweedfs-deployment-topology.md).
+Commands, results and limitations: [topology delivery](../engineering/deployment-topologies.md), [KVM environment](../engineering/local-vm-lab.md), [trust and accounts](../engineering/deployment-pki.md). File-storage topology: [ADR-077](0077-seaweedfs-deployment-topology.md).

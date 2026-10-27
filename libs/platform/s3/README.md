@@ -1,18 +1,22 @@
-# Слой S3
+# S3 Layer
 
-Шаг 2.9 · [ADR-046](../../../docs/adr/0046-s3-object-storage.md) · `psim::platform::s3`
+<!-- language-links -->
+[English](README.md) | [Русский](../../../docs/ru/repository/libs/platform/s3/README.md)
+<!-- /language-links -->
 
-AWS SDK for C++ `1.11.692`, модуль S3, и SeaweedFS `4.48` для MVP. Адаптер предоставляет загрузку, скачивание, метаданные и удаление объектов до 20 МиБ. Доменные права, версии планов, проверка PNG/JPEG и очистка неподвязанных объектов относятся к Resource Catalog на шаге 4.4.
+[ADR-046](../../../docs/adr/0046-s3-object-storage.md) · `psim::platform::s3`
 
-## Использование и исполнение
+AWS SDK for C++ `1.11.692`, the S3 module, and SeaweedFS `4.48` for MVP. The adapter provides uploading, downloading, metadata, and deleting objects up to 20 MiB in size. Domain rights, plan versions, PNG/JPEG validation, and cleaning up unbound objects are handled by Resource Catalog.
 
-Создайте `Sdk` на управляющем потоке до запуска shard. Он должен жить дольше всех клиентов и незавершённых операций. После завершения клиентов уничтожьте его на управляющем потоке: SDK имеет процессное состояние и потоки, их остановка не относится к пути обработки события.
+## Usage and Execution
 
-`Client::create` получает `BlockingPool`, `Options` и необязательный `Metrics`. Создание клиента, чтение секретов, вызовы SDK, файловая система и вычисление SHA-256 выполняются в BlockingPool. Клиент привязан к одному Asio executor; отдельные операции могут идти параллельно в пределах `concurrency`. `close()` прекращает приём новых операций и будит ожидающих, активные вызовы завершаются до освобождения файлов и потоков.
+Create `Sdk` in the main thread before starting the shard. It should survive all clients and unfinished operations. After clients terminate, destroy it in the main thread: the SDK has process state and threads, and stopping them does not affect the event processing path.
 
-Настройте явные endpoint, region, bucket и файлы access/secret key. Они читаются через `security::read_secret`, с проверкой владельца, регулярного файла и прав `0400`. Не используются credential chain, параметры proxy из окружения и перенаправления. TLS проверяет CA и DNS-имя через libcurl/OpenSSL и общий `TlsOptions`; доступны клиентский сертификат и CRL. `allow_plaintext` - явное исключение изолированной разработки.
+`Client::create` receives `BlockingPool`, `Options`, and the optional `Metrics`. Creating a client, reading secrets, calling the SDK, handling file systems, and calculating SHA-256 are performed in BlockingPool. The client is tied to one Asio executor; individual operations can run parallel within `concurrency`. `close()` stops accepting new operations and wakes up pending calls. Active calls are completed before freeing files and threads.
 
-Вызовы:
+Configure explicit endpoints, region, bucket, and access/secret keys. They are read through `security::read_secret`, with owner verification, regular file checks, and `0400` rules. Credential chains, environment proxy parameters, and redirections are not used. TLS verifies CA and DNS name through libcurl/OpenSSL and the general `TlsOptions`; client certificates and CRLs are available. `allow_plaintext` is an exception for isolated development.
+
+Calls:
 
 ```cpp
 auto client = co_await psim::platform::s3::Client::create(&blocking, options, &metrics);
@@ -22,29 +26,29 @@ auto downloaded = co_await (*client)->get(*uploaded, destination_path);
 auto removed = co_await (*client)->remove("tenant/object-id");
 ```
 
-В реальном коде проверяйте каждый `Result` до разыменования. Ошибки содержат коды каталога и безопасные сообщения; ключи, endpoint, пути и секреты не попадают в сообщения или метки метрик.
+In real code, verify each `Result` before dereferencing. Errors contain catalog error codes and secure messages; keys, endpoints, paths, and secrets do not appear in messages or metric labels.
 
-## Потоки, целостность и публикация
+## Streaming, Integrity, and Publication
 
-Загрузка открывает регулярный файл без следования символьной ссылке и создаёт снимок во временном файле. Во время копирования проверяются лимит размера, отмена и срок операции, вычисляется SHA-256. Отправляются именно байты снимка: изменения исходного пути не меняют повтор. Память ограничена блоками по 64 КиБ и буферами SDK/HTTP, временный диск - размером объекта на операцию. Лимит `max_object_bytes` можно уменьшать, верхний предел - 20 МиБ.
+Uploading opens a regular file without following a symbolic link and creates a snapshot in the temporary file. During copying, size limits, cancellation, and operation duration are checked, and SHA-256 is calculated. Only bytes of the snapshot are sent; changes to the original path do not change the repetition. Memory is limited to 64 KiB blocks and SDK/HTTP buffers; the temporary disk size is the object size for each operation. The limit `max_object_bytes` can be reduced, with a maximum of 20 MiB.
 
-PUT передаёт checksum SHA-256 и метаданные `sha256`. ETag хранится только как непрозрачный токен условия. Он не считается SHA-256 и не используется как версия плана.
+PUT sends checksum SHA-256 and metadata `sha256`. ETag is stored only as an opaque token condition. It is not considered SHA-256 and not used as a plan version.
 
-GET требует независимо ожидаемые размер и SHA-256 из результата загрузки или каталога. Сначала сверяются метаданные HEAD, затем GET использует `If-Match`, чтобы не прочитать другой объект после HEAD. Байты пишутся во временный файл рядом с назначением; хэш и длина проверяются до атомарного создания целевого имени. Назначение должно отсутствовать. Ошибка, отмена, превышение лимита и несовпадение SHA-256 не оставляют успешный или частичный целевой файл; временный файл удаляется.
+GET requires independently expected size and SHA-256 from the upload result or catalog metadata. First, metadata HEAD is checked; then GET uses `If-Match` to avoid reading another object after HEAD. Bytes are written to the temporary file with the destination; hash and length are checked before atomic creation of the target name. The destination must be absent. Errors, cancellations, exceeding limits, and mismatches in SHA-256 do not leave a successful or partial target file; the temporary file is deleted.
 
-Атомарное создание имени не является резервным копированием. Долговременное хранение, восстановление и согласование ссылок с каталогом проверяются на шаге 9.3.
+Atomic creation of a name is not a backup copy. Long-term storage, restoration, and matching with the catalog are checked through [backup and recovery procedures](../../../docs/engineering/administration-and-recovery.md).
 
-## Повторы и неизвестный результат
+## Retries and Unknown Outcomes
 
-Ключи объектов неизменяемые. PUT использует `If-None-Match: *`. При потере ответа клиент делает HEAD: совпавшие размер и SHA-256 восстанавливают результат, другой объект даёт конфликт. Только подтверждённое отсутствие разрешает ещё один условный PUT. Истечение срока может оставить неизвестный результат, который нельзя объявить неуспешной записью; вызывающий код может повторить вызов с теми же ключом и байтами и получить сверку.
+Object keys are immutable. PUT uses `If-None-Match: *`. If no response is received, the client performs HEAD: matching size and SHA-256 restores the result; another object causes a conflict. Only confirmed absence allows another conditional PUT. Expiration may leave an unknown result, which cannot be declared as a failed write; the calling code can repeat the call with the same key and bytes and get a check.
 
-Режим `WriteMode::kWriteOnly` выполняет только условный PUT и не делает HEAD для сверки неизвестного результата. Он предназначен для отдельной учётной записи записи резервных копий; неизвестный исход возвращается ошибкой. `list` выполняет ListObjectsV2 с продолжением и размером страницы до 1000 ключей; право ListBucket требуется только читающему административному клиенту.
+The `WriteMode::kWriteOnly` mode only performs conditional PUT and does not perform HEAD for checking unknown results. It is designed for separate account of backup copies; an unknown result is returned as an error. `list` performs ListObjectsV2 with continuation and page size up to 1000 keys; the right ListBucket is only required by reading administrative clients.
 
-У HEAD/GET не больше `read_attempts`, внутренние повторы SDK отключены. DELETE отправляется один раз; при транспортной ошибке удаление также может иметь неизвестный результат. Нельзя автоматически заменять объект под тем же ключом, особенно при повторе после сетевого сбоя.
+For HEAD/GET, there are no more than `read_attempts` internal repeats; SDK internal repeats are disabled. DELETE is sent once; in case of transport error, deletion may also have an unknown result. An object cannot be automatically replaced with the same key, especially after a network failure.
 
-`timeout` задаёт срок операции, `acquire_timeout` - ожидание допуска, `connect_timeout` - соединение. Отмена Asio выставляет атомарный флаг `ContinueRequestHandler`; синхронный вызов SDK дренируется до возврата. Это кооперативная отмена с гранулярностью callback libcurl, а не мгновенное прерывание системного вызова. Файловые операции в BlockingPool также не прерываются посреди системного вызова.
+`timeout` sets the operation duration, `acquire_timeout` waits for permission, `connect_timeout` connects. Asio cancellation sets the atomic flag `ContinueRequestHandler`; synchronous SDK calls are drained until return. This is cooperative cancellation with the granularity of libcurl callbacks, not immediate interruption of system calls. File operations in BlockingPool are also not interrupted during system calls.
 
-## Окружение и поставка
+## Environment and Deployment
 
 ```bash
 task env:up
@@ -53,8 +57,8 @@ task test:s3:sanitizers
 task test:component
 ```
 
-Локальное окружение содержит `s3` с закрытым bucket `psim-plans`, постоянным томом данных и TLS. Установочная identity отделена от `filestore` (Read/Write только этого bucket) и `reader` (Read только этого bucket). Анонимной identity нет. Fixture-ключи и сертификаты создаются `tools/env/s3_test_tls.sh`; они не используются в поставке. Master, filer и служебные порты не публикуются наружу. Fault endpoint через Toxiproxy нужен только для компонентных сценариев.
+The local environment contains `s3` with a private bucket `psim-plans`, a permanent data volume, and TLS. The installation identity is separated from `filestore` (Read/Write only this bucket) and `reader` (Read only this bucket). There is no anonymous identity. Fixture keys and certificates are created by `tools/env/s3_test_tls.sh`; they are not used in production. Master, filer, and service ports are not published externally. Fault endpoint through Toxiproxy is only needed for component scenarios.
 
-Для Debian 13 x86_64 имеется единый бинарный файл `weed` из закреплённого выпуска. На одной машине используется `weed server`; кластер требует нескольких master, volume с репликами, общего отказоустойчивого filer metadata store и нескольких S3 gateways. Размещение, минимальные права, автоматизация TLS и HA-проверки относятся к 9.1; регламент резервирования - к 9.3. Текущий компонентный стенд проверяет клиент против одного настоящего SeaweedFS, а не отказоустойчивость кластера.
+For Debian 13 x86_64, there is a single binary file `weed` from the pinned release. On one machine, `weed server` is used; a cluster requires multiple masters, volumes with replicas, a common fault-tolerant filer metadata store, and several S3 gateways. Placement, least privilege, TLS, and HA checks are described in [deployment topologies](../../../docs/engineering/deployment-topologies.md); backup procedures are in [administration and recovery](../../../docs/engineering/administration-and-recovery.md). The current component environment checks the client against one actual SeaweedFS, not the cluster’s fault tolerance.
 
-Метрики `psim_s3_operation_seconds`, `psim_s3_transferred_bytes_total`, `psim_s3_errors_total`, `psim_s3_retries_total` не содержат меток ключа, tenant, URL или credentials. Порог покрытия инфраструктурного адаптера - 75% по совокупности модульных и компонентных проверок.
+Metrics `psim_s3_operation_seconds`, `psim_s3_transferred_bytes_total`, `psim_s3_errors_total`, `psim_s3_retries_total` do not contain tags for keys, tenants, URLs, or credentials. The coverage threshold for the infrastructure adapter is 75% across module and component checks.

@@ -1,64 +1,67 @@
-# ADR-037. Веб-монорепозиторий: инструменты, генерация клиентов, барьеры
+# ADR-037. Web monorepo: tools, client generation and quality gates
 
-- **Статус:** Принято
-- **Шаг плана:** 1.5
-- **Связанные:** ADR-001, ADR-019, ADR-026, ADR-030, ADR-031, ADR-034, [стандарт TypeScript](../engineering/typescript-coding-standard.md), требование SR-23
+<!-- language-links -->
+[English](0037-web-monorepo.md) | [Русский](../ru/adr/0037-web-monorepo.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Related:** ADR-001, ADR-019, ADR-026, ADR-030, ADR-031, ADR-034, [TypeScript standard](../engineering/typescript-coding-standard.md), requirement SR-23
 
-Шаг 1.5: монорепозиторий pnpm + Turborepo, приложение и библиотеки (дизайн-система, API-клиент из OpenAPI, realtime-клиент), линтеры, Vitest, Playwright, бюджеты размера бандла. DoD: API-клиент генерируется из контракта автоматически; нарушение бюджетов блокирует слияние. Стек веб-клиента зафиксирован планом (раздел 0.1): React 19, TypeScript, Vite, TanStack Query и Router, Zustand, Tailwind CSS 4, shadcn/ui, Vitest, Playwright. Стандарт TypeScript (шаг 1.2) требует строгий компилятор, линтер с проверкой необработанных обещаний и без предупреждений, форматтер, покрытие логики не ниже 80%, сгенерированный клиент без ручных правок. Все инструменты запускаются задачами Task в контейнерах с закреплёнными версиями (ADR-030, SR-23), конвейер локальный (ADR-034).
+## Context
 
-## Рассмотренные варианты
+The pnpm/Turborepo monorepo contains the application, design system, generated OpenAPI client, realtime client, linters, Vitest, Playwright and bundle-size budgets. The API client must regenerate automatically from contracts; budget violations block merging. The web stack uses React 19, TypeScript, Vite, TanStack Query and Router, Zustand, Tailwind CSS 4, shadcn/ui, Vitest and Playwright. The TypeScript standard requires strict compilation, unhandled-promise linting with zero warnings, formatting, at least 80% logic coverage and no manual generated-client edits. Task runs pinned tool containers (ADR-030, SR-23) in the local pipeline (ADR-034).
 
-### Линтер и форматтер
+## Options considered
 
-| Вариант | Плюсы | Минусы |
+### Linter and formatter
+
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| Biome | Один быстрый инструмент | Правила с информацией о типах (необработанные обещания, исчерпывающий `switch`) неполны - стандарт их требует |
-| **ESLint (typescript-eslint `strictTypeChecked`, react-hooks, jsx-a11y) + Prettier** | Правила с типами, стандарт де-факто | Два инструмента, медленнее |
+| Biome | One fast tool | Incomplete type-aware unhandled-promise and exhaustive-`switch` rules required by the standard |
+| **ESLint with typescript-eslint `strictTypeChecked`, react-hooks and jsx-a11y, plus Prettier** | Type-aware rules; de facto standard | Two tools; slower |
 
-### API-клиент из OpenAPI
+### OpenAPI client
 
-| Вариант | Плюсы | Минусы |
+| Option | Advantages | Disadvantages |
 |---|---|---|
-| orval, openapi-generator | Генерируют хуки и классы | Объёмный код, свой рантайм; генератор Java (openapi-generator) |
-| **openapi-typescript (типы) + openapi-fetch (6 КБ)** | Типы путей, параметров и ответов прямо из контракта; рантайм - тонкая обёртка над `fetch` | Хуки TanStack Query пишутся поверх (шаг 8.x) |
+| orval, openapi-generator | Generate hooks and classes | Large generated code and custom runtime; openapi-generator requires Java |
+| **openapi-typescript types plus openapi-fetch, 6 KB** | Contract-derived path, parameter and response types; thin `fetch` wrapper | TanStack Query hooks are implemented above it |
 
-Генерация выполняется при каждой сборке (`turbo run gen` перед линтером, типами, тестами и сборкой) в `src/gen`, который не хранится в git: клиент не может отстать от контракта, а изменение контракта, ломающее консоль, ломает проверку типов.
+Every build runs `turbo run gen` before linting, type checks, tests and builds. Output goes to untracked `src/gen`: clients cannot lag behind contracts, and incompatible contract changes fail console type checking.
 
-### Типы realtime-протокола
+### Realtime types
 
-Протокол описан в proto (ADR-019). Используется **protobuf-es** (`protoc-gen-es` через `buf generate` из модуля контрактов с импортами): типы кадров и канонический JSON proto3 из того же источника, что и у сервера.
+Proto defines the protocol (ADR-019). **protobuf-es**, through `protoc-gen-es` and `buf generate` from the contracts module with imports, generates frame types and canonical proto3 JSON from the same source as the server.
 
 ### TypeScript 7
 
-TypeScript 7 (нативный компилятор) вышел, но typescript-eslint поддерживает TypeScript ниже 6.1. Выбран **TypeScript 6.0**; переход на 7.x - после поддержки в typescript-eslint.
+Use **TypeScript 6.0** because the pinned typescript-eslint version supports TypeScript below 6.1. Adopting the native 7.x compiler requires typescript-eslint support and pipeline revalidation.
 
-### Узел и менеджер пакетов
+### Node and package manager
 
-Node 24 LTS в контейнере (`node:24.21.0-trixie`, по дайджесту: полный образ нужен ради корневых сертификатов для зависимостей buf); pnpm 12 из поля `packageManager` через corepack. Скрипты установки пакетов pnpm запрещены, кроме явно разрешённых (`@bufbuild/buf`) - защита цепочки поставки. E2E - образ Playwright той же версии, что `@playwright/test`.
+The container uses Node 24 LTS, digest-pinned `node:24.21.0-trixie`; the full image supplies root certificates required by buf dependencies. Corepack selects pnpm 12 from `packageManager`. pnpm installation scripts are prohibited except explicitly approved `@bufbuild/buf`, protecting the supply chain. E2E uses a Playwright image matching `@playwright/test`.
 
-## Решение
+## Decision
 
-1. **Структура `web/`** (ADR-001): `apps/console` - приложение (Vite, React 19, TanStack Router и Query, Zustand, Tailwind 4); `packages/design-system` - токены Tailwind 4 (тёмная тема по умолчанию), `cn`, компоненты в стиле shadcn/ui; `packages/api-client` - REST v1; `packages/realtime-client` - протокол realtime. Внутренние пакеты подключаются исходниками TypeScript (`workspace:*`), без отдельной сборки.
-2. **Realtime-клиент** реализует ADR-019: аутентификация, подписки с токеном возобновления, обновление токена по каждой дельте и `Subscribed`, переподключение с экспоненциальной задержкой и джиттером и возобновление по последнему токену, `ResyncRequired` -> новый снимок, keepalive, повторная аутентификация, `VersionGate` для применения дельты только с версией новее известной. Сокет и таймеры подставляются - логика проверяется без сети.
-3. **Барьеры** (`task web:check`, Turborepo): Prettier; `turbo run gen lint typecheck test build size`; ESLint `--max-warnings 0`; `tsc` со строгими опциями стандарта; Vitest с порогом 80% строк, ветвей, функций и выражений на пакет; бюджеты size-limit: весь JavaScript консоли ≤ 150 КБ gzip, CSS ≤ 15 КБ; `task web:e2e` - Playwright (Chromium) по собранной консоли.
-4. **Конвейер:** `web:check` входит в `task check`; этап `web` в `task ci` (`web:check`, `web:e2e`) включается при изменении `web/`, OpenAPI или proto, в `ci:nightly` - всегда; `pnpm-lock.yaml` сканируется Trivy в `security:deps` (SEC-02).
-5. **Команды:** `task web:check`, `web:e2e`, `web:test`, `web:gen`, `web:dev` (сервер разработки на `127.0.0.1:5173`), `web:lock`, `web:format:fix`.
+1. **`web/` layout** (ADR-001): `apps/console` uses Vite, React 19, TanStack Router and Query, Zustand and Tailwind 4; `packages/design-system` provides Tailwind 4 tokens, dark theme by default, `cn` and shadcn/ui-style components; `packages/api-client` implements REST v1; `packages/realtime-client` implements realtime. Internal packages use TypeScript sources through `workspace:*`, without separate builds.
+2. **Realtime client:** ADR-019 authentication, resumable subscriptions, token updates after every delta and `Subscribed`, exponential-backoff reconnection with jitter and the latest token, `ResyncRequired` -> a fresh snapshot, keepalive, reauthentication and `VersionGate` for newer-only deltas. Injectable sockets and timers allow network-free logic tests.
+3. **Gates:** `task web:check` runs Prettier and Turborepo `turbo run gen lint typecheck test build size`; ESLint uses `--max-warnings 0`; `tsc` follows strict standard settings; Vitest enforces 80% lines, branches, functions and statements per package. size-limit budgets are ≤ 150 KB gzip for console JavaScript and ≤ 15 KB CSS. `task web:e2e` runs Playwright Chromium against the built console.
+4. **Pipeline:** `web:check` is included in `task check`. The `web` stage of `task ci` runs `web:check` and `web:e2e` after changes to `web/`, OpenAPI or proto, and always in `ci:nightly`. Trivy scans `pnpm-lock.yaml` through `security:deps` (SEC-02).
+5. **Commands:** `task web:check`, `web:e2e`, `web:test`, `web:gen`, `web:dev` at `127.0.0.1:5173`, `web:lock` and `web:format:fix`.
 
-## Последствия
+## Consequences
 
-- Изменение контракта сразу проверяется против консоли: несовместимое изменение REST или realtime ломает `typecheck`.
-- Пустая оболочка консоли - около 111 КБ JS gzip (React, Router, Query); дальнейший рост - через разделение кода по маршрутам (Ф8), бюджет пересматривается осознанно.
-- Лицензии npm-зависимостей и SBOM веб-артефактов - вместе с поставкой веб-приложения (шаги 9.1, 9.2).
-- Проверка доступности axe-core в E2E - шаг 8.6 (ADR-031).
+- Contract changes are immediately checked against the console; incompatible REST or realtime changes fail `typecheck`.
+- The empty console shell is about 111 KB JS gzip for React, Router and Query. Further growth uses route-based code splitting and deliberate budget revisions.
+- npm dependency licenses and web-artifact SBOMs accompany web delivery.
+- E2E includes axe-core accessibility checks (ADR-031, ADR-076).
 
-## Проверка
+## Verification
 
-`task web:check`, `task web:e2e`. Отрицательные проверки шага 1.5: бюджет JS 50 КБ даёт отказ size-limit; порог покрытия ветвей 80% не пропустил realtime-клиент с 77,96% до добавления тестов; ESLint отклоняет нарушения стандарта.
+Run `task web:check` and `task web:e2e`. Negative checks: a 50 KB JS budget fails size-limit; an 80% branch threshold rejected the realtime client's 77.96% before additional tests; ESLint rejects coding-standard violations.
 
-## Уточнение для дизайн-системы
+## Design-system refinement
 
-[ADR-062](0062-design-system-and-stable-updates.md) предлагает общий бюджет 180 КБ JS gzip для консоли вместе с отдельной витриной. Начальная загрузка рабочей консоли отдельно ограничена прежними 150 КБ JS gzip по транзитивным imports манифеста Vite. CSS остаётся в пределах 15 КБ gzip. Витрина и диалоги не должны увеличивать начальную загрузку без использования.
+[ADR-062](0062-design-system-and-stable-updates.md) proposes a combined 180 KB JS gzip budget for the console and separate component showcase. The operational console's initial transitive Vite-manifest imports retain the 150 KB JS gzip limit; CSS remains within 15 KB gzip. Unused showcase and dialog code must not increase initial loading.
 
-Расширенный объём и измерения уточняются в [ADR-065](0065-ui-loading-budgets.md): суммарно 260 КБ JS gzip при прежних 150 КБ начального JS и 15 КБ CSS.
+[ADR-065](0065-ui-loading-budgets.md) refines the expanded scope and measurements: 260 KB total JS gzip, with unchanged 150 KB initial JS and 15 KB CSS limits.

@@ -1,62 +1,66 @@
-# Серверная поддержка оперативного интерфейса
+# Operational Interface Backend
 
-Решение: [ADR-068](../adr/0068-operational-interface-backend.md). Контракты: [оперативные операции](../../contracts/proto/psim/api/v1/operations.proto), [проекции](../../contracts/proto/psim/api/v1/feed.proto), [команды](../../contracts/proto/psim/api/v1/commands.proto).
+<!-- language-links -->
+[English](operational-interface.md) | [Русский](../ru/engineering/operational-interface.md)
+<!-- /language-links -->
 
-## Тревоги и присутствие
+Solution: [ADR-068](../adr/0068-operational-interface-backend.md). Contracts: [real-time operations](../../contracts/proto/psim/api/v1/operations.proto), [projections](../../contracts/proto/psim/api/v1/feed.proto), [commands](../../contracts/proto/psim/api/v1/commands.proto).
 
-`GET /v1/incidents/{id}/operations` возвращает текущий инцидент, источник с версией, время оценки и риск SLA. Состояние тревоги находится в `incident.operational`: независимые `active` и `acknowledged`, автор подтверждения, время изменения условия, отдельные `shelved` и `suppressed` с причиной, автором и окончанием.
+## Alarms and Presence
 
-`POST /v1/incidents/{id}:update-alarm` принимает `action`: `activate`, `return`, `acknowledge`, `shelve`, `unshelve`, `suppress`, `unsuppress`. Для изменения условия и подавления нужен supervisor; оператор может подтвердить или отложить тревогу. Временный контроль требует `reason` и `until`, снятие - причину. Аудит сохраняет конкретное действие, причину, версию, независимые признаки тревоги и сроки контроля. Срок ограничен сутками. Подтверждение тревоги не переводит инцидент в другой этап жизненного цикла.
+`GET /v1/incidents/{id}/operations` returns the current incident, its source version, evaluation time, and SLA risk. The alarm status is indicated by `incident.operational`: independent `active` and `acknowledged`, author of confirmation, time of condition change, individual `shelved` and `suppressed` with cause, author, and end time.
 
-`POST /v1/incidents/{id}:set-presence` принимает UUID `sessionId`, `editing` и `ttlSeconds` от 1 до 60. Первый запрос не содержит `leaseId`; ответ возвращает новый lease в `incident.operational.presence`. Продление и снятие используют этот идентификатор; для снятия передаётся `release: true`. Истёкший lease нельзя восстановить повтором прежнего запроса. Все операции требуют UUID `Idempotency-Key` и актуальный `If-Match` инцидента. Новая версия распространяется существующим realtime. Клиент согласует `incident_event` и `incident_operational_updated`; прежние клиенты не получают новый вариант события. Наличие lease не предоставляет бизнес-права. `conditionKnown: false` означает отсутствие наблюдения условия для ранее созданного инцидента.
+`POST /v1/incidents/{id}:update-alarm` accepts `action`: `activate`, `return`, `acknowledge`, `shelve`, `unshelve`, `suppress`, `unsuppress`. For condition change and suppression, a supervisor is required; the operator can acknowledge or shelve the alarm. Temporary control requires `reason` and `until`; cancellation requires the cause. Audit retains specific actions, cause, version, independent alerts, and control periods. The period is limited to one day. Acknowledging an alarm does not transition the incident to another lifecycle stage.
 
-Назначение и подтверждённая передача используют существующие операции инцидентов. SLA не пересоздаётся при передаче. Присутствие не инвалидирует неизменившийся брифинг, но требует актуального `If-Match`. Изменение рабочих данных требует повторного формирования передачи; продление lease не восстанавливает прежний брифинг. Риск `unknown` означает отсутствие исходных целей; `on-time`, `at-risk`, `breached`, `completed` вычисляются сервером. `at-risk` соответствует оставшимся 20% первоначального срока, но не менее одной секунды предупреждения.
+`POST /v1/incidents/{id}:set-presence` accepts UUID `sessionId`, flag `editing`, and `ttlSeconds` from 1 to 60. The first request does not contain `leaseId`; the response returns a new lease in `incident.operational.presence`. Extension and cancellation use this identifier; for cancellation, `release: true` is sent. An expired lease cannot be restored by repeating the previous request. All operations require UUID `Idempotency-Key` and current `If-Match` of the incident. A new version is applied to existing realtime. The client agrees on `incident_event` and `incident_operational_updated`; previous clients do not receive the new version of the event. Having a lease does not grant business rights. `conditionKnown: false` indicates no observation of the condition for previously created incidents.
 
-## История и восстановление
+Assignment and confirmed transfer use existing incident operations. SLA is not recreated during transfer. Presence does not disable unchanged briefings, but requires current `If-Match`. Changing working data requires a new handover offer; extending a lease does not restore the previous briefing. Risk `unknown` indicates absence of original targets; `on-time`, `at-risk`, `breached`, `completed` are calculated by the server. `at-risk` corresponds to the remaining 20% of the original period, but not less than one second of warning.
 
-`GET /v1/incidents/{id}/snapshots` возвращает до 200 версий. `afterVersion` и `nextVersion` задают пагинацию. Параметр `at` выбирает последний образ на указанное серверное время. Ответ содержит `historical: true` и время фиксации каждого образа. Историческая версия доступна только пользователю, имеющему права на текущий инцидент и историческую область.
+## History and Restoration
 
-`GET /v1/incidents/{id}/recovery?knownVersion=...` возвращает текущий инцидент, количество изменённых версий и ограниченную сводку хронологии. `snapshotRequired` требует заменить локальное состояние полным образом, если исходная версия неизвестна или диапазон превышает лимит сводки.
+`GET /v1/incidents/{id}/snapshots` returns up to 200 versions. `afterVersion` and `nextVersion` set pagination. Parameter `at` selects the last image at the specified server time. The response contains `historical: true` and time of each image capture. Historical version is available only to users with rights to the current incident and historical scope.
 
-`GET /v1/feed/snapshot?at=...&locationId=...` возвращает согласованный исторический образ ленты, состояния объекта и версии каталога для размещения устройств на плане. `siteIds` ограничивает выборку. Исторический ответ не содержит токенов подписки и не проверяет текущие сессии коннекторов; он не доказывает доступность устройства сейчас. `availableFrom` задаёт начало доступной истории. Запрос до начала истории отклоняется. История сохраняется при переключении поколения проекции.
+`GET /v1/incidents/{id}/recovery?knownVersion=...` returns the current incident, number of changed versions, and limited summary of chronology. `snapshotRequired` requires replacing local state completely if the original version is unknown or the range exceeds the summary limit.
 
-## Предпросмотр команды
+`GET /v1/feed/snapshot?at=...&locationId=...` returns the consistent historical snapshot of the feed, object status, and catalog versions for device placement on the floor plan. `siteIds` limits selection. Historical response does not contain subscription tokens and does not check current connections; it does not prove the device’s availability now. `availableFrom` sets the start of available history. Requests before the start of history are rejected. History is retained when the projection generation is switched.
 
-`POST /v1/commands:preview` принимает объект `command` с полями обычного запроса команды. Возвращаются описание последствия, признак неизвестного последствия, необходимость второго старшего смены, версии устройства и типа, отпечаток конфигурации. Права, параметры, состояние устройства и инцидента проверяются без записи команды и отправки в Kafka.
+## Preview of Command
 
-Поле `Capability.consequence` заполняет администратор. Пустое описание отображается как неизвестное последствие. Предпросмотр не резервирует устройство. Клиент передаёт полученный `fingerprint` как `previewFingerprint` при запросе и подтверждении: изменение версии каталога отклоняет операцию. Поле необязательно для совместимости существующих клиентов. При фактическом запросе и подтверждении повторно проверяются права, версия команды и доступность capability. Подтверждающий должен отличаться от инициатора и иметь роль supervisor в требуемой области.
+`POST /v1/commands:preview` accepts object `command` with fields of regular command request. It returns consequence description, unknown consequence indicator, need for second shift supervisor, device version and type, configuration fingerprint. Rights, parameters, device status, and incident are checked without recording the command and sending to Kafka.
 
-## Учения
+Field `Capability.consequence` is filled by the administrator. An empty description is displayed as an unknown consequence. Preview does not reserve the device. The client sends received `fingerprint` as `previewFingerprint` when requesting and confirming: changing catalog version rejects the operation. Field is not required for compatibility with existing clients. During actual request and confirmation, rights, command version, and capability availability are rechecked. The confirming party must differ from the initiator and have role supervisor in the required scope.
 
-`POST /v1/incidents/{id}:create-exercise` с `title` создаёт частную учебную сессию на час. `GET /v1/incidents/{id}/exercises/{exerciseId}` возвращает её владельцу. `POST .../{exerciseId}:act` принимает `action` и обязательную `reason`; `If-Match` относится к версии учебной сессии. Порядок: `acknowledge` -> `start-work` -> `command` -> `resolve`. Каждый шаг добавляет 25 баллов.
+## Exercises
 
-Учебный инцидент имеет отдельный синтетический идентификатор, неизвестный рабочим API инцидентов и команд. Изменения сохраняются в `incident.exercises`, имеют собственный аудит и не изменяют рабочие инциденты, сроки SLA и устройства. У пользователя может быть до десяти активных сессий. Истёкшие сессии удаляются ограниченными пакетами.
+`POST /v1/incidents/{id}:create-exercise` with `title` creates a private training session for one hour. `GET /v1/incidents/{id}/exercises/{exerciseId}` returns it to the owner. `POST .../{exerciseId}:act` accepts `action` and mandatory `reason`; `If-Match` refers to version of the training session. Order: `acknowledge` -> `start-work` -> `command` -> `resolve`. Each step adds 25 points.
 
-## Локальный ассистент
+The training incident has a separate synthetic identifier, unknown to production incident and command APIs. Changes are stored in `incident.exercises`, have their own audit, and do not change production incidents, SLA periods, and devices. A user can have up to ten active sessions. Expired sessions are removed in bounded batches.
 
-Настройки Incident Service: `settings.assistant_endpoint` - полный адрес локального `POST /api/chat`, `settings.assistant_model` - закреплённый идентификатор установленной модели. TLS использует `settings.jwks_ca_file`; обычный HTTP разрешается только явным `settings.allow_plaintext` в изолированном окружении разработки. Пустые настройки отключают модель с сохранением доступа к исходным данным. Модель устанавливается администратором провайдера заранее; запросы оператора не загружают модели и не выбирают адрес.
+## Local Assistant
 
-`POST /v1/incidents/{id}:ask-assistant` принимает только `question` и требует `If-Match` версии источника. Каждый запрос получает текущие разрешённые факты заново. Поля `sources` содержат идентификатор, версию и время получения; `claims` содержит текст, ссылку на серверный источник и признак предположения. Клиент отображает текст как текст, с обязательной маркировкой происхождения. Ответ не содержит исполняемого действия.
+Settings of Incident Service: `settings.assistant_endpoint` - full address of local `POST /api/chat`, `settings.assistant_model` - fixed identifier of installed model. TLS uses `settings.jwks_ca_file`; regular HTTP is allowed only with explicit `settings.allow_plaintext` in isolated development environment. Empty settings disable the model with access to original data preserved. The model is installed by the provider administrator in advance; operator requests do not load the model or select the address.
 
-Адаптер реализует [протокол Ollama Chat](https://docs.ollama.com/api/chat): `stream: false`, `format: json`, без tools. Не более двух запросов модели на экземпляр одновременно; превышение возвращает 429. Дедлайн - 5 секунд, ответ - до 32 КБ, не более 12 выводов по 2000 символов. Некорректный JSON, чужая ссылка на источник, дополнительные исполняемые поля и отказ транспорта дают `unavailable: true`; доступные источники сохраняются. Аудит фиксирует идентификатор запроса, пользователя, модель, версии источников и принятый ответ. Журнал диалога и межпользовательский кэш отсутствуют.
+`POST /v1/incidents/{id}:ask-assistant` accepts only `question` and requires `If-Match` version of the source. Each request gets current allowed facts again. Fields `sources` contain identifier, version, and time of receipt; `claims` contains text, link to server source, and assumption indicator. The client displays text with mandatory marking of origin. The response does not contain executable action.
 
-Интеграционная проверка использует локальный HTTP-провайдер, проверяющий протокол и границы доступа. Качество и скорость генерации выбранной рабочей модели проверяются отдельно на инфраструктуре её размещения.
+The adapter implements the [Ollama Chat protocol](https://docs.ollama.com/api/chat): `stream: false`, `format: json`, without tools. No more than two model requests can be sent to an instance simultaneously; exceeding this limit will result in a 429 error. The deadline is 5 seconds, with responses up to 32 KiB and no more than 12 claims of 2000 characters each. Incorrect JSON, external links to sources, additional executable fields, and transport failures will result in `unavailable: true`. Available sources are retained. Audit records include the request identifier, user, model, source version, and accepted response. There are no dialog logs or cross-user caches.
 
-## Проверки
+Integration testing uses a local HTTP provider to verify the protocol and access boundaries. The quality and speed of generating the selected working model are tested separately on the infrastructure where it is deployed.
 
-- `task operations:test` - два Incident Service, PostgreSQL, Kafka, Keycloak и локальный провайдер протокола.
-- `task operations:sanitizers` - тот же набор с ASan/UBSan и TSan.
-- `task operations:coverage` - совместное покрытие домена и сервисов с регрессией инцидентов, команд, проекций, realtime и отчётов.
-- `task commands:test` - предпросмотр, подтверждение другим пользователем и доставка через Connector Gateway.
-- `task projection:test` - историческая лента и план, фильтры, отсутствие подтверждения текущей связи и перестроение.
-- `task realtime:test` - доставка полных образов, восстановление и актуальные области доступа.
+## Tests
 
-Метрики `psim_incident_operations_total` и `psim_incident_operations_seconds` используют ограниченные метки операции и результата. Панель проекций показывает частоту и p99 запросов; алерты выделяют ошибки операций и недоступность ассистента.
+- `task operations:test` - two Incident Services, PostgreSQL, Kafka, Keycloak, and a local protocol provider.
+- `task operations:sanitizers` - the same set with ASan/UBSan and TSan.
+- `task operations:coverage` - combined coverage of domains and services with incident regression, commands, projections, realtime, and reports.
+- `task commands:test` - preview, confirmation by another user, and delivery through the Connector Gateway.
+- `task projection:test` - historical feed and plan, filters, absence of confirmation for current connections, and rebuilding.
+- `task realtime:test` - delivery of full snapshots, restoration, and current access scopes.
 
-## Ошибки и эксплуатация
+Metrics `psim_incident_operations_total` and `psim_incident_operations_seconds` use limited tags for operations and results. The projection panel shows request frequency and p99; alerts identify operation errors and agent unavailability.
 
-При 412 клиент перечитывает текущий образ и показывает изменения до повторного подтверждения. Для команды также повторяется предпросмотр; прежний отпечаток не заменяется автоматически. Истёкший lease создаётся заново с новым идентификатором и актуальной версией инцидента.
+## Errors and Operation
 
-429 ассистента означает занятые два слота экземпляра. Обычные операции и чтение источников остаются отдельными запросами. `unavailable: true` проверяется по метрике результата: при сетевом отказе проверяются настроенный адрес, TLS и наличие модели; при некорректном ответе - JSON и ссылки на серверные источники. Модельный текст не используется для выбора адреса или исполнения команды.
+When the client reaches 412, it rereads the current snapshot and shows the changes before requesting confirmation again. For commands, preview is also repeated; the previous snapshot is not automatically replaced. An expired lease is created again with a new identifier and current incident version.
 
-При отсутствии исторического образа нельзя подставлять текущее состояние под выбранное время. Проверяются `availableFrom`, выбранная площадка, полнота проекции и состояние PostgreSQL. Перестроение проекции не удаляет существующую историю снимков. Полный профиль нагрузки, сроки хранения и эксплуатационная топология проверяются в фазах развёртывания и верификации.
+429 indicates that two slots of the instance are occupied. Normal operations and source reading remain separate requests. `unavailable: true` is checked by the result metric: network failure checks the configured address, TLS, and model presence; incorrect response checks JSON and links to server sources. Model text is not used to select an address or execute commands.
+
+Without a historical snapshot, the current state cannot be used to replace the selected time. `availableFrom`, selected site, projection completeness, and PostgreSQL status are checked. Rebuilding the projection does not delete existing snapshot history. The full load profile, storage periods, and operational topology are checked during deployment and verification phases.

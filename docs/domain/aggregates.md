@@ -1,416 +1,418 @@
-# Агрегаты, инварианты и доменные события
+# Aggregates, Invariants, and Domain Events
 
-Версия 0.1 · Шаг плана 0.2 · Статус: черновик
+<!-- language-links -->
+[English](aggregates.md) | [Русский](../ru/domain/aggregates.md)
+<!-- /language-links -->
 
-Для каждого контекста описаны агрегаты, их инварианты, команды и доменные события. Агрегат - граница транзакционной согласованности: инварианты внутри агрегата соблюдаются всегда, между агрегатами согласованность достигается в конечном счёте через события.
+For each context, aggregates, their invariants, commands, and domain events are described. An aggregate is a boundary of transaction consistency: invariants within an aggregate are always respected, and consistency between aggregates is eventually achieved through events.
 
-Модели состояний вынесены в [state-models.md](state-models.md), типы событий датчиков - в [event-taxonomy.md](event-taxonomy.md).
+State models are presented in [state-models.md](state-models.md), and sensor event types are in [event-taxonomy.md](event-taxonomy.md).
 
 ---
 
-## 0. Общие соглашения
+## 0. General Conventions
 
-### 0.1 Идентификаторы
+### 0.1 Identifiers
 
-| Идентификатор | Построение | Кто создаёт | Зачем так |
+| Identifier | Construction | Who Creates | Why |
 |---|---|---|---|
-| `event_id` сырого и нормализованного события | UUIDv7 | Connector SDK при создании события; сохраняется в буфере на диске | Повторная отправка после сбоя несёт тот же `event_id`, и дедупликация возможна по всему конвейеру. Нормализованное событие наследует `event_id` сырого: отображение 1 -> 1 |
-| `signal_id` | Именной UUID от `(tenant_id, rule_id, rule_version, correlation_key, trigger_ref)`, где `trigger_ref` - `event_id` события, завершившего срабатывание, или граница окна для правил отсутствия и порогов | Correlation Engine | Повторная обработка тех же событий после падения даёт тот же `signal_id`; Incident Service отбрасывает повтор через inbox |
-| `incident_id` | UUIDv7 | Incident Service в транзакции создания | Уникальность обеспечивается inbox по `signal_id` и уникальностью открытого инцидента по ключу группировки |
-| `run_id` | Именной UUID от `(incident_id, plan_id, run_ordinal)` | Response Engine | Повторная обработка события «инцидент создан» не запускает сценарий дважды |
-| `command_id` | Ключ идемпотентности клиента (UUIDv7) либо именной UUID от `(run_id, step_id, attempt)` для команд сценария | Клиент или Response Engine | Повтор запроса не приводит к двойному исполнению |
-| `notification_id` | Именной UUID от `(trigger_id, recipient_id, channel)` | Notification Service | Повтор триггера не отправляет уведомление дважды |
-| `audit_seq` | Монотонный номер в цепочке тенанта | Audit Service | Непрерывность цепочки хэшей |
-| `source_id` | Именной UUID от `(connector_id, source_ref)` | Connector Gateway и Resource Catalog одинаково | Шлюз вычисляет ключ события без каталога, идентификатор не меняется при регистрации источника ([ADR-029](../adr/0029-deterministic-source-id.md)) |
-| Прочие (локации, устройства, правила, сценарии, пользователи) | UUIDv7 | Сервис-владелец | - |
+| `event_id` raw and normalized event | UUIDv7 | Connector SDK creates the event; stored in disk buffer | Re-sending after failure carries the same `event_id`, and deduplication is possible across the pipeline. The normalized event inherits `event_id` of the raw event: one-to-one mapping |
+| `signal_id` | Named UUID from `(tenant_id, rule_id, rule_version, correlation_key, trigger_ref)`, where `trigger_ref` is `event_id` event that has completed, or boundary of absence rules window | Correlation Engine | Re-processing the same events after a failure still results in `signal_id`; Incident Service discards duplicates through the inbox |
+| `incident_id` | UUIDv7 | Incident Service during creation | Uniqueness is ensured by the inbox based on `signal_id` and uniqueness of the open incident by grouping key |
+| `run_id` | Named UUID from `(incident_id, plan_id, run_ordinal)` | Response Engine | Re-processing the event “incident created” does not trigger the scenario twice |
+| `command_id` | Client’s idempotence key (UUIDv7) or named UUID from `(run_id, step_id, attempt)` for script commands | Client or Response Engine | Repeating the same request does not lead to double execution |
+| `notification_id` | Named UUID from `(trigger_id, recipient_id, channel)` | Notification Service | Repeated triggering of the trigger does not send notifications twice |
+| `audit_seq` | Monotonically increasing sequence number in tenant chain | Audit Service | Continuity of hash chains |
+| `source_id` | Named UUID from `(connector_id, source_ref)` | Identically in Connector Gateway and Resource Catalog | The gateway calculates event key without a catalog, and the identifier does not change during source registration ([ADR-029](../adr/0029-deterministic-source-id.md)) |
+| Others (locations, devices, rules, scenarios, users) | UUIDv7 | Service owner | - |
 
-Алгоритм именных UUID и пространство имён фиксируются в ADR-005.
+The algorithm for named UUIDs and namespace is defined in ADR-005.
 
-### 0.2 Версии и конкурентность
+### 0.2 Versions and Compatibility
 
-- Каждый изменяемый агрегат имеет `version` (целое, +1 на каждое изменение). REST использует её как ETag; запись с устаревшей версией отклоняется (`412`, код `COMMON_CONCURRENT_MODIFICATION`).
-- Справочные версионированные сущности (правила, сценарии) неизменяемы после публикации: изменение создаёт новую версию.
+- Each mutable aggregate has `version` (integer, +1 for each change). REST uses it as ETag; writes with outdated versions are rejected (`412`, code `COMMON_CONCURRENT_MODIFICATION`).
+- Reference versioned entities (rules, scenarios) are immutable after publication: changes create a new version.
 
-### 0.3 Доменные события
+### 0.3 Domain Events
 
-- Имена в прошедшем времени: `IncidentCreated`, `CommandSent`.
-- Каждое событие несёт `tenant_id`, идентификатор и версию агрегата после изменения, `actor` (пользователь, сервис или коннектор), `occurred_at`, `causation_id` и `correlation_id` для трассировки причинности.
-- Публикуются в топик контекста через transactional outbox (для агрегатов в PostgreSQL) или в транзакции Kafka (для Correlation Engine).
-- Каждое событие, отражающее действие субъекта, порождает запись аудита.
+- Past-tense names: `IncidentCreated`, `CommandSent`.
+- Each event carries `tenant_id`, the identifier and version of the aggregate after change, `actor` (user, service or connector), `occurred_at`, `causation_id` and `correlation_id` for causal tracing.
+- Published in context topic through transactional outbox (for aggregates in PostgreSQL) or in Kafka transaction (for Correlation Engine).
+- Each event reflecting an action of a subject creates an audit record.
 
 ---
 
 ## 1. Catalog
 
-### 1.1 Агрегат `Location`
+### 1.1 Aggregate `Location`
 
-Площадка, здание, этаж или зона. Каждая локация - отдельный агрегат со ссылкой на родителя: это позволяет менять зоны независимо и не держать всю площадку в одной транзакции.
+Site, building, floor or zone. Each location is a separate aggregate with a reference to the parent: this allows changing zones independently and not keeping the entire site in one transaction.
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
 | `kind` | `site`, `building`, `floor`, `zone` |
-| `parent_id` | Пусто только у `site` |
-| `site_id` | Денормализованный идентификатор площадки для ключей и ABAC |
-| `name`, `code` | Код уникален среди соседей |
-| `floor_plan` | Только у `floor`: ссылка на изображение, ширина и высота в условных единицах |
-| `timezone` | Только у `site`; используется в отчётах и расписаниях |
+| `parent_id` | Only empty for `site` |
+| `site_id` | Denormalized identifier of the site for keys and ABAC |
+| `name`, `code` | Code is unique among neighbors |
+| `floor_plan` | Only for `floor`: reference to image, width and height in units |
+| `timezone` | Only for `site`; used in reports and schedules |
 
-**Инварианты:**
-- L1. Допустимые родители: `building` -> `site`; `floor` -> `building`; `zone` -> `floor`, `building` или `site`.
-- L2. `site_id` равен идентификатору корневой площадки цепочки родителей.
-- L3. Локацию нельзя удалить, пока у неё есть дочерние локации или привязанные устройства. Удаление логическое (`archived`).
-- L4. Перенос локации в другую площадку запрещён - это меняет ключи партиционирования истории.
+**Invariants:**
+- L1. Allowable parents: `building` -> `site`; `floor` -> `building`; `zone` -> `floor`, `building` or `site`.
+- L2. `site_id` equals the identifier of the parent site chain.
+- L3. A location cannot be deleted while it has child locations or attached devices. Deletion is logical (`archived`).
+- L4. Moving a location to another site is prohibited - this changes the keys of partition history.
 
-**События:** `LocationCreated`, `LocationUpdated`, `LocationArchived`, `FloorPlanUploaded`.
+**Events:** `LocationCreated`, `LocationUpdated`, `LocationArchived`, `FloorPlanUploaded`.
 
-### 1.2 Агрегат `DeviceType`
+### 1.2 Aggregate `DeviceType`
 
-Справочник: имя, категория таксономии, шаблоны источников, список возможностей с параметрами и признаком `critical`.
+Reference: name, taxonomy category, source templates, list of capabilities with parameters and `critical` attribute.
 
-**Инварианты:** DT1. Код возможности уникален в пределах типа. DT2. Тип нельзя удалить, пока есть устройства этого типа.
+**Invariants:** DT1. Capability code is unique within the type. DT2. The type cannot be deleted while there are devices of this type.
 
-**События:** `DeviceTypeDefined`, `DeviceTypeUpdated`.
+**Events:** `DeviceTypeDefined`, `DeviceTypeUpdated`.
 
-### 1.3 Агрегат `Device`
+### 1.3 Aggregate `Device`
 
-Устройство вместе со своими источниками: источники не существуют без устройства и меняются вместе с ним.
+Device with its sources: Sources do not exist without the device and change with it.
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
-| `device_type_id`, `zone_id`, `site_id`, `connector_id` | Привязки |
-| `external_id` | Идентификатор устройства во внешней системе |
-| `sources[]` | `source_id`, `external_ref`, вид источника |
-| `position` | Координаты на плане этажа (необязательно) |
+| `device_type_id`, `zone_id`, `site_id`, `connector_id` | Bindings |
+| `external_id` | Device identifier in external system |
+| `sources[]` | `source_id`, `external_ref`, source type |
+| `position` | Coordinates on floor plan (optional) |
 | `state` | `active`, `disabled`, `archived` |
 
-**Инварианты:**
-- D1. `external_id` уникален в пределах коннектора - основа идемпотентного импорта.
-- D2. `external_ref` источника уникален в пределах коннектора: коннектор адресует источник однозначно.
-- D3. `position` допустима, только если зона устройства находится на этаже с планом, и лежит в границах плана.
-- D4. Возможности устройства определяются его типом; команда с кодом вне списка возможностей недопустима.
-- D5. Отключённое устройство (`disabled`) не порождает событий в обработку: Normalizer направляет их в DLQ с причиной `PROCESSING_DEVICE_DISABLED`.
+**Invariants:**
+- D1. `external_id` is unique within the connector - basis of idempotent import.
+- D2. Source of `external_ref` is unique within the connector: connector uniquely addresses source.
+- D3. `position` is allowed only if the device zone is on the floor with plan, and lies within the plan boundaries.
+- D4. Device capabilities are determined by its type; command with code not in the list of capabilities is invalid.
+- D5. Administratively disabled device (`disabled`) does not generate events for processing: Normalizer directs them to DLQ with reason `PROCESSING_DEVICE_DISABLED`.
 
-**События:** `DeviceRegistered`, `DeviceUpdated`, `DeviceMoved` (смена зоны), `DeviceDisabled`, `DeviceEnabled`, `DeviceArchived`.
+**Events:** `DeviceRegistered`, `DeviceUpdated`, `DeviceMoved` (zone change), `DeviceDisabled`, `DeviceEnabled`, `DeviceArchived`.
 
-### 1.4 Агрегат `Connector`
+### 1.4 Aggregate `Connector`
 
-Регистрация коннектора: имя, тип, версия протокола, отпечаток сертификата mTLS, допустимые лимиты, состояние `registered`, `revoked`.
+Registration includes name, type, protocol version, mTLS certificate fingerprint, limits, and state `registered`, `revoked`. Connector Gateway owns the persistent registration; Resource Catalog exposes and proxies its management.
 
-**Инварианты:**
-- C1. Активен не более чем один отпечаток сертификата, кроме периода ротации (два отпечатка, у старого задан срок окончания).
-- C2. Отозванный коннектор не может открыть сессию; открытые сессии закрываются.
+**Invariants:**
+- C1. At most one certificate fingerprint is active, except during rotation period (two fingerprints, the old one expires).
+- C2. Revoked connection cannot open a session; opened sessions are closed.
 
-**События:** `ConnectorRegistered`, `ConnectorCredentialsRotated`, `ConnectorRevoked`, `ConnectorLimitsChanged`.
+**Events:** `ConnectorRegistered`, `ConnectorCredentialsRotated`, `ConnectorRevoked`, `ConnectorLimitsChanged`.
 
-### 1.5 Операция импорта
+### 1.5 Import Operation
 
-`ImportJob` - не агрегат предметной области, а процесс: файл, построчные результаты, итог. Каждая строка применяется как отдельная команда к `Device` с идемпотентностью по `(connector_id, external_id)`.
+`ImportJob` is a process rather than a domain aggregate: a file, per-row results, and a summary. Each row is applied as a separate command to `Device`, with idempotency by `(connector_id, external_id)`.
 
----
+### 1.6 The `MaintenanceWindow` Aggregate (ADR-042)
 
-### 1.6 Агрегат `MaintenanceWindow` (ADR-042)
+It represents a device or zone, its start and end times, reason, responsible party, suppression policy, and version. Commands: `ScheduleMaintenance`, `UpdateMaintenance`, `EndMaintenance`; Events: `MaintenanceScheduled`, `MaintenanceUpdated`, `MaintenanceEnded`. Invariants and temporal semantics are defined in [operational-capabilities.md](../architecture/operational-capabilities.md#4-maintenance-mode).
 
-Устройство или зона, время начала и обязательного окончания, причина, ответственный, политика подавления и версия. Команды: `ScheduleMaintenance`, `UpdateMaintenance`, `EndMaintenance`; события: `MaintenanceScheduled`, `MaintenanceUpdated`, `MaintenanceEnded`. Инварианты и временная семантика - в [operational-capabilities.md](../architecture/operational-capabilities.md#4-режим-обслуживания).
+### 1.7 Floor Plan File Metadata (ADR-042)
 
-### 1.7 Метаданные файловых планов (ADR-042)
-
-Resource Catalog хранит `file_id`, владельца ресурса, площадку, версию, размер, тип, SHA-256 и ключ объекта. Бинарное содержимое читается через порт `FileStore`; замена фиксируется с outbox в PostgreSQL. Версия плана и ссылочная целостность входят в резервную копию.
+The Resource Catalog stores `file_id`, resource owner, site, version, size, type, SHA-256, and object key. Binary content is read through port `FileStore`; replacements are recorded in PostgreSQL. Plan version and reference integrity are preserved in a backup copy.
 
 ## 2. Integration
 
-### 2.1 Агрегат `ConnectorSession`
+### 2.1 The `ConnectorSession` Aggregate
 
-Хранится в Redis, живёт только в течение подключения.
+Stored in Redis and only exists during the connection period.
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
 | `session_id`, `connector_id` | - |
-| `gateway_instance` | Экземпляр шлюза, держащий соединение; используется для маршрутизации команд |
-| `state` | См. [state-models.md](state-models.md#4-сессия-коннектора) |
-| `credits` | Доступные кредиты потока событий |
-| `last_heartbeat_at`, `last_acked_seq` по источникам | - |
+| `gateway_instance` | The gateway instance that maintains the connection; used for routing commands |
+| `state` | See [state-models.md](state-models.md#4-connector-session) |
+| `credits` | Available event flow credits |
+| `last_heartbeat_at`, `last_acked_seq` by sources | - |
 
-**Инварианты:**
-- CS1. У коннектора не более одной активной сессии. Новая сессия вытесняет старую (`SessionSuperseded`), чтобы переподключение после разрыва не ждало таймаута.
-- CS2. Коннектор получает подтверждение пакета только после подтверждения записи в Kafka (`acks=all`).
-- CS3. Шлюз принимает событие, только если его `source_id` принадлежит коннектору сессии (по локальной копии каталога).
-- CS4. Число неподтверждённых событий не превышает выданных кредитов.
+**Invariants:**
+- CS1. A connector can have at most one active session. A new session replaces the old one (`SessionSuperseded`) so that reconnection after a break doesn’t wait for a timeout.
+- CS2. The connector receives batch acknowledgement only after confirming the record in Kafka (`acks=all`).
+- CS3. The gateway derives and validates `source_id` against the authenticated connector and source reference. Catalog mapping is checked by Normalizer; unknown sources go to its DLQ.
+- CS4. The number of unconfirmed events does not exceed the granted credits.
 
-**События (операционные, в метриках и аудите):** `SessionOpened`, `SessionSuperseded`, `SessionLost`, `SessionClosed`, `ConnectorRejected`.
+**Events (operational, in metrics, and audit):** `SessionOpened`, `SessionSuperseded`, `SessionLost`, `SessionClosed`, `ConnectorRejected`.
 
-### 2.2 Значение `RawEvent`
+### 2.2 Value object `RawEvent`
 
-Неизменяемое значение: `event_id`, `connector_id`, `source_id`, `source_epoch`, `source_seq`, `occurred_at`, `received_at`, `raw_code`, `attributes` (строковый словарь), `trace_context`.
+Immutable values: `event_id`, `connector_id`, `source_id`, `source_epoch`, `source_seq`, `occurred_at`, `received_at`, `raw_code`, `attributes` (string dictionary), `trace_context`.
 
-**Правила:** RE1. `source_seq` строго возрастает в пределах источника в рамках одной эпохи источника; эпоха увеличивается при сбросе устройства. RE2. Если `occurred_at` позже `received_at` больше чем на допустимое рассогласование часов, шлюз использует `received_at` как время события, сохраняет исходное значение в атрибуте и порождает `system.source.clock_skew` ([ADR-010](../adr/0010-time-semantics.md)).
+**Rules:** RE1. `source_seq` strictly increases within the source epoch; the epoch increases when the device is reset. RE2. If `occurred_at` is later than `received_at` by more than the allowable time difference, the gateway uses `received_at` as the event time, retains the original value in the attribute, and generates `system.source.clock_skew` ([ADR-010](../adr/0010-time-semantics.md)).
 
 ---
 
 ## 3. Event Processing
 
-### 3.1 Агрегат `MappingRuleSet`
+### 3.1 The `MappingRuleSet` Aggregate
 
-Версионированный набор правил отображения для типа коннектора: `raw_code` и условия на атрибуты -> тип таксономии, критичность, извлекаемые атрибуты.
+A versioned set of mapping rules for a connector type: `raw_code` and conditions on attributes -> taxonomy type, criticality, extracted attributes.
 
-**Инварианты:** M1. Каждый тип таксономии в правилах существует в действующей версии таксономии. M2. Для одного `raw_code` правила упорядочены, срабатывает первое подходящее. M3. Опубликованная версия неизменяема.
+**Invariants:** M1. Each taxonomy type in the rules exists in the current taxonomy version. M2. For one `raw_code`, rules are ordered, and the first suitable one is executed. M3. The published version is immutable.
 
-**События:** `MappingRuleSetPublished`.
+**Events:** `MappingRuleSetPublished`.
 
-### 3.2 Значение `Event`
+### 3.2 Value object `Event`
 
-Нормализованное событие: `event_id`, `type` (код таксономии), `class`, `severity`, `site_id`, `zone_id`, `device_id`, `source_id`, `source_seq`, `occurred_at`, `received_at`, `normalized_at`, `attributes`. Не изменяется после создания.
+Normalized event: `event_id`, `type` (taxonomy code), `class`, `severity`, `site_id`, `zone_id`, `device_id`, `source_id`, `source_seq`, `occurred_at`, `received_at`, `normalized_at`, `attributes`. It remains unchanged after creation.
 
-**Правила:**
-- E1. Повтор с тем же `(source_id, epoch, source_seq)` или `event_id` в пределах окна дедупликации отбрасывается.
-- E2. Событие без устройства в каталоге или без правила отображения уходит в DLQ с причиной; в обработку не попадает.
-- E3. Событие значимо, если `severity ≥ порога тенанта` (по умолчанию `medium`) или на него ссылается сигнал. Event History хранит все события, значимые - дольше ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)).
+**Rules:**
+- E1. Repetition with the same `(source_id, epoch, source_seq)` or `event_id` within the deduplication window is discarded.
+- E2. An event without a device in the directory or without mapping rules goes to DLQ with a reason; it does not enter processing.
+- E3. An event is significant if `severity >= tenant_threshold` (default `medium`) or referenced by a signal. Event History stores all normalized events; significant events have longer retention ([ADR-028](../adr/0028-clickhouse-analytical-storage.md)).
 
-### 3.3 Агрегат `CorrelationRule`
+### 3.3 The `CorrelationRule` Aggregate
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
-| `rule_id`, `version` | Каждое изменение - новая версия |
+| `rule_id`, `version` | Each change is a new version |
 | `state` | `draft`, `testing`, `active`, `archived` |
-| `kind` | `single` (одно событие), `sequence`, `conjunction` (несколько источников в окне), `threshold` (N событий за окно), `absence` (ожидаемое событие не пришло) |
-| `correlation_key` | Декларативная область: источник, устройство, зона, этаж, здание или площадка |
-| `window`, `allowed_lateness` | Длительность окна и допустимое опоздание |
-| `conditions` | Фильтры по типу таксономии, критичности, локации, атрибутам |
-| `suppression` | Подавление повторных сигналов на интервал |
-| `output` | Тип инцидента, выражение приоритета и текста, область группировки не уже области корреляции; ключ включает тип инцидента |
+| `kind` | `single` (one event), `sequence`, `conjunction` (multiple sources in a window), `threshold` (N events per window), `absence` (expected event did not occur) |
+| `correlation_key` | Declarative field: source, device, zone, floor, building or site |
+| `window`, `allowed_lateness` | Window duration and allowable delay |
+| `conditions` | Filters by taxonomy type, criticality, location, attributes |
+| `suppression` | Suppression of repeated signals over time |
+| `output` | Incident type, priority expression, text, grouping scope is no narrower than the correlation scope; the key includes incident type |
 
-**Инварианты:**
-- R1. Правило активируется только после успешной валидации; невалидное правило не может перейти в `testing` или `active`.
-- R2. Опубликованная версия неизменяема.
-- R3. Окно не превышает предела, заданного конфигурацией (по умолчанию 24 ч) - ограничение объёма состояния.
-- R4. Ключ группировки ссылается только на поля, гарантированно присутствующие в сигнале.
+**Invariants:**
+- R1. A rule is activated only after successful validation; an invalid rule cannot transition to `testing` or `active`.
+- R2. The published version is immutable.
+- R3. The window does not exceed the limits set by the configuration (default 24 hours) - capacity limit for state.
+- R4. The grouping key refers only to fields guaranteed to be present in the signal.
 
-**События:** `CorrelationRuleDrafted`, `CorrelationRuleValidated`, `CorrelationRuleDryRunCompleted`, `CorrelationRuleArchived`.
+**Events:** `CorrelationRuleDrafted`, `CorrelationRuleValidated`, `CorrelationRuleDryRunCompleted`, `CorrelationRuleArchived`.
 
-### 3.4 Агрегат `RuleSet`
+### 3.4 The `RuleSet` Aggregate
 
-Набор версий правил, действующий для тенанта.
+A set of rules that apply to a tenant.
 
-**Инварианты:**
-- RS1. У тенанта ровно одна активная версия набора.
-- RS2. Активация публикуется в `psim.config.v1`; все экземпляры Correlation Engine переключаются на новую версию на одной и той же границе - по смещению конфигурационного топика, - без смешения версий при обработке одного события.
-- RS3. Состояние правила, версия которого не изменилась, сохраняется при смене набора; состояние изменённого правила сбрасывается.
+**Invariants:**
+- RS1. A tenant has exactly one active version of the set.
+- RS2. Activation is published in `psim.config.v1`. Each Correlation Engine instance applies a complete configuration snapshot between batches at its configuration-topic offset; a single event never mixes rule-set versions.
+- RS3. The state of a rule whose version has not changed is preserved when switching sets; the state of the modified rule is reset.
 
-**События:** `RuleSetActivated`.
+**Events:** `RuleSetActivated`.
 
-### 3.5 Значение `Signal`
+### 3.5 Value object `Signal`
 
-`signal_id`, `origin` (правило или внешний источник, [ADR-025](../adr/0025-ai-extension-points.md)), `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`, `explanation_ref` (необязательно), `absence_deadline` (для отсутствия ожидаемого события).
+`signal_id`, `origin` (rule or external source, [ADR-025](../adr/0025-ai-extension-points.md)), `rule_id`, `rule_version`, `correlation_key`, `grouping_key`, `incident_type_id`, `priority`, `site_id`, `zone_id`, `event_ids[]`, `first_event_at`, `last_event_at`, `emitted_at`, `summary`, `explanation_ref` (optional), `absence_deadline` (for absence of expected event).
 
-Обычный сигнал содержит хотя бы одно событие. Периодическая проверка отсутствия по активным ресурсам каталога может дать сигнал без событий; тогда `absence_deadline` обязателен. При группировке шире зоны поле `zone_id` не заполняется, чтобы не приписывать всему сигналу зону одного участника.
+A normal signal contains at least one event. Periodic checks on active resources in the directory can provide a signal without events; then `absence_deadline` is required. When grouping wider than the zone, the `zone_id` field is not filled to avoid assigning a zone to all signals from one participant.
 
-**Правила:** SG1. `signal_id` детерминирован (раздел 0.1). SG2. Сигнал публикуется в одной транзакции Kafka с фиксацией смещения входного топика и записью changelog - exactly-once.
+**Rules:** SG1. `signal_id` is deterministic (section 0.1). SG2. The signal is published in a single Kafka transaction, with offset recording of the input topic and changelog writing - exactly-once.
 
 ---
 
 ## 4. Incident Management
 
-### 4.1 Агрегат `IncidentType`
+### 4.1 Aggregate `IncidentType`
 
-Код, название, приоритет по умолчанию, окно группировки, ссылка на политику эскалации, признак обязательности сценария.
+Code, name, default priority, grouping window, escalation policy reference, scenario necessity flag.
 
-### 4.2 Агрегат `Incident`
+### 4.2 Aggregate `Incident`
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
 | `incident_id`, `incident_type_id`, `site_id`, `zone_id` | - |
-| `state` | См. [state-models.md](state-models.md#1-инцидент) |
-| `priority`, `priority_source` | Вычисленный или установленный вручную (`computed`, `manual`) |
-| `grouping_key`, `group_until` | Ключ и момент окончания окна присоединения |
-| `signal_ids[]` | Все присоединённые сигналы |
-| `assignee_id` | Ответственный оператор |
-| `escalation_level` | 0 - нет эскалации; ортогонален состоянию |
-| `blocking_steps[]` | Незавершённые обязательные шаги активного запуска сценария (из событий Response) |
-| `resolution`, `resolution_note` | Задаются при решении |
-| `timeline[]` | Хронология (хранится отдельной таблицей, но относится к агрегату) |
-| `created_at`, `acknowledged_at`, `resolved_at`, `closed_at` | Для MTTA и MTTR |
+| `state` | See [state-models.md](state-models.md#1-incident) |
+| `priority`, `priority_source` | Calculated or manually set (`computed`, `manual`) |
+| `grouping_key`, `group_until` | Key and end time of the joining window |
+| `signal_ids[]` | All joined signals |
+| `assignee_id` | Responsible operator |
+| `escalation_level` | 0 - no escalation; orthogonal to state |
+| `blocking_steps[]` | Uncompleted mandatory steps of active scenario execution (from Response events) |
+| `resolution`, `resolution_note` | Set when resolving |
+| `timeline[]` | Chronology (stored in a separate table, but belongs to the aggregate) |
+| `created_at`, `acknowledged_at`, `resolved_at`, `closed_at` | For MTTA and MTTR |
 
-**Инварианты:**
-- I1. Переходы состояний - только по модели состояний.
-- I2. Сигнал присоединяется к инциденту не более одного раза (inbox по `signal_id`).
-- I3. У тенанта не более одного инцидента, принимающего новые сигналы по `grouping_key`. Истечение окна освобождает эту позицию, но не завершает прежний инцидент и его SLA. Обеспечивается уникальным частичным индексом (ADR-053).
-- I4. Сигнал присоединяется к открытому инциденту, только если `occurred_at` его первого события ≤ `group_until`; иначе создаётся новый инцидент, связанный с предыдущим (`related_to`).
-- I5. В состояниях `acknowledged` и `in_progress` назначен ответственный; ответственный имеет роль `operator` или `supervisor` и область доступа, включающую площадку и зону инцидента.
-- I6. Вычисленный приоритет равен максимуму приоритетов сигналов. Ручной приоритет может установить только `supervisor`; новые сигналы его повышают, но не понижают.
-- I7. Решение (`resolve`) невозможно, пока `blocking_steps` не пуст. Исключение - `resolution = duplicate` или `test` по решению `supervisor`.
-- I8. `closed` - конечное состояние. Сигнал по ключу закрытого инцидента создаёт новый инцидент.
-- I9. `created_at ≤ acknowledged_at ≤ resolved_at ≤ closed_at` для заданных значений.
-- I10. Повторное открытие (`reopen`) возможно только из `resolved`, сбрасывает `resolution` и `resolved_at`, сохраняется в хронологии.
+**Invariants:**
+- I1. State transitions - only by state model.
+- I2. A signal is joined to an incident no more than once (inbox according to `signal_id`).
+- I3. A tenant has no more than one incident accepting new signals according to `grouping_key`. Expiration of the window releases this position, but does not complete the previous incident and its SLA. Ensured by a unique partial index (ADR-053).
+- I4. A signal is joined to an open incident only if `occurred_at` of its first event ≤ `group_until`; otherwise, a new incident related to the previous one is created (`related_to`).
+- I5. In states `acknowledged` and `in_progress`, a responsible person is assigned; the responsible person has role `operator` or `supervisor` and access scope including site and incident zone.
+- I6. Calculated priority equals the maximum of signal priorities. Manual priority can only be set by `supervisor`; new signals increase it, but do not decrease it.
+- I7. Resolution (`resolve`) is impossible until `blocking_steps` is empty. Exception - `resolution = duplicate` or `test` by a `supervisor` decision.
+- I8. `closed` - final state. A signal by key of a closed incident creates a new incident.
+- I9. `created_at ≤ acknowledged_at ≤ resolved_at ≤ closed_at` for given values.
+- I10. Reopening (`reopen`) is possible only from `resolved`, cancels `resolution` and `resolved_at`, and is preserved in chronology.
 
-**Команды:** `IngestSignal`, `Acknowledge`, `StartWork`, `Assign`, `Reassign`, `SetPriority`, `AddComment`, `AddLink`, `Resolve`, `Reopen`, `Close`, `ApplyEscalation`, `UpdateBlockingSteps`.
+**Commands:** `IngestSignal`, `Acknowledge`, `StartWork`, `Assign`, `Reassign`, `SetPriority`, `AddComment`, `AddLink`, `Resolve`, `Reopen`, `Close`, `ApplyEscalation`, `UpdateBlockingSteps`.
 
-**События:** `IncidentCreated`, `SignalAttached`, `IncidentPriorityChanged`, `IncidentAcknowledged`, `IncidentWorkStarted`, `IncidentAssigned`, `IncidentEscalated`, `IncidentCommentAdded`, `IncidentLinkAdded`, `IncidentResolved`, `IncidentReopened`, `IncidentClosed`.
+**Events:** `IncidentCreated`, `SignalAttached`, `IncidentPriorityChanged`, `IncidentAcknowledged`, `IncidentWorkStarted`, `IncidentAssigned`, `IncidentEscalated`, `IncidentCommentAdded`, `IncidentLinkAdded`, `IncidentResolved`, `IncidentReopened`, `IncidentClosed`.
 
-**Закрытие:** `resolved` -> `closed` автоматически через настраиваемый интервал (по умолчанию 15 мин) или вручную `supervisor`. Интервал даёт возможность переоткрыть ошибочно решённый инцидент.
+**Closure:** `resolved` -> `closed` automatically at an adjustable interval (default 15 minutes) or manually `supervisor`. The interval allows reopening of incorrectly resolved incidents.
 
 ---
 
 ## 5. Response
 
-### 5.1 Агрегат `ResponsePlan`
+### 5.1 Aggregate `ResponsePlan`
 
-Версионированный сценарий: граф шагов и правила привязки.
+Versioned scenario: graph of steps and binding rules.
 
-| Поле шага | Описание |
+| Step Field | Description |
 |---|---|
 | `step_id`, `kind` | `instruction`, `checklist`, `decision`, `command`, `notify`, `wait`, `escalate`, `automated` |
-| `mandatory` | Обязательность |
-| `next` | Следующий шаг; у `decision` - по шагу на каждый вариант |
-| `params` | Зависят от вида: пункты чек-листа, варианты решения, возможность и цель команды, получатели, длительность ожидания, адрес вызова |
+| `mandatory` | Obligation |
+| `next` | Next step; for `decision` - by step for each variant |
+| `params` | Dependent on type: checklists items, decision options, command capability and target, recipients, waiting duration, call address |
 
-Привязка: тип инцидента, необязательные фильтры по площадкам, зонам и приоритетам; при нескольких подходящих сценариях выбирается наиболее специфичный, при равенстве - с большим приоритетом привязки.
+Binding: type of incident, optional filters by sites, areas, and priorities; if multiple suitable scenarios, the most specific one is chosen, in case of equality - with higher binding priority.
 
-**Инварианты:**
-- P1. Граф ацикличен, имеет ровно один начальный шаг, все шаги достижимы из начального.
-- P2. У `decision` для каждого варианта задан следующий шаг.
-- P3. Шаг `command` ссылается на возможность, существующую хотя бы у одного типа устройств; цель задаётся явно или выражением («все двери зоны инцидента»).
-- P4. Опубликованная версия неизменяема; запуск использует версию, зафиксированную в момент старта.
-- P5. Привязки разных сценариев с одинаковой специфичностью и одинаковым приоритетом не пересекаются.
+**Invariants:**
+- P1. The graph is acyclic, has exactly one initial step, all steps are reachable from the start.
+- P2. For `decision`, the next step is defined for each variant.
+- P3. Step `command` refers to a capability existing at least on one type of device; target is specified explicitly or with an expression ("all doors in the incident zone").
+- P4. Published version is immutable; execution uses the version recorded at startup.
+- P5. Bindings of different scenarios with the same specificity and priority do not overlap.
 
-**События:** `ResponsePlanPublished`, `ResponsePlanArchived`.
+**Events:** `ResponsePlanPublished`, `ResponsePlanArchived`.
 
-### 5.2 Агрегат `ResponseRun`
+### 5.2 Aggregate `ResponseRun`
 
-Исполнение сценария по инциденту.
+Scenario execution for an incident.
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
 | `run_id`, `incident_id`, `plan_id`, `plan_version` | - |
-| `state` | См. [state-models.md](state-models.md#2-запуск-сценария) |
-| `steps{step_id -> состояние, исполнитель, время, результат}` | Состояние каждого шага |
-| `active_steps[]` | Шаги, доступные для выполнения |
+| `state` | See [state-models.md](state-models.md#2-scenario-execution) |
+| `steps{step_id -> state, actor, time, result}` | State of each step |
+| `active_steps[]` | Steps available for execution |
 
-**Инварианты:**
-- RR1. По инциденту не более одного активного запуска.
-- RR2. Шаг выполняется, только если он в `active_steps`.
-- RR3. Обязательный шаг нельзя пропустить (`skip`); необязательный пропускает только `supervisor` или оператор с указанием причины.
-- RR4. Шаг `command` завершается только по финальному статусу команды.
-- RR5. При каждом изменении множества незавершённых обязательных шагов публикуется событие для `Incident.blocking_steps`.
-- RR6. Запуск завершается, когда все пути пройдены или инцидент закрыт; при закрытии инцидента незавершённые шаги переходят в `cancelled`.
+**Invariants:**
+- RR1. No more than one active execution per incident.
+- RR2. A step is executed only if it is in `active_steps`.
+- RR3. An obligatory step cannot be skipped (`skip`); an optional step can be skipped only by `supervisor` or the operator with a reason.
+- RR4. A `command` step completes only when every command it issued reaches successful execution; an acknowledgement, failure, timeout or unknown outcome does not complete it.
+- RR5. Every change to the set of incomplete required steps publishes an event for `Incident.blocking_steps`.
+- RR6. Execution ends when all paths are completed or the incident is closed; when closing an incident, uncompleted steps move to `cancelled`.
 
-**События:** `ResponseRunStarted`, `StepActivated`, `StepCompleted`, `StepSkipped`, `StepFailed`, `MandatoryStepsChanged`, `ResponseRunCompleted`, `ResponseRunCancelled`.
+**Events:** `ResponseRunStarted`, `StepActivated`, `StepCompleted`, `StepSkipped`, `StepFailed`, `MandatoryStepsChanged`, `ResponseRunCompleted`, `ResponseRunCancelled`.
 
-### 5.3 Агрегат `Command`
+### 5.3 Aggregate `Command`
 
-| Поле | Описание |
+| Field | Description |
 |---|---|
 | `command_id`, `device_id`, `connector_id`, `capability`, `params` | - |
-| `incident_id`, `run_id`, `step_id` | Контекст (необязательно, команда может быть ручной) |
-| `requested_by`, `approved_by` | Субъекты |
-| `state`, `deadline_at`, `result` | См. [state-models.md](state-models.md#3-команда) |
+| `incident_id`, `run_id`, `step_id` | Context (optional, command can be manual) |
+| `requested_by`, `approved_by` | Subjects |
+| `state`, `deadline_at`, `result` | See [state-models.md](state-models.md#3-command) |
 
-**Инварианты:**
-- CM1. Возможность входит в список возможностей типа устройства (D4).
-- CM2. Инициатор имеет право на команду и область доступа к зоне устройства.
-- CM3. Критичная команда не отправляется до подтверждения; подтверждающий - `supervisor`, отличный от инициатора.
-- CM4. Финальные состояния (`executed`, `failed`, `timed_out`, `rejected`, `cancelled`) неизменяемы; каждая команда достигает финального состояния не позже `deadline_at` + время срабатывания таймера.
-- CM5. Результат от коннектора с неизвестным или уже финальным `command_id` игнорируется и учитывается в метрике.
+**Invariants:**
+- CM1. The capability is in the list of device types (D4).
+- CM2. The initiator has permission to the command and access to the device area.
+- CM3. A critical command is not sent until confirmation; the confirming one - `supervisor`, different from the initiator.
+- CM4. Final states (`executed`, `failed`, `timed_out`, `rejected`, `cancelled`, `unknown`) are immutable; each command reaches the final state no later than `deadline_at` plus the timer expiration time.
+- CM5. The result from the connector with an unknown or already final `command_id` is ignored and counted in metrics.
 
-**События:** `CommandRequested`, `CommandApprovalRequested`, `CommandApproved`, `CommandRejected`, `CommandSent`, `CommandAcknowledged`, `CommandExecuted`, `CommandFailed`, `CommandTimedOut`, `CommandCancelled`.
+Events: `CommandRequested`, `CommandApprovalRequested`, `CommandApproved`, `CommandRejected`, `CommandSent`, `CommandAcknowledged`, `CommandExecuted`, `CommandFailed`, `CommandTimedOut`, `CommandCancelled`.
 
-### 5.4 Агрегат `EscalationPolicy`
+### 5.4 The `EscalationPolicy` aggregate
 
-SLA принятия и решения по приоритетам; уровни эскалации: задержка, получатели (роль в области, пользователи), каналы.
+Acknowledgement and resolution SLAs by priority; escalation levels: delay, recipients (role within the scope, users), channels.
 
-**Инварианты:** EP1. Задержки уровней строго возрастают. EP2. На каждом уровне есть хотя бы один получатель.
+**Invariants:** EP1. Delays increase strictly with level. EP2. There is at least one recipient at each level.
 
-**События:** `EscalationPolicyChanged`.
+Events: `EscalationPolicyChanged`.
 
-### 5.5 Процесс `SlaTracker`
+### 5.5 The `SlaTracker` process
 
-Не агрегат с собственной моделью, а процесс на сервисе таймеров: при `IncidentCreated` взводит таймер принятия, при `IncidentAcknowledged` снимает его и взводит таймер решения; срабатывание таймера порождает `ApplyEscalation` для инцидента и уведомления уровня.
+It’s not an aggregate with its own model, but a process on the timer service: when `IncidentCreated`, it sets the acknowledgement timer; when `IncidentAcknowledged`, it clears the timer and sets the resolution timer. The timer’s execution generates `ApplyEscalation` for the incident and notification level.
 
-**Правила:** ST1. Таймеры хранятся в PostgreSQL и переживают перезапуск. ST2. Срабатывание идемпотентно по `(incident_id, sla_kind, level)`. ST3. Погрешность срабатывания ≤ 1 с.
+**Rules:** ST1. Timers are stored in PostgreSQL and survive restarting. ST2. Timer firing is idempotent by `(incident_id, sla_kind, level)`. ST3. The timer firing error is ≤ 1 second.
 
-**События:** `SlaBreached`, `EscalationLevelTriggered`.
+Events: `SlaBreached`, `EscalationLevelTriggered`.
 
-### 5.6 Агрегат `Notification`
+### 5.6 The `Notification` aggregate
 
-`notification_id`, получатель, канал, шаблон и данные, состояние (`pending` -> `sent` -> `delivered` | `failed`), число попыток.
+`notification_id`, recipient, channel, template, and data, status (`pending` -> `sent` -> `delivered` | `failed` | `unknown`), number of attempts.
 
-**Инварианты:** N1. Идемпотентность по `notification_id`. N2. Число попыток ограничено политикой канала; исчерпание даёт `failed` и запись аудита. N3. При превышении порога частоты для получателя уведомления объединяются в сводку.
+**Invariants:** N1. It is idempotent with `notification_id`. N2. The number of attempts is limited by the channel policy; exhaustion results in `failed` and an audit record. N3. When the notification receiver’s threshold is exceeded, notifications are combined into a summary.
 
-**События:** `NotificationQueued`, `NotificationSent`, `NotificationDelivered`, `NotificationFailed`, `NotificationsAggregated`.
+Events: `NotificationQueued`, `NotificationSent`, `NotificationDelivered`, `NotificationFailed`, `NotificationsAggregated`.
 
 ---
 
 ## 6. Identity & Access
 
-### 6.1 Модель `Principal`
+### 6.1 The `Principal` model
 
-Вычисляется из JWT при каждом запросе: `user_id`, `tenant_id`, `roles[]`, `scopes[]` (площадки и зоны). Источник истины ролей - Keycloak; области доступа - атрибуты пользователя или групп Keycloak.
+For user requests, it is derived from the verified JWT and fresh Keycloak introspection: `user_id`, `tenant_id`, `roles[]`, `scopes[]` (for sites and access scopes). The source of role truth is Keycloak; access scopes are user attributes or Keycloak groups.
 
-### 6.2 Решение о доступе
+### 6.2 Access Decision
 
-Функция `decide(principal, action, resource) -> allow | deny(reason)`, где `resource` несёт `site_id` и `zone_id`. Чистая функция в общей библиотеке, используемая API Gateway и сервисами.
+The function `decide(principal, action, resource) -> allow | deny(reason)`, where `resource` carries `site_id` and `zone_id`. It is a pure function in the general library, used by API Gateway and services.
 
-**Инварианты:**
-- A1. Запрет по умолчанию: действие без явного разрешения отклоняется.
-- A2. Область доступа на площадку включает все её зоны; область на зону - только зону.
-- A3. Каждый отказ порождает запись аудита `AccessDenied`.
-- A4. Роль `auditor` и `manager` не имеет ни одного изменяющего действия.
+**Invariants:**
+- A1. Default prohibition: Actions without explicit permission are rejected.
+- A2. The access scope for a site includes all its zones; the scope for a zone only includes that zone.
+- A3. Each failure generates an audit record named `AccessDenied`.
+- A4. The roles of `auditor` and `manager` do not have any modifying effects.
 
-Матрица «роль × действие» составляется в шаге 7.4 на основе [ролей](../product/roles-and-journeys.md).
+The “role × action” matrix and access scope checks are described in the [Authorization Guide](../security/authorization.md), based on [roles](../product/roles-and-journeys.md).
 
 ---
 
 ## 7. Audit
 
-### 7.1 Агрегат `AuditChain`
+### 7.1 The `AuditChain` aggregate
 
-Одна цепочка на тенант.
+One chain on the tenant.
 
-| Поле записи | Описание |
+| Field | Description |
 |---|---|
-| `audit_seq` | Номер в цепочке, без пропусков |
-| `source_event_id` | Идентификатор исходного доменного события - ключ идемпотентности |
-| `actor`, `action`, `object_type`, `object_id`, `site_id` | Что произошло |
+| `audit_seq` | Number in the chain, without gaps |
+| `source_event_id` | Identifier of the original domain event - idempotency key |
+| `actor`, `action`, `object_type`, `object_id`, `site_id` | What happened |
 | `occurred_at`, `recorded_at`, `outcome`, `details` | - |
-| `prev_hash`, `hash` | `hash = SHA-256(prev_hash ‖ каноническая сериализация записи)` |
+| `prev_hash`, `hash` | `hash = SHA-256(prev_hash ‖ canonical_record_bytes)` |
 
-**Инварианты:**
-- AU1. Только добавление; изменение и удаление запрещены на уровне прав базы данных.
-- AU2. `audit_seq` непрерывен; `prev_hash` записи равен `hash` предыдущей.
-- AU3. Повтор доменного события с тем же `source_event_id` не создаёт новую запись.
-- AU4. Контрольная точка (`audit_seq`, `hash`, время) фиксируется периодически и экспортируется вне базы данных.
+**Invariants:**
+- AU1. Only addition is allowed; modification and deletion are prohibited at the database rights level.
+- AU2. `audit_seq` is continuous; `prev_hash` records are equal to `hash` from the previous record.
+- AU3. Repeating a domain event with the same `source_event_id` does not create a new record.
+- AU4. The checkpoint (`audit_seq`, `hash`, time) is periodically recorded and exported outside the database.
 
-**События:** `AuditCheckpointCreated`, `AuditIntegrityVerified`, `AuditIntegrityViolated`.
+Events: `AuditCheckpointCreated`, `AuditIntegrityVerified`, `AuditIntegrityViolated`.
 
 ---
 
 ## 8. Reporting
 
-Только проекции, без собственных инвариантов предметной области. Определения метрик (MTTA, MTTR, доля ложных тревог) - в [спецификации приёмки](../product/acceptance-spec.md#s13-отчёт-руководителя). Проекции перестраиваются из Kafka и должны давать идентичный результат.
+Reporting owns projections, without independent business aggregates. Query semantics and access rules are described in the [reporting guide](../engineering/incident-reports.md). Definitions of metrics (MTTA, MTTR, false alarm rate) are provided in the [acceptance specifications](../product/acceptance-spec.md#s13-managers-report). A rebuild must produce the same result when the required source history is retained; otherwise a compatible snapshot or backup is required.
 
 ---
 
-## 9. Покрытие сценариев приёмки
+## 9. Coverage of acceptance scenarios
 
-| Сценарий | Агрегаты и процессы |
+| Scenario | Aggregates and Processes |
 |---|---|
 | S1 | Connector, ConnectorSession, MappingRuleSet |
 | S2 | Location, DeviceType, Device, ImportJob |
 | S3 | RawEvent, Event, MappingRuleSet, Device |
 | S4 | CorrelationRule, RuleSet, Signal |
 | S5 | Signal, Incident, IncidentType |
-| S6 | Incident, Principal (ABAC), проекция ленты |
+| S6 | Incident, Principal (ABAC), feed projection |
 | S7 | Incident, ResponsePlan, ResponseRun |
 | S8 | Command, Device, ConnectorSession |
 | S9 | EscalationPolicy, SlaTracker, Notification, Incident |
-| S10 | AuditChain, решение о доступе |
-| S11 | Детерминированные идентификаторы, inbox и outbox, ConnectorSession |
-| S12 | Неизменяемые версии правил и сценариев, версии схем |
-| S13 | Incident (времена жизненного цикла, решение), проекции |
+| S10 | AuditChain, access decision |
+| S11 | Deterministic identifiers, inbox and outbox, ConnectorSession |
+| S12 | Immutable versions of rules and scenarios, schema versions |
+| S13 | Incidents (lifecycle times, resolutions), projections |
 
-## 10. Эксплуатационные модели (ADR-042)
+## 10. Operational Models (ADR-042)
 
-- Оперативная проекция `DeviceState` отдельно содержит связь, наблюдаемое состояние, качество actual/stale/unknown, источник, эпоху, последовательность, время события и последнего подтверждения. Каталожное состояние Device остаётся жизненным циклом. Сверка после переподключения не заменяет новое состояние старым снимком.
-- Передача ответственности - процесс `HandoverRequest` с получателем, перечнем инцидентов и их ожидаемыми версиями, комментарием, подтверждением и построчными результатами. Команда `AcceptHandover` применяет изменение каждого Incident атомарно и публикует прежнее событие назначения с основанием передачи. SLA и ResponseRun не перезапускаются.
-- `DutyAssignment` в Notification Service связывает площадку с текущим дежурным и резервным получателем; изменения версионируются и аудируются. История назначений сохраняется; календарный график отсутствует в MVP.
-- `ReplayRun` хранит replay_id, инициатора, область, диапазон и версии конфигурации; рабочие изменения запрещены ACL. Результаты живут в изолированном контуре.
+- The `DeviceState` operational projection separately contains the connection, observed state, quality (actual/stale/unknown), source, epoch, sequence, event time, and last acknowledgment. The catalog state of the Device still describes its administrative lifecycle. Rechecking after reconnection does not replace the new state with an old snapshot.
+- The responsibility transfer process is represented by `HandoverRequest`, which involves the recipient, a list of incidents and their expected versions, comments, acknowledgments, and line-by-line results. The command `AcceptHandover` applies changes to each incident atomically and publishes the previous event assignment with the reason for the transfer. SLA and ResponseRun are not restarted.
+- `DutyAssignment` in the Response Engine connects the site to the current duty holder and backup recipient; changes are versioned and audited. The assignment history is retained; a calendar schedule is not part of the current model.
+- `ReplayRun` stores replay_id, the initiator, the access scope, range, and the configuration version; any production mutations are prohibited by ACL. The results reside in an isolated environment.
 
-Подробные инварианты - в [operational-capabilities.md](../architecture/operational-capabilities.md). Модели добавляются в контракты на соответствующих шагах реализации, с проверкой совместимости.
+Detailed invariants are defined in [operational-capabilities.md](../architecture/operational-capabilities.md). Versioned contracts and compatibility checks preserve these boundaries.
+
+Idempotency prevents duplicate logical commands; it does not guarantee exactly-once physical execution. An unknown outcome is not retried automatically. The same restriction applies to notification channels with an indeterminate provider outcome.

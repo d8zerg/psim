@@ -1,161 +1,163 @@
-# Границы MVP
+# MVP Boundaries
 
-Версия 0.2 · Шаг плана 0.1 · Дополнение объёма принято (ADR-042)
+<!-- language-links -->
+[English](mvp-scope.md) | [Русский](../ru/product/mvp-scope.md)
+<!-- /language-links -->
 
-Каждая функция имеет идентификатор `F-<контекст>-<номер>`, ссылку на сценарии приёмки и шаг плана, который её реализует. Контексты соответствуют bounded contexts из шага 0.2.
+Each function has a stable identifier `F-<context>-<number>` and references to acceptance scenarios. Contexts are defined in the [domain diagram](../domain/context-map.md).
 
 ---
 
-## 1. Функции MVP
+## 1. MVP Functions
 
-### 1.1 Integration - коннекторы и ввод событий
+### 1.1 Integration - Connectors and Event Input
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-INT-01 | Протокол коннекторов на gRPC: регистрация, heartbeat, поток событий с подтверждениями, управление потоком на основе кредитов, команды и результаты, передача конфигурации | S1, S8 | 0.5, 4.2 |
-| F-INT-02 | Connector SDK для C++: буфер на диске с досылкой, повторы, приём команд, метрики | S1, S11 | 4.1 |
-| F-INT-03 | Тестовый набор соответствия протоколу (conformance kit) | S1 | 4.1 |
-| F-INT-04 | Connector Gateway: mTLS, аутентификация, валидация схемы, лимиты на коннектор, подтверждение после записи в Kafka, горизонтальное масштабирование | S1, S3, S11 | 4.2 |
-| F-INT-05 | Симулятор и генератор нагрузки: тысячи виртуальных устройств, профили, пики, порядковые номера для сверки, приём команд | S3-S11 | 4.3 |
-| F-INT-06 | Эталонный Webhook/HTTP-коннектор для приёма событий внешних систем (Q2 закрыт) | S1 | 4.3 |
-| F-INT-07 | Руководство разработчика коннектора | S1 | 4.1 |
-| F-INT-08 | Сверка текущего состояния после подключения, доступность устройств и качество данных; досылка истории не делает состояние актуальным | S6, S11 | 4.1, 4.2, 4.5, 7.3 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-INT-01 | gRPC protocol for connectors: registration, heartbeat, event flow with acknowledgments, flow management based on credits, commands and results, configuration transfer | S1, S8 |
+| F-INT-02 | Connector SDK for C++: disk buffer with replay and retries, command reception, metrics | S1, S11 |
+| F-INT-03 | Conformance kit for testing protocol compliance | S1 |
+| F-INT-04 | Connector Gateway: mTLS, authentication, schema validation, connector limits, acknowledgment after writing to Kafka, horizontal scaling | S1, S3, S11 |
+| F-INT-05 | Simulator and load generator: thousands of virtual devices, profiles, peaks, sequence numbers for comparison, command reception | S3-S11 |
+| F-INT-06 | Standard Webhook/HTTP connector for receiving events from external systems | S1 |
+| F-INT-07 | Developer guide for connectors | S1 |
+| F-INT-08 | Current state reconciliation after connection, device availability and data quality; historical replay does not make state current | S6, S11 |
 
-### 1.2 Catalog - объекты и устройства
+### 1.2 Catalog - Objects and Devices
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-CAT-01 | Иерархия: площадка -> здание -> этаж -> зона | S2 | 4.4 |
-| F-CAT-02 | Устройства, источники, типы, возможности (в том числе поддерживаемые команды), привязка к зонам и коннекторам | S2, S8 | 4.4 |
-| F-CAT-03 | Массовый импорт и экспорт (CSV, JSON) с отчётом по строкам | S2 | 4.4 |
-| F-CAT-04 | Поэтажные планы-изображения с координатами устройств, версии в файловом хранилище | S2 | 4.4 |
-| F-CAT-05 | Публикация изменений в `psim.catalog.v1` (compacted) | S2, S3 | 4.4 |
-| F-CAT-06 | Разовый режим обслуживания устройства или зоны: срок, причина, ответственный, явное подавление, автоматическое завершение, сохранение событий и аудита | S4, S10 | 4.4, 5.1, 5.2 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-CAT-01 | Hierarchy: site -> building -> floor -> zone | S2 |
+| F-CAT-02 | Devices, sources, types, capabilities (including supported commands), binding to zones and connectors | S2, S8 |
+| F-CAT-03 | Mass import and export (CSV, JSON) with row-by-row reporting | S2 |
+| F-CAT-04 | Floor plans with device coordinates, version in file storage | S2 |
+| F-CAT-05 | Publishing changes to `psim.catalog.v1` (compacted) | S2, S3 |
+| F-CAT-06 | One-time maintenance for devices or zones: duration, reason, responsible person, explicit suppression, automatic termination, event and audit storage | S4, S10 |
 
-### 1.3 Event Processing - нормализация и корреляция
+### 1.3 Event Processing - Normalization and Correlation
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-EVP-01 | Таксономия событий v1: охрана, пожар, СКУД, видеоаналитика, периметр, технические неисправности; модель критичности | S3 | 0.2 |
-| F-EVP-02 | Декларативные правила отображения сырых событий в таксономию | S1, S3 | 4.5 |
-| F-EVP-03 | Обогащение площадкой, зоной, типом, критичностью из локальной копии каталога | S3 | 4.5 |
-| F-EVP-04 | Дедупликация по порядковому номеру источника; отбраковка в DLQ с причиной | S3, S11 | 4.5 |
-| F-EVP-05 | Event History в ClickHouse: хранение всех событий (значимых - дольше), поиск по объекту, зоне, устройству, типу, времени (ADR-028) | S7 | 4.5, 5.4 |
-| F-EVP-06 | Язык правил корреляции: условия, окна, последовательности, пороги, отсутствие события, связь нескольких источников, подавление, вычисление приоритета | S4 | 5.1 |
-| F-EVP-07 | Жизненный цикл правил: черновик -> тест -> активно -> архив; валидация; пробный прогон на истории | S4 | 5.1 |
-| F-EVP-08 | Correlation Engine: состояние в RocksDB с changelog, event time и водяные знаки, exactly-once, атомарная смена версии правил | S4, S5, S11 | 5.2 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-EVP-01 | v1 event taxonomy: security, fire, access control, video analytics, perimeter, technical failures; severity model | S3 |
+| F-EVP-02 | Declarative rules for mapping raw events in the taxonomy | S1, S3 |
+| F-EVP-03 | Enrichment of the site, zone, type, and severity from local catalog copy | S3 |
+| F-EVP-04 | Deduplication by source sequence number; rejection in DLQ with reason | S3, S11 |
+| F-EVP-05 | Event History in ClickHouse: storage of all events (significant ones - longer), search by object, zone, device, type, time (ADR-028) | S7 |
+| F-EVP-06 | Correlation rule language: conditions, windows, sequences, thresholds, absence of event, multiple source connection, suppression, priority calculation | S4 |
+| F-EVP-07 | Lifecycle of rules: draft -> test -> active -> archive; validation; trial run on history | S4 |
+| F-EVP-08 | Correlation Engine: state in RocksDB with changelog, event time and watermarks, exactly-once, atomic rule version switching | S4, S5, S11 |
 
 ### 1.4 Incident Management
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-INC-01 | Жизненный цикл: новый -> принят -> в работе -> решён -> закрыт; эскалирован; ложный | S5-S7 | 5.3 |
-| F-INC-02 | Группировка сигналов в открытый инцидент по ключу и окну; ноль дубликатов | S5 | 5.3 |
-| F-INC-03 | Приоритеты и их пересчёт | S5, S6 | 5.3 |
-| F-INC-04 | Назначение и передача между операторами | S7, S9 | 5.3 |
-| F-INC-05 | Хронология, комментарии, вложения-ссылки | S7 | 5.3 |
-| F-INC-06 | Связь инцидента с сигналами и исходными событиями | S7 | 5.4 |
-| F-INC-07 | Передача незакрытых инцидентов с подтверждением получателя, проверкой версии и области доступа, сохранением SLA и сценария | S7, S10 | 5.3, 8.3 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-INC-01 | Lifecycle: new -> acknowledged -> in progress -> resolved -> closed; escalation - separate indicator, false alarm - result of resolution | S5-S7 |
+| F-INC-02 | Grouping signals into open incidents by key and window; zero duplicates | S5 |
+| F-INC-03 | Priorities and their recalculation | S5, S6 |
+| F-INC-04 | Assignment and transfer between operators | S7, S9 |
+| F-INC-05 | Chronology, comments, linked attachments | S7 |
+| F-INC-06 | Links between incidents, signals and source events | S7 |
+| F-INC-07 | Transfer of unclosed incidents with acknowledgment of the recipient, verification of version and access scope, preservation of SLA and scenario | S7, S10 |
 
-### 1.5 Response - реагирование, команды, эскалации, уведомления
+### 1.5 Response - Reaction, Commands, Escalations, Notifications
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-RSP-01 | Сценарии реагирования: инструкция, чек-лист, решение с ветвлением, команда, уведомление, ожидание, эскалация, обязательный шаг | S7 | 6.1 |
-| F-RSP-02 | Версионирование сценариев; версия фиксируется при запуске | S7 | 6.1 |
-| F-RSP-03 | Привязка сценариев к типам инцидентов, зонам, приоритетам | S7 | 6.1 |
-| F-RSP-04 | Надёжное исполнение с продолжением после перезапуска; сервис таймеров с точностью ≤ 1 с | S7, S9 | 6.1 |
-| F-RSP-05 | Команды на устройства: жизненный цикл, авторизация, подтверждение критичных команд, идемпотентность, таймауты | S8 | 6.2 |
-| F-RSP-06 | Политики SLA на принятие и решение, многоуровневые эскалации | S9 | 6.3 |
-| F-RSP-07 | Уведомления: в приложении, email, webhook; повторы, фиксация доставки, подавление при массовых событиях | S9 | 6.3 |
-| F-RSP-08 | Явное назначение текущего дежурного площадки; разрешение получателя эскалации и резервный контакт | S9, S10 | 6.3, 8.3 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-RSP-01 | Response scenarios: instruction, checklist, branching decision, command, notification, waiting, escalation, mandatory step | S7 |
+| F-RSP-02 | Versioning of scenarios; version is pinned at run start | S7 |
+| F-RSP-03 | Binding scenarios to incident types, zones, priorities | S7 |
+| F-RSP-04 | Reliable execution with continuation after restart; timer service with accuracy ≤ 1 sec | S7, S9 |
+| F-RSP-05 | Commands to devices: lifecycle, authorization, confirmation of critical commands, idempotence, timeouts | S8 |
+| F-RSP-06 | SLA policies for acceptance and resolution, multi-level escalations | S9 |
+| F-RSP-07 | Notifications: in the application, email, webhook; retries, delivery tracking, suppression during mass events | S9 |
+| F-RSP-08 | Explicit assignment of the current site duty; escalation recipient resolution and backup contact | S9, S10 |
 
-### 1.6 Audit и Reporting
+### 1.6 Audit and Reporting
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-AUD-01 | Неизменяемый журнал на цепочке хэшей с контрольными точками | S10 | 6.4 |
-| F-AUD-02 | Проверка целостности, поиск, экспорт | S10 | 6.4 |
-| F-AUD-03 | Аудит всех действий пользователей и системы, включая отказы в доступе и действия администраторов | S10 | 6.4 |
-| F-REP-01 | Отчёты: количество инцидентов по типам и объектам, MTTA, MTTR, доля ложных тревог, нагрузка операторов, соблюдение SLA; экспорт CSV | S13 | 6.5 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-AUD-01 | Unchangeable log on the hash chain with checkpoints | S10 |
+| F-AUD-02 | Integrity checking, search, export | S10 |
+| F-AUD-03 | Audit of all user and system actions, including access failures and administrator actions | S10 |
+| F-REP-01 | Reports: number of incidents by type and object, MTTA, MTTR, false alarm ratio, operator load, SLA compliance; CSV export | S13 |
 
 ### 1.7 Identity & Access, API
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-IAM-01 | Вход через Keycloak (OIDC, PKCE) | все UI | 7.4, 8.2 |
-| F-IAM-02 | RBAC по ролям из [roles-and-journeys.md](roles-and-journeys.md), ABAC по площадкам и зонам | S6-S10, S13 | 7.4 |
-| F-IAM-03 | Учётные записи коннекторов (mTLS) | S1 | 7.4, 4.2 |
-| F-API-01 | REST API v1: курсорная пагинация, ошибки RFC 9457, ключи идемпотентности, ETag | все | 7.1 |
-| F-API-02 | Realtime-канал WebSocket: снимки и изменения инцидентов, сценариев, устройств, зон и коннекторов; фильтры по области доступа, возобновление по токену | S6, S11 | 7.2 |
-| F-API-03 | Read-модели: лента инцидентов, состояние объектов и устройств с качеством и временем подтверждения, загрузка операторов; перестроение из Kafka | S6 | 7.3 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-IAM-01 | Login through Keycloak (OIDC, PKCE) | All UI |
+| F-IAM-02 | RBAC by roles from [roles-and-journeys.md](roles-and-journeys.md), ABAC by sites and zones | S6-S10, S13 |
+| F-IAM-03 | Connector accounts (mTLS) | S1 |
+| F-API-01 | REST API v1: cursor pagination, RFC 9457 errors, idempotence keys, ETag | All |
+| F-API-02 | Real-time WebSocket channel: snapshots and changes of incidents, scenarios, devices, zones and connectors; filters by access scope, token-based resumption | S6, S11 |
+| F-API-03 | Read models: incident feed, status of objects and devices with quality and time of confirmation, operator workload; rebuild from Kafka | S6 |
 
 ### 1.8 Web Application
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-WEB-01 | Дизайн-система: тёмная и светлая темы, плотность для операторов, ru и en, доступность | все UI | 8.1 |
-| F-WEB-02 | Оболочка: вход, ролевые модули, индикация связи, восстановление после разрыва | S6, S11 | 8.2 |
-| F-WEB-03 | Консоль оператора: лента с виртуализацией до 10 000 инцидентов, карточка, сценарий, команды, обзор объектов на плане, горячие клавиши, звуковое оповещение, свежесть состояния, передача ответственности и текущий дежурный | S6-S9 | 8.3 |
-| F-WEB-04 | Администрирование: каталог и импорт, редактор правил с пробным прогоном, редактор сценариев в виде формы, коннекторы и сертификаты, обслуживание, роли и области, retention | S1, S2, S4 | 8.4 |
-| F-WEB-05 | Аудит и отчёты с графиками и экспортом | S10, S13 | 8.5 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-WEB-01 | Design system: dark and light themes, density for operators, ru and en, accessibility | All UI |
+| F-WEB-02 | Shell: entry, role modules, communication indication, recovery after disconnection | S6, S11 |
+| F-WEB-03 | Operator Console: feed with up to 10,000 incidents, card, scenario, commands, overview of objects on the floor plan, hotkeys, audio notifications, status freshness, responsibility transfer and current duty | S6-S9 |
+| F-WEB-04 | Administration: catalog and import, rule editor with trial run, scenario editor in form, connectors and certificates, maintenance management, roles and access scopes, retention | S1, S2, S4 |
+| F-WEB-05 | Audit and reports with charts and export | S10, S13 |
 
-### 1.9 Platform - развёртывание и эксплуатация
+### 1.9 Platform - Deployment and Operation
 
-| ID | Функция | Сценарии | Шаг |
-|---|---|---|---|
-| F-PLT-01 | Топологии: одна машина, кластер на VM | S11, S12 | 9.1 |
-| F-PLT-02 | Установщик, миграции expand/contract, обновление без простоя, откат | S12 | 9.2 |
-| F-PLT-03 | Резервное копирование и восстановление: PITR, конфигурация, compacted-топики | - | 9.3 |
-| F-PLT-04 | Наблюдаемость: OTLP-трассировка, метрики Prometheus, дашборды Grafana, алерты с runbook | S11 | 2.1, 9.4 |
-| F-PLT-05 | CLI администратора: диагностика, повторная обработка DLQ, перестроение проекций, проигрывание событий, проверка аудита | S10, S11 | 9.5 |
-| F-PLT-06 | Поставка: пакеты для Debian 13 x86_64, контейнерные образы без root, SBOM, подписи | S12 | 1.3 |
-| F-PLT-07 | Хранение поэтажных планов через FileStore и S3-совместимый адаптер: версии, авторизация, проверки загрузки, резервное копирование | S2, S11 | 4.4, 9.1, 9.3 |
-| F-PLT-08 | Регистрация, продление и отзыв сертификатов, восстановление доверия и Keycloak; внешняя PKI, регламент для обеих топологий | S1, S11 | 2.6, 4.2, 9.1, 9.3, 9.5 |
-| F-PLT-09 | Изолированный диагностический replay без рабочих инцидентов, команд, уведомлений и внешних вызовов | S4, S8, S10 | 5.1, 6.1, 9.5 |
+| ID | Function | Scenarios |
+|---|---|---|
+| F-PLT-01 | Topology: single machine, cluster on VM | S11, S12 |
+| F-PLT-02 | Installer, expand/contract migrations, zero-downtime updates, rollback | S12 |
+| F-PLT-03 | Backup and restoration: PITR, configuration, compacted topics | - |
+| F-PLT-04 | Observability: OTLP tracing, Prometheus metrics, Grafana dashboards, alerts with runbook | S11 |
+| F-PLT-05 | CLI for administrator: diagnosis, re-processing of DLQ, rebuilding projections, event playback, audit verification | S10, S11 |
+| F-PLT-06 | Supply: packages for Debian 13 x86_64, container images without root, SBOM, signatures | S12 |
+| F-PLT-07 | Floor plan storage through FileStore and S3-compatible adapter: versions, authorization, upload validation, backup | S2, S11 |
+| F-PLT-08 | Registration, renewal, revocation of certificates, restoration of trust and Keycloak; external PKI, procedures for both topologies | S1, S11 |
+| F-PLT-09 | Isolated diagnostic replay without production incidents, commands, notifications, and external calls | S4, S8, S10 |
 
 ---
 
-## 2. Вне MVP
+## 2. Beyond MVP
 
-Явный список. Изменение требует решения владельца продукта и ADR.
+Explicit list. Changes require product owner and ADR decision.
 
-| № | Вне MVP | Что есть в MVP вместо |
+| No. | Beyond MVP | What is included in MVP instead |
 |---|---|---|
-| X1 | ИИ: автоматическая сортировка тревог, снижение ложных срабатываний и выполнение действий моделью | Ассистент для чтения разрешённых фактов с источниками входит в оперативный интерфейс (ADR-067); остальные возможности используют точки расширения ADR-025 |
-| X2 | ГИС и BIM | Поэтажные планы-изображения с координатами |
-| X3 | Мобильное приложение для выездных групп | Уведомления по email и webhook |
-| X4 | Федерация ситуационных центров и мультитенантная эксплуатация | tenant_id в модели данных, контрактах и ключах; один тенант |
-| X5 | Edge-узлы на объектах | Буферизация на диске в Connector SDK |
-| X6 | Телефония, радиосвязь, массовое оповещение | Шаг сценария «уведомление» и webhook |
-| X7 | Видеостена; встроенный просмотр видео | Ссылки на внешние ресурсы во вложениях инцидента |
-| X8 | BI-инструменты и произвольная аналитика | История событий и факты инцидентов в ClickHouse (ADR-028), отчёты MVP, экспорт CSV |
-| X9 | Коннекторы к продуктам конкретных производителей сверх эталонных | Connector SDK и тестовый набор соответствия для партнёров |
-| X10 | Геораспределённое резервирование | Кластер в одном ЦОД с RTO ≤ 60 с |
-| X11 | Сертификации | Выбор дистрибутивов пересматривается позже |
-| X12 | Коннекторы на языках, отличных от C++ | Протокол на gRPC позволяет писать коннекторы на любом языке без SDK |
-| X13 | Скриптовые языки в правилах и сценариях | Декларативные модели правил и сценариев (ADR-011) |
-| X14 | Отдельные редакции и лицензирование функций | Одна редакция Enterprise |
-| X15 | Топология Kubernetes (Helm-чарт, операторы) | Одна машина и кластер на VM; образы контейнеров совместимы с Kubernetes |
-| X16 | Эталонные коннекторы сверх симулятора и Webhook/HTTP, включая MQTT и ONVIF | Протокол и SDK открыты для партнёров |
-| X17 | Визуальный редактор сценариев реагирования | Редактор сценариев в виде формы |
-| X18 | Собственное хранение фотографий, документов и видеоклипов инцидента | Файловое хранилище только для планов; вложения инцидентов - внешние системы,  ссылки |
-| X19 | Календарные графики смен, отпуска, автоматические замещения и повторяющееся обслуживание | Явное назначение дежурного, подтверждённая передача инцидентов и разовые интервалы обслуживания |
+| X1 | AI: automatic sorting of alarms, reducing false triggers and model-based actions | Assistant for reading permitted facts from sources via the operational interface (ADR-067); other capabilities use ADR-025 extensions |
+| X2 | GIS and BIM | Floor plan images with coordinates |
+| X3 | Mobile app for field teams | Email and webhook notifications |
+| X4 | Federation of situational centers and multi-tenant operation | tenant_id in data models, contracts, and keys; one tenant |
+| X5 | Edge nodes on objects | Disk buffering in Connector SDK |
+| X6 | Telephony, radio communication, mass notification | "Notification" scenario step and webhook |
+| X7 | Video wall; built-in video viewing | Links to external resources in incident attachments |
+| X8 | BI tools and arbitrary analytics | Event and incident facts in ClickHouse (ADR-028), MVP reports, CSV export |
+| X9 | Connectors to specific vendor products beyond the standard ones | Connector SDK and test suite for partners |
+| X10 | Geographically distributed failover | Cluster in one data center with RTO ≤ 60 seconds |
+| X11 | Certifications | Distribution choices will be reviewed later |
+| X12 | Connectors in languages other than C++ | gRPC protocol allows writing connectors in any language without SDK |
+| X13 | Scripting languages in rules and scenarios | Declarative models of rules and scenarios (ADR-011) |
+| X14 | Separate versions and licensing of functions | One version for Enterprise |
+| X15 | Kubernetes topology (Helm chart, operators) | Single machine and cluster on VM; container images are compatible with Kubernetes |
+| X16 | Standard connectors beyond simulator and Webhook/HTTP, including MQTT and ONVIF | Protocol and SDK open to partners |
+| X17 | Visual editor for scenario editing | Form-based scenario editor |
+| X18 | Own storage for incident photos, documents, and videos | File storage only for plans; incident attachments are external systems, links |
+| X19 | Shift calendars, holidays, automatic replacements, and recurring maintenance | Explicit duty assignment, confirmed incident transfer, and one-time maintenance intervals |
 
 ---
 
-## 3. Принятые сокращения объёма
+## 3. Accepted scope reductions
 
-Для варианта «один инженер с ИИ-ассистентами» план (раздел 19.1) фиксирует сокращения объёма. **Приняты** (вопрос Q1 в [product brief](product-brief.md)). Функции F-INT-06, F-PLT-01 и F-WEB-04 реализуются в сокращённом виде; вынесенное попадает в список «вне MVP» как X15-X17.
+For development by one engineer with AI assistants, the following scope reductions are accepted. Functions F-INT-06, F-PLT-01, and F-WEB-04 have explicitly limited content; excluded capabilities are listed as X15-X17.
 
-| Сокращение | Затронутые функции | Влияние на приёмку |
+| Reduction | Affected functions | Impact on acceptance |
 |---|---|---|
-| Визуальный редактор сценариев заменяется формой | F-WEB-04 | Нет: S7 выполняется |
-| Из эталонных коннекторов остаются симулятор и Webhook/HTTP | F-INT-06 | Нет: S1 проверяется одним коннектором |
-| Kubernetes переносится за пределы MVP | F-PLT-01 | Нет: S11, S12 проверяются в кластере на VM |
+| Visual editor for scenario editing is replaced with form | F-WEB-04 | No: S7 is executed |
+| From standard connectors, simulator and Webhook/HTTP remain | F-INT-06 | No: S1 is checked by one connector |
+| Kubernetes is moved beyond MVP | F-PLT-01 | No: S11, S12 are checked on VM cluster |
 
-## 4. Принятые эксплуатационные дополнения
+## 4. Accepted operational additions
 
-Принято: минимальный объём из [operational-capabilities.md](../architecture/operational-capabilities.md), [ADR-042](../adr/0042-operational-capabilities.md). Приоритет - достоверность состояния и realtime, файловое хранилище и восстановление, затем обслуживание, сертификаты и replay, минимальная передача ответственности и дежурство. Функции распределены по существующим шагам; их статус реализации ведётся в [progress.md](../progress.md).
+Accepted: minimum scope from [operational-capabilities.md](../architecture/operational-capabilities.md), [ADR-042](../adr/0042-operational-capabilities.md). Priority - state reliability and realtime, file storage and recovery, then maintenance management, certificates and replay, minimum responsibility transfer and duty. Implemented functions and unconfirmed conditions are listed in [release readiness](release-readiness.md).
 
-Правила участия и сообщения об уязвимостях опубликованы в [CONTRIBUTING.md](../../CONTRIBUTING.md) и [SECURITY.md](../../SECURITY.md). Совместимость и поддержка определены в [политике](../engineering/compatibility-and-support.md); воспроизводимые синтетические демонстрационные данные готовятся на шаге 11.1.
+Rules of participation and vulnerability reporting are published in [CONTRIBUTING.md](../../CONTRIBUTING.md) and [SECURITY.md](../../SECURITY.md). Compatibility and support are defined in [policy](../engineering/compatibility-and-support.md); reproducible synthetic demonstration remains a required condition for acceptance.

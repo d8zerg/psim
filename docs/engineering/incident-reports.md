@@ -1,55 +1,59 @@
-# Отчёты по инцидентам
+# Incident Reports
 
-Projection Service обслуживает `ReportService` и загружает факты инцидентов в ClickHouse. Семантика метрик и модель хранения определены в [ADR-057](../adr/0057-incident-reporting.md).
+<!-- language-links -->
+[English](incident-reports.md) | [Русский](../ru/engineering/incident-reports.md)
+<!-- /language-links -->
 
-## Запуск и доступ
+The Projection Service serves `ReportService` and loads incident facts into ClickHouse. The semantics of metrics and storage model are defined in [ADR-057](../adr/0057-incident-reporting.md).
 
-Каждый процесс задаёт непустой `service.instance`. Сервис `psim-projection-service` использует общий stream runtime: Kafka, Schema Registry, PostgreSQL для журнала пакетов и outbox аудита, TLS API, JWT/JWKS, readiness, метрики и трассировку. Сначала запускают Incident Service и Response Engine. Их PostgreSQL-схемы нужны для пересчёта; обычный загрузчик читает Kafka.
+## Launch and Access
 
-| Настройка `settings` | Назначение |
+Each process specifies a non-empty `service.instance`. The service `psim-projection-service` uses a shared stream runtime: Kafka, Schema Registry, PostgreSQL for batch journal and audit outbox, TLS API, JWT/JWKS, readiness, metrics, and tracing. First, the Incident Service and Response Engine are launched. Their PostgreSQL schemas are needed for recalculation; the regular loader reads from Kafka.
+
+| Configuration of `settings` | Assignment |
 |---|---|
-| `clickhouse_host`, `clickhouse_port`, `clickhouse_cluster` | Узел, нативный порт, кластер DDL |
-| `clickhouse_user`, `clickhouse_password_file` | Роль загрузчика и защищённый файл пароля |
+| `clickhouse_host`, `clickhouse_port`, `clickhouse_cluster` | Node, native port, DDL cluster |
+| `clickhouse_user`, `clickhouse_password_file` | Role of loader and protected password file |
 | `clickhouse_ca_file`, `clickhouse_certificate_file`, `clickhouse_private_key_file` | TLS ClickHouse |
-| `reports_read_user`, `reports_read_password_file` | Выделенная роль API только с SELECT на представление и его зависимости |
-| `reports_batch_messages`, `reports_batch_wait_ms` | Размер пакета и задержка, по умолчанию 5000 и 100 мс |
-| `tls_certificate_file`, `tls_private_key_file`, `tls_ca_file` | TLS API, по умолчанию `reports-server.pem` и `reports-server.key` из `tls_directory` |
-| `issuer`, `jwks_url`, `jwks_ca_file` | Доверенная идентификация |
+| `reports_read_user`, `reports_read_password_file` | Dedicated role for API with only SELECT for view and its dependencies |
+| `reports_batch_messages`, `reports_batch_wait_ms` | Batch size and delay, default 5000 and 100 ms |
+| `tls_certificate_file`, `tls_private_key_file`, `tls_ca_file` | TLS API, default `reports-server.pem` and `reports-server.key` from `tls_directory` |
+| `issuer`, `jwks_url`, `jwks_ca_file` | Identity verification |
 
-Consumer group - `psim-projection-service`, начало чтения - earliest в доступном retention. Локальное незашифрованное подключение допускается только при явном `allow_plaintext`. Загрузчик создаёт таблицы и представления на кластере, поэтому при первичном запуске нужны DDL-права. Производственная поставка должна выделять права установки и рабочие права. API может использовать отдельную роль чтения. Пользователь API получает роль `manager`, `supervisor` или `auditor` и область площадок или зон. Тенант берётся из проверенного JWT.
+Consumer group - `psim-projection-service`, start of reading - earliest in available retention. Local unencrypted connection is allowed only with explicit `allow_plaintext`. The loader creates tables and views on the cluster, so DDL rights are needed at initial launch. Production delivery should separate installation privileges from runtime privileges. The API can use a separate reading role. The API user receives roles `manager`, `supervisor` or `auditor` and a site or zone scope. The tenant is taken from verified JWT.
 
 ## API
 
-- `GET /v1/reports/incidents` - JSON по Protobuf JSON mapping.
-- `GET /v1/reports/incidents:export` - тот же отчёт в CSV с заголовком и строкой итогов.
+- `GET /v1/reports/incidents` - JSON as Protobuf JSON mapping.
+- `GET /v1/reports/incidents:export` - the same report in CSV with header and summary line.
 
-Обязательные параметры: `filter.from` и `filter.to` в RFC 3339, с точностью не мельче миллисекунды. Интервал `[from,to)` не длиннее 400 суток. Дополнительные повторяемые параметры: `filter.site_ids`, `filter.incident_type_ids`, `filter.priorities`. Имена `filter.siteIds` и `filter.incidentTypeIds` также принимаются. Для каждого фильтра допускается не более 100 значений. Приоритеты: `PRIORITY_P1`-`PRIORITY_P4`.
+Required parameters: `filter.from` and `filter.to` in RFC 3339, with precision no finer than milliseconds. The interval `[from,to)` is not longer than 400 days. Additional repeated parameters: `filter.site_ids`, `filter.incident_type_ids`, `filter.priorities`. Names `filter.siteIds` and `filter.incidentTypeIds` are also accepted. For each filter, no more than 100 values are allowed. Priorities: `PRIORITY_P1`-`PRIORITY_P4`.
 
-`grouping` принимает `REPORT_GROUPING_NONE`, `REPORT_GROUPING_SITE`, `REPORT_GROUPING_INCIDENT_TYPE`, `REPORT_GROUPING_PRIORITY`, `REPORT_GROUPING_OPERATOR`, `REPORT_GROUPING_DAY`. По умолчанию возвращаются итоги. День определяется в UTC. Группа приоритета содержит число 1-4, группа оператора - идентификатор последнего ответственного; пустая группа обозначает отсутствие назначения. Предел - 10000 групп, превышение возвращает ошибку без усечения.
+`grouping` accepts `REPORT_GROUPING_NONE`, `REPORT_GROUPING_SITE`, `REPORT_GROUPING_INCIDENT_TYPE`, `REPORT_GROUPING_PRIORITY`, `REPORT_GROUPING_OPERATOR`, `REPORT_GROUPING_DAY`. By default, totals are returned. The day is determined in UTC. The priority group contains numbers 1-4, the operator group - the identifier of the last responsible person; an empty group indicates no assignment. Limit - 10000 groups, exceeding returns an error without truncation.
 
-`incidentsCreated` - число созданных за период, `incidentsResolved` - число решённых за период, включая созданные раньше. MTTA относится к принятию в периоде, MTTR и ложные тревоги - к решению в периоде. При группировке по дням используется время соответствующего наблюдения. SLA относится к первому из моментов завершения и дедлайна; незавершённое наблюдение учитывается после дедлайна. `mtta` и `mttr` - длительности, `falseAlarmRate`, `ackSlaCompliance` и `resolveSlaCompliance` - доли. `ackSlaEvaluated` и `resolveSlaEvaluated` позволяют отличить нулевую долю от отсутствия наблюдений. `escalated` считает созданные за период инциденты с ненулевым текущим уровнем эскалации. Нагрузка оператора представлена `incidentsCreated` при группировке по последнему ответственному. Итоги вычисляются по исходным наблюдениям. При отсутствии данных счётчики и доли равны нулю; нулевые поля могут отсутствовать в JSON согласно Protobuf mapping.
+`incidentsCreated` - number of created incidents during the period, `incidentsResolved` - number of resolved incidents during the period, including those created earlier. MTTA relates to acknowledgement during the period, MTTR and false alarms - to resolution during the period. When grouping by days, the time of the corresponding observation is used. SLA relates to the first moment of completion and deadline; unfinished observations are considered after the deadline. `mtta` and `mttr` - durations, `falseAlarmRate`, `ackSlaCompliance` and `resolveSlaCompliance` - fractions. `ackSlaEvaluated` and `resolveSlaEvaluated` allow distinguishing zero fraction from no observations. `escalated` counts incidents created during the period with a non-zero current escalation level. The operator load is represented by `incidentsCreated` when grouped by the last responsible person. Results are calculated based on original observations. If there are no data, counters and fractions are zero; zero fields may be absent in JSON according to Protobuf mapping.
 
-CSV использует UTF-8, запятую, CRLF и двойные кавычки. Колонка `row_kind` различает итог и группы. Значения групп, начинающиеся со знаков формул, получают апостроф для безопасного открытия в табличном редакторе. Ответы имеют `Cache-Control: no-store`.
+CSV uses UTF-8, comma, CRLF, and double quotes. Column `row_kind` distinguishes summaries and groups. Values starting with symbols get apostrophes for safe opening in a spreadsheet editor. Answers have `Cache-Control: no-store`.
 
-## Пересчёт
+## Recalculation
 
-`psim-report-tool` входит в пакет и образ Projection Service:
+`psim-report-tool` is included in the package and image of the Projection Service:
 
 ```sh
 psim-report-tool rebuild TENANT_UUID FROM_MS TO_MS
 ```
 
-Границы пересчёта выбирают инциденты по времени создания и задаются Unix-временем в миллисекундах. Для восстановления отчётов нужны также инциденты, созданные до начала отчётного периода; при полном восстановлении выбирают весь доступный диапазон. PostgreSQL: `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. По умолчанию TLS проверяет имя узла и УЦ. Пароль передаётся защищённым окружением, а не аргументом команды. Роли достаточно SELECT на `incident.incidents` и `escalation.incidents`.
+The recalculation boundaries are chosen based on the time of creation of incidents and are set in Unix time in milliseconds. To restore reports, incidents created before the reporting period are also needed; when restoring completely, the entire available range is selected. PostgreSQL: `PSIM_PG_HOST`, `PSIM_PG_PORT`, `PSIM_PG_DATABASE`, `PSIM_PG_USER`, `PSIM_PG_PASSWORD`, `PSIM_PG_SSLMODE`, `PSIM_PG_SSLROOTCERT`, `PSIM_PG_SSLCERT`, `PSIM_PG_SSLKEY`. By default, TLS checks the hostname and CA. The password is sent in a secure environment, not as an argument to the command. Roles require only SELECT for `incident.incidents` and `escalation.incidents`.
 
-ClickHouse: `PSIM_CH_HOST`, `PSIM_CH_PORT`, `PSIM_CH_USER`, `PSIM_CH_PASSWORD_FILE`, `PSIM_CH_CA_FILE`, `PSIM_CH_CERT_FILE`, `PSIM_CH_KEY_FILE`. Только для изолированного локального стенда допускается `PSIM_CH_ALLOW_PLAINTEXT=1`. Роль пересчёта получает INSERT на `incident_facts`; материализованное представление должно уже существовать.
+ClickHouse: `PSIM_CH_HOST`, `PSIM_CH_PORT`, `PSIM_CH_USER`, `PSIM_CH_PASSWORD_FILE`, `PSIM_CH_CA_FILE`, `PSIM_CH_CERT_FILE`, `PSIM_CH_KEY_FILE`. Only for isolated local test environment, `PSIM_CH_ALLOW_PLAINTEXT=1` is allowed. The recalculation role gets INSERT for `incident_facts`; the materialized view must already exist.
 
-Утилита читает согласованный снимок порциями по 200 инцидентов. При ошибке часть фактов может быть вставлена, повтор безопасен. Живой загрузчик останавливать не требуется. Для проверки восстановления в пустое назначение сравнивают отчёты и `incident_report_current` до и после пересчёта на остановленных источниках. События до доступного retention Kafka восстанавливают из PostgreSQL.
+The utility reads a consistent snapshot in portions of 200 incidents. If there’s an error, part of the facts may be inserted; repetition is safe. The live loader doesn’t need to be stopped. To verify restoration, reports are compared with `incident_report_current` before and after recalculation on stopped sources. Events before the available retention in Kafka are restored from PostgreSQL.
 
-Не удаляйте только `incident_report_states`, оставляя журнал пакетов и дедупликационные токены загрузчика как единственный механизм восстановления. Выполните пересчёт PostgreSQL после восстановления схемы. Утилита дополняет проекцию, но не удаляет ошибочно внесённые строки или версии.
+Don’t delete only `incident_report_states`, leaving batch journal and loader deduplication tokens as the only restoration mechanism. Perform PostgreSQL recalculation after restoring the schema. The utility supplements the projection, but doesn’t delete incorrectly inserted rows or versions.
 
-## Эксплуатация и проверки
+## Operation and Testing
 
-`psim_clickhouse_*` показывает пакеты, ошибки и отставание загрузчика; `psim_report_query_seconds` - длительность обработки API, включая аудит. Незавершённые пакеты сохраняются в `psim_clickhouse.pending_batches`; ошибки повторяются с задержкой. Readiness ухудшается при ошибке загрузчика, остановке фоновой задачи или отказе публикации аудита. При росте задержки проверяют Kafka lag, доступность PostgreSQL и ClickHouse, размер порций и части таблиц. При отказе публикации аудита проверяют outbox `reports.psim_outbox` и доступ к `psim.audit.v1`.
+`psim_clickhouse_*` shows batches, errors, and loader delay; `psim_report_query_seconds` - API processing duration, including audit. Unfinished batches are stored in `psim_clickhouse.pending_batches`; errors repeat with delay. Readiness worsens when the loader has an error, a background task stops, or the audit publication fails. When the delay increases, check Kafka lag, PostgreSQL and ClickHouse availability, batch size, and table parts. If the audit publication fails, check `reports.psim_outbox` outbox and access to `psim.audit.v1`.
 
 ```sh
 task reports:test
@@ -58,12 +62,12 @@ task reports:sanitizers
 task reports:coverage
 ```
 
-Результаты сохраняются в `build/reports/<preset>/report.json`, журналы - рядом. Объём и результаты нагрузочного замера указываются в отчёте; ограничение три секунды проверяется для всех пяти запросов, включая первый.
+The results are stored in `build/reports/<preset>/report.json`, and the logs are located nearby. The volume and results of the load measurement are indicated in the report; a limit of three seconds is checked for all five requests, including the first one.
 
-Локальный Prometheus загружает правила задержки отчётов и ошибок проекции. Grafana автоматически получает дашборд `PSIM incident reports`: p99 API, ошибки загрузки, скорость вставки и readiness. Для другой топологии настраивают обнаружение адресов административного порта сервиса.
+The local Prometheus loads the rules for delay reporting and projection errors. Grafana provisions the dashboard `PSIM incident reports`: p99 API, loading errors, insertion speed, and readiness. For another topology, the detection of administrative port addresses for the service is configured.
 
-Проверен синтетический набор из миллиона инцидентов за 30 суток: пять запросов занимают 1,76-2,23 с. Это проверка отчёта на заданном объёме, без одновременной нагрузки потока событий. Полная нагрузка записи проверяется при системной квалификации. Интеграционные проверки пройдены в Debug, ASan/UBSan и TSan, включая инцидент, созданный до начала периода, повторы, переоткрытие, передачу, границы SLA, доступ руководителя и восстановление материализованного состояния. Покрытие сервиса - 89,37% строк при пороге 75%. DEB-пакет и контейнер содержат сервис и утилиту пересчёта.
+A synthetic set of one million incidents over 30 days was tested: five requests took 1.76-2.23 seconds. This is a test of the report at a specified volume, without simultaneous event flow load. The full load is checked during system qualification. Integration tests were conducted in Debug, ASan/UBSan, and TSan modes, including an incident created before the period began, repetitions, reopening, handover, SLA boundaries, access by managers, and restoration of the materialized state. Service coverage is 89.37% of lines at a threshold of 75%. The DEB package and container contain the service and a utility for recalculation.
 
-## Совместное размещение с моделями консоли
+## Co-location with console read models
 
-Projection Service также владеет [моделями консоли](console-projections.md). Флаги `reports_enabled`, `console_enabled` и `console_writer` позволяют разделить загрузчик отчётности, единственного писателя консоли и читающие экземпляры. Для прежней отдельной конфигурации отчётности задайте `console_enabled: false`. Пакет и образ сервиса содержат обе утилиты: `psim-report-tool` и `psim-console-tool`.
+The Projection Service also owns [console read models](console-projections.md). Flags `reports_enabled`, `console_enabled`, and `console_writer` allow separating the report loader, the single console writer, and reading instances. For an earlier separate reporting configuration, set `console_enabled: false`. The package and service image contain both utilities: `psim-report-tool` and `psim-console-tool`.

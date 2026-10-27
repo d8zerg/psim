@@ -1,37 +1,40 @@
-# ADR-045. Нативный слой ClickHouse и восстановление пакетов Kafka
+# ADR-045. Native ClickHouse layer and Kafka batch recovery
 
-- **Статус:** Принято
-- **Шаг плана:** 2.8
-- **Дополняет:** [ADR-028](0028-clickhouse-analytical-storage.md)
-- **Связанные:** ADR-014, ADR-016, ADR-024, ADR-041, ADR-043
+<!-- language-links -->
+[English](0045-clickhouse-layer.md) | [Русский](../ru/adr/0045-clickhouse-layer.md)
+<!-- /language-links -->
 
-## Контекст
+- **Status:** Accepted
+- **Supplements:** [ADR-028](0028-clickhouse-analytical-storage.md)
+- **Related to:** ADR-014, ADR-016, ADR-024, ADR-041, ADR-043
 
-Токен топика, партиции и диапазона смещений не обеспечивает повтор пакета, если после сбоя таймер или размер пакета создаёт другие границы. DLQ также должна согласовываться с фиксацией смещений. Нативный клиент синхронный; его сокет нельзя передавать другому запросу до завершения текущего вызова. DDL ClickHouse не участвует в транзакции PostgreSQL.
+## Context
 
-## Решение
+The token of the topic, partition, and range of offsets does not ensure batch repetition if the timer or batch size after a failure creates other boundaries. DLQ must also align with offset recording. The native client is synchronous; its socket cannot be passed to another request until the current call is completed. DDL ClickHouse does not participate in PostgreSQL transactions.
 
-1. Зафиксировать `clickhouse-cpp/2.6.1`, Apache-2.0, в Conan с OpenSSL. Выполнять нативные операции в существующем `BlockingPool`; пул соединений ограничен на shard. После ошибки удалять соединение и выбирать следующую реплику; неизвестные результаты записи не повторять автоматически.
-2. Использовать общий TLS-профиль безопасности с CA, проверкой имени, SNI, клиентским сертификатом и CRL при наличии. Секреты читать из защищённых файлов. Загрузчик, читатель и мигратор имеют отдельные права; SQL и диагностические ответы сервера не попадают в ошибки платформы.
-3. `Select` строит SQL только из проверенных идентификаторов. Все значения - нативные параметры. Обязательны `tenant_id`, интервал времени и ограничения строк, байтов и длительности. Доверенный DDL отделён в административный интерфейс.
-4. До вставки сохранять подготовленные столбцы, исходные DLQ-записи, назначение и границы смещений в PostgreSQL из шага 2.4. Хранить только незавершённые пакеты. Повтор использует исходные байты и SHA-256 токен; имя преобразования стабильно и версионируется при смене семантики.
-5. После подтверждения вставки отметить пакет в журнале; одной Kafka-транзакцией опубликовать DLQ и зафиксировать входные смещения. Перед очисткой восстановленного журнала проверить уже зафиксированные смещения. Групповое поколение и transactional id ограждают прежние экземпляры, блокировка строки журнала сериализует вставку пакета.
-6. Сохранить ограниченную семантику дедупликации ADR-028. Настроить окно ClickHouse под суммарное число блоков и время восстановления. Для повторов за пределами окна использовать стабильный ключ `ReplicatedReplacingMergeTree` и `FINAL`; физические повторы до слияния частей допустимы за пределами окна. Физические потери подтверждённых данных требуют восстановления из источников.
-7. Вести checksums и прогресс DDL в PostgreSQL, сериализовать операторы advisory lock. Сохранять план до первого DDL. Каждый оператор идемпотентен: после падения последний может повториться. `contract` - отдельный запуск после завершённого `expand` и дренирования старых версий.
-8. Проверять адаптер против двух реплик ClickHouse с Keeper, mTLS, ограниченными ролями и сетевыми сбоями. Настоящий SIGKILL на границах доставки должен восстанавливать пакет при изменённом размере чтения. Симулятор 2.7 остаётся ручным и не подменяет компонентные проверки.
+## Solution
 
-## Последствия
+1. Register `clickhouse-cpp/2.6.1`, Apache-2.0, in Conan with OpenSSL. Perform native operations in the existing `BlockingPool`; the connection pool is bounded per shard. After an error, remove the connection and select the next replica; writes with unknown outcomes should not be automatically repeated.
+2. Use a common TLS security profile with CA, name verification, SNI, client certificate, and CRL if available. Secrets should be read from secure files. The loader, reader, and migrator have separate rights; SQL and server diagnostic responses do not enter platform errors.
+3. `Select` constructs SQL only from verified identifiers. All values are native parameters. `tenant_id`, time interval, and limits on rows, bytes, and duration are required. Trusted DDL is separated into administrative interface.
+4. Before insertion, save prepared columns, original DLQ records, assignments, and offset boundaries in PostgreSQL through the platform library. Only incomplete batchs should be saved. Repetition uses original bytes and SHA-256 token; the transformation name is stable and versioned when semantics change.
+5. After confirmation of insertion, mark the batch in the log; publish DLQ with one Kafka transaction and record input offsets. Before cleaning up a recovered journal, check committed offsets. Group generation and transactional id fence previous instances; a journal row lock serializes batch insertion.
+6. Save limited deduplication semantics from ADR-028. Configure ClickHouse window based on total blocks and recovery time. For repetitions outside the window, use stable keys `ReplicatedReplacingMergeTree` and `FINAL`; physical repetitions before merging are allowed outside the window. Physical loss of confirmed data requires restoration from sources.
+7. Keep checksums and progress of DDL in PostgreSQL, serialize statements with an advisory lock. Save plans before the first DDL. Each operation is idempotent: after a failure, the last one can repeat. `contract` is a separate run after `expand` is completed and old versions are drained.
+8. Check the adapter against two replicas of ClickHouse with Keeper, mTLS, limited roles, and network failures. The actual SIGKILL at delivery boundaries should restore the batch if the read size changes. The simulator remains manual and does not replace component checks.
 
-- Шаг 2.8 дополнительно зависит от готового слоя PostgreSQL 2.4. Нужны служебная схема, права на журнал и его резервирование; предметная история в ней не хранится.
-- Незавершённый пакет ограничен настройками размера; чтение приостанавливается на время доставки. Это ограничивает память и распространяет противодавление до Kafka.
-- Вызов синхронного драйвера дренируется до освобождения соединения. Серверный лимит и сокетные таймауты действуют на разных уровнях; отмена Asio не прерывает системный вызов мгновенно.
-- Схемы предметной истории, retention и отчётов уточняются на шагах 4.5, 5.4 и 6.5. Слой предоставляет механизм, не фиксируя предметную модель раньше этих шагов.
+## Consequences
 
-## Проверка
+- ClickHouse adapter depends on PostgreSQL layer. A service schema, log rights, and its backup are needed; domain history is not stored there.
+- Uncompleted batchs are limited by size settings; reading is paused during delivery. This limits memory and spreads backpressure to Kafka.
+- Synchronous driver calls are drained until the connection is freed. Server limits and socket timeouts operate at different levels; Asio cancellation does not interrupt system calls immediately.
+- Schemas for domain history, retention, and reports are defined in ADR-052, ADR-054, and ADR-057. The library provides infrastructure mechanisms; the domain model belongs to services.
 
-`task test:clickhouse`, `task test:clickhouse:sanitizers`, `task test:component`, `task bench:clickhouse`. Порог вставки - 100 000 строк/с, покрытие адаптера - 75%. Запросы проверяются на бинарных значениях и попытках SQL-инъекции, tenant/time нельзя исключить из построителя.
+## Verification
 
-## Источники
+`task test:clickhouse`, `task test:clickhouse:sanitizers`, `task test:component`, `task bench:clickhouse`. Insertion threshold is 100,000 rows/s, adapter coverage is 75%. Requests are checked for binary values and SQL injection attempts; tenant/time cannot be excluded from the builder.
 
-- [Нативный клиент ClickHouse](https://github.com/ClickHouse/clickhouse-cpp/tree/v2.6.1).
-- [Дедупликация повторных вставок](https://clickhouse.com/docs/guides/developer/deduplicating-inserts-on-retries).
+## Sources
+
+- [Native ClickHouse client](https://github.com/ClickHouse/clickhouse-cpp/tree/v2.6.1).
+- [Deduplication of repeated insertions](https://clickhouse.com/docs/guides/developer/deduplicating-inserts-on-retries).
