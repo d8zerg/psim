@@ -28,6 +28,11 @@ class Check:
             self.compose_cmd += ["-f", "deploy/local/compose.sanitizer.yaml"]
         override = self.output / "compose.yaml"
         overrides = {"normalizer": {"environment": {"PSIM__TELEMETRY__SAMPLING_RATIO": "0.001"}}}
+        self.normalizer_shards = int(os.environ.get("PSIM_PROCESSING_SHARDS", "1"))
+        if not 1 <= self.normalizer_shards <= 4:
+            raise ValueError("invalid processing shard count")
+        for name in ("normalizer", "normalizer-2", "normalizer-3"):
+            overrides.setdefault(name, {}).setdefault("environment", {})["PSIM__RUNTIME__SHARDS"] = str(self.normalizer_shards)
         gap = os.environ.get("PSIM_NORMALIZER_TRANSACTION_GAP_MS")
         if gap is not None:
             for name in ("normalizer", "normalizer-2", "normalizer-3"):
@@ -38,7 +43,7 @@ class Check:
         self.owned = subprocess.run(["docker", "network", "inspect", project + "_default"], capture_output=True).returncode != 0
         self.probe = envctl.Env(project)
         self.apps = ["normalizer", "normalizer-2", "normalizer-3", "event-history", "history-2"]
-        self.report = {"passed": False, "events": count, "checks": []}
+        self.report = {"passed": False, "events": count, "normalizer_shards_per_instance": self.normalizer_shards, "checks": []}
 
     def run(self, args, log_output=True):
         result = subprocess.run(args, cwd=ROOT, env=self.env, capture_output=True, text=True)
@@ -76,7 +81,7 @@ class Check:
             self.wait(lambda: self.probe.http("GET", "http://" + service + ":9100/health/ready")[0] == 200)
 
     def balanced(self, normalizers=3):
-        for group, members in (("psim-normalizer", normalizers), ("psim-event-history", 2)):
+        for group, members in (("psim-normalizer", normalizers * self.normalizer_shards), ("psim-event-history", 2)):
             def stable():
                 state = self.compose("exec", "-T", "kafka-1", "/opt/kafka/bin/kafka-consumer-groups.sh", "--bootstrap-server", "kafka-1:19092", "--describe", "--group", group, "--state")
                 return any(re.search(r"\bStable\s+" + str(members) + r"\s*$", row) for row in state.splitlines())

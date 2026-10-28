@@ -224,17 +224,16 @@ struct Stream {
       throw std::runtime_error("test batch write failed");
     }
     wire::SessionResponse response;
+    if (!next(&response, wire::SessionResponse::kCredits)) {
+      throw std::runtime_error("test batch did not return credits before acknowledgement");
+    }
     if (!next(&response, wire::SessionResponse::kBatchAck)) {
       stream->WritesDone();
       const auto status = stream->Finish();
       finished = true;
       throw std::runtime_error("test batch was not acknowledged: " + status.error_message());
     }
-    auto ack = response.batch_ack();
-    if (!next(&response, wire::SessionResponse::kCredits)) {
-      throw std::runtime_error("test batch did not return credits");
-    }
-    return ack;
+    return response.batch_ack();
   }
 };
 

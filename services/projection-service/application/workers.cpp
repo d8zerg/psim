@@ -195,7 +195,7 @@ class HttpWorker final : public p::stream::Worker {
     while (!stopping_) {
       auto result = co_await relay_->drain_once();
       relay_healthy_.store(result.has_value());
-      timer_.expires_after(std::chrono::milliseconds(result ? 10 : 250));
+      timer_.expires_after(p::pg::outbox_poll_interval(result));
       if (!stopping_) {
         co_await timer_.async_wait(asio::as_tuple(asio::use_awaitable));
       }

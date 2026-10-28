@@ -109,11 +109,11 @@ asio::awaitable<p::Result<Json>> Repository::get_import(p::security::Principal p
   co_return Json::parse(rows->value(0, 0).value_or(""));
 }
 
-asio::awaitable<p::Result<void>> Repository::import_once() {
-  co_return co_await pg::in_transaction<void>(
+asio::awaitable<p::Result<bool>> Repository::import_once() {
+  co_return co_await pg::in_transaction<bool>(
       pool_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
-      [this](pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+      [this](pg::Transaction* tx) -> asio::awaitable<p::Result<bool>> {
         auto jobs = co_await tx->connection().query(
             {.sql = "SELECT tenant::text,id::text,principal::text FROM catalog.imports "
                     "WHERE report->>'state'='IMPORT_STATE_RUNNING' ORDER BY id LIMIT 1"});
@@ -121,13 +121,13 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
           co_return std::unexpected(jobs.error());
         }
         if (!jobs->size()) {
-          co_return p::Result<void>{};
+          co_return false;
         }
         const std::string tenant(jobs->value(0, 0).value_or(""));
         const std::string id(jobs->value(0, 1).value_or(""));
         auto locked = co_await lock(tx, tenant);
         if (!locked) {
-          co_return locked;
+          co_return std::unexpected(locked.error());
         }
         auto current = co_await tx->connection().query(
             {.sql =
@@ -138,7 +138,7 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
           co_return std::unexpected(current.error());
         }
         if (!current->size()) {
-          co_return p::Result<void>{};
+          co_return false;
         }
         auto report = Json::parse(current->value(0, 0).value_or(""));
         const bool dry_run = current->value(0, 2) == "t";
@@ -232,7 +232,7 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
           mutation.action = dry_run ? "validate" : "complete";
           auto audited = co_await audit(tx, mutation, "import", id, "", std::chrono::system_clock::now());
           if (!audited) {
-            co_return audited;
+            co_return std::unexpected(audited.error());
           }
           for (const auto* sql : {"DELETE FROM catalog.import_rows WHERE tenant=$1::uuid AND job=$2::uuid",
                                   "DELETE FROM catalog.import_seen WHERE tenant=$1::uuid AND job=$2::uuid"}) {
@@ -251,7 +251,7 @@ asio::awaitable<p::Result<void>> Repository::import_once() {
         if (!saved) {
           co_return std::unexpected(saved.error());
         }
-        co_return p::Result<void>{};
+        co_return true;
       });
 }
 }  // namespace psim::resource_catalog

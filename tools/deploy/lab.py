@@ -155,6 +155,7 @@ def up(topology):
             '--env', 'LD_PRELOAD=', '--tmpfs', '/tmp:rw,nosuid,size=32m,mode=1777',
             '--mount', 'type=bind,src=' + str(ROOT / 'tools/deploy') + ',dst=/repo/tools/deploy,readonly',
             '--mount', 'type=bind,src=' + str(ROOT / 'deploy/local/config/keycloak') + ',dst=/repo/deploy/local/config/keycloak,readonly',
+            '--mount', 'type=bind,src=' + str(ROOT / 'deploy/observability') + ',dst=/repo/deploy/observability,readonly',
             '--mount', 'type=bind,src=' + str(bundle) + ',dst=/bundle,readonly',
             '--mount', 'type=bind,src=' + str(holder) + ',dst=/private', '--entrypoint', 'python3',
             'psim-platform/postgres:' + profile.image_version, '/repo/tools/deploy/material.py', '--bundle', '/bundle', '--output', '/private/material', '--lab-issue'])

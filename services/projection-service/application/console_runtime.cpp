@@ -1,5 +1,7 @@
 #include <boost/asio/as_tuple.hpp>
 #include <boost/asio/co_spawn.hpp>
+#include <opentelemetry/nostd/shared_ptr.h>
+#include <opentelemetry/trace/span.h>
 #include <prometheus/gauge.h>
 #include <prometheus/histogram.h>
 
@@ -12,6 +14,7 @@
 #include <optional>
 #include <string>
 #include <utility>
+#include <vector>
 
 #include "console_replay.hpp"
 #include "console_store.hpp"
@@ -201,27 +204,40 @@ class ConsoleWorker final : public p::stream::Worker {
         }
         heartbeat = std::chrono::steady_clock::now() + std::chrono::seconds(1);
       }
-      const auto before = source_->positions();
-      auto messages = co_await source_->poll(64, std::chrono::milliseconds(2));
+      auto written = source_->positions();
+      auto messages = co_await source_->poll(1024, std::chrono::milliseconds(2));
       if (!messages) {
         context().logger().error("console Kafka read failed");
         co_return;
       }
+      std::vector<opentelemetry::nostd::shared_ptr<opentelemetry::trace::Span>> traces;
       for (const auto& message : *messages) {
-        auto trace = p::stream::span(context(), "console.project", message.headers());
-        auto applied = co_await store_->apply(&message);
+        traces.push_back(p::stream::span(context(), "console.project", message.headers()));
+      }
+      auto applied = co_await store_->apply_batch(*messages);
+      for (const auto& trace : traces) {
         trace->End();
-        if (!applied) {
-          context().logger().error("console write failed", {{"code", std::string(applied.error().name())}});
-          co_return;
-        }
+      }
+      if (!applied) {
+        context().logger().error("console write failed", {{"code", std::string(applied.error().name())}});
+        co_return;
+      }
+      for (const auto& message : *messages) {
+        auto& offset = written[message.topic_partition()];
+        offset = std::max(offset, message.offset() + 1);
         if (const auto timestamp = message.timestamp()) {
           updates_->Observe(
               std::max(0.0, std::chrono::duration<double>(std::chrono::system_clock::now() - *timestamp).count()));
         }
       }
-      auto advanced =
-          before == source_->positions() ? p::Result<void>{} : co_await store_->advance(source_->positions());
+      p::kafka::Offsets changed;
+      for (const auto& [partition, offset] : source_->positions()) {
+        const auto previous = written.find(partition);
+        if (previous == written.end() || previous->second < offset) {
+          changed.emplace(partition, offset);
+        }
+      }
+      auto advanced = changed.empty() ? p::Result<void>{} : co_await store_->advance(std::move(changed));
       if (!advanced) {
         context().logger().error("console cursor write failed");
         co_return;

@@ -114,7 +114,7 @@ asio::awaitable<p::Result<void>> Registry::initialize() {
 
 asio::awaitable<p::Result<Snapshot>> Registry::snapshot() {
   co_return co_await pg::in_transaction<Snapshot>(
-      pool_,
+      reader_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): owned until awaited.
       [](pg::Transaction* tx) -> asio::awaitable<p::Result<Snapshot>> {
         auto revision = co_await tx->connection().query({.sql = "SELECT revision FROM ingest.control WHERE id=1"});

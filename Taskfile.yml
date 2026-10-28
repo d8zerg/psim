@@ -53,6 +53,9 @@ vars:
   CI_SCOPE: build/{{.PLATFORM}}/ci-scope.json
 
 includes:
+  load:
+    taskfile: ./tools/taskfiles/load.yml
+    dir: .
   deploy:
     taskfile: ./tools/taskfiles/deploy.yml
     dir: .
@@ -246,6 +249,8 @@ tasks:
         if: '[ "{{.CPP}}" = true ]'
       - task: bench:compare                   # B-05; before the environment loads the machine
         vars: {BENCHES: '{{.BENCHES}}'}
+        if: '[ "{{.BENCH}}" = true ]'
+      - task: load:test
         if: '[ "{{.BENCH}}" = true ]'
       - task: operator:benchmark              # isolated browser measurements
         if: '[ "{{.WEB}}" = true ]'

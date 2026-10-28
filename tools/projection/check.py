@@ -126,15 +126,37 @@ class Check(Base):
         self.wait(lambda: any(row["maintenanceId"] == self.device_maintenance for row in self.snapshot()["maintenanceWindows"]), 30)
         self.mark("shared scoped models, independent event/report cursors, maintenance and duty projections")
 
+    def ignored_events(self):
+        topic = "psim.events.normalized.v1"
+        self.compose("stop", "-t", "30", "projection-service")
+        before = self.positions(topic)
+        revision_sql = "SELECT revision FROM console.generations WHERE id=(SELECT generation FROM console.active)"
+        revision = int(self.sql(revision_sql))
+        observation_sql = "SELECT body::text FROM console.resources WHERE replica=(SELECT generation FROM console.active) AND kind='observation' AND id='" + self.source["sourceId"] + "'"
+        observation = self.sql(observation_sql)
+        records = [self.event(sequence) for sequence in range(1000, 1512)]
+        for record in records:
+            record["value"]["event"]["eventClass"] = "EVENT_CLASS_INFO"
+        try:
+            self.probe(records)
+        finally:
+            self.compose("start", "projection-service")
+        self.wait(lambda: self.positions(topic) >= before + len(records), 60)
+        assert self.sql(observation_sql) == observation
+        assert int(self.sql(revision_sql)) - revision < 32, "ignored events caused per-message projection writes"
+        self.compose("restart", "-t", "30", "projection-service")
+        self.wait(lambda: self.device_status(), 60)
+        assert self.positions(topic) >= before + len(records)
+        assert self.sql(observation_sql) == observation
+        self.mark("ignored events checkpoint in batches and survive restart without changing device observations")
+
     def cache_fallback(self):
         self.snapshot()
         self.snapshot()
         assert re.search(r"psim_console_cache_hits_total [1-9]", self.metrics_text())
         self.compose("stop", "-t", "10", "valkey")
         try:
-            status = self.device_status()
-            assert status["quality"] == "DATA_QUALITY_STALE" and not status["online"]
-            assert status["sources"][0]["values"] == {"armed": "true"}
+            self.request("GET", "/v1/feed/locations/" + self.floor["locationId"] + "/status", role="operator", expected=503)
         finally:
             self.compose("start", "--wait", "valkey")
         self.probe(releases=[self.runtime_lease])
@@ -146,7 +168,7 @@ class Check(Base):
         self.probe(leases=[self.runtime_lease])
         self.probe([self.state_report(13)])
         self.wait(lambda: self.device_status()["online"], 30)
-        self.mark("Redis cache hits, PostgreSQL fallback and lease loss without false online")
+        self.mark("Redis cache hits, fail-closed REST quota, PostgreSQL reads after cache eviction and lease loss without false online")
 
     def rebuild_command(self, expected=True):
         command = "PSIM_PG_PASSWORD_FILE=/repo/.cache/event-flow/postgres.secret PSIM_PG_SSLMODE=disable PSIM_KAFKA_ALLOW_PLAINTEXT=1 " + f"build/debian13/{self.preset}/services/projection-service/psim-console-tool rebuild"
@@ -191,8 +213,11 @@ class Check(Base):
             return next(float(value) for label, value in values if float(label) == 0.1)
         before = self.metrics_text()
         total = 300
+        history_sql = "SELECT count(*) FROM console.history WHERE kind='observation' AND id='" + self.source["sourceId"] + "'"
+        history_before = int(self.sql(history_sql))
         self.probe([self.event(sequence) for sequence in range(20, 20 + total)])
         self.wait(lambda: self.sql("SELECT version FROM console.resources WHERE replica=(SELECT generation FROM console.active) AND kind='observation' AND id='" + self.source["sourceId"] + "'") == str(19 + total), 60)
+        assert int(self.sql(history_sql)) - history_before == total, "batched projection lost intermediate history"
         after = self.metrics_text()
         measured = count(after) - count(before)
         slow = measured - (count(after, True) - count(before, True))
@@ -201,6 +226,22 @@ class Check(Base):
             assert slow / measured <= 0.01, (slow, measured)
         self.report["consoleUpdateLatency"] = {"samples": measured, "over100ms": slow, "p99UpperBoundMs": 100 if slow / measured <= 0.01 else None, "source": "Kafka CreateTime to PostgreSQL COMMIT"}
         self.mark("live console projection latency measured independently of replay")
+
+    def atomic_batch_failure(self):
+        self.compose("stop", "-t", "30", "projection-service")
+        before = self.digest()
+        position = self.positions("psim.events.normalized.v1")
+        history = self.sql("SELECT count(*) FROM console.history")
+        records = [self.event(sequence) for sequence in range(5000, 5130)]
+        records[-1]["value"]["event"]["sourceId"] = "invalid-source"
+        self.probe(records)
+        self.compose("start", "projection-service")
+        self.wait(lambda: "PROCESSING_PAYLOAD_INVALID" in self.compose("logs", "--no-color", "--tail", "100", "projection-service"), 60)
+        self.compose("stop", "-t", "30", "projection-service")
+        assert self.digest() == before, "failed projection batch changed resources"
+        assert self.positions("psim.events.normalized.v1") == position, "failed projection batch advanced offsets"
+        assert self.sql("SELECT count(*) FROM console.history") == history, "failed projection batch changed history"
+        self.mark("invalid batch rolls back pipelined resource writes, history and Kafka positions together")
 
     def expiry_after_rebuild(self):
         device = self.request("POST", "/v1/devices", self.device(902))["device"]
@@ -261,6 +302,7 @@ def main():
         check.snapshots()
         check.feeds()
         check.prepare_models()
+        check.ignored_events()
         check.history()
         check.cache_fallback()
         check.reconstruction()
@@ -270,6 +312,7 @@ def main():
         check.contracts()
         check.metrics()
         check.cancel_inflight()
+        check.atomic_batch_failure()
         check.report["passed"] = True
     finally:
         try:

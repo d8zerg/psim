@@ -392,6 +392,37 @@ TEST(PgOutbox, FailedPublisherLeavesTheWholeBatchPendingAndSuccessfulRetryDrains
   run(scenario(schema));
 }
 
+TEST(PgOutbox, IdleRelayFindsNewCommittedMessagesWithoutPublishingUncommittedRows) {
+  auto scenario = [](std::string schema) -> asio::awaitable<void> {
+    auto connection = co_await connect();
+    MessageStore store(schema);
+    check(co_await store.initialize(connection.get()));
+    Pool pool({.connection = options()});
+    bool fail_publish = false;
+    std::size_t published = 0;
+    const Publisher publish = [&fail_publish, &published](std::span<const OutboxMessage> messages) {
+      return fake_publish(&fail_publish, &published, messages);
+    };
+    OutboxRelay relay(&pool, store, publish);
+    EXPECT_EQ(take(co_await relay.drain_once()), 0);
+    auto transaction = take(co_await Transaction::begin(connection.get()));
+    check(co_await store.append(&transaction, {.id = "rolled-back", .record = {.topic = "events", .value = "unused"}}));
+    EXPECT_EQ(take(co_await relay.drain_once()), 0);
+    check(co_await transaction.rollback());
+    EXPECT_EQ(take(co_await relay.drain_once()), 0);
+    for (const auto* id : {"first", "second"}) {
+      auto next = take(co_await Transaction::begin(connection.get()));
+      check(co_await store.append(&next, {.id = id, .record = {.topic = "events", .value = std::string("a\0b", 3)}}));
+      check(co_await next.commit());
+      EXPECT_EQ(take(co_await relay.drain_once()), 1);
+      EXPECT_EQ(take(co_await relay.drain_once()), 0);
+    }
+    EXPECT_EQ(published, 2);
+    co_await drop(schema);
+  };
+  run(scenario(unique_schema()));
+}
+
 TEST(PgConnection, TerminatedBackendFailsWithoutRetryingAndPoolReconnects) {
   auto scenario = []() -> asio::awaitable<void> {
     Pool pool({.connection = options(), .size = 1});

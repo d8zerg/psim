@@ -23,7 +23,8 @@ class Registry {
  public:
   using Encode = std::function<platform::kafka::Record(std::string, std::string, const google::protobuf::Message&)>;
 
-  Registry(platform::pg::Pool* pool, Encode encode) : pool_(pool), encode_(std::move(encode)), messages_("ingest") {}
+  Registry(platform::pg::Pool* pool, platform::pg::Pool* reader, Encode encode)
+      : pool_(pool), reader_(reader), encode_(std::move(encode)), messages_("ingest") {}
 
   boost::asio::awaitable<platform::Result<void>> initialize();
   boost::asio::awaitable<platform::Result<Snapshot>> snapshot();
@@ -49,6 +50,7 @@ class Registry {
   boost::asio::awaitable<platform::Result<void>> append(platform::pg::Transaction* tx,
                                                         const ingest::v1::GatewayStateRecord* state);
   platform::pg::Pool* pool_;
+  platform::pg::Pool* reader_;
   Encode encode_;
   platform::pg::MessageStore messages_;
 };

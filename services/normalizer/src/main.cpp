@@ -10,6 +10,7 @@
 #include <memory>
 #include <set>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -42,8 +43,11 @@ std::string settings() {
 
 class Worker final : public p::stream::Worker {
  public:
-  explicit Worker(const p::runtime::Context& context)
-      : p::stream::Worker(context, "normalizer", "psim.ingest.raw.v1") {}
+  Worker(const p::runtime::Context& context, std::size_t shard)
+      : p::stream::Worker(context, "normalizer", "psim.ingest.raw.v1", p::kafka::Semantics::kExactlyOnce, false, shard),
+        component_name_("normalizer-" + std::to_string(shard)) {}
+
+  std::string_view name() const override { return component_name_; }
 
   std::string consumer_group() const override { return "psim-normalizer"; }
 
@@ -241,6 +245,7 @@ class Worker final : public p::stream::Worker {
 
  private:
   std::unique_ptr<Model> model_;
+  std::string component_name_;
   std::unique_ptr<p::stream::Replica> control_;
   std::set<std::int32_t> restore_;
   std::int64_t batch_started_ns_ = 0;
@@ -259,7 +264,9 @@ int main(int argc, char** argv) {
                                        .create = [](psim::platform::runtime::Context& context)
                                            -> psim::platform::Result<psim::platform::runtime::Components> {
                                          psim::platform::runtime::Components result;
-                                         result.push_back(std::make_unique<psim::normalizer::Worker>(context));
+                                         for (std::size_t shard = 0; shard < context.shards().size(); ++shard) {
+                                           result.push_back(std::make_unique<psim::normalizer::Worker>(context, shard));
+                                         }
                                          return result;
                                        }});
 }

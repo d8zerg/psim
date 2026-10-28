@@ -1,0 +1,51 @@
+version: '3'
+tasks:
+  test:
+    desc: Reject incomplete load evidence and verify capacity arithmetic
+    cmds:
+      - task: :cpp:_run
+        vars: {CMD: 'python3 -I tools/load/test_load.py'}
+  _run:
+    internal: true
+    requires: {vars: [PROFILE]}
+    cmds:
+      - task: :cpp:build
+        vars: {PRESET: release}
+      - python3 -I tools/load/check.py {{.PROFILE}}
+  steady:
+    desc: Measure 50000 acknowledged events per second for ten minutes after warmup
+    cmds:
+      - task: _run
+        vars: {PROFILE: steady}
+  soak:
+    desc: Measure ten minutes of LOAD-50K with memory and consumer lag sampling
+    cmds:
+      - task: _run
+        vars: {PROFILE: soak}
+  peak:
+    desc: Measure 75000 acknowledged events per second for five minutes and bounded recovery
+    cmds:
+      - task: _run
+        vars: {PROFILE: peak}
+  consoles:
+    desc: Qualify 500 consoles and public read latency during LOAD-50K
+    cmds:
+      - task: steady
+  nightly:
+    desc: Exercise the complete load instrumentation at 5000 events per second
+    cmds:
+      - task: _run
+        vars: {PROFILE: nightly}
+  qualify:
+    desc: Run sustained, soak and peak load qualification on the ready owned cluster
+    cmds:
+      - task: test
+      - task: steady
+      - task: soak
+      - task: peak
+  sizing:
+    desc: Calculate storage and capacity from explicit assumptions and measured event row sizes
+    requires: {vars: [INPUT, OUTPUT]}
+    cmds:
+      - task: :cpp:_run
+        vars: {CMD: 'python3 -I tools/load/sizing.py {{.INPUT}} {{.OUTPUT}}'}

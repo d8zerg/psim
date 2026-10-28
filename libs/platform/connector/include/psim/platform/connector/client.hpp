@@ -45,6 +45,11 @@ struct Diagnostics {
   std::size_t sessions = 0;
   std::size_t acknowledged = 0;
   std::size_t rejected = 0;
+  std::size_t batches_sent = 0;
+  std::size_t batch_acks = 0;
+  double max_acknowledgement_ms = 0;
+  double max_buffer_acknowledgement_ms = 0;
+  double max_pending_read_ms = 0;
   std::string last_error;
 };
 

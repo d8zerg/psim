@@ -277,13 +277,20 @@ class Worker final : public p::stream::Worker {
     const std::array timers{&tick_, &imports_, &relay_timer_, &cleanup_, &config_timer_};
     auto& timer = *timers.at(operation);
     while (!stopping_) {
+      auto interval = std::chrono::milliseconds(1);
       p::Result<void> result;
       if (operation == 0) {
         result = co_await repository_->tick(context().clock().wall());
       } else if (operation == 1) {
-        result = co_await repository_->import_once();
+        auto imported = co_await repository_->import_once();
+        if (!imported) {
+          result = std::unexpected(imported.error());
+        } else if (!*imported) {
+          interval = std::chrono::milliseconds(50);
+        }
       } else if (operation == 2) {
         auto published = co_await relay_->drain_once();
+        interval = p::pg::outbox_poll_interval(published);
         if (!published) {
           result = std::unexpected(published.error());
         }
@@ -310,7 +317,6 @@ class Worker final : public p::stream::Worker {
         context().logger().warn("catalog background operation deferred",
                                 {{"code", std::string(result.error().name())}});
       }
-      auto interval = std::chrono::milliseconds(1);
       if (!result) {
         interval = std::chrono::milliseconds(250);
       } else if (operation == 0) {

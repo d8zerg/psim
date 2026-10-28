@@ -43,7 +43,7 @@ class Repository {
   asio::awaitable<p::Result<void>> tick(Time now);
   asio::awaitable<p::Result<Json>> start_import(Mutation mutation, std::vector<Json> rows, bool dry_run);
   asio::awaitable<p::Result<Json>> get_import(p::security::Principal principal, std::string id);
-  asio::awaitable<p::Result<void>> import_once();
+  asio::awaitable<p::Result<bool>> import_once();
   asio::awaitable<p::Result<void>> reserve_file(p::security::Principal principal, Json file);
   asio::awaitable<p::Result<Json>> attach_file(Json file, double width, double height, Mutation mutation);
   asio::awaitable<p::Result<Json>> file(p::security::Principal principal, std::string floor, std::uint64_t version);

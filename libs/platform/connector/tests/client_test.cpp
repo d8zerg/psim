@@ -152,6 +152,49 @@ class Peer final : public wire::ConnectorGatewayService::Service {
   std::unique_ptr<grpc::Server> server_;
 };
 
+TEST(ConnectorConformance, CreditsBeforeAcknowledgementRestoreTheFullBatchWindow) {
+  std::atomic_bool first_received{false};
+  std::atomic_bool queued{false};
+  Peer peer([&](grpc::ServerContext* /*context*/, Stream* stream) {
+    wire::SessionRequest request;
+    if (!stream->Read(&request) || !stream->Write(registered("session", 2))) {
+      return grpc::Status::OK;
+    }
+    for (const auto expected : {1, 2, 2}) {
+      if (!receive(stream, &request) || !request.has_event_batch()) {
+        return grpc::Status::OK;
+      }
+      EXPECT_EQ(request.event_batch().events_size(), expected);
+      if (expected == 1) {
+        first_received.store(true);
+        if (!wait([&] { return queued.load(); })) {
+          return grpc::Status(grpc::StatusCode::DEADLINE_EXCEEDED, "events were not queued");
+        }
+      }
+      wire::SessionResponse response;
+      response.mutable_credits()->set_grant(static_cast<std::uint32_t>(request.event_batch().events_size()));
+      (void)stream->Write(response);
+      response.Clear();
+      response.mutable_batch_ack()->set_batch_seq(request.event_batch().batch_seq());
+      response.mutable_batch_ack()->set_accepted(static_cast<std::uint32_t>(request.event_batch().events_size()));
+      (void)stream->Write(response);
+    }
+    while (receive(stream, &request)) {
+    }
+    return grpc::Status::OK;
+  });
+  Client client(peer.options());
+  ASSERT_TRUE(client.publish(alarm()));
+  ASSERT_TRUE(client.start());
+  ASSERT_TRUE(wait([&] { return first_received.load(); }));
+  ASSERT_TRUE(client.publish_batch({alarm(), alarm(), alarm(), alarm()}));
+  queued.store(true);
+  EXPECT_TRUE(client.flush(std::chrono::milliseconds(5000)));
+  EXPECT_EQ(client.diagnostics().acknowledged, 5);
+  EXPECT_EQ(client.diagnostics().batch_acks, 3);
+  client.stop();
+}
+
 TEST(ConnectorConformance, CreditsHeartbeatLostAckReplayAndLegacyNegotiation) {
   std::atomic_int sessions{0};
   std::string first_id;
@@ -203,6 +246,11 @@ TEST(ConnectorConformance, CreditsHeartbeatLostAckReplayAndLegacyNegotiation) {
   EXPECT_TRUE(client.flush(std::chrono::milliseconds(5000)));
   EXPECT_GE(sessions.load(), 2);
   EXPECT_EQ(client.diagnostics().acknowledged, 1);
+  EXPECT_GE(client.diagnostics().batches_sent, 2);
+  EXPECT_EQ(client.diagnostics().batch_acks, 1);
+  EXPECT_GT(client.diagnostics().max_acknowledgement_ms, 0);
+  EXPECT_GT(client.diagnostics().max_buffer_acknowledgement_ms, 0);
+  EXPECT_GT(client.diagnostics().max_pending_read_ms, 0);
   EXPECT_NE(client.metrics().find("psim_connector_pending_events 0"), std::string::npos);
   EXPECT_FALSE(client.start());
   client.stop();

@@ -4,6 +4,7 @@
 #include <grpcpp/grpcpp.h>
 #include <prometheus/counter.h>
 #include <prometheus/gauge.h>
+#include <prometheus/histogram.h>
 #include <psim/connector/v1/administration.grpc.pb.h>
 #include <psim/connector/v1/connector.grpc.pb.h>
 
@@ -47,6 +48,7 @@ class Gateway final : public platform::stream::Worker,
   boost::asio::awaitable<void> shutdown() override;
   boost::asio::awaitable<platform::Result<void>> open_listener();
   boost::asio::awaitable<void> refresh();
+  boost::asio::awaitable<void> maintain_registry();
   boost::asio::awaitable<void> publish();
   boost::asio::awaitable<void> commands();
   boost::asio::awaitable<void> renew(std::shared_ptr<SessionState> session);
@@ -63,6 +65,7 @@ class Gateway final : public platform::stream::Worker,
   void timer();
   std::unique_ptr<grpc::Server> server_;
   std::unique_ptr<platform::pg::Pool> database_;
+  std::unique_ptr<platform::pg::Pool> registry_reader_;
   std::unique_ptr<Registry> registry_;
   std::unique_ptr<platform::pg::OutboxRelay> relay_;
   std::unique_ptr<platform::redis::Pool> redis_;
@@ -70,14 +73,15 @@ class Gateway final : public platform::stream::Worker,
   std::unique_ptr<platform::kafka::Consumer> command_consumer_;
   std::map<std::string, std::shared_ptr<SessionState>> sessions_;
   Snapshot snapshot_;
-  boost::asio::steady_timer tick_, refreshed_, published_, idle_;
+  boost::asio::steady_timer tick_, refreshed_, maintained_, published_, idle_;
   std::chrono::steady_clock::time_point verified_{};
   std::string boot_, ca_file_;
   std::atomic_bool healthy_{false};
-  bool stopping_ = false, command_healthy_ = true;
+  bool stopping_ = false, command_healthy_ = true, snapshot_healthy_ = true;
   int background_ = 0, releasing_ = 0;
   prometheus::Counter *accepted_, *rejected_, *commands_sent_, *expired_, *denied_;
   prometheus::Gauge* connected_;
+  prometheus::Histogram *quota_latency_, *prepare_latency_, *delivery_latency_, *ack_latency_;
 };
 
 [[nodiscard]] std::string settings_schema();

@@ -226,9 +226,11 @@ class Worker final : public p::stream::Worker {
   asio::awaitable<void> background(bool publishing) {
     auto& timer = publishing ? relay_timer_ : tick_;
     while (!stopping_) {
+      auto interval = std::chrono::milliseconds(publishing ? 1 : 1000);
       p::Result<void> result;
       if (publishing) {
         auto emitted = co_await relay_->drain_once();
+        interval = p::pg::outbox_poll_interval(emitted);
         if (!emitted) {
           result = std::unexpected(emitted.error());
         }
@@ -241,11 +243,10 @@ class Worker final : public p::stream::Worker {
             "audit background operation deferred",
             {{"code", std::string(result.error().name())}, {"error", std::string(result.error().message())}});
       }
-      auto interval = publishing ? 1 : 1000;
       if (!result) {
-        interval = 250;
+        interval = std::chrono::milliseconds(250);
       }
-      timer.expires_after(std::chrono::milliseconds(interval));
+      timer.expires_after(interval);
       if (!stopping_) {
         co_await timer.async_wait(asio::as_tuple(asio::use_awaitable));
       }

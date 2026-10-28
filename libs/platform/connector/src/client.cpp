@@ -29,6 +29,7 @@
 #include <mutex>
 #include <optional>
 #include <random>
+#include <ratio>
 #include <sstream>
 #include <stdexcept>
 #include <stop_token>
@@ -540,6 +541,7 @@ class Client::Impl {
             }
             credits += response.credits().grant();
           } else if (response.has_batch_ack()) {
+            const auto received = Clock::now();
             const auto& ack = response.batch_ack();
             if (!inflight || ack.batch_seq() != inflight->batch_seq()
                 || static_cast<std::uint64_t>(ack.accepted()) + static_cast<std::uint64_t>(ack.rejections_size())
@@ -566,8 +568,19 @@ class Client::Impl {
               const std::scoped_lock lock(mutex_);
               diagnostics_.acknowledged += ack.accepted();
               diagnostics_.rejected += static_cast<std::size_t>(ack.rejections_size());
+              ++diagnostics_.batch_acks;
+              diagnostics_.max_acknowledgement_ms =
+                  std::max(diagnostics_.max_acknowledgement_ms,
+                           std::chrono::duration<double, std::milli>(received - batch_sent).count());
             }
+            const auto buffer_ack_started = Clock::now();
             store_.acknowledge(ids);
+            {
+              const std::scoped_lock lock(mutex_);
+              diagnostics_.max_buffer_acknowledgement_ms =
+                  std::max(diagnostics_.max_buffer_acknowledgement_ms,
+                           std::chrono::duration<double, std::milli>(Clock::now() - buffer_ack_started).count());
+            }
             inflight.reset();
             changed_.notify_all();
           } else if (response.has_command()) {
@@ -627,9 +640,16 @@ class Client::Impl {
           }
         }
         if (!inflight && credits != 0) {
+          const auto pending_started = Clock::now();
           auto events = store_.pending(static_cast<std::size_t>(std::min<std::uint64_t>(
                                            {credits, parameters.max_batch_events(), options_.max_batch_events})),
                                        std::min<std::size_t>(parameters.max_batch_bytes(), options_.max_batch_bytes));
+          {
+            const std::scoped_lock lock(mutex_);
+            diagnostics_.max_pending_read_ms =
+                std::max(diagnostics_.max_pending_read_ms,
+                         std::chrono::duration<double, std::milli>(Clock::now() - pending_started).count());
+          }
           if (events.empty()) {
             if (store_.count() != 0) {
               set_error("first pending event exceeds negotiated batch size");
@@ -647,9 +667,13 @@ class Client::Impl {
           }
           credits -= events.size();
           inflight = *batch;
-          batch_sent = now;
+          batch_sent = Clock::now();
           if (!stream->Write(request)) {
             break;
+          }
+          {
+            const std::scoped_lock lock(mutex_);
+            ++diagnostics_.batches_sent;
           }
         }
       }
@@ -752,7 +776,12 @@ std::string Client::metrics() const {
        << "psim_connector_buffer_bytes " << data.buffer_bytes << '\n'
        << "psim_connector_sessions_total " << data.sessions << '\n'
        << "psim_connector_acknowledged_events_total " << data.acknowledged << '\n'
-       << "psim_connector_rejected_events_total " << data.rejected << '\n';
+       << "psim_connector_rejected_events_total " << data.rejected << '\n'
+       << "psim_connector_batches_sent_total " << data.batches_sent << '\n'
+       << "psim_connector_batch_acks_total " << data.batch_acks << '\n'
+       << "psim_connector_acknowledgement_max_seconds " << data.max_acknowledgement_ms / 1000 << '\n'
+       << "psim_connector_buffer_acknowledgement_max_seconds " << data.max_buffer_acknowledgement_ms / 1000 << '\n'
+       << "psim_connector_pending_read_max_seconds " << data.max_pending_read_ms / 1000 << '\n';
   return text.str();
 }
 }  // namespace psim::platform::connector

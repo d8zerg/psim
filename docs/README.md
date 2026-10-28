@@ -109,6 +109,7 @@
 - [Web Client Qualification](engineering/web-client-quality.md)
 - [Comparison of Web Client Loading](engineering/web-client-loading.md)
 - [Delivery of two deployment topologies](engineering/deployment-topologies.md)
+- [Performance qualification and sizing](engineering/performance.md)
 - [Local KVM Lab](engineering/local-vm-lab.md)
 - [Initial Trust and Accounts](engineering/deployment-pki.md)
 - [Observability Pack and Dashboards](engineering/observability.md)

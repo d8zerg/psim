@@ -49,6 +49,8 @@ class MessageStore {
 
 /// Publisher succeeds only after durable acknowledgement of every message in the batch.
 using Publisher = std::function<asio::awaitable<Result<void>>(std::span<const OutboxMessage>)>;
+/// Bound idle database polling while draining nonempty batches promptly.
+[[nodiscard]] Duration outbox_poll_interval(const Result<std::size_t>& published);
 /// Use a dedicated idempotent producer with an empty transactional_id.
 [[nodiscard]] Publisher kafka_publisher(kafka::Producer* producer, Duration timeout = Duration{30000});
 
@@ -69,5 +71,6 @@ class OutboxRelay {
   MessageStore store_;
   Publisher publisher_;
   std::size_t batch_size_;
+  bool empty_ = true;
 };
 }  // namespace psim::platform::pg

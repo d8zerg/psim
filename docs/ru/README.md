@@ -109,6 +109,7 @@
 - [Квалификация веб-клиента](engineering/web-client-quality.md)
 - [Сравнение загрузки веб-клиента](engineering/web-client-loading.md)
 - [Поставка двух топологий](engineering/deployment-topologies.md)
+- [Проверка производительности и модель сайзинга](engineering/performance.md)
 - [Локальный стенд KVM](engineering/local-vm-lab.md)
 - [Первоначальное доверие и учётные записи](engineering/deployment-pki.md)
 - [Пакет наблюдаемости и дашборды](engineering/observability.md)

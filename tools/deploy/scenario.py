@@ -1,5 +1,6 @@
 """Exercise public deployment APIs with fresh installation credentials and verified TLS."""
 import argparse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import datetime as dt
 import hashlib
 import json
@@ -160,8 +161,16 @@ def setup(api):
 
 def setup_load(api):
     state = json.loads(STATE.read_text())
+    clients = json.loads((CASE / 'config.json').read_text()).get('rolling_clients', 1)
+    if not 1 <= clients <= 100 or 1000 % clients:
+        raise RuntimeError('invalid load client count')
+    connectors = json.loads((CASE / 'identities.json').read_text())[19:19 + clients]
+    if len(connectors) != clients:
+        raise RuntimeError('missing independent load connector identities')
     if state.get('load_devices') == 10000:
-        print('LOAD-50K catalog already prepared'); return
+        if state.get('load_connectors', [state['connector']]) != connectors:
+            redistribute_load(api, state, connectors)
+        print('LOAD-50K catalog already prepared for ' + str(clients) + ' clients'); return
     device_type = api.request('GET', '/v1/devices/' + state['device'])['device']['deviceTypeId']
     zones = [(state['site'], state['zone'])]
     for _ in range(9):
@@ -171,7 +180,7 @@ def setup_load(api):
     jobs = []
     for site_index, (site, zone) in enumerate(zones):
         rows = [{'deviceId': str(uuid.uuid4()), 'deviceTypeId': device_type,
-                 'zoneId': zone, 'siteId': site, 'connectorId': state['connector'],
+                 'zoneId': zone, 'siteId': site, 'connectorId': connectors[index % clients],
                  'externalId': 'load-' + str(site_index) + '-' + str(index), 'name': 'Load device',
                  'sources': [{'externalRef': 'load/' + str(site_index) + '/' + str(index), 'kind': 'alarm', 'name': 'Load source'}]}
                 for index in range(1000) if site_index != 0 or index != 0]
@@ -191,9 +200,54 @@ def setup_load(api):
                 pending.remove(identifier)
         if time.monotonic() >= deadline: raise RuntimeError('LOAD-50K catalog import timed out')
         if pending: time.sleep(1)
-    state.update(load_devices=10000, load_sites=[site for site, _ in zones], load_imports=jobs)
+    state.update(load_devices=10000, load_sites=[site for site, _ in zones], load_imports=jobs, load_connectors=connectors)
     save(state)
     print('LOAD-50K catalog prepared: 10000 devices on 10 sites')
+
+
+def redistribute_load(api, state, connectors):
+    previous = set(state.get('load_connectors', [state['connector']])) | set(connectors)
+    rows = []
+    seen = set()
+    for site_index, site in enumerate(state['load_sites']):
+        cursor = ''
+        while True:
+            page = api.request('GET', '/v1/devices?' + urllib.parse.urlencode(
+                {'siteId': site, 'pageSize': 1000, 'pageToken': cursor}))
+            for row in page['devices']:
+                external = row.get('externalId', '')
+                prefix = 'load-' + str(site_index) + '-'
+                if row['connectorId'] not in previous or not external.startswith(prefix):
+                    continue
+                device = int(external[len(prefix):])
+                if not 0 <= device < 1000 or (site_index, device) in seen:
+                    raise RuntimeError('ambiguous load catalog ownership')
+                seen.add((site_index, device))
+                target = connectors[device % len(connectors)]
+                if row['connectorId'] != target:
+                    body = {key: row[key] for key in ('deviceId', 'deviceTypeId', 'zoneId', 'siteId', 'externalId', 'name')}
+                    body['connectorId'] = target
+                    body['sources'] = [{key: source[key] for key in ('externalRef', 'kind', 'name')} for source in row['sources']]
+                    if 'position' in row: body['position'] = row['position']
+                    rows.append((body, row['version']))
+            cursor = page.get('nextPageToken', '')
+            if not cursor: break
+    if seen != {(site, device) for site in range(10) for device in range(1000) if site or device}:
+        raise RuntimeError('load catalog is incomplete; refusing partial redistribution')
+    refreshed = time.monotonic()
+    def move(item):
+        body, version = item
+        api.request('PUT', '/v1/devices/' + body['deviceId'], body, version)
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        futures = [pool.submit(move, row) for row in rows]
+        for done, future in enumerate(as_completed(futures), 1):
+            future.result()
+            if time.monotonic() - refreshed > 60:
+                api = API(api.origin); refreshed = time.monotonic()
+            if done % 1000 == 0: print('Load devices reassigned: ' + str(done), flush=True)
+    state['load_connectors'] = connectors
+    save(state)
+    print('Load catalog redistributed through public APIs without creating additional devices', flush=True)
 
 
 def verify(api):

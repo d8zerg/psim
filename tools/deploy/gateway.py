@@ -25,14 +25,16 @@ def command(bundle, profile, holder):
             '--workdir', '/repo', '--entrypoint', 'python3', image]
 
 
-def prepare(bundle, profile, holder):
+def prepare(bundle, profile, holder, additional_clients=None):
     local.vm.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '0:0',
         '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'DAC_OVERRIDE', '--security-opt', 'no-new-privileges:true',
         '--env', 'LD_PRELOAD=', '--tmpfs', '/tmp:rw,nosuid,size=32m,mode=1777',
         '--mount', 'type=bind,src=' + str(local.ROOT / 'tools/deploy') + ',dst=/code,readonly',
         '--mount', 'type=bind,src=' + str(bundle) + ',dst=/bundle,readonly',
         '--mount', 'type=bind,src=' + str(holder) + ',dst=/private', '--entrypoint', 'python3',
-        'psim-platform/postgres:' + profile.image_version, '/code/qualification_setup.py', 'prepare', '--bundle', '/bundle', '--material', '/private/material'])
+        'psim-platform/postgres:' + profile.image_version, '/code/qualification_setup.py',
+        'prepare' if additional_clients is None else 'extend', '--bundle', '/bundle', '--material', '/private/material',
+        '--clients', str(additional_clients or 100)])
 
 
 def bench():

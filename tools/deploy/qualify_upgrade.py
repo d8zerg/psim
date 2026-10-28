@@ -56,7 +56,7 @@ def qualify(args):
     if not args.reuse_case: gateway.prepare(bundle, coordinator.profile, holder)
     runtime = gateway.command(bundle, coordinator.profile, holder)
     if args.reuse_case:
-        local.vm.run(runtime + ['-c', 'import json,pathlib; p=pathlib.Path("/case"); s=json.loads((p/"scenario.json").read_text()); ids=json.loads((p/"identities.json").read_text()); assert s["connector"]==ids[19] and s.get("load_devices")==10000; assert not (p/"rolling-ledger.txt").exists() or (p/"rolling-ledger.txt").stat().st_size==0, "existing case already published events"'])
+        local.vm.run(runtime + ['-c', 'import json,pathlib; p=pathlib.Path("/case"); s=json.loads((p/"scenario.json").read_text()); ids=json.loads((p/"identities.json").read_text()); assert s["connector"]==ids[19] and s.get("load_devices")==10000; assert all(f.stat().st_size==0 for f in p.glob("rolling*ledger.txt")), "existing case already published events"'])
     local.vm.run(runtime + ['/repo/tools/deploy/qualification_setup.py', 'token'])
     probe = runtime.copy(); probe[probe.index('--entrypoint') + 1] = '/repo/build/debian13/release/services/connector-gateway/psim-gateway-probe'
     if not args.reuse_case:

@@ -132,11 +132,11 @@ asio::awaitable<Result<std::unique_ptr<pg::Pool>>> Worker::database() {
 
 kafka::ClientOptions Worker::kafka_options(std::string client_id) const {
   const auto& config = context_.config();
-  kafka::ClientOptions options{
-      .bootstrap = config.get<std::string>("settings.brokers"),
-      .client_id = std::move(client_id),
-      .properties = {{"linger.ms", "1"}, {"fetch.wait.max.ms", "1"}, {"socket.nagle.disable", "true"}},
-      .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
+  // Keep the Kafka layer's batching and idle-fetch defaults for co-located clients.
+  kafka::ClientOptions options{.bootstrap = config.get<std::string>("settings.brokers"),
+                               .client_id = std::move(client_id),
+                               .properties = {{"socket.nagle.disable", "true"}},
+                               .allow_plaintext = config.get<bool>("settings.allow_plaintext")};
   if (!options.allow_plaintext) {
     options.security = kafka::TransportSecurity{
         .tls = {.ca_file = config.get<std::string>("settings.kafka_ca_file"),

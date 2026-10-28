@@ -36,6 +36,8 @@ The first match determines the type, class, and severity. An empty condition is 
 
 `ProcessingSettings` sets the significance threshold. `taxonomy_file` specifies the readable YAML: the package installs it in `/usr/share/psim/taxonomy.yaml`, and the local test environment reads the repository file. The number of resources and cursors is limited by `max_replica_entries`. Cursors are not automatically deleted. Old numbers outside the range 4096 are sent to DLQ with a reason. The read batch has a limit of 16 messages, with a target confirmation interval of 5 ms and a minimum interval between transactions of 5 ms (`transaction_gap_ms`). Cursors from the same source are coalesced into the latest snapshot within a transaction.
 
+`runtime.shards` creates one independent normalization worker per shard. Each worker owns its model, Kafka consumer and transactional producer; transaction identities include the shard index. Kafka assigns input partitions within the shared `psim-normalizer` group, so a source remains owned by one worker. Each worker restores cursor state for its assigned partitions before processing and exposes separate readiness.
+
 ## Status and History
 
 The presence of an event in history does not prove device state freshness. Only recently confirmed observations by the current receiving session receive `live_observation` and `state_observed_at`; other events retain their time without increasing freshness. When reading, the projection takes into account the current Gateway session and the monotonicity of confirmation time.

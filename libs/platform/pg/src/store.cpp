@@ -221,6 +221,13 @@ Publisher kafka_publisher(kafka::Producer* producer, Duration timeout) {
   };
 }
 
+Duration outbox_poll_interval(const Result<std::size_t>& published) {
+  if (!published) {
+    return Duration{250};
+  }
+  return *published == 0 ? Duration{50} : Duration{1};
+}
+
 asio::awaitable<Result<std::size_t>> OutboxRelay::drain_once() {
   if (!pool_ || !publisher_ || !detail::identifier(store_.schema()) || batch_size_ == 0 || batch_size_ > 4096) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "invalid PostgreSQL outbox relay options");
@@ -228,6 +235,17 @@ asio::awaitable<Result<std::size_t>> OutboxRelay::drain_once() {
   auto lease = co_await pool_->acquire();
   if (!lease) {
     co_return std::unexpected(lease.error());
+  }
+  if (empty_) {
+    const auto pending = co_await (*lease)->query(
+        {.sql = *detail::schema_sql(store_.schema(),
+                                    "SELECT 1 FROM @schema@.psim_outbox WHERE published_at IS NULL LIMIT 1")});
+    if (!pending) {
+      co_return std::unexpected(pending.error());
+    }
+    if (pending->size() == 0) {
+      co_return 0;
+    }
   }
   auto transaction = co_await Transaction::begin(&**lease);
   if (!transaction) {
@@ -239,6 +257,7 @@ asio::awaitable<Result<std::size_t>> OutboxRelay::drain_once() {
     co_return std::unexpected(leader.error());
   }
   if (leader->value(0, 0) != "t") {
+    empty_ = true;
     const auto rollback = co_await transaction->rollback();
     if (!rollback) {
       co_return std::unexpected(rollback.error());
@@ -315,6 +334,7 @@ asio::awaitable<Result<std::size_t>> OutboxRelay::drain_once() {
   if (!committed) {
     co_return std::unexpected(committed.error());
   }
+  empty_ = messages.empty();
   co_return messages.size();
 }
 

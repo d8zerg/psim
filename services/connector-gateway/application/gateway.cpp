@@ -287,6 +287,7 @@ Gateway::Gateway(const p::runtime::Context& context)
     : p::stream::Worker(context, "ingest", ""),
       tick_(executor()),
       refreshed_(executor()),
+      maintained_(executor()),
       published_(executor()),
       idle_(executor()),
       boot_(p::stream::uuid7()) {
@@ -299,6 +300,15 @@ Gateway::Gateway(const p::runtime::Context& context)
   commands_sent_ = counter("psim_gateway_commands_sent_total", "Commands delivered to the owning connector session");
   expired_ = counter("psim_gateway_heartbeat_timeouts_total", "Sessions closed after three missed heartbeat intervals");
   denied_ = counter("psim_gateway_admissions_denied_total", "Rejected connector admissions");
+  auto& batch_latency = prometheus::BuildHistogram()
+                            .Name("psim_gateway_batch_stage_seconds")
+                            .Help("Connector event batch processing time by stage")
+                            .Register(registry);
+  const prometheus::Histogram::BucketBoundaries bounds{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 15};
+  quota_latency_ = &batch_latency.Add({{"stage", "quota"}}, bounds);
+  prepare_latency_ = &batch_latency.Add({{"stage", "prepare"}}, bounds);
+  delivery_latency_ = &batch_latency.Add({{"stage", "kafka"}}, bounds);
+  ack_latency_ = &batch_latency.Add({{"stage", "acknowledge"}}, bounds);
   connected_ = &prometheus::BuildGauge()
                     .Name("psim_gateway_sessions")
                     .Help("Open connector transports")
@@ -384,10 +394,16 @@ asio::awaitable<p::Result<void>> Gateway::initialize() {
     co_return std::unexpected(database.error());
   }
   database_ = std::move(*database);
-  registry_ = std::make_unique<Registry>(
-      database_.get(), [this](std::string topic, std::string key, const google::protobuf::Message& value) {
-        return record(std::move(topic), std::move(key), value, {});
-      });
+  auto reader = co_await p::stream::Worker::database();
+  if (!reader) {
+    co_return std::unexpected(reader.error());
+  }
+  registry_reader_ = std::move(*reader);
+  registry_ =
+      std::make_unique<Registry>(database_.get(), registry_reader_.get(),
+                                 [this](std::string topic, std::string key, const google::protobuf::Message& value) {
+                                   return record(std::move(topic), std::move(key), value, {});
+                                 });
   auto initialized = co_await registry_->initialize();
   if (!initialized) {
     co_return initialized;
@@ -446,9 +462,10 @@ asio::awaitable<p::Result<void>> Gateway::initialize() {
   if (!acknowledged) {
     co_return acknowledged;
   }
-  background_ = 3;
+  background_ = 4;
   healthy_.store(true);
   asio::co_spawn(executor(), refresh(), asio::detached);
+  asio::co_spawn(executor(), maintain_registry(), asio::detached);
   asio::co_spawn(executor(), publish(), asio::detached);
   asio::co_spawn(executor(), this->commands(), asio::detached);
   timer();
@@ -524,24 +541,15 @@ void Gateway::timer() {
 asio::awaitable<void> Gateway::refresh() {
   while (!stopping_) {
     auto fresh = co_await registry_->snapshot();
+    snapshot_healthy_ = fresh.has_value();
     if (fresh) {
       snapshot_ = std::move(*fresh);
       verified_ = Steady::now();
-      bool closing = false;
       for (const auto& [id, session] : sessions_) {
         if (!allowed(*session)) {
-          closing = true;
           session->stop(grpc::Status(grpc::StatusCode::UNAUTHENTICATED, "connector registration revoked"),
                         "trust_revoked");
         }
-      }
-      if (!closing) {
-        auto acknowledged = co_await registry_->acknowledge(boot_, snapshot_.revision);
-        healthy_.store(acknowledged.has_value() && command_healthy_);
-      }
-      auto expired = co_await registry_->expire();
-      if (!expired) {
-        healthy_.store(false);
       }
     } else {
       healthy_.store(false);
@@ -554,13 +562,35 @@ asio::awaitable<void> Gateway::refresh() {
   idle_.cancel();
 }
 
+asio::awaitable<void> Gateway::maintain_registry() {
+  // Durable presence and expiry writes must not postpone reading current trust decisions.
+  while (!stopping_) {
+    const auto enforced = snapshot_healthy_ && Steady::now() - verified_ < std::chrono::seconds(1)
+                          && std::ranges::all_of(sessions_, [this](const auto& item) { return allowed(*item.second); });
+    if (enforced) {
+      auto acknowledged = co_await registry_->acknowledge(boot_, snapshot_.revision);
+      healthy_.store(acknowledged.has_value() && snapshot_healthy_ && command_healthy_
+                     && Steady::now() - verified_ < std::chrono::seconds(1));
+    } else {
+      healthy_.store(false);
+    }
+    if (auto expired = co_await registry_->expire(); !expired) {
+      healthy_.store(false);
+    }
+    maintained_.expires_after(std::chrono::milliseconds(200));
+    co_await maintained_.async_wait(asio::as_tuple(asio::use_awaitable));
+  }
+  --background_;
+  idle_.cancel();
+}
+
 asio::awaitable<void> Gateway::publish() {
   while (!stopping_) {
     auto result = co_await relay_->drain_once();
     if (!result) {
       context().logger().warn("connector status or audit publication deferred");
     }
-    published_.expires_after(std::chrono::milliseconds(result ? 20 : 500));
+    published_.expires_after(p::pg::outbox_poll_interval(result));
     co_await published_.async_wait(asio::as_tuple(asio::use_awaitable));
   }
   --background_;
@@ -598,6 +628,7 @@ asio::awaitable<void> Gateway::shutdown() {
   healthy_.store(false);
   tick_.cancel();
   refreshed_.cancel();
+  maintained_.cancel();
   published_.cancel();
   for (const auto& [id, session] : sessions_) {
     session->stop(grpc::Status(grpc::StatusCode::UNAVAILABLE, "gateway draining"), "draining");
@@ -619,6 +650,10 @@ asio::awaitable<void> Gateway::shutdown() {
   command_consumer_.reset();
   relay_.reset();
   registry_.reset();
+  if (registry_reader_) {
+    registry_reader_->close();
+    registry_reader_.reset();
+  }
   verifier_.reset();
   if (redis_) {
     redis_->close();
@@ -791,16 +826,27 @@ asio::awaitable<p::Result<void>> Gateway::events(std::shared_ptr<SessionState> s
   }
   session->batch = batch.batch_seq();
   session->credits -= static_cast<std::uint32_t>(batch.events_size());
+  auto stage_started = Steady::now();
   auto limited = co_await quota(session, static_cast<std::uint32_t>(batch.events_size()));
+  quota_latency_->Observe(std::chrono::duration<double>(Steady::now() - stage_started).count());
   if (!limited) {
     co_return limited;
   }
   Response response;
   auto* ack = response.mutable_batch_ack();
+  stage_started = Steady::now();
   ack->set_batch_seq(batch.batch_seq());
   std::vector<p::kafka::Record> records;
   std::set<std::string> ids;
+  std::size_t prepared = 0;
   for (const auto& input : batch.events()) {
+    // Let registry refresh, lease renewal and other sessions run between bounded preparation chunks.
+    if (prepared++ % 64 == 0) {
+      co_await asio::post(executor(), asio::use_awaitable);
+      if (session->stopped || !allowed(*session)) {
+        co_return p::fail(p::ErrorCode::kAuthUnauthenticated, "session closed during batch preparation");
+      }
+    }
     if (!ids.insert(input.event_id()).second) {
       co_return p::fail(p::ErrorCode::kIngestInvalidEvent, "repeated event identity in one batch");
     }
@@ -838,7 +884,11 @@ asio::awaitable<p::Result<void>> Gateway::events(std::shared_ptr<SessionState> s
     records.push_back(record("psim.ingest.raw.v1", raw->source_id(), event, std::move(headers)));
     trace->End();
   }
+  prepare_latency_->Observe(std::chrono::duration<double>(Steady::now() - stage_started).count());
+  stage_started = Steady::now();
   auto sent = co_await deliver(std::move(records));
+  delivery_latency_->Observe(std::chrono::duration<double>(Steady::now() - stage_started).count());
+  stage_started = Steady::now();
   if (!sent) {
     co_return sent;
   }
@@ -857,10 +907,12 @@ asio::awaitable<p::Result<void>> Gateway::events(std::shared_ptr<SessionState> s
   ack->set_accepted(static_cast<std::uint32_t>(batch.events_size() - ack->rejections_size()));
   accepted_->Increment(ack->accepted());
   rejected_->Increment(static_cast<double>(ack->rejections_size()));
-  session->send(std::move(response));
   Response credits;
   credits.mutable_credits()->set_grant(static_cast<std::uint32_t>(batch.events_size()));
   session->send(std::move(credits));
+  // Restore the send window before ACK releases the client's next batch.
+  session->send(std::move(response));
+  ack_latency_->Observe(std::chrono::duration<double>(Steady::now() - stage_started).count());
   co_return p::Result<void>{};
 }
 

@@ -813,8 +813,7 @@ class Gateway final : public p::stream::Worker {
         co_return;
       }
       auto result = co_await relay_->drain_once();
-      (void)result;
-      relay_timer_.expires_after(std::chrono::milliseconds(100));
+      relay_timer_.expires_after(p::pg::outbox_poll_interval(result));
       co_await relay_timer_.async_wait(asio::as_tuple(asio::use_awaitable));
       if (!accepting_) {
         break;

@@ -16,12 +16,55 @@
 #include <vector>
 
 #include "psim/platform/connector/grpc_process.hpp"
+#include "psim/platform/pg/connection.hpp"
 #include "psim/platform/redis/connection.hpp"
 #include "psim/platform/redis/serde.hpp"
 #include "psim/platform/stream/runtime.hpp"
 #include "support.hpp"
 
 namespace psim::connector_gateway::testing {
+namespace {
+asio::awaitable<bool> heartbeat_with_registry_lock(Stream* stream, bool block_snapshot) {
+  auto connection = co_await p::pg::Connection::connect({.host = "postgres",
+                                                         .user = "postgres",
+                                                         .password = "psim-dev-postgres",
+                                                         .properties = {{"sslmode", "disable"}}});
+  if (!connection || !co_await (*connection)->query({.sql = "BEGIN"})) {
+    throw std::runtime_error("cannot begin registry lock test");
+  }
+  const auto* sql = block_snapshot ? "LOCK TABLE ingest.registrations IN ACCESS EXCLUSIVE MODE"
+                                   : "LOCK TABLE ingest.gateways IN SHARE MODE";
+  if (!co_await (*connection)->query({.sql = sql})) {
+    throw std::runtime_error("cannot lock registry test table");
+  }
+  asio::steady_timer timer(co_await asio::this_coro::executor);
+  timer.expires_after(std::chrono::milliseconds(2500));
+  co_await timer.async_wait(asio::use_awaitable);
+  const auto alive = stream->heartbeat();
+  if (!co_await (*connection)->query({.sql = "ROLLBACK"})) {
+    throw std::runtime_error("cannot release registry test lock");
+  }
+  timer.expires_after(std::chrono::milliseconds(500));
+  co_await timer.async_wait(asio::use_awaitable);
+  co_return alive;
+}
+}  // namespace
+
+TEST(GatewayNetwork, BlockedPresenceWriteDoesNotInvalidateFreshTrust) {
+  enroll(18);
+  Stream stream(18);
+  ASSERT_TRUE(stream.connect());
+  EXPECT_TRUE(run(heartbeat_with_registry_lock(&stream, false)));
+  EXPECT_EQ(stream.batch({event()}).accepted(), 1);
+}
+
+TEST(GatewayNetwork, BlockedTrustReadClosesSession) {
+  enroll(17);
+  Stream stream(17);
+  ASSERT_TRUE(stream.connect());
+  EXPECT_FALSE(run(heartbeat_with_registry_lock(&stream, true)));
+}
+
 TEST(GatewayNetwork, RejectsUnregisteredTrustedCertificate) {
   Stream stream(19);
   EXPECT_FALSE(stream.connect());

@@ -3,6 +3,11 @@ languages:
 - en
 - ru
 pages:
+- id: docs/engineering/performance
+  en: docs/engineering/performance.md
+  ru: docs/ru/engineering/performance.md
+  en_sha256: c76b7fc8f308f7b0cdf67ef3812dc036bf44afb1df3b2ca945a651d9dd27ca04
+  ru_sha256: 407de1bf68789bb253a2cf13c4f4f217214607bb77be8842a315d5e9b5da3b89
 - id: CONTRIBUTING
   en: CONTRIBUTING.md
   ru: docs/ru/repository/CONTRIBUTING.md
@@ -41,8 +46,8 @@ pages:
 - id: docs/README
   en: docs/README.md
   ru: docs/ru/README.md
-  en_sha256: bd88d89301b2df7677423190cd3b2ba51c2195a27ffa6c135395c748e7f2290f
-  ru_sha256: bcc2bb2c4ce64cbae6d97accc12d4ac9968d8a295189b545dfbda70b51f60d27
+  en_sha256: 9757140cec862353d6e9d90d3e5ac6d7d4663eb157aaec33248bf07aa14cfcc0
+  ru_sha256: e078c3e65c972eb707184eec3cc5b6634de7cc4c5c9127c9761fb21ef314df9f
 - id: docs/adr/0001-monorepo-structure
   en: docs/adr/0001-monorepo-structure.md
   ru: docs/ru/adr/0001-monorepo-structure.md
@@ -691,8 +696,8 @@ pages:
 - id: docs/engineering/normalization-and-history
   en: docs/engineering/normalization-and-history.md
   ru: docs/ru/engineering/normalization-and-history.md
-  en_sha256: 9ea36bcc3cec1a6c753a227800165234655f332b1fea6ccf284b48d79dc617a6
-  ru_sha256: c93632554714188a96ba0f8353e0830cba9a66b586861999c372075489f3b2b3
+  en_sha256: 292505915e88881f6bdef94133bdd55e4b7aaf9711609a63008a6bfd6b375e53
+  ru_sha256: 6965d4f3a58187f752ab9b97e5e5364684f81a5753d59fd9a5cdfac0e081e413
 - id: docs/engineering/notifications
   en: docs/engineering/notifications.md
   ru: docs/ru/engineering/notifications.md

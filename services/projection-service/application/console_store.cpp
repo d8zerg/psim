@@ -9,6 +9,7 @@
 #include <psim/processing/v1/event.pb.h>
 #include <psim/response/v1/events.pb.h>
 
+#include <algorithm>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
@@ -17,6 +18,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -247,53 +249,95 @@ asio::awaitable<p::Result<void>> ConsoleStore::initialize() {
 }
 
 asio::awaitable<p::Result<void>> ConsoleStore::apply(const p::kafka::Message* message) {
-  auto parsed = updates(*message);
-  if (!parsed) {
-    co_return std::unexpected(parsed.error());
+  co_return co_await apply_batch(std::span<const p::kafka::Message>(message, 1));
+}
+
+asio::awaitable<p::Result<void>> ConsoleStore::apply_batch(std::span<const p::kafka::Message> messages) {
+  if (messages.empty()) {
+    co_return p::Result<void>{};
   }
   co_return co_await console_transaction<void>(
       pool_, writer_,
       // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited closure.
-      [this, &message, &parsed](p::pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
-        for (const auto& update : *parsed) {
-          auto stored = co_await tx->connection().query(
-              {.sql =
-                   "INSERT INTO console.resources "
-                   "VALUES($1,$2::uuid,$3,$4::uuid,$5,NULLIF($6,'')::timestamptz,$7,$8::jsonb) ON "
-                   "CONFLICT(replica,tenant,kind,id) DO UPDATE SET "
-                   "version=EXCLUDED.version,confirmed=EXCLUDED.confirmed,session=EXCLUDED.session,body=EXCLUDED.body "
-                   "WHERE (EXCLUDED.kind NOT IN ('observation','reported','connection') AND "
-                   "console.resources.version<EXCLUDED.version) "
-                   "OR (EXCLUDED.kind='connection' AND (console.resources.confirmed<EXCLUDED.confirmed OR "
-                   "(console.resources.confirmed=EXCLUDED.confirmed AND console.resources.version<EXCLUDED.version))) "
-                   "OR (EXCLUDED.kind IN ('observation','reported') AND "
-                   "(EXCLUDED.body->>'sourceEpoch')::numeric >= (console.resources.body->>'sourceEpoch')::numeric AND "
-                   "((console.resources.confirmed<EXCLUDED.confirmed AND "
-                   "((EXCLUDED.body->>'sourceEpoch')::numeric > (console.resources.body->>'sourceEpoch')::numeric OR "
-                   "console.resources.version<=EXCLUDED.version)) OR "
-                   "(console.resources.confirmed=EXCLUDED.confirmed AND ((EXCLUDED.body->>'sourceEpoch')::numeric > "
-                   "(console.resources.body->>'sourceEpoch')::numeric OR "
-                   "console.resources.version<EXCLUDED.version))))",
-               .parameters = {Param::text(replica_), Param::text(update.tenant), Param::text(update.kind),
-                              Param::text(update.id), Param::integer(static_cast<std::int64_t>(update.version)),
-                              Param::text(update.time), Param::text(update.session), Param::text(update.body.dump())}});
-          if (!stored) {
-            co_return std::unexpected(stored.error());
+      [this, messages](p::pg::Transaction* tx) -> asio::awaitable<p::Result<void>> {
+        std::vector<p::pg::Query> pending;
+        std::size_t pending_bytes = 0;
+        // Preserve every update and history trigger while bounding each network write.
+        // NOLINTNEXTLINE(cppcoreguidelines-avoid-capturing-lambda-coroutines): awaited owned closure.
+        auto enqueue = [&pending, &pending_bytes, tx](p::pg::Query query) -> asio::awaitable<p::Result<void>> {
+          auto bytes = query.sql.size();
+          for (const auto& parameter : query.parameters) {
+            bytes += parameter.value ? parameter.value->size() : 0;
+          }
+          if (!pending.empty() && (pending.size() >= 128 || pending_bytes + bytes > std::size_t{1024} * 1024)) {
+            auto stored = co_await tx->connection().pipeline(std::move(pending));
+            pending.clear();
+            pending_bytes = 0;
+            if (!stored) {
+              co_return std::unexpected(stored.error());
+            }
+          }
+          pending_bytes += bytes;
+          pending.push_back(std::move(query));
+          co_return p::Result<void>{};
+        };
+        p::kafka::Offsets positions;
+        for (const auto& message : messages) {
+          auto parsed = updates(message);
+          if (!parsed) {
+            co_return std::unexpected(parsed.error());
+          }
+          for (const auto& update : *parsed) {
+            auto stored = co_await enqueue(
+                {.sql =
+                     "INSERT INTO console.resources "
+                     "VALUES($1,$2::uuid,$3,$4::uuid,$5,NULLIF($6,'')::timestamptz,$7,$8::jsonb) ON "
+                     "CONFLICT(replica,tenant,kind,id) DO UPDATE SET "
+                     "version=EXCLUDED.version,confirmed=EXCLUDED.confirmed,session=EXCLUDED.session,body=EXCLUDED."
+                     "body "
+                     "WHERE (EXCLUDED.kind NOT IN ('observation','reported','connection') AND "
+                     "console.resources.version<EXCLUDED.version) "
+                     "OR (EXCLUDED.kind='connection' AND (console.resources.confirmed<EXCLUDED.confirmed OR "
+                     "(console.resources.confirmed=EXCLUDED.confirmed AND "
+                     "console.resources.version<EXCLUDED.version))) "
+                     "OR (EXCLUDED.kind IN ('observation','reported') AND "
+                     "(EXCLUDED.body->>'sourceEpoch')::numeric >= (console.resources.body->>'sourceEpoch')::numeric "
+                     "AND "
+                     "((console.resources.confirmed<EXCLUDED.confirmed AND "
+                     "((EXCLUDED.body->>'sourceEpoch')::numeric > (console.resources.body->>'sourceEpoch')::numeric OR "
+                     "console.resources.version<=EXCLUDED.version)) OR "
+                     "(console.resources.confirmed=EXCLUDED.confirmed AND ((EXCLUDED.body->>'sourceEpoch')::numeric > "
+                     "(console.resources.body->>'sourceEpoch')::numeric OR "
+                     "console.resources.version<EXCLUDED.version))))",
+                 .parameters = {Param::text(replica_), Param::text(update.tenant), Param::text(update.kind),
+                                Param::text(update.id), Param::integer(static_cast<std::int64_t>(update.version)),
+                                Param::text(update.time), Param::text(update.session),
+                                Param::text(update.body.dump())}});
+            if (!stored) {
+              co_return std::unexpected(stored.error());
+            }
+          }
+          auto& offset = positions[message.topic_partition()];
+          offset = std::max(offset, message.offset() + 1);
+        }
+        for (const auto& [partition, offset] : positions) {
+          auto positioned = co_await enqueue(
+              {.sql = "INSERT INTO console.positions VALUES($1,$2,$3,$4) ON CONFLICT(replica,topic,partition) DO "
+                      "UPDATE SET next_offset=GREATEST(console.positions.next_offset,EXCLUDED.next_offset)",
+               .parameters = {Param::text(replica_), Param::text(partition.topic), Param::integer(partition.partition),
+                              Param::integer(offset)}});
+          if (!positioned) {
+            co_return std::unexpected(positioned.error());
           }
         }
-        auto positioned = co_await tx->connection().query(
-            {.sql = "INSERT INTO console.positions VALUES($1,$2,$3,$4) ON CONFLICT(replica,topic,partition) DO "
-                    "UPDATE SET next_offset=GREATEST(console.positions.next_offset,EXCLUDED.next_offset)",
-             .parameters = {Param::text(replica_), Param::text(std::string(message->topic())),
-                            Param::integer(message->partition()), Param::integer(message->offset() + 1)}});
-        if (!positioned) {
-          co_return std::unexpected(positioned.error());
-        }
-        auto revision =
-            co_await tx->connection().query({.sql = "UPDATE console.generations SET revision=revision+1 WHERE id=$1",
-                                             .parameters = {Param::text(replica_)}});
+        auto revision = co_await enqueue({.sql = "UPDATE console.generations SET revision=revision+1 WHERE id=$1",
+                                          .parameters = {Param::text(replica_)}});
         if (!revision) {
           co_return std::unexpected(revision.error());
+        }
+        auto stored = co_await tx->connection().pipeline(std::move(pending));
+        if (!stored) {
+          co_return std::unexpected(stored.error());
         }
         co_return p::Result<void>{};
       });

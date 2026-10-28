@@ -7,6 +7,7 @@
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -43,6 +44,7 @@ class ConsoleStore {
   boost::asio::awaitable<platform::Result<platform::kafka::Offsets>> positions();
   boost::asio::awaitable<platform::Result<void>> advance(platform::kafka::Offsets positions);
   boost::asio::awaitable<platform::Result<void>> apply(const platform::kafka::Message* message);
+  boost::asio::awaitable<platform::Result<void>> apply_batch(std::span<const platform::kafka::Message> messages);
   boost::asio::awaitable<platform::Result<StateSnapshot>> snapshot(platform::security::Principal principal,
                                                                    std::string location,
                                                                    std::set<std::string> sites = {},

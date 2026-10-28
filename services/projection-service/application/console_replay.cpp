@@ -38,18 +38,20 @@ asio::awaitable<p::Result<void>> console_catch_up(ConsoleStore* store, p::kafka:
     if (std::chrono::steady_clock::now() >= deadline) {
       co_return p::fail(p::ErrorCode::kCommonDeadlineExceeded, "console replay did not reach captured offsets");
     }
-    auto messages = co_await source->poll(64, std::chrono::milliseconds(2));
+    auto messages = co_await source->poll(1024, std::chrono::milliseconds(2));
     if (!messages) {
       co_return std::unexpected(messages.error());
     }
-    for (const auto& message : *messages) {
+    std::vector<p::kafka::Message> selected;
+    for (auto& message : *messages) {
       const p::kafka::TopicPartition partition{std::string(message.topic()), message.partition()};
       if (targets.contains(partition) && message.offset() < targets.at(partition)) {
-        auto applied = co_await store->apply(&message);
-        if (!applied) {
-          co_return applied;
-        }
+        selected.push_back(std::move(message));
       }
+    }
+    auto applied = co_await store->apply_batch(selected);
+    if (!applied) {
+      co_return applied;
     }
   }
   co_return co_await store->advance(targets);
