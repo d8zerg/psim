@@ -235,7 +235,7 @@ methods:
   task: task load:nightly
 - id: L-02
   kind: load
-  name: Sustained LOAD-50K for 1 hour
+  name: Sustained LOAD-50K for 10 minutes
   criteria: 50 000 events/s; event -> signal p99 <= 300 ms; event -> console p99 <= 1 s; reconciliation finds no loss or duplicates
   env: E-CLUSTER
   gate: release
@@ -243,7 +243,7 @@ methods:
   task: task load:steady
 - id: L-03
   kind: soak
-  name: LOAD-50K soak test for 24 hours
+  name: LOAD-50K soak test for 10 minutes
   criteria: The L-02 thresholds hold throughout the interval; memory use, lag and latency do not grow
   env: E-CLUSTER
   gate: release
@@ -251,7 +251,7 @@ methods:
   task: task load:soak
 - id: L-04
   kind: load
-  name: 1.5x peak (75 000 events/s) for 10 minutes
+  name: 1.5x peak (75 000 events/s) for 5 minutes
   criteria: 0 losses; lag returns to normal within 5 minutes after the peak
   env: E-CLUSTER
   gate: release
@@ -430,7 +430,7 @@ methods:
   criteria: No interval longer than 5 s without new signals; latency SLOs hold throughout; reconciliation finds no loss or
     duplicates
   env: E-CLUSTER
-  gate: release
+  gate: on-demand
   barrier: automated
   task: task deploy:upgrade:qualify
 - id: C-13

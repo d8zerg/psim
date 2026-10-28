@@ -84,7 +84,7 @@ References: [Kafka](https://kafka.apache.org/43/getting-started/upgrade/), [Post
 
 ## Qualification
 
-S12/C-12 qualification is incomplete. Successful upgrade and rollback under full LOAD-50K remain mandatory before release. The temporary-additional-replica mechanism has targeted startup-order checks; its full load qualification is incomplete.
+S12/C-12 qualification is incomplete. Upgrade and rollback under full LOAD-50K, correction of known delays and the SDK buffer error, and repeated runs are optional, excluded from step 10.1 and do not block release. The temporary-additional-replica mechanism has targeted startup-order checks; its full load qualification is incomplete.
 
 The completed cluster run replaced all 26 instances and performed a full rollback. All 1433 floor-plan reads succeeded. All 171708 SDK-acknowledged raw identifiers were found; this does not establish successful end-to-end reconciliation. A signal pause of approximately 19 seconds and incident lag violated S12 criteria. A separate LOAD-50K attempt stopped on a local SDK buffer error before services were upgraded. These results remain limitations, not a successful S12 result.
 

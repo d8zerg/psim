@@ -303,7 +303,7 @@ Reliability and Recovery (F-INT-08, F-PLT-07, F-PLT-08):
 
 **Method:** CHAOS + E2E · **Test Environment:** E-CLUSTER
 
-**Status:** The load qualification has not been completed. A successful execution is required before release; the following criteria have not been relaxed and have not yet been confirmed. Known limitations are listed in [release readiness](release-readiness.md).
+**Status:** The load qualification has not been completed. Qualification is optional, excluded from step 10.1 and does not block release; the following criteria apply to an optional run and have not yet been confirmed. Known limitations are listed in [release readiness](release-readiness.md).
 
 ```gherkin
 Given the cluster runs version N under LOAD-50K

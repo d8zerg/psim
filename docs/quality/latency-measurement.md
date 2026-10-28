@@ -41,7 +41,7 @@ The source time is set by the load generator on its own clock; the generator nod
 
 ## 5. Calculation and Criteria
 
-1. **Warm-up:** The first 10 minutes of load (or 5% of soak duration) are excluded.
+1. **Warm-up:** Warm-up is performed before the measurement interval and excluded from it: 10 minutes for load tests, or 5% of the measurement duration for soak tests. L-03 requires 10 full minutes of measured load after warm-up.
 2. **Windows:** Percentiles are calculated over the entire measurement interval and by sliding windows of 1 min; the criterion is met if it’s fulfilled for the entire interval, and no more than 1% of windows exceed the threshold (short-term spikes are reported).
 3. **Chaos Tests:** During failure and recovery, SLO delays are not evaluated; RTO and no loss are measured. After recovery - again SLO.
 4. **Update (S12):** SLO is evaluated throughout the entire update without excluding any windows.

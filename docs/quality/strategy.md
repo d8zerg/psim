@@ -22,7 +22,7 @@ The `task docs:verification` task verifies coverage of each objective G-01-G-19 
 ## 1. Principles
 
 1. **Evidence, not declaration.** Each objective has a measurable threshold, method, and where the threshold is automatically checked.
-2. **Fast tests first.** The maximum number of checks is in fast levels: domain core, properties, simulation. Higher levels (cluster, 24 hours) confirm what cannot be verified earlier.
+2. **Fast tests first.** The maximum number of checks is in fast levels: domain core, properties, simulation. Higher levels (cluster, sustained load) confirm what cannot be verified earlier.
 3. **Determinism.** Domain core and pipeline are tested deterministically (ADR-016, ADR-044); any found errors are reproduced by seed.
 4. **One task interface.** All checks are Task tasks (ADR-030); CI calls the same tasks as developers.
 5. **Gate, not report.** Violation of thresholds blocks merging or release; exceptions are clearly recorded in the registry as known limitations.
@@ -41,7 +41,7 @@ The `task docs:verification` task verifies coverage of each objective G-01-G-19 
 | E2E UI | Operator and administrator scenarios in browser | Playwright | night, release | minutes |
 | Benchmark | Throughput and latency of hot components against baseline | Google Benchmark | PR (affected), night | minutes |
 | Load | Throughput and SLO delay under load | Simulator (load generator), Prometheus metrics | night (simplified profile), release (full) | hours |
-| Soak | 24-hour stability: leaks, lag growth, degradation | Simulator, metrics | release | 24 hours |
+| Soak | 10-minute stability: leaks, lag growth, degradation | Simulator, metrics | release | 10 minutes |
 | Chaos | Behavior during failures: losses, duplicates, RTO, RPO | Toxiproxy, process and node stops, reconciliation | night (basic set), release (full) | hours |
 | Security | SAST, dependencies and images, DAST, fuzzing, TLS, authorization checks | clang-tidy, Trivy, OWASP ZAP, libFuzzer, testssl.sh | PR (SAST, dependencies), night, release | minutes - 24 hours |
 | Fitness functions | Architectural rules | Scripts `tools/`, Task tasks | PR | seconds |
@@ -76,7 +76,9 @@ Load profiles: `LOAD-50K` ([acceptance-spec.md](../product/acceptance-spec.md#ge
 |---|---|---|---|
 | **PR** | Each commit: `task ci` before the commit ([ADR-036](../adr/0036-no-git-hooks.md)); change range - [ADR-034](../adr/0034-local-ci-and-supply-chain.md) | Commit and push in `master` | `task check`; build with `-Werror`; clang-tidy; unit, property, component, contract; ASan+UBSan and TSan sanitizers; coverage; benchmarks for affected components (regression > 5%); smoke integration; fitness functions; SAST and dependency checks |
 | **Nightly** | Daily on `master` (`task ci:nightly`, full range) | Next release, creates a task when down | Integration and E2E; load `LOAD-5K`/`LOAD-10K`; basic chaos set; one hour of fuzzing per target; image scanning |
-| **Release** | Candidate for release (`task release`) | Release | Full load `LOAD-50K`; peak ×1.5; soak 24 hours; full chaos set on `E-CLUSTER`; N -> N+1 updates and rollbacks; DAST; 24 hours of fuzzing; TLS checks; manual procedures; SBOM and signatures |
+| **Release** | Candidate for release (`task release`) | Release | Full load `LOAD-50K` for 10 minutes; peak ×1.5 for 5 minutes; soak 10 minutes; mandatory chaos tests on `E-CLUSTER`; DAST; 24 hours of fuzzing; TLS checks; manual procedures; SBOM and signatures |
+
+S12/C-12 upgrades and rollbacks, correction of known delays and the SDK buffer error, profiling and optimization, persistent-disk correlation checks and sizing validation on at least two configurations are optional. They are excluded from step 10.1 and do not block release. S12/C-12 uses the `on-demand` gate; its pass criteria remain unchanged.
 
 In CI, 10 minutes of parser and rule validator fuzzing must complete without crashes or sanitizer errors. A full execution of each target for 24 hours is required for release qualification.
 

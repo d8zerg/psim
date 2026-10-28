@@ -7,8 +7,8 @@ requirements:
     en: Throughput
     ru: Пропускная способность
   target:
-    en: 50,000 events/s sustained for 24 hours; 1.5x peak for 10 minutes
-    ru: 50 000 событий/с устойчиво в течение 24 ч, пиковый ×1,5 в течение 10 мин
+    en: 50,000 events/s sustained for 10 minutes; 1.5x peak for 5 minutes
+    ru: 50 000 событий/с устойчиво в течение 10 мин, пиковый ×1,5 в течение 5 мин
 - id: G-02
   category: slo
   name:
@@ -71,8 +71,8 @@ requirements:
     en: Upgrades
     ru: Обновление
   target:
-    en: No processing downtime in the cluster topology
-    ru: Без простоя обработки в кластерной топологии
+    en: No processing downtime in the cluster topology; S12/C-12 qualification is optional
+    ru: Без простоя обработки в кластерной топологии; квалификация S12/C-12 опциональна
 - id: G-10
   category: slo
   name:

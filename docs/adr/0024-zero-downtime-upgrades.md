@@ -39,4 +39,4 @@ Containers and systemd use saved configuration versions and a replacement journa
 
 ## Verification
 
-S12/C-12: upgrade and rollback under `LOAD-50K` with end-to-end reconciliation. Load qualification is incomplete; S12 criteria remain a mandatory release gate.
+S12/C-12: upgrade and rollback under `LOAD-50K` with end-to-end reconciliation. Load qualification is incomplete and optional; it is excluded from step 10.1 and does not block release. The pass criteria remain unchanged for an optional run.

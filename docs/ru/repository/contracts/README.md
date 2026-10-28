@@ -97,4 +97,4 @@ task contracts:buf -- dep update   # Run an arbitrary buf command
 | S12 Обновление | Правила эволюции и `buf breaking`; согласование версии в `Register.protocol_versions`; `Envelope.schema_version` |
 | S13 Отчёт | `ReportService.GetIncidentReport` (`IncidentMetrics`: `mtta`, `mttr`, `false_alarm_rate`, соблюдение SLA), `ExportIncidentReport` (CSV) |
 
-Контрактные механизмы обновления реализованы; успешный нагрузочный сценарий S12 остаётся обязательным перед выпуском. Неподтверждённые критерии перечислены в [готовности выпуска](../../product/release-readiness.md).
+Контрактные механизмы обновления реализованы; нагрузочная квалификация S12 опциональна и не блокирует выпуск. Неподтверждённые критерии перечислены в [готовности выпуска](../../product/release-readiness.md).

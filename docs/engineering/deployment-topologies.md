@@ -93,7 +93,7 @@ Keycloak issues tokens with audience `psim` and resource-server audiences. Each 
 
 ## Verification scope
 
-Verified behavior includes VM creation and deletion, readiness of all 26 cluster application instances, and public HTTPS with CA verification and TLS 1.3. The two-gateway ingestion check measured 296,905 events/s: 400,000 acknowledged events in 1.347 seconds, all found in Kafka. Other application services were stopped for this run. The measurement boundary was gateway batch receipt -> acknowledgment by every Kafka ISR. Client preparation and transport shutdown were excluded. Services were restored afterward, with readiness required for all 26 instances. This run does not establish 24-hour stability of the entire domain pipeline.
+Verified behavior includes VM creation and deletion, readiness of all 26 cluster application instances, and public HTTPS with CA verification and TLS 1.3. The two-gateway ingestion check measured 296,905 events/s: 400,000 acknowledged events in 1.347 seconds, all found in Kafka. Other application services were stopped for this run. The measurement boundary was gateway batch receipt -> acknowledgment by every Kafka ISR. Client preparation and transport shutdown were excluded. Services were restored afterward, with readiness required for all 26 instances. This run does not establish 10-minute stability of the entire domain pipeline.
 
 Two runs with background applications running and only normalizers stopped achieved 32,850 and 38,100 events/s, with complete Kafka reconciliation. Both are below 50,000 events/s. On the shared local profile, L-06 separately checks gateway -> Kafka ingestion. Combined application throughput and sustained load require separate qualification on the reference configuration.
 

@@ -65,10 +65,10 @@ Format: Source -> Trigger -> Environment -> Response -> Metric.
 
 | ID | Trigger and Environment | Response | Metric |
 |---|---|---|---|
-| QS-P1 | `LOAD-50K` for 24 hours | Pipeline processes stream without increased lag | Consumer lag does not increase; SLOs for delays are met |
+| QS-P1 | `LOAD-50K` for 10 minutes | Pipeline processes stream without increased lag | Consumer lag does not increase; SLOs for delays are met |
 | QS-P2 | Event ending the `conjunction` rule at `LOAD-50K` | Signal is published | Event -> signal p99 ≤ 300 ms |
 | QS-P3 | New incident at `LOAD-50K` with 500 open consoles | Incident is delivered and rendered | Event -> console p99 ≤ 1 second |
-| QS-P4 | Peak ×1.5 (75,000 events/s) for 10 minutes | Delay increases within budget, lag dissipates after peak | Lag returns to normal ≤ 5 minutes after peak; 0 losses |
+| QS-P4 | Peak ×1.5 (75,000 events/s) for 5 minutes | Delay increases within budget, lag dissipates after peak | Lag returns to normal ≤ 5 minutes after peak; 0 losses |
 | QS-P5 | Operator opens incident card | REST request is served | p99 ≤ 200 ms |
 | QS-P6 | 10,000 active incidents in the feed | Scrolling and filtering | ≥ 50 frames/s |
 

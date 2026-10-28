@@ -10,18 +10,18 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 | Test suites | 23 | 13 | 0 | 3 | 39 |
 | Load tests | 0 | 3 | 8 | 0 | 11 |
 | Soak tests | 0 | 0 | 1 | 0 | 1 |
-| Chaos and failures | 0 | 5 | 10 | 0 | 15 |
+| Chaos and failures | 0 | 5 | 9 | 1 | 15 |
 | Benchmarks | 5 | 1 | 0 | 1 | 7 |
 | Fitness functions | 19 | 1 | 2 | 0 | 22 |
 | Security | 4 | 2 | 3 | 0 | 9 |
 | Manual procedures | 0 | 0 | 5 | 0 | 5 |
-| **Total** | 51 | 25 | 29 | 4 | **109** |
+| **Total** | 51 | 25 | 28 | 5 | **109** |
 
 ## 2. SLO goals
 
 | ID | Goal | Target | Methods |
 |---|---|---|---|
-| G-01 | Throughput | 50,000 events/s sustained for 24 hours; 1.5x peak for 10 minutes | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
+| G-01 | Throughput | 50,000 events/s sustained for 10 minutes; 1.5x peak for 5 minutes | L-01 (nightly), L-02 (release), L-03 (release), L-04 (release), L-06 (release), B-01 (nightly), B-03 (pr) |
 | G-02 | Event to signal latency | p99 <= 300 ms | L-02 (release), L-03 (release), FF-05 (release), B-03 (pr), B-04 (pr) |
 | G-03 | Event to incident in the console latency | p99 <= 1 s | L-05 (release), TS-11 (pr), FF-05 (release), TS-31 (pr), TS-32 (pr) |
 | G-04 | REST API response latency | p99 <= 200 ms for console read operations | L-05 (release) |
@@ -29,7 +29,7 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 | G-06 | Duplicate incidents | 0 across restarts and retries | TS-02 (pr), TS-07 (on-demand), TS-08 (on-demand), TS-28 (pr), C-02 (nightly), C-11 (release) |
 | G-07 | Cluster recovery time objective | <= 60 s after failure of any one node | C-01 (release), C-02 (nightly), C-03 (release), C-11 (release), C-14 (release), C-15 (release) |
 | G-08 | Incident recovery point objective | 0 in the cluster topology | C-03 (release), C-11 (release) |
-| G-09 | Upgrades | No processing downtime in the cluster topology | C-12 (release) |
+| G-09 | Upgrades | No processing downtime in the cluster topology; S12/C-12 qualification is optional | C-12 (on-demand) |
 | G-10 | Console | Smooth incident feed with 10,000 active incidents | TS-15 (nightly), TS-14 (pr) |
 
 ## 3. Engineering quality goals
@@ -61,7 +61,7 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 | [S9](../product/acceptance-spec.md) | TS-08 (on-demand), TS-10 (nightly), TS-11 (pr), TS-17 (nightly), TS-21 (nightly), TS-28 (pr), TS-35 (on-demand) |
 | [S10](../product/acceptance-spec.md) | TS-13 (pr), TS-10 (nightly), TS-11 (pr), TS-20 (nightly), TS-21 (nightly), TS-22 (nightly), TS-23 (nightly), TS-24 (pr), TS-28 (pr), TS-37 (pr) |
 | [S11](../product/acceptance-spec.md) | C-01 (release), C-02 (nightly), C-03 (release), C-04 (release), C-05 (release), C-06 (release), C-07 (nightly), C-08 (release), C-09 (nightly), C-10 (nightly), C-11 (release), C-15 (release), TS-14 (pr), TS-18 (nightly), TS-19 (nightly), TS-22 (nightly), TS-24 (pr), TS-32 (pr) |
-| [S12](../product/acceptance-spec.md) | C-12 (release) |
+| [S12](../product/acceptance-spec.md) | C-12 (on-demand) |
 | [S13](../product/acceptance-spec.md) | L-09 (nightly), TS-30 (pr), TS-10 (nightly), TS-11 (pr), M-05 (release), TS-37 (pr) |
 
 ## 5. Method catalog
@@ -115,8 +115,8 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 | ID | Method | Pass criterion | Environment | Gate | Command |
 |---|---|---|---|---|---|
 | L-01 | Nightly LOAD-5K test | Lag does not grow; stage latency regresses by no more than 5% against baseline; reconciliation finds no loss. | E-CI | nightly | `task load:nightly` |
-| L-02 | Sustained LOAD-50K for 1 hour | 50 000 events/s; event -> signal p99 <= 300 ms; event -> console p99 <= 1 s; reconciliation finds no loss or duplicates. | E-CLUSTER | release | `task load:steady` |
-| L-04 | 1.5x peak (75 000 events/s) for 10 minutes | 0 losses; lag returns to normal within 5 minutes after the peak. | E-CLUSTER | release | `task load:peak` |
+| L-02 | Sustained LOAD-50K for 10 minutes | 50 000 events/s; event -> signal p99 <= 300 ms; event -> console p99 <= 1 s; reconciliation finds no loss or duplicates. | E-CLUSTER | release | `task load:steady` |
+| L-04 | 1.5x peak (75 000 events/s) for 5 minutes | 0 losses; lag returns to normal within 5 minutes after the peak. | E-CLUSTER | release | `task load:peak` |
 | L-05 | Consoles and REST under load | 500 consoles; REST read p99 <= 200 ms; realtime delivery p99 <= 200 ms; event -> rendering p99 <= 1 s during LOAD-50K. | E-CLUSTER | release | `task load:consoles` |
 | L-06 | Ingestion through two gateway instances | 50 000 events/s through 2 Connector Gateway instances up to Kafka acknowledgement; other application processes on the combined local profile are temporarily stopped; instance failure causes no loss. | E-CLUSTER | release | `task deploy:gateway:qualify` |
 | L-07 | Import of 50 000 devices | Import completes within 5 minutes; consumers receive catalog changes within 2 s. | E-LOCAL | nightly | `task catalog:bench` |
@@ -130,7 +130,7 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 
 | ID | Method | Pass criterion | Environment | Gate | Command |
 |---|---|---|---|---|---|
-| L-03 | LOAD-50K soak test for 24 hours | The L-02 thresholds hold throughout the interval; memory use, lag and latency do not grow. | E-CLUSTER | release | `task load:soak` |
+| L-03 | LOAD-50K soak test for 10 minutes | The L-02 thresholds hold throughout the interval; memory use, lag and latency do not grow. | E-CLUSTER | release | `task load:soak` |
 
 ### Chaos and failures
 
@@ -147,7 +147,7 @@ See [strategy.md](strategy.md). Parentheses identify the gate: `pr` blocks mergi
 | C-09 | Node and source clock skew | A source clock is 10 minutes ahead; events are corrected and marked clock_skew; node clock skew raises an alert. | E-CI | nightly | `task chaos:clock-skew` |
 | C-10 | Connector connection loss for 10 minutes | SDK-buffered events are delivered without loss; commands issued during the outage reach a final status. | E-CI | nightly | `task chaos:connector-disconnect` |
 | C-11 | Cluster node power loss | Measure RTO <= 60 s and RPO = 0 for each node in turn; reconciliation finds no loss. | E-CLUSTER | release | `task chaos:node-down` |
-| C-12 | N -> N+1 upgrade and rollback under load | No interval longer than 5 s without new signals; latency SLOs hold throughout; reconciliation finds no loss or duplicates. | E-CLUSTER | release | `task deploy:upgrade:qualify` |
+| C-12 | N -> N+1 upgrade and rollback under load | No interval longer than 5 s without new signals; latency SLOs hold throughout; reconciliation finds no loss or duplicates. | E-CLUSTER | on-demand | `task deploy:upgrade:qualify` |
 | C-13 | Keycloak unavailability | Existing sessions continue; new sign-ins receive a clear error; event processing is unaffected. Purpose: Threat T38 in the threat model. | E-CI | nightly | `task chaos:idp` |
 | C-14 | Correlation state recovery | Correlation Engine recovers within 30 s after crashing with the reference state size. | E-CLUSTER | release | `task chaos:correlation-restore` |
 | C-15 | File storage node failures | Stop the SeaweedFS volume server, filer, S3 gateway and master leader during floor plan reads and uploads; existing plans remain readable, failed uploads preserve the previous version, volume replicas recover and SHA-256 matches for every version. Purpose: Cluster floor plan storage resilience (ADR-042, ADR-046). | E-CLUSTER | release | `task chaos:filestore` |

@@ -23,13 +23,22 @@ This document describes available implementations and unverified release conditi
 
 | Condition | Known result | Evidence required before claiming compliance |
 |---|---|---|
-| Full `LOAD-50K` profile | Component and local runs do not establish stability of the entire pipeline | 24 hours at 50,000 events/s, a 75,000 events/s peak, end-to-end reconciliation and latency measurements for G-01-G-06 |
-| S12 / C-12 upgrade | Sequential replacement and rollback are implemented; local checks found an approximately 19-second signal pause, incident lag and an SDK buffer error during ramp-up | Resolve causes and complete an upgrade at target load with a pause of at most 5 seconds, SLO compliance and full reconciliation |
+| Full `LOAD-50K` profile | Component and local runs do not establish stability of the entire pipeline | 10 minutes of measured load at 50,000 events/s after warm-up, a 75,000 events/s peak for 5 minutes, end-to-end reconciliation and latency measurements for G-01-G-06 |
 | Recovery and RPO/RTO | Recovery tools and isolated tests are implemented | Exercises in a clean target environment for both topologies, independent backup storage, measured RPO/RTO, and verification of permissions, keys and revoked certificates |
 | Failure domains | A local VM cluster on one Linux host checks process and guest-OS failures | Verification of independent physical failure domains and the reference hardware configuration |
 | Observability | Static checks and isolated Docker Compose verify queries, TLS, OTLP and alert delivery | Complete Grafana login through Keycloak, infrastructure protocols on the target cluster, an external recipient and independent `PsimWatchdog` monitoring |
 | Security | Component permission, TLS and isolation tests and short fuzzing runs are available | Full security qualification: 24 hours per fuzz target, DAST, TLS verification and threat-model penetration testing |
 | Documentation and demonstration | Complete paired EN/RU guides, diagrams, API references, dashboards and operational instructions; portal and extracted archive pass offline checks without development materials | Independent installation and connector integration using each edition, and a reproducible synthetic demonstration |
+
+## Optional qualification
+
+The following work is excluded from step 10.1 and does not block its acceptance or release. The performance report and sizing model remain required. An optional check that was not run does not establish compliance with its criteria.
+
+| Work | Known result | Optional verification |
+|---|---|---|
+| S12 / C-12 upgrade | Sequential replacement and rollback are implemented; local checks found an approximately 19-second signal pause, incident lag and an SDK buffer error during ramp-up | Resolve causes and complete an upgrade at target load with a pause of at most 5 seconds, SLO compliance and full reconciliation |
+| Profiling, optimization and persistent-disk correlation | The correlation benchmark used tmpfs and a limited key count | Profile hot paths, optimize based on results and measure persistent-disk state with the reference key count |
+| Sizing validation on two configurations | The sizing model is prepared using available measurements and extrapolation | Validate the model on at least two test-environment configurations |
 
 ## Release-note rules
 

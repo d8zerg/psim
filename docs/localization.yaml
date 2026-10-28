@@ -26,8 +26,8 @@ pages:
 - id: contracts/README
   en: contracts/README.md
   ru: docs/ru/repository/contracts/README.md
-  en_sha256: db347a0f5a58f07ad5bef0e0284e8e198051ef1f4073489e7edfffc75e720ef5
-  ru_sha256: c227d6aea438021ae97dc3f5456be72748c00cbdbf8cf7ec6ec41f54a90b7e7f
+  en_sha256: 65f5421c8b99b1f569f53cc6a4ee74ef532bfae2c7fdc3f791aeb26bfbc7123d
+  ru_sha256: 19f50b431ce86bd6b0bd48b865924ac47505e52311fcef28eb703c24fd2b2f04
 - id: contracts/docs/proto-reference
   en: contracts/docs/proto-reference.md
   ru: docs/ru/repository/contracts/docs/proto-reference.md
@@ -161,8 +161,8 @@ pages:
 - id: docs/adr/0024-zero-downtime-upgrades
   en: docs/adr/0024-zero-downtime-upgrades.md
   ru: docs/ru/adr/0024-zero-downtime-upgrades.md
-  en_sha256: f1aed03ff5a2ef4174efb0255d66df89e15a87b76935536567d6a74b96058fed
-  ru_sha256: 1f8d95be45896ceddcb5410035e30cea1ac25daa5747ed5c70635b02dfb16798
+  en_sha256: d8f62432ca931e5585b6e24234359db55e0e580cb59a11033a49c5941428639f
+  ru_sha256: 8392e37f185f3761652e4df4a7a5fee559c096bae30e52381b19340f3384b235
 - id: docs/adr/0025-ai-extension-points
   en: docs/adr/0025-ai-extension-points.md
   ru: docs/ru/adr/0025-ai-extension-points.md
@@ -511,8 +511,8 @@ pages:
 - id: docs/architecture/deployment
   en: docs/architecture/deployment.md
   ru: docs/ru/architecture/deployment.md
-  en_sha256: 8698d4fe44834d14cc3781807ef7de77c9fcf9bf8de72ae3ceb0f7c7cd99738f
-  ru_sha256: 16d49eb264d51daaeb149ecc179255b0d9eecab46386319e9d62f3b6e16f514b
+  en_sha256: a6b7e4d37f8a44d3a1b72cca0d64949974d06b3f0e5c45d9f863599a7cdc62dc
+  ru_sha256: c9f6b88e2e23c93b08ac86102158f60fe1c08a762dea3c3ac43690a18de6599e
 - id: docs/architecture/operational-capabilities
   en: docs/architecture/operational-capabilities.md
   ru: docs/ru/architecture/operational-capabilities.md
@@ -521,8 +521,8 @@ pages:
 - id: docs/architecture/quality
   en: docs/architecture/quality.md
   ru: docs/ru/architecture/quality.md
-  en_sha256: ebe2cc002b7171676cfa363047c2d3ab97b2d29df7cfeda70307f4c43fe53837
-  ru_sha256: 01a8a15de76aaa80f813854923d04991a334da942e845d0b2f7623690f626f86
+  en_sha256: 56a4ff0b8db86a3d771869b78480a8c1e0da97ca215c4d43c677325638c66013
+  ru_sha256: a54820eb2cec2bd6ea493a8d0d895f1c30dc32097ffe1f71144c14b149175cab
 - id: docs/architecture/runtime-view
   en: docs/architecture/runtime-view.md
   ru: docs/ru/architecture/runtime-view.md
@@ -641,8 +641,8 @@ pages:
 - id: docs/engineering/deployment-topologies
   en: docs/engineering/deployment-topologies.md
   ru: docs/ru/engineering/deployment-topologies.md
-  en_sha256: 90a7ef42bd4c47817fa4f5f95f392ab7990796c0cd147457c1c0175c5dee1b99
-  ru_sha256: 3ba6e09393107688fe6b79fe9156e3ade393b2a8f3a8fcb193afab042a7f3de4
+  en_sha256: 6ac98d4fdbac8d0429b1a16509a6a1c0b351ce495fa32cee61f3d6152675a89a
+  ru_sha256: a8ae3cd43e3e7056d33e2b9f96ddd4b40f13a5755e254b55fed416a66b47f4c9
 - id: docs/engineering/design-system-acceptance
   en: docs/engineering/design-system-acceptance.md
   ru: docs/ru/engineering/design-system-acceptance.md
@@ -676,8 +676,8 @@ pages:
 - id: docs/engineering/installation-and-upgrades
   en: docs/engineering/installation-and-upgrades.md
   ru: docs/ru/engineering/installation-and-upgrades.md
-  en_sha256: c950efc553b1a909d332081a8bbd9a8d1739814b2c4701aec3434b1fa5b714a8
-  ru_sha256: db4326917d844afc9d8bd95149e965cdb4007cd1488daf6c657ff9ea967cae6f
+  en_sha256: d94a9046bdcd14ff400f7776fc74aaeeefc19a242082f40eb4e488e17175012c
+  ru_sha256: 1d3f00b538a45eb8d237a2c8b85eec3ef88be3ca2f927642227872599f2653bd
 - id: docs/engineering/live-correlation
   en: docs/engineering/live-correlation.md
   ru: docs/ru/engineering/live-correlation.md
@@ -761,8 +761,8 @@ pages:
 - id: docs/product/acceptance-spec
   en: docs/product/acceptance-spec.md
   ru: docs/ru/product/acceptance-spec.md
-  en_sha256: 61dda29916259eda227cdb807cc88533a8cb8f936b72df9e5d82db0fdb06a3e2
-  ru_sha256: 6eb2706e8f7f1f88fbb1f6a7c5bbbf3931da21955e2e44e2dd267faa5fd9e7e7
+  en_sha256: e6da3c1bf95190410c7daa762e42d1c11be716e05c53cb57af23dd37d5c1f614
+  ru_sha256: 1cf1156353cf19ff3eef1e4f340ffbcb925e6fca585074fa17b514870a7cdec5
 - id: docs/product/mvp-scope
   en: docs/product/mvp-scope.md
   ru: docs/ru/product/mvp-scope.md
@@ -771,13 +771,13 @@ pages:
 - id: docs/product/product-brief
   en: docs/product/product-brief.md
   ru: docs/ru/product/product-brief.md
-  en_sha256: 9e7ff5e931cb174fd95e530199f93debcf8bcc25d31c7618153842c7415f987f
-  ru_sha256: 445c208eebc2ec70fc794b2ccf20dc671e3e6bb493f310d0dd9f898d53cae517
+  en_sha256: 16efb82bba1064b98351fe2250dd4e5e648648c145f5c2eb5b39e19c2ffb437c
+  ru_sha256: 1eab5791ed1ec72dbaff1cd17ea4e5b6c26b2b2a1924274ec029871da3c7cc45
 - id: docs/product/release-readiness
   en: docs/product/release-readiness.md
   ru: docs/ru/product/release-readiness.md
-  en_sha256: 6c6b56d5fc584256b2448663aa151acbd4dd058f1de4cec017406401189e21d6
-  ru_sha256: 06c03842dcf0f77d2f340ba7a0b3e7e809a205afa82ff7229367e9f9b1549cdd
+  en_sha256: 01a3e77d821aecaa49e5d6e60c30d2f6e3f1e75907fca5cea89a4f56b2deb473
+  ru_sha256: 1813f89770d71cd4641186f9129fa73a6ab121369bb9b150eb81f5df13af1c8f
 - id: docs/product/roles-and-journeys
   en: docs/product/roles-and-journeys.md
   ru: docs/ru/product/roles-and-journeys.md
@@ -786,8 +786,8 @@ pages:
 - id: docs/quality/latency-measurement
   en: docs/quality/latency-measurement.md
   ru: docs/ru/quality/latency-measurement.md
-  en_sha256: 831d7912ac24e7bd32495b219071c1550d137e4d6122d1dbddc8e8e81e291f46
-  ru_sha256: 09dd5b63b0affa28992b6f2f9a2dbafc9f8de2c5ba69911b2d9c8ca9c660fb85
+  en_sha256: 4c29560fd9f6a33dbe6101403b95d28ecf7b23dd677c1d09d157b8381dc5e6fc
+  ru_sha256: 5595a4eeb4752bed71f140e0c46cf5efb9518dc9e4178d7086d422eed24ed5dd
 - id: docs/quality/reconciliation
   en: docs/quality/reconciliation.md
   ru: docs/ru/quality/reconciliation.md
@@ -796,13 +796,13 @@ pages:
 - id: docs/quality/strategy
   en: docs/quality/strategy.md
   ru: docs/ru/quality/strategy.md
-  en_sha256: 137d904b62aa5a8523917681c9149be3c40ac6f71a606fc9fb6ab863531ca068
-  ru_sha256: 312a65144ac06d9bdb244eed36ce0849f78c79d843e9384bd4e591c1318ae2a7
+  en_sha256: 7ddfba00decf56fc732a763b819f29637a5c8290170561b3f90a843406b1bca7
+  ru_sha256: 2f6321ff2eeeebe249c4d770169cfef0237ab503c91fde2fe5f3f21c9dec3dca
 - id: docs/quality/verification-matrix
   en: docs/quality/verification-matrix.md
   ru: docs/ru/quality/verification-matrix.md
-  en_sha256: b60a5f56f7de44a1fc501f276baf7964a2af5fc7aa02894a6b0aa8e2b1af67ad
-  ru_sha256: db280d6d1692ebe02fee3e8ad8d917c90cb65c7790a6bfbc6873daf914aee0cd
+  en_sha256: 5f4ea6d05b91ede59bc129c23f91d3da266a793f2045659425eb0ec6286bad33
+  ru_sha256: e9118ed837437408bfed18d07d89fc44386182b5441b54f8c181075bbf5ac617
 - id: docs/security/authorization
   en: docs/security/authorization.md
   ru: docs/ru/security/authorization.md

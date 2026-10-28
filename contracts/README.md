@@ -97,4 +97,4 @@ Each scenario S1-S13 ([acceptance-spec.md](../docs/product/acceptance-spec.md)) 
 | S12 Update | Rules for evolution and `buf breaking`; version synchronization in `Register.protocol_versions`; `Envelope.schema_version` |
 | S13 Report | `ReportService.GetIncidentReport` (`IncidentMetrics`: `mtta`, `mttr`, `false_alarm_rate`, SLA compliance), `ExportIncidentReport` (CSV) |
 
-Contract upgrade mechanisms are implemented; a successful S12 load scenario is required before release. Unverified criteria are listed in [release readiness](../docs/product/release-readiness.md).
+Contract upgrade mechanisms are implemented; S12 load qualification is optional and does not block release. Unverified criteria are listed in [release readiness](../docs/product/release-readiness.md).

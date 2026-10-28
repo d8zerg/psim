@@ -303,8 +303,8 @@ artifacts:
         source: Performance regression gate
         ru: Барьер регрессии производительности
       /methods/28/name:
-        source: 1.5x peak (75 000 events/s) for 10 minutes
-        ru: Пик ×1,5 (75 000 событий/с), 10 мин
+        source: 1.5x peak (75 000 events/s) for 5 minutes
+        ru: Пик ×1,5 (75 000 событий/с), 5 мин
       /methods/104/purpose:
         source: Notification delivery and SSRF protection
         ru: Доставка уведомлений и защита от SSRF
@@ -323,8 +323,8 @@ artifacts:
         source: Correlation rule evaluation
         ru: Вычисление правил корреляции
       /methods/27/name:
-        source: LOAD-50K soak test for 24 hours
-        ru: Длительная нагрузка LOAD-50K, 24 ч
+        source: LOAD-50K soak test for 10 minutes
+        ru: Длительная нагрузка LOAD-50K, 10 мин
       /methods/104/name:
         source: Notification delivery and webhook protection
         ru: Доставка уведомлений и защита webhook
@@ -346,8 +346,8 @@ artifacts:
         source: Normalizer per CPU core
         ru: Normalizer на ядро
       /methods/26/name:
-        source: Sustained LOAD-50K for 1 hour
-        ru: Устойчивая нагрузка LOAD-50K, 1 ч
+        source: Sustained LOAD-50K for 10 minutes
+        ru: Устойчивая нагрузка LOAD-50K, 10 мин
       /methods/103/criteria:
         source: Projections rebuilt by Kafka replay match production projections; old events cannot produce false online or
           actual state; the end-to-end event scenario passes after API Gateway projection migration

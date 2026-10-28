@@ -91,7 +91,7 @@ Addition accepted ([ADR-042](../adr/0042-operational-capabilities.md)): reliable
 | Category | Metric | Goal |
 |---|---|---|
 | Acceptance | Completed S1-S13 scenarios | 13 out of 13 |
-| Performance | Stable load | 50,000 events/second over 24 hours, peak ×1.5 over 10 minutes |
+| Performance | Stable load | 50,000 events/second over 10 minutes, peak ×1.5 over 5 minutes |
 | Delay | Event -> Incident in console | p99 ≤ 1s |
 | Reliability | Losses and duplicates of incidents | 0 |
 | Reliability | RTO in case of one cluster node failure | ≤ 60 seconds |

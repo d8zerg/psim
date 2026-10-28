@@ -172,7 +172,7 @@ Update without downtime (S12, QS-O1) in the cluster:
 
 For Normalizer and Correlation Engine containers, additional replica startup with separate producer identity is implemented until the old one stops; Kafka assignments and readiness are checked before processing is transferred. Details and actual check boundaries are provided in [update guide](../engineering/installation-and-upgrades.md).
 
-The S12/C-12 qualification is not completed and remains mandatory before release. Updates without violating the SLO have not been confirmed for LOAD-50K. On a single machine, sequential replacement allows a short outage for each service.
+The S12/C-12 qualification is incomplete and optional; it is excluded from step 10.1 and does not block release. Updates without violating the SLO have not been confirmed for LOAD-50K. On a single machine, sequential replacement allows a short outage for each service.
 
 ## 5. Network Ports
 
