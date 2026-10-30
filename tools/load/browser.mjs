@@ -1,13 +1,30 @@
 import { chromium } from '/repo/web/apps/console/node_modules/@playwright/test/index.mjs';
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, rename, access } from 'node:fs/promises';
 import { createHmac } from 'node:crypto';
 
 const fixture = JSON.parse(await readFile('/case/load-browser.json', 'utf8'));
+const consoles = Number(process.env.PSIM_LOAD_CONSOLES ?? 500);
+if (!Number.isInteger(consoles) || consoles < 1 || consoles > 500) throw new Error('invalid console count');
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ ignoreHTTPSErrors: true, viewport: { width: 1440, height: 1000 } });
 const page = await context.newPage();
 const renders = {};
 const errors = [];
+const incidentDeliveries = [];
+let feedSocket;
+page.on('websocket', socket => {
+  if (!socket.url().endsWith('/v1/realtime')) return;
+  if (feedSocket && !feedSocket.isClosed()) return;
+  feedSocket = socket;
+  socket.on('framereceived', frame => {
+    try {
+      const value = JSON.parse(String(frame.payload));
+      const event = value.delta?.incidentEvent;
+      // Automation observes the frame asynchronously; DOM timestamps measure rendering independently.
+      if (event) incidentDeliveries.push({ observed_ms: Date.now(), event });
+    } catch { /* Ignore transport frames that contain no JSON event. */ }
+  });
+});
 page.on('pageerror', error => errors.push(error.message));
 let accessToken = '';
 page.on('response', async response => {
@@ -43,7 +60,7 @@ try {
   await page.locator('input[name=userLabel]').fill('Load qualification');
   await page.getByRole('button', { name: 'Submit', exact: true }).click();
   await page.locator('[data-testid="connection-status"][data-status="open"]').waitFor({ timeout: 60000 });
-  await page.evaluate(async token => {
+  await page.evaluate(async ({ token, consoles }) => {
     window.loadSockets = [];
     window.loadRealtime = [];
     window.loadSocketErrors = [];
@@ -51,8 +68,8 @@ try {
       if (!response.ok) throw new Error('snapshot failed: ' + response.status);
       return response.json();
     });
-    for (let batch = 0; batch < 499; batch += 16) {
-      await Promise.all(Array.from({ length: Math.min(16, 499 - batch) }, (_, offset) => new Promise((resolve, reject) => {
+    for (let batch = 0; batch < consoles - 1; batch += 16) {
+      await Promise.all(Array.from({ length: Math.min(16, consoles - 1 - batch) }, (_, offset) => new Promise((resolve, reject) => {
         const socket = new WebSocket(location.origin.replace('https:', 'wss:') + '/v1/realtime');
         const deadline = setTimeout(() => reject(new Error('subscription timeout')), 30000);
         let resumeToken = snapshot.resumeToken;
@@ -78,13 +95,22 @@ try {
         window.loadSockets.push(socket);
       })));
     }
-  }, accessToken);
+  }, { token: accessToken, consoles });
   console.log('READY');
   let previousToken = accessToken;
   let lastPing = Date.now();
+  let lastProgress = 0;
   for (;;) {
     try { await access('/case/load-browser.stop'); break; } catch { /* Continue until publication and delivery drain. */ }
     await page.waitForTimeout(500);
+    if (Date.now() - lastProgress >= 1000) {
+      await writeFile('/case/load-browser-progress.tmp', JSON.stringify({
+        rendered_events: new Set(Object.keys(renders).map(key => key.slice(0, key.lastIndexOf(':')))).size,
+        errors: [...errors],
+      }));
+      await rename('/case/load-browser-progress.tmp', '/case/load-browser-progress.json');
+      lastProgress = Date.now();
+    }
     if (accessToken !== previousToken) {
       await page.evaluate(token => window.loadSockets.forEach(socket => socket.loadSend({ authenticate: { accessToken: token } })), accessToken);
       previousToken = accessToken;
@@ -101,7 +127,7 @@ try {
     return result;
   });
   await writeFile('/case/load-browser-result.json', JSON.stringify({ renders, errors: [...errors, ...sockets.errors],
-    clients: sockets.clients, realtime: sockets.realtime, authenticated: !!accessToken }));
+    clients: sockets.clients, realtime: sockets.realtime, incident_deliveries: incidentDeliveries, authenticated: !!accessToken }));
 } finally {
   await browser.close();
 }

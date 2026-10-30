@@ -320,6 +320,7 @@ asio::awaitable<void> watch_rolling() {
   std::unordered_map<std::string, std::int64_t> event_times;
   std::unordered_map<std::string, std::int64_t> pending_incidents;
   nlohmann::json incident_origins = nlohmann::json::object();
+  auto observations = nlohmann::json::array();
   std::vector<std::uint64_t> signal_histogram(100001);
   std::vector<std::uint64_t> incident_histogram(100001);
   std::map<std::int64_t, std::vector<std::uint64_t>> windows;
@@ -377,6 +378,11 @@ asio::awaitable<void> watch_rolling() {
         }
         previous = point;
         const auto occurred = milliseconds(value->signal().last_event_at());
+        observations.push_back({{"kind", "signal"},
+                                {"signal_id", identity},
+                                {"occurred_ms", occurred},
+                                {"produced_ms", milliseconds(value->envelope().produced_at())},
+                                {"observed_ms", now}});
         count(&signal_histogram, now - occurred);
         auto& signal_window = signal_windows[now / 10000];
         if (signal_window.empty()) {
@@ -421,6 +427,12 @@ asio::awaitable<void> watch_rolling() {
           continue;
         }
         incident_sources[identity] = value->envelope().correlation_id();
+        observations.push_back({{"kind", "incident"},
+                                {"signal_id", identity},
+                                {"message_id", value->envelope().message_id()},
+                                {"correlation_id", value->envelope().correlation_id()},
+                                {"produced_ms", milliseconds(value->envelope().produced_at())},
+                                {"observed_ms", now}});
         if (auto found = event_times.find(identity); found != event_times.end()) {
           incident(now - found->second, now);
           incident_origins[value->envelope().correlation_id()] = found->second;
@@ -457,6 +469,7 @@ asio::awaitable<void> watch_rolling() {
                            {"windows", intervals},
                            {"incident_origins_ms", incident_origins},
                            {"incident_message_ids", incidents},
+                           {"observations", observations},
                            {"pending", event_times.size() + pending_incidents.size()}}
                 .dump()
          << '\n';

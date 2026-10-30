@@ -36,6 +36,10 @@ KafkaMetrics::KafkaMetrics(prometheus::Registry& registry)
       retries_(counter(registry, "psim_kafka_retries_total", "Messages retried after a transient error")),
       dead_letters_(counter(registry, "psim_kafka_dead_letters_total", "Messages sent to the dead letter topic")),
       transactions_(counter(registry, "psim_kafka_transactions_total", "Kafka transactions by result")),
+      transaction_stages_(&prometheus::BuildHistogram()
+                               .Name("psim_kafka_transaction_stage_seconds")
+                               .Help("Kafka transaction stages and blocking call queue waits")
+                               .Register(registry)),
       stopped_partitions_(
           gauge(registry, "psim_kafka_stopped_partitions", "Partitions stopped after repeated program errors")) {}
 
@@ -78,6 +82,12 @@ prometheus::Counter& KafkaMetrics::dead_letters(std::string_view stage, std::str
 
 prometheus::Counter& KafkaMetrics::transactions(std::string_view result) {
   return transactions_->Add({{"result", std::string(result)}});
+}
+
+prometheus::Histogram& KafkaMetrics::transaction_stage(std::string_view stage) {
+  return transaction_stages_->Add(
+      {{"stage", std::string(stage)}},
+      prometheus::Histogram::BucketBoundaries{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 5});
 }
 
 prometheus::Gauge& KafkaMetrics::stopped_partitions(std::string_view stage) {

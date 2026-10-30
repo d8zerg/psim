@@ -70,7 +70,7 @@ class Profile:
         require(set(value) <= {'format', 'name', 'topology', 'nodes', 'public_name', 'public_port', 'security_tenant', 'virtual_ip', 'interface', 'version', 'prefix', 'uid_base', 'shards', 'wal_archive'}, 'unknown inventory field')
         require(value.get('format') == 1, 'unsupported inventory format')
         topology = value.get('topology')
-        require(topology in ('single', 'cluster'), 'topology must be single or cluster')
+        require(topology in ('single', 'cluster', 'isolated'), 'unsupported deployment topology')
         nodes = []
         require(isinstance(value.get('nodes'), list), 'inventory nodes must be an array')
         for item in value['nodes']:
@@ -79,7 +79,7 @@ class Profile:
             require(not ipaddress.ip_address(address).is_unspecified and not ipaddress.ip_address(address).is_multicast, 'invalid node address')
             require(isinstance(item['roles'], list) and all(isinstance(role, str) for role in item['roles']), 'invalid node role list')
             roles = frozenset(item['roles'])
-            require(roles and roles <= ROLES, 'invalid node roles')
+            require(roles and roles <= (ROLES | {'kafka', 'support'} if topology == 'isolated' else ROLES), 'invalid node roles')
             nodes.append(Node(identifier(item['name']), address, identifier(item['failure_domain']), roles))
         require(nodes and len({n.name for n in nodes}) == len(nodes) and len({n.address for n in nodes}) == len(nodes), 'nodes must have unique names and addresses')
         public = value.get('public_name', '')
@@ -108,6 +108,16 @@ class Profile:
         if topology == 'single':
             require(len(nodes) == 1 and nodes[0].roles == ROLES, 'single topology requires one node with all roles')
             require(virtual is None, 'single topology does not use a virtual address')
+        elif topology == 'isolated':
+            require(len(nodes) == 4, 'isolated lab requires four nodes')
+            for role, count in [('infrastructure', 1), ('kafka', 1), ('application', 2), ('edge', 2), ('support', 1), ('observability', 1)]:
+                require(len(profile.select(role)) == count, 'invalid isolated lab placement: ' + role)
+            apps = set(profile.select('application'))
+            require(set(profile.select('edge')) == apps and set(profile.select('support')) <= apps and set(profile.select('observability')) <= apps,
+                    'isolated lab auxiliary services must use application nodes')
+            require(not (apps & set(profile.select('infrastructure'))) and not (apps & set(profile.select('kafka'))) and
+                    not (set(profile.select('infrastructure')) & set(profile.select('kafka'))), 'isolated lab roles must be separate')
+            require(virtual is None, 'isolated lab does not use a virtual address')
         else:
             require(len(profile.select('infrastructure')) == 3, 'cluster requires exactly three infrastructure nodes')
             for role, count in [('application', 2), ('edge', 2), ('observability', 1)]:
@@ -119,7 +129,11 @@ class Profile:
         return profile
 
     def select(self, role):
-        return tuple(n for n in self.nodes if role in n.roles)
+        selected = tuple(n for n in self.nodes if role in n.roles)
+        if not selected and self.topology != 'isolated':
+            if role == 'kafka': return self.select('infrastructure')
+            if role == 'support': return self.select('infrastructure')[:2]
+        return selected
 
     @property
     def image_version(self):

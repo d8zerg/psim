@@ -1,0 +1,54 @@
+{
+  "format": 1,
+  "name": "psim-platform-vm-isolated",
+  "network": "10.91.0.0/24",
+  "gateway": "10.91.0.1",
+  "nodes": [
+    {
+      "name": "node-1",
+      "address": "10.91.0.11",
+      "cpus": 4,
+      "memory_mib": 9216,
+      "disk_gib": 45,
+      "ssh_port": 2211
+    },
+    {
+      "name": "node-2",
+      "address": "10.91.0.12",
+      "cpus": 4,
+      "memory_mib": 9216,
+      "disk_gib": 45,
+      "ssh_port": 2212
+    },
+    {
+      "name": "node-3",
+      "address": "10.91.0.13",
+      "cpus": 4,
+      "memory_mib": 9216,
+      "disk_gib": 45,
+      "ssh_port": 2213
+    },
+    {
+      "name": "node-4",
+      "address": "10.91.0.14",
+      "cpus": 4,
+      "memory_mib": 9216,
+      "disk_gib": 45,
+      "ssh_port": 2214
+    }
+  ],
+  "forwards": [
+    {
+      "name": "console",
+      "host_port": 8443,
+      "target_address": "10.91.0.11",
+      "target_port": 443
+    },
+    {
+      "name": "connectors",
+      "host_port": 7443,
+      "target_address": "10.91.0.11",
+      "target_port": 7443
+    }
+  ]
+}

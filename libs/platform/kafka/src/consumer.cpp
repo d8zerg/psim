@@ -62,6 +62,7 @@ struct Consumer::State {
   RebalanceListener* listener = nullptr;
   std::set<TopicPartition> assignment;
   Offsets positions;
+  Offsets observed_commits;
   std::map<std::string, std::pair<prometheus::Counter*, prometheus::Counter*>, std::less<>> series;
   bool closed = false;
   bool fatal = false;
@@ -113,6 +114,7 @@ struct Consumer::State {
     }
     for (const auto& partition : partitions) {
       assignment.erase(partition);
+      observed_commits.erase(partition);
       if (deps.metrics != nullptr) {
         deps.metrics->consumer_lag(options.group_id, partition.topic, partition.partition).Set(0);
       }
@@ -152,11 +154,18 @@ struct Consumer::State {
     for (const auto& [topic, data] : stats["topics"].items()) {
       for (const auto& [id, partition] : data.value("partitions", nlohmann::json::object()).items()) {
         const auto number = partition.value("partition", -1);
-        const auto lag = partition.value("consumer_lag", std::int64_t{-1});
-        if (number < 0 || lag < 0 || !assignment.contains({.topic = topic, .partition = number})) {
+        const TopicPartition key{.topic = topic, .partition = number};
+        if (number < 0 || !assignment.contains(key)) {
           continue;
         }
-        deps.metrics->consumer_lag(options.group_id, topic, number).Set(static_cast<double>(lag));
+        auto lag = partition.value("consumer_lag", std::int64_t{-1});
+        if (const auto committed = observed_commits.find(key); committed != observed_commits.end()) {
+          const auto end = partition.value(options.read_committed ? "ls_offset" : "hi_offset", std::int64_t{-1});
+          lag = end < 0 ? -1 : std::max(std::int64_t{0}, end - committed->second);
+        }
+        if (lag >= 0) {
+          deps.metrics->consumer_lag(options.group_id, topic, number).Set(static_cast<double>(lag));
+        }
       }
     }
   }
@@ -315,13 +324,17 @@ asio::awaitable<Result<void>> Consumer::commit(Offsets offsets) {
     co_return fail(ErrorCode::kCommonInvalidArgument, "kafka commit: no blocking pool");
   }
   auto state = state_;
-  co_return co_await state->deps.blocking->run([state, offsets = std::move(offsets)]() -> Result<void> {
+  auto committed = co_await state->deps.blocking->run([state, offsets]() -> Result<void> {
     const auto list = detail::to_list(offsets);
     if (const auto err = rd_kafka_commit(state->handle.get(), list.get(), 0); err) {
       return std::unexpected(detail::to_error(err, "commit offsets"));
     }
     return {};
   });
+  if (committed) {
+    record_committed(offsets);
+  }
+  co_return committed;
 }
 
 Result<void> Consumer::commit_now(const Offsets& offsets) {
@@ -332,7 +345,19 @@ Result<void> Consumer::commit_now(const Offsets& offsets) {
   if (const auto err = rd_kafka_commit(state_->handle.get(), list.get(), 0); err) {
     return std::unexpected(detail::to_error(err, "commit offsets"));
   }
+  record_committed(offsets);
   return {};
+}
+
+void Consumer::record_committed(const Offsets& offsets) const {
+  if (state_->deps.metrics == nullptr) {
+    return;
+  }
+  for (const auto& [partition, offset] : offsets) {
+    if (offset >= 0 && state_->assignment.contains(partition)) {
+      state_->observed_commits[partition] = offset;
+    }
+  }
 }
 
 asio::awaitable<Result<Offsets>> Consumer::committed(std::vector<TopicPartition> partitions, Duration timeout) {
@@ -378,6 +403,7 @@ Result<void> Consumer::assign(const Offsets& offsets) {
     return std::unexpected(detail::to_error(error, "assign replay partitions"));
   }
   state_->assignment.clear();
+  state_->observed_commits.clear();
   state_->positions = offsets;
   for (const auto& [partition, offset] : offsets) {
     state_->assignment.insert(partition);

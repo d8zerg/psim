@@ -43,10 +43,10 @@ def bootstrap(profile):
     root = Path(__file__).resolve().parents[2]
     registry = contracts.load_yaml(root / 'contracts/topics/topics.yaml')
     topics = {topic['name']: topic for topic in registry['topics']}
-    deployment = profile.topology
-    replication = registry['defaults']['replication_factor'][deployment]
-    minimum = registry['defaults']['min_insync_replicas'][deployment]
-    broker = profile.select('infrastructure')[0].name + ':9092'
+    deployment = 'cluster' if profile.topology == 'isolated' else profile.topology
+    replication = 1 if profile.topology == 'isolated' else registry['defaults']['replication_factor'][deployment]
+    minimum = 1 if profile.topology == 'isolated' else registry['defaults']['min_insync_replicas'][deployment]
+    broker = profile.select('kafka')[0].name + ':9092'
     commands = ['#!/bin/sh', 'set -eu']
     def invoke(tool, *args):
         commands.append(shlex.join(['/opt/kafka/bin/kafka-' + tool + '.sh', '--bootstrap-server', broker,

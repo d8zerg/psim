@@ -98,6 +98,61 @@ class Boundaries(unittest.TestCase):
         self.assertEqual((state / 'manifest.json').stat().st_mode & 0o777, 0o600)
         self.assertFalse(list(state.glob('*.tmp')))
 
+    def saved_lab(self):
+        value = copy.deepcopy(self.value)
+        for node in value['nodes']:
+            node['cpus'] = 4
+        state = vm.directory(value['name'])
+        state.mkdir()
+        saved = copy.deepcopy(value) | {'managed': 1, 'uid': os.getuid(), 'host_state': str(state),
+                                       'instance': 'existing-instance', 'profile_hash': vm.profile_digest(value)}
+        for index, node in enumerate(saved['nodes']):
+            node['mac'] = 'existing-mac-' + str(index)
+        vm.write_manifest(state, saved)
+        return state, saved
+
+    def test_cpu_resize_preserves_disks_and_identities_and_is_idempotent(self):
+        state, saved = self.saved_lab()
+        marker = state / 'disk.qcow2'
+        marker.write_bytes(b'existing guest data')
+        with patch.object(vm, 'container', return_value={'Id': 'owned'}), patch.object(vm, 'down') as down:
+            with patch.object(vm, 'run') as run, patch.object(vm, 'wait'), patch.object(vm.os, 'cpu_count', return_value=24):
+                vm.resize_cpu(self.value)
+                self.assertEqual(down.call_count, 1)
+                run.assert_called_once()
+                updated = vm.manifest(self.value['name'])
+                self.assertEqual([node['cpus'] for node in updated['nodes']], [6, 6, 4])
+                self.assertEqual(updated['profile_hash'], vm.profile_digest(self.value))
+                self.assertEqual(updated['instance'], saved['instance'])
+                self.assertEqual([node['mac'] for node in updated['nodes']], [node['mac'] for node in saved['nodes']])
+                vm.resize_cpu(self.value)
+                self.assertEqual(down.call_count, 1)
+                run.assert_called_once()
+        self.assertEqual(marker.read_bytes(), b'existing guest data')
+
+    def test_cpu_resize_rejects_other_changes_and_oversubscription_before_stopping(self):
+        state, saved = self.saved_lab()
+        with patch.object(vm, 'container', side_effect=AssertionError('Docker must not be called')):
+            for field in ('memory_mib', 'disk_gib', 'ssh_port'):
+                value = copy.deepcopy(self.value)
+                value['nodes'][0][field] += 1
+                with self.subTest(field=field), self.assertRaisesRegex(ValueError, 'cannot change'):
+                    vm.resize_cpu(value)
+            with patch.object(vm.os, 'cpu_count', return_value=12), self.assertRaisesRegex(ValueError, 'exceeds'):
+                vm.resize_cpu(self.value)
+        self.assertEqual(vm.manifest(self.value['name']), saved)
+
+    def test_failed_cpu_resize_restores_the_previous_manifest_and_restarts(self):
+        state, saved = self.saved_lab()
+        with patch.object(vm, 'container', return_value={'Id': 'owned'}), patch.object(vm, 'down') as down:
+            with patch.object(vm, 'run') as run, patch.object(vm.os, 'cpu_count', return_value=24):
+                with patch.object(vm, 'wait', side_effect=[ValueError('boot failed'), None]):
+                    with self.assertRaisesRegex(ValueError, 'boot failed'):
+                        vm.resize_cpu(self.value)
+                self.assertEqual(down.call_count, 2)
+                self.assertEqual(run.call_count, 2)
+        self.assertEqual(vm.manifest(self.value['name']), saved)
+
     def test_failed_image_download_never_becomes_a_cached_image(self):
         (self.root / 'deploy/vm').mkdir(parents=True)
         data = b'valid image'

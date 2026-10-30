@@ -8,9 +8,30 @@ Status: Accepted. The test environment is used for developing cluster services. 
 
 ## Resources
 
-The [local.json](../../deploy/vm/local.json) profile creates three Debian 13 x86_64 VMs. Each VM is allocated 4 vCPU, 12288 MiB of RAM, and 60 GiB of disk space. In total, 12 vCPU, 36 GiB of RAM, and 180 GiB of logical disk space are required. The disks use copy-on-write; the initial physical size is significantly smaller than the logical size.
+The [local.json](../../deploy/vm/local.json) profile creates three Debian 13 x86_64 VMs. CPU allocation is 6/6/4 vCPU for node-1/node-2/node-3. Each VM has 12288 MiB of RAM and 60 GiB of disk space. In total, 16 vCPU, 36 GiB of RAM, and 180 GiB of logical disk space are required. The disks use copy-on-write; the initial physical size is significantly smaller than the logical size.
 
 Tested host: AMD Ryzen 9 3900X, 24 logical CPUs, 64 GB RAM, NVMe. Additional 8 GiB of available memory and 20 GiB of free disk space are required before startup. Reservations from other running test environments are taken into account. KVM is mandatory; software emulation is not used.
+
+## Isolated performance lab
+
+The [isolated VM profile](../../deploy/vm/isolated.json) and [deployment inventory](../../deploy/topologies/local-isolated.json) separate applications, Kafka and databases. Status: Accepted for diagnostic load tests. Kafka uses one broker, replication factor 1 and minimum ISR 1; this profile does not qualify the replicated cluster.
+
+| VM | Placement | vCPU | RAM | Logical disk |
+| --- | --- | ---: | ---: | ---: |
+| node-1 | Product services, edge, Keycloak, Schema Registry | 4 | 9 GiB | 45 GiB |
+| node-2 | Product services, edge, central monitoring | 4 | 9 GiB | 45 GiB |
+| node-3 | Kafka | 4 | 9 GiB | 45 GiB |
+| node-4 | PostgreSQL, ClickHouse, Valkey, Keeper, object storage | 4 | 9 GiB | 45 GiB |
+
+Every VM also runs monitoring and telemetry agents. Total allocation remains 16 vCPU, 36 GiB RAM and 180 GiB logical disk. Topic partition counts retain the cluster layout so that changing replication does not also reduce consumer parallelism. The `single` and `cluster` profiles retain their existing replication settings.
+
+```sh
+task deploy:isolated:up
+task deploy:isolated:status
+task deploy:isolated:down
+```
+
+The namespace is `PSIM_LAB_ID=isolated`. An explicit `VERSION` can select already built release images when creating the lab. The previously deployed three-node lab is stopped before publishing the same host ports; its disks, credentials and factory record remain available in their original namespace. The isolated lab initializes a separate installation and does not migrate existing data. Both layouts still share the physical CPU and SSD; results with RF=1 must be reported separately from RF=3 qualification.
 
 ## Management
 
@@ -29,7 +50,7 @@ task vm:destroy
 
 `up` creates or restarts VMs, checks the completion of cloud-init, and writes initial records to disks. A repeated `up` keeps running VMs. `bootstrap` installs Docker Engine and Compose packages with version and SHA-256 checks in guest OSs. Platform services are installed separately.
 
-`down` terminates guest OSs and saves disks, SSH keys, and identifiers. `destroy` deletes control containers and only the directory of the specified test environment. The base image cache and packages are saved. Changing resources, addresses, or bootstrap requires explicit re-building of the environment. Port publishing can be changed via `down/up` with disk preservation.
+`down` terminates guest OSs and saves disks, SSH keys, and identifiers. `destroy` deletes control containers and only the directory of the specified test environment. The base image cache and packages are saved. After changing only CPU counts in the profile, `task vm:resize-cpu` shuts down and restarts the VMs with their existing disks, SSH identities and installation data. It rejects other profile changes and restores the previous CPU configuration if startup fails. Changing memory, disks, addresses, or bootstrap requires explicit re-building of the environment. Port publishing can be changed via `down/up` with disk preservation.
 
 ```sh
 task vm:node:kill NODE=node-1
@@ -55,6 +76,6 @@ task vm:test
 
 Testing uses a separate name `psim-platform-vm-test` and SSH ports `2311-2313`; it requires free resource budget for three VMs. It does not use an existing environment with such a name.
 
-Seven module-level tests of profile and ownership boundaries have been verified: incorrect resources and addresses, repeated nodes, replacing the directory with a symbolic link, foreign UID or path, foreign container, corrupted image download, Docker request failure, and interrupted state recording.
+Ten module-level tests of profile and ownership boundaries have been verified: incorrect resources and addresses, repeated nodes, replacing the directory with a symbolic link, foreign UID or path, foreign container, corrupted image download, Docker request failure, interrupted state recording, CPU-only resize boundaries, idempotence and failed-start rollback.
 
 The native test confirmed three independent KVM guest kernels, specified CPU/RAM/disks, repeated `up` without rebooting, TCP between nodes, port publishing on localhost, hardware watchdog, availability of two nodes after the third is shut down, preservation of flushed data after emergency and normal reboots, and deletion of the own environment. Report: `build/vm/qualification.json`. PostgreSQL, Kafka, SeaweedFS, and application pipeline are not confirmed by this test.

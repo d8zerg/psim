@@ -38,8 +38,9 @@ def agent(bundle, node, central, package):
         'targets': [], 'service_metrics': {}, 'volumes': {}, 'certificates': []}
     targets = config['targets']
     # Every node probes infrastructure; a network partition remains visible from both sides.
-    for target in profile.select('infrastructure'):
+    for target in profile.select('kafka'):
         targets.append({'component': 'kafka', 'kind': 'tcp', 'host': target.name, 'port': 9092})
+    for target in profile.select('infrastructure'):
         targets.append({'component': 'postgres', 'kind': 'tcp', 'host': target.name, 'port': 5432, 'tls': None})
     if 'application' in node.roles:
         config['service_metrics'] = {name: 19100 + index for index, name in enumerate(SERVICES)}
@@ -69,19 +70,22 @@ def agent(bundle, node, central, package):
             bundle.credential(node, 'monitoring', 'clickhouse.secret', secret_id='monitoring/clickhouse.secret')
             targets.extend([
                 {'component': 'clickhouse', 'kind': 'clickhouse', 'host': node.name, 'port': 18447},
-                {'component': 'keycloak', 'kind': 'http', 'host': node.name, 'port': 19000, 'path': '/identity/health/ready'},
-                {'component': 'keycloak-metrics', 'kind': 'prometheus', 'host': node.name, 'port': 19000, 'path': '/identity/metrics',
-                    'metrics': {'http_server_requests_seconds_count': 'psim_keycloak_requests_total', 'jvm_memory_used_bytes': 'psim_keycloak_memory_used_bytes'}},
                 {'component': 'seaweed-filer', 'kind': 'http', 'host': node.name, 'port': 18888, 'path': '/healthz', 'tls': 'seaweed_tls'},
                 {'component': 'seaweed-s3', 'kind': 'tcp', 'host': node.name, 'port': 18333},
             ])
+    if node in profile.select('support'):
+        targets.extend([
+            {'component': 'keycloak', 'kind': 'http', 'host': node.name, 'port': 19000, 'path': '/identity/health/ready'},
+            {'component': 'keycloak-metrics', 'kind': 'prometheus', 'host': node.name, 'port': 19000, 'path': '/identity/metrics',
+             'metrics': {'http_server_requests_seconds_count': 'psim_keycloak_requests_total', 'jvm_memory_used_bytes': 'psim_keycloak_memory_used_bytes'}},
+        ])
     if 'edge' in node.roles:
         targets.append({'component': 'haproxy', 'kind': 'prometheus', 'host': node.name, 'port': 19301, 'path': '/metrics', 'tls': None,
             'metrics': {'haproxy_server_status': 'psim_haproxy_server_status', 'haproxy_server_current_sessions': 'psim_haproxy_sessions',
                 'haproxy_backend_connection_errors_total': 'psim_haproxy_connection_errors_total'}})
     if node == central:
         config['backups'] = ['postgres', 'clickhouse', 'kafka-config', 'product-config', 'plans', 'identity-pki']
-        config['kafka'] = {'brokers': ','.join(n.name + ':9092' for n in profile.select('infrastructure'))}
+        config['kafka'] = {'brokers': ','.join(n.name + ':9092' for n in profile.select('kafka'))}
         for component, port, path in [('prometheus', 19090, '/-/ready'), ('alertmanager', 19093, '/-/ready'),
                                       ('loki', 13100, '/ready'), ('tempo', 13200, '/ready')]:
             targets.append({'component': component, 'kind': 'http', 'host': '127.0.0.1', 'port': port, 'path': path, 'tls': None})

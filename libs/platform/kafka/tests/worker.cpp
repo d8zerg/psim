@@ -80,8 +80,11 @@ class Worker final : public kafka::Handler {
                                              .group_protocol = "consumer",
                                              .auto_offset_reset = "earliest"},
                                             deps);
-    auto producer = kafka::Producer::create(
-        executor, {.client = client, .transactional_id = args_.exactly_once ? args_.instance : std::string{}}, deps);
+    auto producer = kafka::Producer::create(executor,
+                                            {.client = client,
+                                             .transactional_id = args_.exactly_once ? args_.instance : std::string{},
+                                             .transactional_batching = args_.exactly_once},
+                                            deps);
     if (!consumer || !producer) {
       co_return psim::platform::fail(psim::platform::ErrorCode::kCommonInternal, "cannot create the clients");
     }

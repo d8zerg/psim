@@ -4,6 +4,7 @@
 #include <boost/asio/awaitable.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <memory>
 #include <string>
 #include <vector>
@@ -27,6 +28,9 @@ struct ProducerOptions {
   /// How long librdkafka retries a message before reporting a delivery error.
   std::chrono::milliseconds delivery_timeout{120000};
   std::chrono::milliseconds transaction_timeout{60000};
+  /// Enqueue-only transactions: accumulate until native flush, then register offsets and commit. Tracked sends are
+  /// rejected; delivery callbacks may run in the blocking pool.
+  bool transactional_batching = false;
 };
 
 /// Idempotent producer: acks=all, no duplicates or reordering on retries (ADR-041). Bound to the
@@ -80,6 +84,8 @@ class Producer {
   Result<void> abort_transaction_now(Duration timeout);
 
   [[nodiscard]] bool in_transaction() const noexcept;
+  /// Successfully enqueued key, value and header bytes in the current transaction.
+  [[nodiscard]] std::size_t transaction_bytes() const noexcept;
 
   /// The producer cannot continue (fenced by a newer instance, fatal idempotence error) and must
   /// be recreated; its open transaction is lost.

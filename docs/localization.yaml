@@ -6,8 +6,8 @@ pages:
 - id: docs/engineering/performance
   en: docs/engineering/performance.md
   ru: docs/ru/engineering/performance.md
-  en_sha256: c76b7fc8f308f7b0cdf67ef3812dc036bf44afb1df3b2ca945a651d9dd27ca04
-  ru_sha256: 407de1bf68789bb253a2cf13c4f4f217214607bb77be8842a315d5e9b5da3b89
+  en_sha256: c814754f22cfabc741b7765284306e87302912d4ae5e68768028fbf69fdb350e
+  ru_sha256: 4195676c2c942a6dd0747191c1dc1bd0f6ce5e36825ab11d75ecd760c67a6b8c
 - id: CONTRIBUTING
   en: CONTRIBUTING.md
   ru: docs/ru/repository/CONTRIBUTING.md
@@ -251,8 +251,8 @@ pages:
 - id: docs/adr/0041-kafka-layer
   en: docs/adr/0041-kafka-layer.md
   ru: docs/ru/adr/0041-kafka-layer.md
-  en_sha256: 7650374ad6889d29273b10c50db9f7c1c3033a7042243d6166728177b2d79397
-  ru_sha256: a1f8a230fdc062a2fbcdbcfc7982096512e8ff750849d601f7a7314e1b0727bc
+  en_sha256: 8771101dd65bef0081b85e41f49dc589753b61585980b73634734279775ba5ec
+  ru_sha256: 3836c090a93c13d9198846494c49f83fa8d6a250aeab2c7506624ec60b7cfcb6
 - id: docs/adr/0042-operational-capabilities
   en: docs/adr/0042-operational-capabilities.md
   ru: docs/ru/adr/0042-operational-capabilities.md
@@ -691,8 +691,8 @@ pages:
 - id: docs/engineering/local-vm-lab
   en: docs/engineering/local-vm-lab.md
   ru: docs/ru/engineering/local-vm-lab.md
-  en_sha256: cdd3d39610aa915ea8540dcd29e4e0ea8e1a78e47bbf98cb7b660917149095c2
-  ru_sha256: 22144066de5a8eea24aadc92fe98fd15b3d3a9142e62ba68a12b3986341e608b
+  en_sha256: 4d08f496fee9d0d8466eb21269dd3459b91143896bb717d23792db0f0f951d90
+  ru_sha256: 15ab93f62a49b7fc134f449be5050f3b2d86d063ce06f6126d3435c7bbe4fd4d
 - id: docs/engineering/normalization-and-history
   en: docs/engineering/normalization-and-history.md
   ru: docs/ru/engineering/normalization-and-history.md

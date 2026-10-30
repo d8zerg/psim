@@ -22,16 +22,19 @@ def render_infrastructure(bundle):
     profile = bundle.profile
     nodes = profile.select('infrastructure')
     cluster = profile.topology == 'cluster'
+    brokers = profile.select('kafka')
+    for index, node in enumerate(brokers, 1):
+        kafka(bundle, node, index, brokers)
     for index, node in enumerate(nodes, 1):
-        kafka(bundle, node, index, nodes)
         postgres(bundle, node, nodes)
         valkey(bundle, node, index, nodes)
         keeper(bundle, node, index, nodes)
         seaweed(bundle, node, index, nodes)
         if index <= 2 or not cluster:
             clickhouse(bundle, node, index, nodes)
-            identity(bundle, node)
-            registry(bundle, node)
+    for node in profile.select('support'):
+        identity(bundle, node)
+        registry(bundle, node)
     for node in profile.select('edge'):
         proxy(bundle, node)
     for node in profile.select('application'):
@@ -422,8 +425,8 @@ def proxy(bundle, node):
         sections.append(text)
     tcp('postgres', 15432, [(n.name, 5432) for n in infra], primary=profile.topology == 'cluster')
     tcp('clickhouse', 19440, [(n.name, 9440) for n in infra[:2]])
-    tcp('registry', 18443, [(n.name, 18181) for n in infra[:2]])
-    tcp('keycloak', 18444, [(n.name, 18445) for n in infra[:2]])
+    tcp('registry', 18443, [(n.name, 18181) for n in profile.select('support')])
+    tcp('keycloak', 18444, [(n.name, 18445) for n in profile.select('support')])
     tcp('s3', 18446, [(n.name, 18333) for n in infra[:2]])
     for index, (name, (_, port, _)) in enumerate(SERVICES.items()):
         if name in ('normalizer', 'correlation-engine'):
@@ -449,7 +452,7 @@ def proxy(bundle, node):
   default_backend public-web
 backend public-identity
   mode http
-'''+''.join(f'  server identity-{i} {n.name}:18445 ssl verify required ca-file {ca} verifyhost keycloak sni str(keycloak) check\n' for i,n in enumerate(infra[:2],1))+f'''backend public-api
+'''+''.join(f'  server identity-{i} {n.name}:18445 ssl verify required ca-file {ca} verifyhost keycloak sni str(keycloak) check\n' for i,n in enumerate(profile.select('support'),1))+f'''backend public-api
   mode http
   retries 2
   option redispatch

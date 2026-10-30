@@ -63,6 +63,7 @@ tasks:
   check:
     desc: Validate deployment profiles, process isolation and Helm material isolation without VMs
     cmds:
+      - docker run --rm --network none --user {{.UID}}:{{.GID}} --volume "{{.ROOT_DIR}}:/repo:ro" --workdir /repo {{.TOOLCHAIN_IMAGE}} python3 -I tools/deploy/test_isolated.py
       - python3 -I tools/deploy/check.py
   images:
     desc: Build release services and the configured infrastructure images
@@ -81,7 +82,23 @@ tasks:
   vm:up:
     desc: Install or resume the complete local VM deployment
     cmds:
-      - python3 -I tools/deploy/lab.py up --topology {{.TOPOLOGY | default "cluster"}}
+      - python3 -I tools/deploy/lab.py up --topology {{.TOPOLOGY | default "cluster"}} {{if .VERSION}}--version {{.VERSION}}{{end}}
+  isolated:up:
+    desc: Start four VMs with separate application, Kafka RF=1 and database placement
+    env: {PSIM_LAB_ID: isolated}
+    cmds:
+      - task: vm:up
+        vars: {TOPOLOGY: isolated}
+  isolated:status:
+    desc: Show the isolated lab factory record
+    env: {PSIM_LAB_ID: isolated}
+    cmds:
+      - python3 -I tools/deploy/lab.py status
+  isolated:down:
+    desc: Stop the isolated lab while preserving its disks and credentials
+    env: {PSIM_LAB_ID: isolated}
+    cmds:
+      - python3 -I tools/deploy/lab.py down
   vm:down:
     desc: Stop the local VM deployment while preserving disks and credentials
     cmds:

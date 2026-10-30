@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "psim/platform/kafka/consumer.hpp"
+#include "psim/platform/kafka/metrics.hpp"
 #include "psim/platform/kafka/processor.hpp"
 #include "psim/platform/kafka/producer.hpp"
 #include "psim/platform/kafka/serde.hpp"
@@ -80,7 +81,8 @@ void stamp(kafka::Headers& headers, std::string_view stage);
 class Worker : public runtime::Component, public kafka::Handler {
  public:
   Worker(const runtime::Context& context, std::string stage, std::string input,
-         kafka::Semantics semantics = kafka::Semantics::kExactlyOnce, bool broadcast = false, std::size_t shard = 0);
+         kafka::Semantics semantics = kafka::Semantics::kExactlyOnce, bool broadcast = false, std::size_t shard = 0,
+         std::string worker_id = {});
 
   [[nodiscard]] std::string_view name() const override { return stage_; }
 
@@ -117,9 +119,19 @@ class Worker : public runtime::Component, public kafka::Handler {
 
   virtual std::size_t batch_size() const { return 32; }
 
+  virtual bool transactional_batching() const { return false; }
+
+  virtual std::size_t max_transaction_records() const { return 0; }
+
+  virtual std::size_t max_transaction_bytes() const { return 0; }
+
+  virtual std::size_t input_prefetch_bytes() const { return 0; }
+
   virtual std::chrono::milliseconds transaction_gap() const { return std::chrono::milliseconds(0); }
 
   virtual std::chrono::milliseconds commit_interval() const { return std::chrono::milliseconds(20); }
+
+  virtual std::chrono::milliseconds batch_commit_interval() const { return commit_interval(); }
 
   virtual std::chrono::milliseconds transaction_timeout() const { return std::chrono::seconds(60); }
 
@@ -134,7 +146,8 @@ class Worker : public runtime::Component, public kafka::Handler {
   std::string input_;
   kafka::Semantics semantics_;
   bool broadcast_;
-  std::size_t shard_;
+  std::string worker_id_;
+  std::unique_ptr<kafka::KafkaMetrics> kafka_metrics_;
   std::unique_ptr<kafka::Producer> producer_;
   std::unique_ptr<kafka::Consumer> consumer_;
   std::unique_ptr<kafka::Processor> processor_;

@@ -70,7 +70,7 @@ key = "/case/seaweed.key"
     nodes = profile.select('application')
     config = {'fixtures': '/case', 'tls': '/case', 'connector_type': 'qualification-' + installation['id'][:8],
               'gateways': [node.name + ':17443' for node in nodes],
-              'sdk_endpoint': 'connector-gateway:7443', 'failover_interval_ms': 5, 'kafka': {'brokers': ','.join(node.name + ':9092' for node in profile.select('infrastructure')),
+              'sdk_endpoint': 'connector-gateway:7443', 'failover_interval_ms': 5, 'kafka': {'brokers': ','.join(node.name + ':9092' for node in profile.select('kafka')),
               'ca_file': '/case/ca.pem', 'certificate_file': '/case/reader.pem', 'private_key_file': '/case/reader.key'}}
     (target / 'config.json').write_text(json.dumps(config, indent=2) + '\n')
     for path in target.iterdir():

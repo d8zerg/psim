@@ -113,6 +113,9 @@ class Consumer {
   [[nodiscard]] rd_kafka_s* handle() const noexcept;
 
  private:
+  friend class Producer;
+  // Producer transactions commit offsets outside the consumer's librdkafka handle.
+  void record_committed(const Offsets& offsets) const;
   struct State;
   explicit Consumer(std::shared_ptr<State> state);
   std::shared_ptr<State> state_;

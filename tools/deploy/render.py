@@ -67,8 +67,9 @@ class Bundle:
 
     def hosts(self, node):
         result = {item.name: item.address for item in self.profile.nodes}
+        proxy = node.address if node in self.profile.select('edge') else self.profile.select('edge')[0].address
         for role in ('postgres', 'registry', 's3', 'keycloak', 'clickhouse', *SERVICES):
-            result[role] = str(self.profile.virtual_ip).split('/')[0] if self.profile.virtual_ip else node.address
+            result[role] = str(self.profile.virtual_ip).split('/')[0] if self.profile.virtual_ip else proxy
         if self.profile.public_name != 'localhost':
             result[self.profile.public_name] = str(self.profile.virtual_ip).split('/')[0] if self.profile.virtual_ip else node.address
         return result
@@ -86,7 +87,7 @@ class Bundle:
                 secret = lambda suffix: self.credential(node, name, suffix)
                 settings = {
                     'allow_plaintext': False,
-                    'brokers': ','.join(item.name + ':9092' for item in infra),
+                    'brokers': ','.join(item.name + ':9092' for item in profile.select('kafka')),
                     'registry': 'https://registry:18443/apis/ccompat/v7',
                     'registry_ca_file': ca, 'registry_certificate_file': certificate, 'registry_private_key_file': key,
                     'kafka_ca_file': ca, 'kafka_certificate_file': certificate, 'kafka_private_key_file': key,
@@ -155,6 +156,8 @@ class Bundle:
                           'telemetry': {'otlp_endpoint': node.name + ':4317', 'otlp_tls': True, 'otlp_ca_file': ca, 'sampling_ratio': 0.01},
                           'runtime': {'shards': profile.shards if name in ('normalizer', 'event-history', 'correlation-engine', 'connector-gateway') else 1},
                           'shutdown': {'drain_timeout_ms': 30000}, 'settings': settings}
+                if name == 'normalizer':
+                    config['runtime']['blocking_threads'] = max(4, profile.shards * 4)
                 self.write(node.name + '/services/' + name + '.json', config)
                 filename = CONFIG + '/services/' + name + '.json'
                 image = 'psim-platform/psim-' + binary + ':' + profile.image_version

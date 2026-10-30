@@ -195,7 +195,103 @@ TEST(KafkaComponent, DeliversKeysValuesHeadersAndTheTraceContext) {
   EXPECT_EQ(metrics.consumed_messages(topic).Value(), 1.0);
 }
 
+asio::awaitable<void> native_batch(std::string topic, async::BlockingPool* pool) {
+  const auto executor = co_await asio::this_coro::executor;
+  auto options = client();
+  options.properties["linger.ms"] = "5000";
+  auto producer =
+      Producer::create(executor,
+                       {.client = options, .transactional_id = unique("native-batch"), .transactional_batching = true},
+                       {.blocking = pool})
+          .value();
+  EXPECT_TRUE((co_await producer->init_transactions(seconds(10))).has_value());
+  EXPECT_TRUE(producer->begin_transaction().has_value());
+  EXPECT_FALSE((co_await producer->send({.topic = topic, .value = "tracked"})).has_value());
+  std::vector<Record> tracked{{.topic = topic, .value = "tracked-batch"}};
+  EXPECT_FALSE((co_await producer->send_batch(std::move(tracked))).has_value());
+  EXPECT_EQ(producer->transaction_bytes(), 0U);
+  EXPECT_TRUE((co_await producer->enqueue({.topic = topic, .key = "k", .value = "native"})).has_value());
+  EXPECT_EQ(producer->transaction_bytes(), 7U);
+  EXPECT_TRUE((co_await producer->commit_transaction(nullptr, {}, seconds(2))).has_value());
+  EXPECT_EQ(producer->transaction_bytes(), 0U);
+}
+
+TEST(KafkaComponent, EnqueueOnlyCommitFlushesBeforeLingerWithOneBlockingThread) {
+  Topics topics;
+  const auto topic = topics.create("native-batch", 1);
+  async::BlockingPool pool(1, 4);
+  run(native_batch(topic, &pool));
+  const auto values = read_all(topic, 1, seconds(10));
+  ASSERT_EQ(values.size(), 1U);
+  EXPECT_EQ(values.front().second, "native");
+}
+
 // --- Broker faults and transactions ---------------------------------------------------------------
+
+asio::awaitable<void> expect_lag(Consumer* input, KafkaMetrics* metrics, std::string topic, double expected) {
+  const auto earliest = std::chrono::steady_clock::now() + milliseconds(150);
+  const auto deadline = earliest + seconds(5);
+  auto& lag = metrics->consumer_lag(input->group(), topic, 0);
+  while (std::chrono::steady_clock::now() < deadline) {
+    EXPECT_TRUE((co_await input->poll(10, milliseconds(50))).has_value());
+    if (std::chrono::steady_clock::now() >= earliest && lag.Value() == expected) {
+      break;
+    }
+  }
+  EXPECT_EQ(lag.Value(), expected);
+}
+
+asio::awaitable<void> transaction_lag(std::string topic, bool read_committed, KafkaMetrics* metrics,
+                                      async::BlockingPool* pool) {
+  const auto executor = co_await asio::this_coro::executor;
+  auto publisher = Producer::create(executor, {.client = client()}).value();
+  for (int index = 0; index < 4; ++index) {
+    EXPECT_TRUE((co_await publisher->send({.topic = topic, .key = "lag", .value = std::to_string(index)})).has_value());
+  }
+  auto options = consumer(topic, unique("lag"), read_committed);
+  options.client.properties["statistics.interval.ms"] = "20";
+  auto input = Consumer::create(executor, std::move(options), {.blocking = pool, .metrics = metrics}).value();
+  std::vector<Message> messages;
+  const auto deadline = std::chrono::steady_clock::now() + seconds(20);
+  while (messages.empty() && std::chrono::steady_clock::now() < deadline) {
+    messages = (co_await input->poll(1, milliseconds(100))).value();
+  }
+  if (messages.empty()) {
+    throw std::runtime_error("lag consumer did not receive input");
+  }
+  const auto partition = messages.front().topic_partition();
+  auto producer =
+      Producer::create(executor, {.client = client(), .transactional_id = unique("lag-tx")}, {.blocking = pool})
+          .value();
+  EXPECT_TRUE((co_await producer->init_transactions(milliseconds(10000))).has_value());
+  EXPECT_TRUE((co_await input->commit({{partition, 0}})).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 4);
+  EXPECT_TRUE(producer->begin_transaction().has_value());
+  EXPECT_TRUE((co_await producer->commit_transaction(input.get(), {{partition, 1}}, milliseconds(10000))).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 3);
+  EXPECT_TRUE(producer->begin_transaction().has_value());
+  EXPECT_TRUE((co_await producer->abort_transaction(milliseconds(10000))).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 3);
+  EXPECT_TRUE(producer->begin_transaction().has_value());
+  EXPECT_TRUE(producer->commit_transaction_now(input.get(), {{partition, 2}}, milliseconds(10000)).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 2);
+  EXPECT_TRUE((co_await input->commit({{partition, 4}})).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 0);
+  EXPECT_TRUE(input->commit_now({{partition, 3}}).has_value());
+  co_await expect_lag(input.get(), metrics, topic, 1);
+  co_await input->close();
+  EXPECT_EQ(metrics->consumer_lag(input->group(), topic, 0).Value(), 0);
+}
+
+TEST(KafkaComponent, ConsumerLagTracksCommittedOffsetsAcrossProducerTransactionsAndAborts) {
+  Topics topics;
+  prometheus::Registry registry;
+  KafkaMetrics metrics(registry);
+  async::BlockingPool pool(1, 4);
+  for (const bool read_committed : {false, true}) {
+    run(transaction_lag(topics.create("lag", 1), read_committed, &metrics, &pool));
+  }
+}
 
 constexpr int kFaultMessages = 20000;
 
@@ -258,10 +354,15 @@ TEST(KafkaComponent, ReadCommittedSkipsAbortedTransactions) {
 /// Runs a processor on its own thread until result().
 class Stage {
  public:
-  Stage(ConsumerOptions input, ProcessorOptions options, KafkaMetrics* metrics, Handler* handler)
-      : input_(std::move(input)), options_(std::move(options)), metrics_(metrics), handler_(handler), thread_([this] {
-          run_stage();
-        }) {}
+  Stage(ConsumerOptions input, ProcessorOptions options, KafkaMetrics* metrics, Handler* handler,
+        async::Clock* clock = nullptr, bool transactional_batching = false)
+      : input_(std::move(input)),
+        options_(std::move(options)),
+        metrics_(metrics),
+        handler_(handler),
+        clock_(clock),
+        transactional_batching_(transactional_batching),
+        thread_([this] { run_stage(); }) {}
 
   Stage(const Stage&) = delete;
   Stage& operator=(const Stage&) = delete;
@@ -297,7 +398,7 @@ class Stage {
     const auto executor = co_await asio::this_coro::executor;
     const Dependencies deps{.blocking = pool, .metrics = metrics_};
     auto input = Consumer::create(executor, input_, deps);
-    ProducerOptions output{.client = client()};
+    ProducerOptions output{.client = client(), .transactional_batching = transactional_batching_};
     if (options_.semantics == Semantics::kExactlyOnce) {
       output.transactional_id = input_.group_id + "-tx";
     }
@@ -313,7 +414,7 @@ class Stage {
     asio::io_context io;
     async::BlockingPool pool(2, 16);
     async::SystemClock clock;
-    auto future = asio::co_spawn(io, stage(&pool, &clock), asio::use_future);
+    auto future = asio::co_spawn(io, stage(&pool, clock_ == nullptr ? &clock : clock_), asio::use_future);
     io.run();
     result_ = future.get();
   }
@@ -322,6 +423,8 @@ class Stage {
   ProcessorOptions options_;
   KafkaMetrics* metrics_;
   Handler* handler_;
+  async::Clock* clock_;
+  bool transactional_batching_;
   std::atomic<bool> stop_{false};
   bool finished_ = false;
   Result<void> result_;
@@ -337,6 +440,163 @@ bool wait_until(const std::function<bool()>& condition, milliseconds timeout) {
     std::this_thread::sleep_for(milliseconds(50));
   }
   return condition();
+}
+
+class BatchProbe final : public Handler {
+ public:
+  BatchProbe(async::ManualClock* clock, std::string output) : clock_(clock), output_(std::move(output)) {}
+
+  void before_poll() override {
+    if (pending_ > 0) {
+      clock_->advance(milliseconds(1));
+    }
+  }
+
+  asio::awaitable<Result<void>> handle(const Message* message, Output* output) override {
+    auto result = co_await output->send(
+        {.topic = output_, .key = std::string(message->key()), .value = std::string(message->value())});
+    if (result) {
+      ++pending_;
+      clock_->advance(milliseconds(2));
+    }
+    co_return result;
+  }
+
+  void committed() override {
+    sizes_.push_back(pending_);
+    committed_ += pending_;
+    pending_ = 0;
+    finished_at_ = clock_->steady();
+  }
+
+  [[nodiscard]] int count() const { return committed_; }
+
+  [[nodiscard]] const std::vector<int>& sizes() const { return sizes_; }
+
+  [[nodiscard]] async::SteadyTime finished_at() const { return finished_at_; }
+
+ private:
+  async::ManualClock* clock_;
+  std::string output_;
+  int pending_ = 0;
+  std::atomic<int> committed_{0};
+  std::vector<int> sizes_;
+  async::SteadyTime finished_at_;
+};
+
+TEST(KafkaComponent, TransactionBatchingAmortizesCommitsAndBoundsProcessingTime) {
+  for (const auto interval : {milliseconds(0), milliseconds(6), milliseconds(50)}) {
+    SCOPED_TRACE(interval.count());
+    Topics topics;
+    const auto input = topics.create("batch-in", 1);
+    const auto output = topics.create("batch-out", 1);
+    produce_numbers(input, 8);
+    async::ManualClock clock;
+    BatchProbe handler(&clock, output);
+    Stage processor(consumer(input, unique("batch-group")),
+                    {.stage = stage_name(),
+                     .semantics = Semantics::kExactlyOnce,
+                     .max_batch = 8,
+                     .commit_interval = milliseconds(5),
+                     .batch_commit_interval = interval},
+                    nullptr, &handler, &clock);
+    ASSERT_TRUE(wait_until([&] { return handler.count() == 8; }, seconds(30)));
+    ASSERT_TRUE(processor.result());
+    EXPECT_EQ(handler.sizes(), interval == milliseconds(50) ? std::vector<int>{8} : (std::vector<int>{3, 3, 2}));
+    EXPECT_EQ(histogram(read_all(output, 8, seconds(10))).size(), 8U);
+  }
+}
+
+TEST(KafkaComponent, TransactionLimitsBoundRecordsAndOutputBytesAcrossBatches) {
+  for (const bool bytes : {false, true}) {
+    Topics topics;
+    const auto input = topics.create("bounded-in", 1);
+    const auto output = topics.create("bounded-out", 1);
+    produce_numbers(input, 8);
+    async::ManualClock clock;
+    BatchProbe handler(&clock, output);
+    Stage processor(consumer(input, unique("bounded-group")),
+                    {.stage = stage_name(),
+                     .semantics = Semantics::kExactlyOnce,
+                     .max_batch = 2,
+                     .commit_interval = milliseconds(500),
+                     .batch_commit_interval = milliseconds(500),
+                     .max_transaction_records = bytes ? 0U : 3U,
+                     .max_transaction_bytes = bytes ? 6U : 0U},
+                    nullptr, &handler, &clock, true);
+    ASSERT_TRUE(wait_until([&] { return handler.count() >= 6; }, seconds(30)));
+    ASSERT_TRUE(processor.result());
+    EXPECT_EQ(handler.sizes(), (std::vector<int>{3, 3, 2}));
+    EXPECT_EQ(histogram(read_all(output, 8, seconds(10))).size(), 8U);
+  }
+}
+
+TEST(KafkaComponent, TransactionBatchingKeepsTheSparseInputCommitDeadline) {
+  Topics topics;
+  const auto input = topics.create("sparse-in", 1);
+  const auto output = topics.create("sparse-out", 1);
+  produce_numbers(input, 1);
+  async::ManualClock clock;
+  BatchProbe handler(&clock, output);
+  Stage processor(consumer(input, unique("sparse-group")),
+                  {.stage = stage_name(),
+                   .semantics = Semantics::kExactlyOnce,
+                   .max_batch = 8,
+                   .commit_interval = milliseconds(5),
+                   .batch_commit_interval = milliseconds(50)},
+                  nullptr, &handler, &clock);
+  ASSERT_TRUE(wait_until([&] { return handler.count() == 1; }, seconds(30)));
+  ASSERT_TRUE(processor.result());
+  EXPECT_EQ(handler.sizes(), std::vector<int>{1});
+  EXPECT_EQ(handler.finished_at(), async::SteadyTime{} + milliseconds(5));
+  EXPECT_EQ(read_all(output, 1, seconds(10)).size(), 1U);
+}
+
+class IdleProbe final : public Handler {
+ public:
+  explicit IdleProbe(std::string output) : output_(std::move(output)) {}
+
+  void before_poll() override { ++polls_; }
+
+  void assigned(const std::vector<TopicPartition>& partitions) override { ready_ = !partitions.empty(); }
+
+  asio::awaitable<Result<void>> handle(const Message* message, Output* output) override {
+    co_return co_await output->send(
+        {.topic = output_, .key = std::string(message->key()), .value = std::string(message->value())});
+  }
+
+  [[nodiscard]] int polls() const { return polls_; }
+
+  [[nodiscard]] bool ready() const { return ready_; }
+
+ private:
+  std::string output_;
+  std::atomic<int> polls_{0};
+  std::atomic<bool> ready_{false};
+};
+
+TEST(KafkaComponent, IdleProcessorsWaitForInputBeforeAndAfterCommitting) {
+  for (const auto semantics : {Semantics::kAtLeastOnce, Semantics::kExactlyOnce}) {
+    SCOPED_TRACE(semantics == Semantics::kExactlyOnce ? "exactly once" : "at least once");
+    Topics topics;
+    const auto input = topics.create("idle-in", 1);
+    const auto output = topics.create("idle-out", 1);
+    IdleProbe handler(output);
+    Stage processor(consumer(input, unique("idle-group")),
+                    {.stage = stage_name(), .semantics = semantics, .commit_interval = milliseconds(5)}, nullptr,
+                    &handler);
+    ASSERT_TRUE(wait_until([&] { return handler.ready(); }, seconds(30)));
+    for (int cycle = 0; cycle < 2; ++cycle) {
+      // An expired commit deadline must not turn an empty consumer into a 1 ms polling loop.
+      const auto before = handler.polls();
+      std::this_thread::sleep_for(milliseconds(500));
+      EXPECT_LT(handler.polls() - before, 60);
+      produce_numbers(input, 1);
+      EXPECT_EQ(read_all(output, static_cast<std::size_t>(cycle + 1), seconds(10)).size(),
+                static_cast<std::size_t>(cycle + 1));
+    }
+    ASSERT_TRUE(processor.result());
+  }
 }
 
 /// Copies every message to `output` after an optional delay, counting them.
@@ -483,30 +743,44 @@ class TransactionalState final : public Handler {
   std::atomic<int> committed_{0}, aborts_{0};
 };
 
-TEST(KafkaComponent, TransactionAbortRollsBackHandlerStateAndPartialOutputs) {
+void transaction_abort_rolls_back(bool batching) {
   Topics topics;
   const auto input = topics.create("state-in", 1);
   const auto output = topics.create("state-out", 1);
   produce_numbers(input, 100);
   TransactionalState handler(output);
+  prometheus::Registry registry;
+  KafkaMetrics metrics(registry);
   {
     Stage processor(consumer(input, unique("state-group")),
                     {.stage = stage_name(),
                      .semantics = Semantics::kExactlyOnce,
                      .max_batch = 100,
                      .commit_interval = milliseconds(20),
+                     .batch_commit_interval = milliseconds(50),
                      .retry = {.initial = milliseconds(10)}},
-                    nullptr, &handler);
+                    &metrics, &handler, nullptr, batching);
     ASSERT_TRUE(wait_until([&] { return handler.committed_count() >= 100; }, milliseconds(60000)));
     ASSERT_TRUE(processor.result());
   }
   EXPECT_GE(handler.aborts(), 1);
   EXPECT_EQ(handler.committed_count(), 100);
+  for (const auto* stage : {"flush", "pool_wait", "offsets", "commit"}) {
+    EXPECT_GT(metrics.transaction_stage(stage).Collect().histogram.sample_count, 0U) << stage;
+  }
   const auto values = histogram(read_all(output, 100, seconds(20)));
   ASSERT_EQ(values.size(), 100U);
   for (const auto& [value, count] : values) {
     EXPECT_EQ(count, 1) << value;
   }
+}
+
+TEST(KafkaComponent, TransactionAbortRollsBackHandlerStateAndPartialOutputs) {
+  transaction_abort_rolls_back(false);
+}
+
+TEST(KafkaComponent, EnqueueOnlyTransactionsRollBackHandlerStateAndPartialOutputs) {
+  transaction_abort_rolls_back(true);
 }
 
 TEST(KafkaComponent, CircuitBreakerStopsAPartitionAfterRepeatedProgramErrors) {

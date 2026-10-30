@@ -45,7 +45,7 @@ def read_state():
     require(not STATE.is_symlink() and STATE.stat().st_uid == os.getuid() and STATE.stat().st_mode & 0o777 == 0o600,
             'foreign or unsafe deployment factory record')
     state = json.loads(STATE.read_text())
-    require(state['format'] == 1 and state['uid'] == os.getuid() and state['root'] == str(ROOT) and state['topology'] in ('single', 'cluster'),
+    require(state['format'] == 1 and state['uid'] == os.getuid() and state['root'] == str(ROOT) and state['topology'] in ('single', 'cluster', 'isolated'),
             'deployment factory identity mismatch')
     return state
 
@@ -65,7 +65,7 @@ def save_state(state):
 
 
 def paths(topology):
-    require(topology in ('single', 'cluster'), 'invalid lab topology')
+    require(topology in ('single', 'cluster', 'isolated'), 'invalid lab topology')
     return local.BUILD / ('lab-' + topology), CACHE / ('lab-' + topology)
 
 
@@ -116,16 +116,17 @@ def public_ca(profile, holder, topology, create=True):
     return path
 
 
-def up(topology):
+def up(topology, version=None):
     bundle, holder = paths(topology)
     state = read_state()
     require(state is None or state['topology'] == topology, 'another lab topology is installed; destroy it before changing topology')
     if state:
         profile = verify_bundle(bundle)
+        require(version is None or profile.version == version, 'requested image version differs from the installed lab')
         checksum = digest(bundle / 'manifest.json')
     else:
-        value = json.loads((ROOT / ('deploy/topologies/local-vm.json' if topology == 'cluster' else 'deploy/topologies/local-single.json')).read_text())
-        value['version'] = local.vm.capture(['python3', '-I', str(ROOT / 'tools/version.py'), '--field', 'version'])
+        value = json.loads((ROOT / ({'cluster': 'deploy/topologies/local-vm.json', 'single': 'deploy/topologies/local-single.json', 'isolated': 'deploy/topologies/local-isolated.json'}[topology])).read_text())
+        value['version'] = version or local.vm.capture(['python3', '-I', str(ROOT / 'tools/version.py'), '--field', 'version'])
         profile = Profile.parse(value)
         bundle.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.TemporaryDirectory(prefix='.lab-render-', dir=bundle.parent) as temporary:
@@ -247,10 +248,11 @@ if p.exists():
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('action', choices=['up', 'down', 'destroy', 'status'])
-    parser.add_argument('--topology', choices=['single', 'cluster'], default='cluster')
+    parser.add_argument('--topology', choices=['single', 'cluster', 'isolated'], default='cluster')
+    parser.add_argument('--version', help='existing application image version for a new lab')
     args = parser.parse_args()
     with exclusive():
-        if args.action == 'up': up(args.topology)
+        if args.action == 'up': up(args.topology, args.version)
         elif args.action == 'down': local.vm.down(local.VM_NAME)
         elif args.action == 'destroy': destroy()
         else: print(json.dumps(read_state(), indent=2))

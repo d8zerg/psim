@@ -3,6 +3,7 @@
 #include <prometheus/counter.h>
 #include <prometheus/family.h>
 #include <prometheus/gauge.h>
+#include <prometheus/histogram.h>
 #include <prometheus/registry.h>
 
 #include <cstdint>
@@ -28,6 +29,7 @@ class KafkaMetrics {
   prometheus::Counter& retries(std::string_view stage);
   prometheus::Counter& dead_letters(std::string_view stage, std::string_view code);
   prometheus::Counter& transactions(std::string_view result);
+  prometheus::Histogram& transaction_stage(std::string_view stage);
   /// Partitions stopped by the circuit breaker after repeated program errors.
   prometheus::Gauge& stopped_partitions(std::string_view stage);
 
@@ -42,6 +44,7 @@ class KafkaMetrics {
   prometheus::Family<prometheus::Counter>* retries_;
   prometheus::Family<prometheus::Counter>* dead_letters_;
   prometheus::Family<prometheus::Counter>* transactions_;
+  prometheus::Family<prometheus::Histogram>* transaction_stages_;
   prometheus::Family<prometheus::Gauge>* stopped_partitions_;
 };
 

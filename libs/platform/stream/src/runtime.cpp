@@ -64,14 +64,14 @@ void stamp(kafka::Headers& headers, std::string_view stage) {
 }
 
 Worker::Worker(const runtime::Context& context, std::string stage, std::string input, kafka::Semantics semantics,
-               bool broadcast, std::size_t shard)
+               bool broadcast, std::size_t shard, std::string worker_id)
     : context_(context),
       executor_(context.shards().executor(shard)),
       stage_(std::move(stage)),
       input_(std::move(input)),
       semantics_(semantics),
       broadcast_(broadcast),
-      shard_(shard),
+      worker_id_(worker_id.empty() ? std::to_string(shard) : std::move(worker_id)),
       stopped_(executor_) {}
 
 asio::awaitable<Result<void>> Worker::schema(std::string topic) {
@@ -148,15 +148,17 @@ kafka::ClientOptions Worker::kafka_options(std::string client_id) const {
 
 asio::awaitable<Result<void>> Worker::open() {
   const auto& config = context_.config();
+  kafka_metrics_ = std::make_unique<kafka::KafkaMetrics>(context_.metrics().registry());
   const auto options = kafka_options(stage_ + "-" + config.get<std::string>("service.instance"));
   const auto transactional = semantics_ == kafka::Semantics::kExactlyOnce && !input_.empty();
   auto producer = kafka::Producer::create(
       executor_,
       {.client = options,
-       .transactional_id = transactional ? options.client_id + "-" + std::to_string(shard_) : "",
+       .transactional_id = transactional ? options.client_id + "-" + worker_id_ : "",
        .delivery_timeout = std::chrono::milliseconds(10000),
-       .transaction_timeout = transaction_timeout()},
-      {.blocking = &context_.blocking(), .logger = &context_.logger()});
+       .transaction_timeout = transaction_timeout(),
+       .transactional_batching = transactional_batching()},
+      {.blocking = &context_.blocking(), .metrics = kafka_metrics_.get(), .logger = &context_.logger()});
   if (!producer) {
     co_return std::unexpected(producer.error());
   }
@@ -166,13 +168,18 @@ asio::awaitable<Result<void>> Worker::open() {
     co_return std::unexpected(initialized.error());
   }
   if (!input_.empty()) {
+    auto input_options = options;
+    if (const auto bytes = input_prefetch_bytes(); bytes > 0) {
+      input_options.properties["queued.max.messages.kbytes"] = std::to_string(bytes / 1024);
+      input_options.properties["fetch.max.bytes"] = std::to_string(bytes);
+    }
     auto consumer = kafka::Consumer::create(
         executor_,
-        {.client = options,
+        {.client = input_options,
          .group_id =
              consumer_group().empty() ? options.client_id + (broadcast_ ? "-" + uuid7() : "") : consumer_group(),
          .topics = {input_}},
-        {.blocking = &context_.blocking(), .logger = &context_.logger()});
+        {.blocking = &context_.blocking(), .metrics = kafka_metrics_.get(), .logger = &context_.logger()});
     if (!consumer) {
       co_return std::unexpected(consumer.error());
     }
@@ -183,9 +190,13 @@ asio::awaitable<Result<void>> Worker::open() {
                                 .semantics = semantics_,
                                 .max_batch = batch_size(),
                                 .commit_interval = commit_interval(),
+                                .batch_commit_interval = batch_commit_interval(),
                                 .transaction_gap = transaction_gap(),
+                                .max_transaction_records = max_transaction_records(),
+                                .max_transaction_bytes = max_transaction_bytes(),
                                 .timeout = std::chrono::milliseconds(10000)},
-        kafka::Dependencies{.blocking = &context_.blocking(), .logger = &context_.logger()});
+        kafka::Dependencies{
+            .blocking = &context_.blocking(), .metrics = kafka_metrics_.get(), .logger = &context_.logger()});
     running_ = true;
     asio::co_spawn(executor_, run(), asio::detached);
   }

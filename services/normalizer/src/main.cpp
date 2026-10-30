@@ -37,23 +37,35 @@ std::string settings() {
   schema["properties"]["max_replica_entries"] = {
       {"type", "integer"}, {"minimum", 1}, {"maximum", 10000000}, {"default", 1000000}};
   schema["properties"]["transaction_gap_ms"] = {{"type", "integer"}, {"minimum", 0}, {"maximum", 1000}, {"default", 5}};
+  schema["properties"]["workers_per_shard"] = {{"type", "integer"}, {"minimum", 1}, {"maximum", 8}, {"default", 2}};
   return schema.dump();
 }
 }  // namespace
 
 class Worker final : public p::stream::Worker {
  public:
-  Worker(const p::runtime::Context& context, std::size_t shard)
-      : p::stream::Worker(context, "normalizer", "psim.ingest.raw.v1", p::kafka::Semantics::kExactlyOnce, false, shard),
-        component_name_("normalizer-" + std::to_string(shard)) {}
+  Worker(const p::runtime::Context& context, std::size_t shard, std::size_t worker)
+      : p::stream::Worker(context, "normalizer", "psim.ingest.raw.v1", p::kafka::Semantics::kExactlyOnce, false, shard,
+                          worker == 0 ? std::to_string(shard) : std::to_string(shard) + "-" + std::to_string(worker)),
+        component_name_("normalizer-" + std::to_string(shard) + "-" + std::to_string(worker)) {}
 
   std::string_view name() const override { return component_name_; }
 
   std::string consumer_group() const override { return "psim-normalizer"; }
 
-  std::size_t batch_size() const override { return 16; }
+  std::size_t batch_size() const override { return 512; }
+
+  bool transactional_batching() const override { return true; }
+
+  std::size_t max_transaction_records() const override { return 512; }
+
+  std::size_t max_transaction_bytes() const override { return 8 * 1024 * 1024; }
+
+  std::size_t input_prefetch_bytes() const override { return 16 * 1024 * 1024; }
 
   std::chrono::milliseconds commit_interval() const override { return std::chrono::milliseconds(5); }
+
+  std::chrono::milliseconds batch_commit_interval() const override { return std::chrono::milliseconds(20); }
 
   std::chrono::milliseconds transaction_gap() const override {
     return std::chrono::milliseconds(context().config().get<std::int64_t>("settings.transaction_gap_ms"));
@@ -258,15 +270,23 @@ class Worker final : public p::stream::Worker {
 }  // namespace psim::normalizer
 
 int main(int argc, char** argv) {
-  return psim::platform::runtime::run(argc, argv,
-                                      {.name = "normalizer",
-                                       .settings_schema = psim::normalizer::settings(),
-                                       .create = [](psim::platform::runtime::Context& context)
-                                           -> psim::platform::Result<psim::platform::runtime::Components> {
-                                         psim::platform::runtime::Components result;
-                                         for (std::size_t shard = 0; shard < context.shards().size(); ++shard) {
-                                           result.push_back(std::make_unique<psim::normalizer::Worker>(context, shard));
-                                         }
-                                         return result;
-                                       }});
+  return psim::platform::runtime::run(
+      argc, argv,
+      {.name = "normalizer",
+       .settings_schema = psim::normalizer::settings(),
+       .create = [](psim::platform::runtime::Context& context)
+           -> psim::platform::Result<psim::platform::runtime::Components> {
+         psim::platform::runtime::Components result;
+         const auto workers = context.config().get<std::size_t>("settings.workers_per_shard");
+         if (context.shards().size() > 64 / workers) {
+           return psim::platform::fail(psim::platform::ErrorCode::kCommonInvalidArgument,
+                                       "normalizer supports at most 64 workers per instance");
+         }
+         for (std::size_t shard = 0; shard < context.shards().size(); ++shard) {
+           for (std::size_t worker = 0; worker < workers; ++worker) {
+             result.push_back(std::make_unique<psim::normalizer::Worker>(context, shard, worker));
+           }
+         }
+         return result;
+       }});
 }

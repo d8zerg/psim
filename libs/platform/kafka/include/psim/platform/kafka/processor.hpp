@@ -46,8 +46,15 @@ struct ProcessorOptions {
   std::size_t max_batch = 500;
   /// The transaction interval is part of the EOS-K stage latency budget (ADR-006).
   std::chrono::milliseconds commit_interval{1000};
+  /// EOS-K limit while handling an already fetched batch; zero uses commit_interval.
+  /// Between batches, commit_interval still bounds waiting for more input.
+  std::chrono::milliseconds batch_commit_interval{0};
   /// Give the coordinator time to finish markers before the next AddPartitionsToTxn.
   std::chrono::milliseconds transaction_gap{0};
+  /// Hard input count and enqueued output byte limits checked after each handled input; zero disables.
+  /// before_commit output and one handler invocation can exceed the byte limit.
+  std::size_t max_transaction_records = 0;
+  std::size_t max_transaction_bytes = 0;
   RetryPolicy retry{};
   /// Program errors (exceptions) in a row that stop a partition.
   std::uint32_t circuit_breaker = 5;
@@ -144,7 +151,7 @@ class Processor final : public RebalanceListener {
   void retry_later(const Message& message, Partition& partition, const Error& error);
   void stop_partition(const TopicPartition& id, Partition& partition, std::int64_t next);
   void resume_due();
-  asio::awaitable<Result<void>> commit(bool force);
+  asio::awaitable<Result<void>> commit(bool force, std::chrono::milliseconds interval = std::chrono::milliseconds(0));
   asio::awaitable<Result<void>> commit_offsets();
   asio::awaitable<Result<void>> commit_transaction();
   void rewind(bool transaction_only);
@@ -164,6 +171,7 @@ class Processor final : public RebalanceListener {
   std::map<TopicPartition, Partition> partitions_;
   async::SteadyTime last_commit_{};
   async::SteadyTime transaction_started_{};
+  std::size_t transaction_records_ = 0;
   std::optional<async::SteadyTime> transaction_finished_;
   bool dirty_ = false;
   bool stopping_ = false;

@@ -9,12 +9,15 @@
 #include <boost/asio/this_coro.hpp>
 #include <boost/asio/use_awaitable.hpp>
 #include <librdkafka/rdkafka.h>
+#include <nlohmann/json.hpp>
 #include <unistd.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cstddef>
+#include <cstdint>
 #include <expected>
 #include <functional>
 #include <map>
@@ -92,7 +95,8 @@ struct Producer::State {
   std::optional<Error> delivery_error;
   std::map<std::string, TopicSeries, std::less<>> series;
   bool transaction = false;
-  bool fatal = false;
+  std::atomic_bool fatal{false};
+  std::size_t transaction_bytes = 0;
   // A blocking transactional call runs in the pool and serves delivery reports there; the pump
   // stays away from the handle meanwhile.
   bool blocking_call = false;
@@ -166,6 +170,31 @@ struct Producer::State {
     }
   }
 
+  void on_statistics(std::string_view value) const {
+    if (deps.logger == nullptr || !deps.logger->enabled(log::Level::kDebug)) {
+      return;
+    }
+    const auto stats = nlohmann::json::parse(value, nullptr, false);
+    if (stats.is_discarded() || !stats.contains("brokers")) {
+      return;
+    }
+    for (const auto& [broker, data] : stats["brokers"].items()) {
+      const auto mean = [&data](const char* name) {
+        const auto window = data.find(name);
+        return window != data.end() && window->is_object() ? window->value("avg", 0.0) : 0.0;
+      };
+      deps.logger->debug(
+          "kafka producer statistics",
+          {{"producer", options.transactional_id.empty() ? options.client.client_id : options.transactional_id},
+           {"broker", broker},
+           {"queued_messages", stats.value("msg_cnt", std::int64_t{0})},
+           {"queue_us", mean("int_latency")},
+           {"socket_queue_us", mean("outbuf_latency")},
+           {"round_trip_us", mean("rtt")},
+           {"throttle_ms", mean("throttle")}});
+    }
+  }
+
   /// Serve delivery reports and errors waiting in the queue, then wake senders waiting for room.
   void serve() {
     if (blocking_call) {
@@ -187,7 +216,7 @@ struct Producer::State {
 
   /// Queue a message; `queue_full` tells a full local queue (wait and retry) from other errors.
   // The record is not const: librdkafka takes mutable pointers, although it copies (RD_KAFKA_MSG_F_COPY).
-  Result<void> produce(Record& record, std::shared_ptr<Pending>* pending, bool* queue_full) const {
+  Result<void> produce(Record& record, std::shared_ptr<Pending>* pending, bool* queue_full) {
     rd_kafka_headers_t* headers = nullptr;
     if (!record.headers.empty()) {
       headers = rd_kafka_headers_new(record.headers.size());
@@ -222,6 +251,12 @@ struct Producer::State {
     // NOLINTEND(cppcoreguidelines-pro-type-union-access)
     const detail::ErrorPtr error(rd_kafka_produceva(handle.get(), args.data(), count));
     if (!error) {
+      if (transaction) {
+        transaction_bytes += record.key.size() + record.value.size();
+        for (const auto& [name, value] : record.headers) {
+          transaction_bytes += name.size() + value.size();
+        }
+      }
       return {};  // librdkafka owns the headers now
     }
     if (headers != nullptr) {
@@ -234,6 +269,9 @@ struct Producer::State {
   /// Produce, waiting for room while the local queue is full.
   asio::awaitable<Result<void>> produce_waiting(Record* record, std::shared_ptr<Pending>* pending) {
     while (true) {
+      if (options.transactional_batching && blocking_call) {
+        co_return fail(ErrorCode::kCommonInvalidArgument, "producer is finalizing a transaction");
+      }
       if (fatal) {
         co_return fail(ErrorCode::kCommonInternal, "kafka producer is in a fatal state");
       }
@@ -280,18 +318,35 @@ struct Producer::State {
   }
 
   // Blocking transactional calls; they run in the pool or inside a rebalance callback.
-  Result<void> commit_blocking(rd_kafka_consumer_group_metadata_t* group, const Offsets& offsets, int timeout_ms) {
+  void observe(std::string_view stage, Clock::time_point started) const {
+    if (deps.metrics != nullptr) {
+      deps.metrics->transaction_stage(stage).Observe(std::chrono::duration<double>(Clock::now() - started).count());
+    }
+  }
+
+  Result<void> send_offsets(rd_kafka_consumer_group_metadata_t* group, const Offsets& offsets, int timeout_ms) {
     if (group != nullptr && !offsets.empty()) {
       const auto list = detail::to_list(offsets);
-      if (auto sent = check(rd_kafka_send_offsets_to_transaction(handle.get(), list.get(), group, timeout_ms),
-                            "send offsets to the transaction");
-          !sent) {
+      const auto started = Clock::now();
+      auto sent = check(rd_kafka_send_offsets_to_transaction(handle.get(), list.get(), group, timeout_ms),
+                        "send offsets to the transaction");
+      observe("offsets", started);
+      if (!sent) {
         return sent;
       }
     }
+    return {};
+  }
+
+  Result<void> commit_only(int timeout_ms, std::optional<Clock::time_point> deadline = {}) {
     // A retriable failure leaves the transaction open: commit again (librdkafka documentation).
     for (int attempt = 0;; ++attempt) {
+      if (deadline) {
+        timeout_ms = remaining(*deadline);
+      }
+      const auto started = Clock::now();
       const detail::ErrorPtr error(rd_kafka_commit_transaction(handle.get(), timeout_ms));
+      observe("commit", started);
       if (!error) {
         return {};
       }
@@ -304,18 +359,66 @@ struct Producer::State {
     }
   }
 
+  Result<void> commit_blocking(rd_kafka_consumer_group_metadata_t* group, const Offsets& offsets, int timeout_ms) {
+    if (auto sent = send_offsets(group, offsets, timeout_ms); !sent) {
+      return sent;
+    }
+    return commit_only(timeout_ms);
+  }
+
+  static int remaining(Clock::time_point deadline) {
+    return static_cast<int>(std::max(
+        std::chrono::duration_cast<std::chrono::milliseconds>(deadline - Clock::now()).count(), std::int64_t{0}));
+  }
+
+  Result<void> flush_blocking(Clock::time_point deadline) {
+    const auto started = Clock::now();
+    const auto error = rd_kafka_flush(handle.get(), remaining(deadline));
+    observe("flush", started);
+    if (error != RD_KAFKA_RESP_ERR_NO_ERROR) {
+      return std::unexpected(detail::to_error(error, "kafka flush"));
+    }
+    return take_delivery_error();
+  }
+
   Result<void> abort_blocking(int timeout_ms) {
     return check(rd_kafka_abort_transaction(handle.get(), timeout_ms), "abort the transaction");
+  }
+
+  template <typename Call>
+  asio::awaitable<Result<void>> pool_call(Call call) {
+    const auto queued = Clock::now();
+    auto result = co_await deps.blocking->run([this, queued, call = std::move(call)]() mutable {
+      observe("pool_wait", queued);
+      return call();
+    });
+    co_return result;
   }
 
   /// Run a blocking transactional call in the pool with the pump paused, then serve its reports.
   template <typename Call>
   asio::awaitable<Result<void>> in_pool(Call call) {
     blocking_call = true;
-    auto result = co_await deps.blocking->run(std::move(call));
+    auto result = co_await pool_call(std::move(call));
     blocking_call = false;
     serve();
     co_return result;
+  }
+
+  static asio::awaitable<Result<void>> commit_batch(std::shared_ptr<State> self,
+                                                    std::shared_ptr<rd_kafka_consumer_group_metadata_t> group,
+                                                    Offsets offsets, Clock::time_point deadline) {
+    // Register offsets only after output partitions are registered and delivered. Concurrent
+    // AddOffsetsToTxn and AddPartitionsToTxn can cause coordinator retries.
+    co_return co_await self->in_pool([self, group, offsets, deadline]() -> Result<void> {
+      if (auto flushed = self->flush_blocking(deadline); !flushed) {
+        return flushed;
+      }
+      if (auto sent = self->send_offsets(group.get(), offsets, remaining(deadline)); !sent) {
+        return sent;
+      }
+      return self->commit_only(remaining(deadline), deadline);
+    });
   }
 };
 
@@ -329,15 +432,22 @@ Producer::~Producer() {
 
 Result<std::unique_ptr<Producer>> Producer::create(const asio::any_io_executor& executor, ProducerOptions options,
                                                    Dependencies deps) {
+  if (options.transactional_batching && (options.transactional_id.empty() || deps.blocking == nullptr)) {
+    return fail(ErrorCode::kCommonInvalidArgument,
+                "transactional batching requires a transactional id and blocking pool");
+  }
   // Idempotence gives acks=all, ordered retries without duplicates (ADR-041); zstd as the topics.
   detail::Properties defaults{
       {"compression.type", "zstd"},
-      {"linger.ms", "5"},
+      {"linger.ms", options.transactional_batching ? "100" : "5"},
       {"batch.size", "1000000"},
       {"queue.buffering.max.messages", "200000"},
       {"delivery.timeout.ms", std::to_string(options.delivery_timeout.count())},
   };
   detail::Properties fixed{{"enable.idempotence", "true"}, {"acks", "all"}};
+  if (deps.logger != nullptr && deps.logger->enabled(log::Level::kDebug)) {
+    defaults.emplace("statistics.interval.ms", "5000");
+  }
   if (!options.transactional_id.empty()) {
     fixed.emplace("transactional.id", options.transactional_id);
     // librdkafka requires delivery.timeout.ms <= transaction.timeout.ms (at least 1 s).
@@ -358,6 +468,10 @@ Result<std::unique_ptr<Producer>> Producer::create(const asio::any_io_executor& 
   rd_kafka_conf_set_error_cb(conf->get(), [](rd_kafka_t*, int code, const char* reason, void* opaque) {
     static_cast<State*>(opaque)->on_error(code, reason);
   });
+  rd_kafka_conf_set_stats_cb(conf->get(), [](rd_kafka_t*, char* json, std::size_t size, void* opaque) {
+    static_cast<State*>(opaque)->on_statistics(std::string_view(json, size));
+    return 0;
+  });
   std::array<char, 512> text{};
   detail::KafkaPtr handle(rd_kafka_new(RD_KAFKA_PRODUCER, conf->get(), text.data(), text.size()));
   if (!handle) {
@@ -376,6 +490,9 @@ asio::awaitable<Result<void>> Producer::enqueue(Record record) {
 }
 
 asio::awaitable<Result<Delivery>> Producer::send(Record record) {
+  if (state_->options.transactional_batching) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "transactional batching accepts enqueue only");
+  }
   auto pending = std::make_shared<Pending>();
   auto holder = std::make_unique<std::shared_ptr<Pending>>(pending);
   if (auto produced = co_await state_->produce_waiting(&record, holder.get()); !produced) {
@@ -397,6 +514,9 @@ asio::awaitable<Result<Delivery>> Producer::send(Record record) {
 asio::awaitable<Result<void>> Producer::send_batch(std::vector<Record> records) {
   if (records.empty()) {
     co_return Result<void>{};
+  }
+  if (state_->options.transactional_batching) {
+    co_return fail(ErrorCode::kCommonInvalidArgument, "transactional batching accepts enqueue only");
   }
   auto pending = std::make_shared<Pending>();
   pending->remaining = records.size();
@@ -473,6 +593,7 @@ Result<void> Producer::begin_transaction() {
     return begun;
   }
   state_->transaction = true;
+  state_->transaction_bytes = 0;
   return {};
 }
 
@@ -480,21 +601,31 @@ asio::awaitable<Result<void>> Producer::commit_transaction(const Consumer* sourc
   if (auto usable = state_->transactional("commit transaction", true); !usable) {
     co_return usable;
   }
-  // Deliver first with the pump: the commit itself then has nothing left to flush.
-  if (auto flushed = co_await flush(timeout); !flushed) {
-    co_return flushed;
-  }
   auto state = state_;
   std::shared_ptr<rd_kafka_consumer_group_metadata_t> group;
   if (source != nullptr) {
     group = source->group_metadata();
   }
-  auto committed =
-      co_await state->in_pool([state, group, offsets, ms = static_cast<int>(timeout.count())]() -> Result<void> {
-        return state->commit_blocking(group.get(), offsets, ms);
-      });
+  Result<void> committed;
+  if (state->options.transactional_batching) {
+    committed = co_await State::commit_batch(state, group, offsets, Clock::now() + timeout);
+  } else {
+    // Tracked sends complete on their owning executor before the native commit can poll them.
+    const auto started = Clock::now();
+    auto flushed = co_await flush(timeout);
+    state->observe("flush", started);
+    if (!flushed) {
+      co_return flushed;
+    }
+    committed = co_await state->in_pool([state, group, offsets, ms = static_cast<int>(timeout.count())] {
+      return state->commit_blocking(group.get(), offsets, ms);
+    });
+  }
   if (committed) {
     state_->transaction = false;
+    if (source != nullptr) {
+      source->record_committed(offsets);
+    }
   }
   co_return committed;
 }
@@ -508,6 +639,9 @@ Result<void> Producer::commit_transaction_now(const Consumer* source, const Offs
   state_->serve();
   if (committed) {
     state_->transaction = false;
+    if (source != nullptr) {
+      source->record_committed(offsets);
+    }
   }
   return committed;
 }
@@ -541,6 +675,10 @@ Result<void> Producer::abort_transaction_now(Duration timeout) {
 
 bool Producer::in_transaction() const noexcept {
   return state_->transaction;
+}
+
+std::size_t Producer::transaction_bytes() const noexcept {
+  return state_->transaction ? state_->transaction_bytes : 0;
 }
 
 bool Producer::fatal() const noexcept {

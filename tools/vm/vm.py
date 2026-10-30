@@ -304,6 +304,44 @@ def down(name):
     print('VM lab stopped; disks preserved')
 
 
+def resize_cpu(value):
+    name = value['name']
+    saved = manifest(name)
+    keys = ('format', 'name', 'network', 'gateway', 'nodes', 'forwards')
+    previous = {key: saved[key] for key in keys if key in saved}
+    previous['nodes'] = [{key: node[key] for key in value['nodes'][0]} for node in saved['nodes']]
+    require(profile_digest(previous) == saved['profile_hash'], 'saved VM profile hash mismatch')
+    expected = json.loads(json.dumps(previous))
+    require(len(value['nodes']) == len(expected['nodes']), 'CPU resize cannot change the VM inventory')
+    for current, requested in zip(expected['nodes'], value['nodes']):
+        require(type(requested['cpus']) is int and 1 <= requested['cpus'] <= 64, 'invalid VM CPU count')
+        current['cpus'] = requested['cpus']
+    require(expected == value, 'CPU resize cannot change networking, memory, disks or VM identities')
+    require(sum(node['cpus'] for node in value['nodes']) <= os.cpu_count(), 'VM CPU allocation exceeds the host')
+    current = container(name)
+    require(current is not None, 'CPU resize requires the existing VM controller')
+    if previous == value:
+        print('VM CPU allocation already matches the profile')
+        return
+    state = directory(name)
+    down(name)
+    updated = json.loads(json.dumps(saved))
+    for node, requested in zip(updated['nodes'], value['nodes']):
+        node['cpus'] = requested['cpus']
+    updated['profile_hash'] = profile_digest(value)
+    write_manifest(state, updated)
+    try:
+        run(['docker', 'start', current['Id']], stdout=subprocess.DEVNULL)
+        wait(name)
+    except (ValueError, OSError, subprocess.SubprocessError):
+        down(name)
+        write_manifest(state, saved)
+        run(['docker', 'start', current['Id']], stdout=subprocess.DEVNULL)
+        wait(name)
+        raise
+    print('VM CPU allocation updated; disks and identities preserved')
+
+
 def destroy(name):
     manifest(name)
     down(name)
@@ -319,13 +357,14 @@ def main():
     parser = argparse.ArgumentParser(prog='psim-platform-vm')
     parser.add_argument('--profile', default=str(ROOT / 'deploy/vm/local.json'))
     actions = parser.add_subparsers(dest='action', required=True)
-    for action in ('up', 'down', 'destroy', 'status', 'doctor', 'wait', 'image'):
+    for action in ('up', 'down', 'destroy', 'status', 'doctor', 'wait', 'image', 'resize-cpu'):
         actions.add_parser(action)
     command = actions.add_parser('exec'); command.add_argument('--node', required=True); command.add_argument('command', nargs=argparse.REMAINDER)
     command = actions.add_parser('node'); command.add_argument('operation', choices=['start', 'stop', 'kill']); command.add_argument('--node', required=True)
     args = parser.parse_args(); value = profile(args.profile); name = value['name']
     if args.action == 'up': up(value)
     elif args.action == 'down': down(name)
+    elif args.action == 'resize-cpu': resize_cpu(value)
     elif args.action == 'destroy': destroy(name)
     elif args.action == 'doctor': directory(name); print(json.dumps(doctor(value), indent=2))
     elif args.action == 'wait': wait(name)

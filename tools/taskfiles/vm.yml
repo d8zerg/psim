@@ -22,6 +22,9 @@ tasks:
   down:
     desc: Shut down the managed VMs while preserving their disks and SSH identities
     cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} down']
+  resize-cpu:
+    desc: Apply CPU-only profile changes and restart VMs while preserving disks and identities
+    cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} resize-cpu']
   destroy:
     desc: Stop and remove only the owned VM lab, disks and SSH identities
     cmds: ['python3 -I tools/vm/vm.py --profile {{.VM_PROFILE}} destroy']

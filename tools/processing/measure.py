@@ -44,7 +44,7 @@ def measure(check, count, mode="emit", normalizers=3):
 
 def main():
     check = Check(sys.argv[1], "release", int(sys.argv[2]))
-    report = {"profile": {"offered_events_per_second": 50000, "sources": 100, "zones": 100, "normalizer_instances": 3, "normalizer_shards_per_instance": check.normalizer_shards, "history_instances": 2, "kafka_brokers": 1, "shared_host_clock": True, "warmup_events": min(check.count, 50000), "normalizer_batch_size": 16, "normalizer_commit_interval_ms": 5, "normalizer_transaction_gap_ms": int(os.environ.get("PSIM_NORMALIZER_TRANSACTION_GAP_MS", "5"))}}
+    report = {"profile": {"offered_events_per_second": 50000, "sources": 100, "zones": 100, "normalizer_instances": 3, "normalizer_shards_per_instance": check.normalizer_shards, "history_instances": 2, "kafka_brokers": 1, "shared_host_clock": True, "warmup_events": min(check.count, 50000), "normalizer_workers_per_shard": check.normalizer_workers, "normalizer_batch_size": 512, "normalizer_commit_interval_ms": 5, "normalizer_transaction_gap_ms": int(os.environ.get("PSIM_NORMALIZER_TRANSACTION_GAP_MS", "5"))}}
     try:
         if check.owned:
             check.prepare()

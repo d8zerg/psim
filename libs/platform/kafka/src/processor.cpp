@@ -105,6 +105,7 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
           co_return begun;
         }
         transaction_started_ = clock_->steady();
+        transaction_records_ = 0;
       }
       if (exactly_once && partition.transaction_start < 0) {
         partition.transaction_start = message.offset();
@@ -119,8 +120,9 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
       if (*step == Step::kAbortBatch) {
         break;
       }
+      ++transaction_records_;
       const auto generation = rewind_generation_;
-      if (auto committed = co_await commit(false); !committed) {
+      if (auto committed = co_await commit(false, options_.batch_commit_interval); !committed) {
         co_return committed;
       }
       if (generation != rewind_generation_) {
@@ -157,6 +159,7 @@ asio::awaitable<Result<void>> Processor::run(Handler* handler) {
           co_return begun;
         }
         transaction_started_ = clock_->steady();
+        transaction_records_ = 0;
       }
       // Include group offsets even for timer-only transactions to fence a revoked owner.
       for (const auto& id : input_->assignment()) {
@@ -319,8 +322,14 @@ void Processor::resume_due() {
 
 std::chrono::milliseconds Processor::poll_wait() const {
   const auto now = clock_->steady();
-  auto due =
-      (options_.semantics == Semantics::kExactlyOnce ? transaction_started_ : last_commit_) + options_.commit_interval;
+  auto due = now + kMaxPollWait;
+  if (options_.semantics == Semantics::kExactlyOnce) {
+    if (output_->in_transaction()) {
+      due = std::min(due, transaction_started_ + options_.commit_interval);
+    }
+  } else if (dirty_) {
+    due = std::min(due, last_commit_ + options_.commit_interval);
+  }
   for (const auto& [id, partition] : partitions_) {
     if (partition.resume_at) {
       due = std::min(due, *partition.resume_at);
@@ -330,10 +339,16 @@ std::chrono::milliseconds Processor::poll_wait() const {
   return std::clamp(wait, milliseconds(1), kMaxPollWait);
 }
 
-asio::awaitable<Result<void>> Processor::commit(bool force) {
+asio::awaitable<Result<void>> Processor::commit(bool force, std::chrono::milliseconds interval) {
   const auto now = clock_->steady();
   if (options_.semantics == Semantics::kExactlyOnce) {
-    if (output_->in_transaction() && (force || now - transaction_started_ >= options_.commit_interval)) {
+    if (interval <= milliseconds(0)) {
+      interval = options_.commit_interval;
+    }
+    const bool full =
+        (options_.max_transaction_records > 0 && transaction_records_ >= options_.max_transaction_records)
+        || (options_.max_transaction_bytes > 0 && output_->transaction_bytes() >= options_.max_transaction_bytes);
+    if (output_->in_transaction() && (force || full || now - transaction_started_ >= interval)) {
       co_return co_await commit_transaction();
     }
     co_return Result<void>{};

@@ -93,7 +93,7 @@ def images_match(node, expected):
 def prepare(bundle, material):
     bundle = Path(bundle).resolve(); material = Path(material).resolve()
     profile = verify_bundle(bundle)
-    value = vm.profile(ROOT / 'deploy/vm/local.json')
+    value = vm.profile(ROOT / ('deploy/vm/isolated.json' if profile.topology == 'isolated' else 'deploy/vm/local.json'))
     value['name'] = VM_NAME
     value['nodes'] = [node for node in value['nodes'] if node['name'] in {item.name for item in profile.nodes}]
     saved = vm.manifest(value['name']) if vm.directory(value['name']).exists() else None
